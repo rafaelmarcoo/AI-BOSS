@@ -3,7 +3,7 @@
 > AI-powered Financial Advisor for SME Founders
 
 **AUT Final Year Project 2025**  
-**Team:** Rafael Manubay (Tech Lead), Mohaned, Kaiden, Hamza, Akshay  
+**Team:** Rafael, Mohaned, Kaiden, Hamza, Akshay  
 **Supervisors:** Dr. Jeffrey Kilby, Phillip Wong
 
 ---
@@ -133,7 +133,7 @@ npm run lint         # Run ESLint
 
 - Post in Teams channel
 - Create GitHub issue
-- Message Rafael
+- Message Rafael, Phillip
 
 ---
 

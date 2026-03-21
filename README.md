@@ -1,36 +1,140 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI-BOSS
 
-## Getting Started
+> AI-powered Financial Advisor for SME Founders
 
-First, run the development server:
+**AUT Final Year Project 2025**  
+**Team:** Rafael Manubay (Tech Lead), Mohaned, Kaiden, Hamza, Akshay  
+**Supervisors:** Dr. Jeffrey Kilby, Phillip Wong
 
+---
+
+## 🎯 Project Overview
+
+AI-BOSS helps small business founders make better financial decisions through:
+- Real-time financial insights from Xero integration
+- AI-powered forecasting using multi-agent system (LangGraph)
+- Scenario modeling (What if I hire 2 people?)
+- Privacy-first architecture with MCP security boundary
+
+---
+
+## 🏗️ Tech Stack
+
+- **Frontend:** Next.js 16, TypeScript, Material-UI, Tailwind CSS
+- **Backend:** Next.js API Routes
+- **AI:** LangChain.js, LangGraph.js, OpenAI GPT-4o / Claude 3.5 Sonnet
+- **Database:** Supabase (PostgreSQL)
+- **Integration:** Xero API (OAuth 2.0)
+- **Deployment:** Vercel
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Node.js v22+ (recommended)
+- npm v10+
+- Git
+
+### Installation
+
+1. **Clone the repository:**
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/YOUR_USERNAME/AI-BOSS.git
+cd AI-BOSS
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. **Install dependencies:**
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. **Set up environment variables:**
+```bash
+# Copy the template
+cp .env.example .env.local
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Edit .env.local with your actual keys
+```
 
-## Learn More
+4. **Run development server:**
+```bash
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+5. **Open browser:**
+```
+http://localhost:3000
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 📁 Project Structure
+```
+AI-BOSS/
+├── app/                  # Next.js 16 App Router (at root!)
+│   ├── api/              # API routes (we'll create)
+│   ├── favicon.ico       # Site icon
+│   ├── globals.css       # Global styles
+│   ├── layout.tsx        # Root layout
+│   └── page.tsx          # Home page
+├── components/           # React components
+├── lib/                  # Utilities & helpers
+├── types/                # TypeScript types
+├── docs/                 # Documentation
+├── public/               # Static assets
+├── next.config.ts        # Next.js config (TypeScript)
+├── tsconfig.json         # TypeScript config
+└── package.json
+```
 
-## Deploy on Vercel
+**Note:** Next.js 16 uses root-level `app/` folder (no `src/`)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🔧 Development
+
+### Available Scripts
+```bash
+npm run dev          # Start dev server
+npm run build        # Build for production
+npm run start        # Start production server
+npm run lint         # Run ESLint
+```
+
+### Branching Strategy
+
+- `main` - Production (protected)
+- `feature/card-X-name` - Feature branches
+
+### Making Changes
+
+1. Create branch: `git checkout -b feature/card-2-database`
+2. Make changes: `git add .` and `git commit -m "feat: message"`
+3. Push: `git push origin feature/card-2-database`
+4. Create Pull Request on GitHub
+5. Get review from Rafael
+6. Merge after approval
+
+---
+
+## 🤝 Team
+
+- **Rafael**
+- **Mohaned**
+- **Kaiden** 
+- **Hamza** 
+- **Akshay** 
+
+---
+
+## 🆘 Getting Help
+
+- Post in Teams channel
+- Create GitHub issue
+- Message Rafael
+
+---
+
+**Built with Next.js 16 🚀**

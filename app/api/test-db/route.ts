@@ -1,30 +1,27 @@
-import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { ApiError } from '@/lib/api/errors'
+import { handleRouteError, successResponse } from '@/lib/api/responses'
+import { createAdminSupabaseClient } from '@/lib/supabase'
 
 export async function GET() {
-    try {
-        const { data, error } = await supabase
-            .from('users')
-            .select('count')
-            .single();
+  try {
+    const supabase = createAdminSupabaseClient()
+    const { count, error } = await supabase
+      .from('users')
+      .select('*', { count: 'exact', head: true })
 
-        if (error) {
-            return NextResponse.json(
-                { error: error.message },
-                { status: 500 }
-            )
-        }
-
-        return NextResponse.json({
-            success: true,
-            message: 'Test DB connection successful',
-            timestamp: new Date().toISOString(),
-        })
-    } catch (error) {
-        return NextResponse.json(
-            { error: 'Failed to connect to database' },
-            { status: 500 }
-        )
-
+    if (error) {
+      throw new ApiError(500, 'INTERNAL_ERROR', error.message)
     }
+
+    return successResponse(
+      {
+        userCount: count ?? 0,
+        timestamp: new Date().toISOString(),
+      },
+      undefined,
+      'Test DB connection successful.'
+    )
+  } catch (error) {
+    return handleRouteError(error)
+  }
 }

@@ -19,7 +19,7 @@ export interface FinancialSnapshot {
   burn_rate: number | null
   runway_months: number | null
   data_source: 'xero' | 'manual'
-  raw_data: any
+  raw_data: unknown
   created_at: string
 }
 
@@ -29,7 +29,7 @@ export interface PolicyRule {
   rule_name: string
   rule_type: 'threshold' | 'approval' | 'compliance'
   rule_description: string | null
-  rule_config: any
+  rule_config: unknown
   is_active: boolean
   created_at: string
   updated_at: string
@@ -40,9 +40,9 @@ export interface DecisionLog {
   user_id: string
   user_query: string
   ai_response: string
-  tools_used: any
-  data_accessed: any
-  calculations: any
+  tools_used: unknown
+  data_accessed: unknown
+  calculations: unknown
   model_used: string | null
   tokens_used: number | null
   response_time_ms: number | null

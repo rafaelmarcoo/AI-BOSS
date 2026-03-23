@@ -1,8 +1,17 @@
 'use client'
 
-import Link from 'next/link'
+import NextLink from 'next/link'
 import { useRouter } from 'next/navigation'
 import { FormEvent, useState } from 'react'
+import {
+  Alert,
+  Button,
+  Link as MuiLink,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material'
 
 type Mode = 'sign-in' | 'sign-up'
 
@@ -75,106 +84,114 @@ export function AuthForm({ mode, redirectTo }: AuthFormProps) {
   const isSignUp = mode === 'sign-up'
 
   return (
-    <form
+    <Paper
+      component="form"
       onSubmit={handleSubmit}
-      className="flex w-full max-w-md flex-col gap-4 rounded-[2rem] border border-black/10 bg-white p-8 shadow-[0_24px_80px_rgba(15,23,42,0.10)]"
+      elevation={0}
+      sx={{
+        width: '100%',
+        maxWidth: 448,
+        p: { xs: 3, sm: 4 },
+        borderRadius: '2rem',
+        border: '1px solid',
+        borderColor: 'divider',
+        bgcolor: 'background.paper',
+        boxShadow: '0 24px 80px rgba(15, 23, 42, 0.10)',
+      }}
     >
-      <div className="space-y-1">
-        <h1 className="text-3xl font-semibold text-slate-950">
+      <Stack spacing={3}>
+        <Stack spacing={0.5}>
+          <Typography variant="h4" component="h1" fontWeight={600}>
           {isSignUp ? 'Create your account' : 'Welcome back'}
-        </h1>
-        <p className="text-sm text-slate-600">
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
           {isSignUp
             ? 'Set up a secure account to start using AI-BOSS.'
             : 'Sign in to access protected API routes and your dashboard.'}
-        </p>
-      </div>
+          </Typography>
+        </Stack>
 
-      {errorMessage ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {errorMessage}
-        </div>
-      ) : null}
+        {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
 
-      {isSignUp ? (
-        <>
-          <label className="space-y-1 text-sm text-slate-700">
-            <span>Full name</span>
-            <input
+        {isSignUp ? (
+          <Stack spacing={2}>
+            <TextField
               name="fullName"
+              label="Full name"
               type="text"
-              className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-slate-400"
               placeholder="Jane Founder"
+              autoComplete="name"
+              fullWidth
+              error={Boolean(fieldErrors.fullName)}
+              helperText={fieldErrors.fullName ?? ' '}
             />
-            {fieldErrors.fullName ? (
-              <span className="text-xs text-red-600">{fieldErrors.fullName}</span>
-            ) : null}
-          </label>
 
-          <label className="space-y-1 text-sm text-slate-700">
-            <span>Company name</span>
-            <input
+            <TextField
               name="companyName"
+              label="Company name"
               type="text"
-              className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-slate-400"
               placeholder="Acme Ltd"
+              autoComplete="organization"
+              fullWidth
+              error={Boolean(fieldErrors.companyName)}
+              helperText={fieldErrors.companyName ?? ' '}
             />
-            {fieldErrors.companyName ? (
-              <span className="text-xs text-red-600">{fieldErrors.companyName}</span>
-            ) : null}
-          </label>
-        </>
-      ) : null}
+          </Stack>
+        ) : null}
 
-      <label className="space-y-1 text-sm text-slate-700">
-        <span>Email</span>
-        <input
+        <TextField
           name="email"
+          label="Email"
           type="email"
-          className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-slate-400"
           placeholder="founder@example.com"
+          autoComplete="email"
+          fullWidth
           required
+          error={Boolean(fieldErrors.email)}
+          helperText={fieldErrors.email ?? ' '}
         />
-        {fieldErrors.email ? (
-          <span className="text-xs text-red-600">{fieldErrors.email}</span>
-        ) : null}
-      </label>
 
-      <label className="space-y-1 text-sm text-slate-700">
-        <span>Password</span>
-        <input
+        <TextField
           name="password"
+          label="Password"
           type="password"
-          className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-slate-400"
           placeholder="At least 8 characters"
+          autoComplete={isSignUp ? 'new-password' : 'current-password'}
+          fullWidth
           required
+          error={Boolean(fieldErrors.password)}
+          helperText={fieldErrors.password ?? ' '}
         />
-        {fieldErrors.password ? (
-          <span className="text-xs text-red-600">{fieldErrors.password}</span>
-        ) : null}
-      </label>
 
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="rounded-full bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
-      >
-        {isSubmitting
-          ? 'Working...'
-          : isSignUp
-            ? 'Create account'
-            : 'Sign in'}
-      </button>
-
-      <p className="text-sm text-slate-600">
-        {isSignUp ? 'Already have an account?' : 'Need an account?'}{' '}
-        <Link
-          href={isSignUp ? '/sign-in' : '/sign-up'}
-          className="font-medium text-slate-950 underline underline-offset-4"
+        <Button
+          type="submit"
+          variant="contained"
+          disabled={isSubmitting}
+          fullWidth
+          sx={{
+            py: 1.5,
+            borderRadius: '999px',
+          }}
         >
-          {isSignUp ? 'Sign in' : 'Sign up'}
-        </Link>
-      </p>
-    </form>
+          {isSubmitting
+            ? 'Working...'
+            : isSignUp
+              ? 'Create account'
+              : 'Sign in'}
+        </Button>
+
+        <Typography variant="body2" color="text.secondary">
+          {isSignUp ? 'Already have an account?' : 'Need an account?'}{' '}
+          <MuiLink
+            component={NextLink}
+            href={isSignUp ? '/sign-in' : '/sign-up'}
+            underline="hover"
+            sx={{ fontWeight: 600, color: 'text.primary' }}
+          >
+            {isSignUp ? 'Sign in' : 'Sign up'}
+          </MuiLink>
+        </Typography>
+      </Stack>
+    </Paper>
   )
 }

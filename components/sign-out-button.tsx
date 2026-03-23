@@ -1,5 +1,6 @@
 'use client'
 
+import { Button } from '@mui/material'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
@@ -18,13 +19,25 @@ export function SignOutButton() {
   }
 
   return (
-    <button
+    <Button
       type="button"
       onClick={handleSignOut}
       disabled={isSubmitting}
-      className="rounded-full border border-white/15 px-5 py-3 text-sm font-medium text-white transition hover:border-cyan-300 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-70"
+      variant="outlined"
+      sx={{
+        borderRadius: '999px',
+        px: 2.5,
+        py: 1.25,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+        color: 'common.white',
+        '&:hover': {
+          borderColor: 'primary.light',
+          color: 'primary.light',
+          backgroundColor: 'rgba(255, 255, 255, 0.04)',
+        },
+      }}
     >
       {isSubmitting ? 'Logging out...' : 'Log out'}
-    </button>
+    </Button>
   )
 }

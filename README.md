@@ -41,7 +41,7 @@ AI-BOSS helps small business founders make better financial decisions through:
 
 1. **Clone the repository:**
 ```bash
-git clone https://github.com/YOUR_USERNAME/AI-BOSS.git
+git clone https://github.com/rafaelmarcoo/AI-BOSS.git
 cd AI-BOSS
 ```
 

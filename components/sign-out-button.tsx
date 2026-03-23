@@ -22,9 +22,9 @@ export function SignOutButton() {
       type="button"
       onClick={handleSignOut}
       disabled={isSubmitting}
-      className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-950 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-70"
+      className="rounded-full border border-white/15 px-5 py-3 text-sm font-medium text-white transition hover:border-cyan-300 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-70"
     >
-      {isSubmitting ? 'Signing out...' : 'Sign out'}
+      {isSubmitting ? 'Logging out...' : 'Log out'}
     </button>
   )
 }

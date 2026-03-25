@@ -147,7 +147,168 @@ npm run dev          # Start dev server
 npm run build        # Build for production
 npm run start        # Start production server
 npm run lint         # Run ESLint
+npm test             # Run Jest test suite
+npm run test:watch   # Run Jest in watch mode
 ```
+
+## 🧪 Testing
+
+The project is set up for **Jest + React Testing Library** so we can test UI components, route handlers, and pure business logic in a way that fits the current Next.js 16 app structure.
+
+### Testing stack
+
+- **Jest** for the test runner, assertions, mocking, and watch mode
+- **React Testing Library** for component tests focused on user-visible behaviour
+- **jest-dom** for DOM-specific assertions such as `toBeInTheDocument()`
+- **next/jest** so Jest works cleanly with Next.js and the existing TypeScript configuration
+
+### Current setup files
+
+- `jest.config.js` - Main Jest configuration using `next/jest`
+- `jest.setup.ts` - Shared test setup that loads `@testing-library/jest-dom`
+- `package.json` - Test scripts such as `npm test` and `npm run test:watch`
+
+### How to run tests
+
+Run the full suite:
+
+```bash
+npm test
+```
+
+Run Jest in watch mode while developing:
+
+```bash
+npm run test:watch
+```
+
+If no tests have been written yet, Jest may report that no tests were found. That is expected during initial setup until the first test files are added.
+
+### Recommended test structure
+
+Keep tests inside a root `__tests__/` folder so the structure stays easy to scan as the project grows:
+
+```text
+__tests__/
+├── api/          # Route handler tests
+├── components/   # React component tests
+└── lib/          # Pure utility and business-logic tests
+```
+
+Use these naming conventions:
+
+- `*.test.ts` for utility, API, and non-React tests
+- `*.test.tsx` for React component tests
+
+Examples:
+
+- `__tests__/components/chat-message.test.tsx`
+- `__tests__/api/health.route.test.ts`
+- `__tests__/lib/runway.test.ts`
+
+### What we should test
+
+Focus on testing behaviour that matters to users and developers:
+
+- **Components**: what renders, what text appears, what happens when a user interacts
+- **API route handlers**: status codes, JSON payloads, validation, and error handling
+- **Utilities / formulas**: pure functions such as financial calculations or data transforms
+
+Good candidates for tests in this repo include:
+
+- authentication form behaviours
+- health endpoint responses
+- financial helpers such as runway or burn-rate calculations
+- response helpers in `lib/api`
+
+### Testing guidelines
+
+Write tests that are small, readable, and focused on one behaviour at a time.
+
+- Test what the user can observe, not implementation details
+- Prefer accessible queries such as `getByRole`, `getByLabelText`, and `getByText`
+- Avoid testing library internals, generated class names, or framework implementation details
+- Keep business logic in small pure functions where possible so it is easy to test
+- Mock external systems only when necessary, such as network calls, auth providers, or Supabase clients
+
+### Component testing guidance
+
+For React components:
+
+- render the component with React Testing Library
+- assert visible content and interactive behaviour
+- prefer user-centric assertions over snapshot-heavy tests
+- keep presentational components simple so they are easy to verify
+
+Examples of useful assertions:
+
+- the correct heading or message is shown
+- a submit button becomes disabled while a request is in progress
+- validation feedback appears when an API call fails
+
+### API route testing guidance
+
+For App Router route handlers under `app/api/.../route.ts`:
+
+- import the exported `GET`, `POST`, or other handler directly
+- call the handler in the test
+- inspect the returned `Response` object
+- assert status codes and JSON payload shape
+
+This is usually simpler and faster than spinning up the full app server for every route test.
+
+Typical things to check:
+
+- success responses return the expected JSON structure
+- invalid input returns the right error code and message
+- protected routes reject unauthenticated requests
+
+### Utility and formula testing guidance
+
+Financial logic should live in plain helper functions whenever possible.
+
+This makes it easier to:
+
+- test calculations without involving UI or network layers
+- reuse the same logic in route handlers and components
+- reduce the amount of mocking required
+
+Examples:
+
+- runway months calculation
+- burn-rate helpers
+- API payload normalization
+
+### Practical conventions for this repo
+
+- Put shared helpers in `lib/` when they are framework-agnostic
+- Keep route-specific logic in `app/api/.../route.ts`
+- If a route becomes hard to test, move complex logic into `lib/` and test that helper directly
+- Keep each test file close to one feature area and avoid giant mixed-purpose test files
+
+### Before opening a PR
+
+When test coverage exists for your feature, run:
+
+```bash
+npm test
+npm run lint
+```
+
+Before merging work, aim to make sure:
+
+- all relevant tests pass locally
+- new logic includes tests where practical
+- failing edge cases are covered for important financial or auth behaviour
+
+### Future expansion
+
+This setup is a starting point. As the project grows, we can extend it with:
+
+- mocked Supabase integration tests
+- more API route coverage
+- scenario-planning calculation tests
+- CI checks that run `npm test` automatically on pull requests
 
 ### Branching Strategy
 

@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server'
 import { ApiError, isApiError } from '@/lib/api/errors'
 
 export function successResponse<T>(
@@ -6,7 +5,7 @@ export function successResponse<T>(
   init?: ResponseInit,
   message?: string
 ) {
-  return NextResponse.json(
+  return Response.json(
     {
       success: true,
       data,
@@ -17,7 +16,7 @@ export function successResponse<T>(
 }
 
 export function errorResponse(error: ApiError) {
-  return NextResponse.json(
+  return Response.json(
     {
       success: false,
       error: {

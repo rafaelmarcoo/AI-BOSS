@@ -1,7 +1,7 @@
 const ALGORITHM = 'AES-GCM'  // AES-256-GCM: industry standard symmetric encryption
 const KEY_LENGTH = 256        // 256-bit key
 
-// Reads your TOKEN_ENCRYPTION_KEY from env and validates it
+// Reads TOKEN_ENCRYPTION_KEY from env and validates it
 function getKeyMaterial(): string {
   const key = process.env.TOKEN_ENCRYPTION_KEY
   if (!key || key.length !== 64) {
@@ -11,7 +11,7 @@ function getKeyMaterial(): string {
   return key
 }
 
-// Converts the hex string from your env into a real CryptoKey object
+// Converts the hex string from env into a real CryptoKey object
 // that the Web Crypto API can use
 async function importKey(): Promise<CryptoKey> {
   const keyHex = getKeyMaterial()

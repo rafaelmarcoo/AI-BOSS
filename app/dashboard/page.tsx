@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
+import XeroConnect from '@/components/xero-connect'
 import {
   Box,
   Button,
@@ -327,6 +328,24 @@ export default async function DashboardPage() {
                       </Paper>
                     ))}
                   </Box>
+                  {/* Xero connection */}
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 3,
+                      borderRadius: 4,
+                      bgcolor: dashboardTokens.surface,
+                      border: '1px solid',
+                      borderColor: dashboardTokens.border,
+                    }}
+                  >
+                    <Stack spacing={2}>
+                      <Typography variant="h6" fontWeight={700} color="common.white">
+                        Data Connectors
+                      </Typography>
+                      <XeroConnect />
+                    </Stack>
+                  </Paper>
                 </Stack>
               </Box>
             </Box>

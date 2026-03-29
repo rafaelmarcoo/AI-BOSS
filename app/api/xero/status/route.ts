@@ -4,6 +4,10 @@ import { requireAuthenticatedUser } from '@/lib/auth'
 //import { createServerSupabaseClient } from '@/lib/supabase'
 import { createAdminSupabaseClient } from '@/lib/supabase'
 
+// This route handles GET requests to /api/xero/status
+// The XeroConnect component calls this on page load to decide what to show:
+// - connected: false → show "Connect to Xero" button
+// - connected: true → show tenant name, "Connected" chip and "Disconnect" button
 export async function GET(request: NextRequest) {
   try {
     const { user } = await requireAuthenticatedUser(request)
@@ -11,6 +15,7 @@ export async function GET(request: NextRequest) {
 
     console.log('Status check for user:', user.id)
 
+    // Look up the Xero connection for this user
     const { data: connection, error: connError } = await supabase
       .from('xero_connections')
       .select('tenant_id, tenant_name, connected_at, expires_at')
@@ -24,6 +29,7 @@ export async function GET(request: NextRequest) {
       return successResponse({ connected: false })
     }
 
+    // Row found — return the connection details
     return successResponse({
       connected: true,
       tenantId: connection.tenant_id,

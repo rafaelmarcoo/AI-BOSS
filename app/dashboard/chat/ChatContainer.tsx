@@ -16,8 +16,8 @@ interface ChatContainerProps {
   email: string;
 }
 
-export function ChatContainer({ fullName, email }: ChatContainerProps) {
-  const [messages, setMessages] = useState<ChatRecord[]>([
+function createStarterMessages(fullName: string | null, email: string): ChatRecord[] {
+  return [
     {
       id: "welcome",
       role: "assistant",
@@ -28,14 +28,20 @@ export function ChatContainer({ fullName, email }: ChatContainerProps) {
       role: "assistant",
       content: 'Try asking: "What is our runway if revenue stays flat?"',
     },
-  ]);
+  ];
+}
+
+export function ChatContainer({ fullName, email }: ChatContainerProps) {
+  const starterMessages = createStarterMessages(fullName, email);
+  const [conversationMessages, setConversationMessages] = useState<ChatRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const messages = [...starterMessages, ...conversationMessages];
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, loading]);
+  }, [conversationMessages, fullName, email, loading]);
 
   useEffect(() => {
     return () => {
@@ -45,11 +51,14 @@ export function ChatContainer({ fullName, email }: ChatContainerProps) {
 
   const handleSend = (input: string) => {
     const id = Date.now().toString();
-    setMessages((prev) => [...prev, { id, role: "user", content: input }]);
+    setConversationMessages((prev) => [
+      ...prev,
+      { id, role: "user", content: input },
+    ]);
     setLoading(true);
 
     timerRef.current = setTimeout(() => {
-      setMessages((prev) => [
+      setConversationMessages((prev) => [
         ...prev,
         {
           id: `${id}-assistant`,

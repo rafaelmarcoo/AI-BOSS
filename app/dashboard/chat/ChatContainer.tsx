@@ -1,14 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Alert, Box, Stack } from "@mui/material";
+import { Alert, Box, Button, Stack } from "@mui/material";
 import { ChatInput } from "./ChatInput";
-import { ChatMessage, type ChatRole } from "./ChatMessage";
+import {
+  ChatMessage,
+  type ChatMessageStatus,
+  type ChatRole,
+} from "./ChatMessage";
 
 interface ChatRecord {
   id: string;
   role: ChatRole;
   content: string;
+  status?: ChatMessageStatus;
 }
 
 interface ChatContainerProps {
@@ -30,6 +35,11 @@ interface ChatApiResponse {
   error?: {
     message?: string;
   };
+}
+
+interface ChatErrorState {
+  message: string;
+  failedMessageId: string | null;
 }
 
 function createChatId() {
@@ -63,7 +73,7 @@ export function ChatContainer({ fullName, email }: ChatContainerProps) {
   const starterMessages = createStarterMessages(fullName, email);
   const [conversationMessages, setConversationMessages] = useState<ChatRecord[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ChatErrorState | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const messages = [...starterMessages, ...conversationMessages];
 
@@ -71,11 +81,13 @@ export function ChatContainer({ fullName, email }: ChatContainerProps) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [conversationMessages, fullName, email, loading]);
 
-  const handleSend = async (input: string) => {
-    const id = createChatId();
+  const sendMessage = async (
+    input: string,
+    existingMessages = conversationMessages
+  ) => {
     const nextConversation = [
-      ...conversationMessages,
-      { id, role: "user" as const, content: input },
+      ...existingMessages,
+      { id: createChatId(), role: "user" as const, content: input },
     ];
 
     setError(null);
@@ -108,15 +120,51 @@ export function ChatContainer({ fullName, email }: ChatContainerProps) {
         mapApiConversationToRecords(payload.data.conversation)
       );
     } catch (requestError) {
+      const failedMessageId = nextConversation[nextConversation.length - 1]?.id ?? null
+
       setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "AI-BOSS could not respond right now."
+        {
+          message:
+            requestError instanceof Error
+              ? requestError.message
+              : "AI-BOSS could not respond right now.",
+          failedMessageId,
+        }
       );
-      setConversationMessages((prev) => prev.filter((message) => message.id !== id));
+      setConversationMessages((prev) =>
+        prev.map((message) =>
+          message.id === failedMessageId
+            ? { ...message, status: "failed" }
+            : message
+        )
+      );
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSend = async (input: string) => {
+    await sendMessage(input);
+  };
+
+  const handleRetry = async () => {
+    if (!error?.failedMessageId) {
+      return;
+    }
+
+    const failedMessage = conversationMessages.find(
+      (message) => message.id === error.failedMessageId
+    );
+
+    if (!failedMessage) {
+      return;
+    }
+
+    const retryConversation = conversationMessages.filter(
+      (message) => message.id !== error.failedMessageId
+    );
+
+    await sendMessage(failedMessage.content, retryConversation);
   };
 
   return (
@@ -140,8 +188,18 @@ export function ChatContainer({ fullName, email }: ChatContainerProps) {
       >
         <Stack spacing={1.25} sx={{ pb: 2 }}>
           {error ? (
-            <Alert severity="error" sx={{ alignSelf: "stretch" }}>
-              {error}
+            <Alert
+              severity="error"
+              sx={{ alignSelf: "stretch" }}
+              action={
+                error.failedMessageId ? (
+                  <Button color="inherit" size="small" onClick={handleRetry}>
+                    Retry
+                  </Button>
+                ) : null
+              }
+            >
+              {error.message}
             </Alert>
           ) : null}
           {messages.map((message) => (
@@ -149,6 +207,7 @@ export function ChatContainer({ fullName, email }: ChatContainerProps) {
               key={message.id}
               role={message.role}
               content={message.content}
+              status={message.status}
             />
           ))}
           {loading ? <ChatMessage role="assistant" isLoading /> : null}

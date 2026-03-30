@@ -1,4 +1,4 @@
-import type { NextRequest } from 'next/server'
+import { NextRequest } from 'next/server'
 import { handleRouteError, successResponse } from '@/lib/api/responses'
 import { requireAuthenticatedUser } from '@/lib/auth'
 import { getMcpToolByName } from '@/lib/mcp/tools'

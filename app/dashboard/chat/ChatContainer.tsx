@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Box, Stack } from "@mui/material";
+import { Alert, Box, Stack } from "@mui/material";
 import { ChatInput } from "./ChatInput";
 import { ChatMessage, type ChatRole } from "./ChatMessage";
 
@@ -14,6 +14,26 @@ interface ChatRecord {
 interface ChatContainerProps {
   fullName: string | null;
   email: string;
+}
+
+interface ChatApiMessage {
+  role: ChatRole;
+  content: string;
+}
+
+interface ChatApiResponse {
+  success: boolean;
+  data?: {
+    message: ChatApiMessage;
+    conversation: ChatApiMessage[];
+  };
+  error?: {
+    message?: string;
+  };
+}
+
+function createChatId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function createStarterMessages(fullName: string | null, email: string): ChatRecord[] {
@@ -31,44 +51,72 @@ function createStarterMessages(fullName: string | null, email: string): ChatReco
   ];
 }
 
+function mapApiConversationToRecords(messages: ChatApiMessage[]): ChatRecord[] {
+  return messages.map((message) => ({
+    id: createChatId(),
+    role: message.role,
+    content: message.content,
+  }));
+}
+
 export function ChatContainer({ fullName, email }: ChatContainerProps) {
   const starterMessages = createStarterMessages(fullName, email);
   const [conversationMessages, setConversationMessages] = useState<ChatRecord[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messages = [...starterMessages, ...conversationMessages];
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [conversationMessages, fullName, email, loading]);
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
+  const handleSend = async (input: string) => {
+    const id = createChatId();
+    const nextConversation = [
+      ...conversationMessages,
+      { id, role: "user" as const, content: input },
+    ];
 
-  const handleSend = (input: string) => {
-    const id = Date.now().toString();
-    setConversationMessages((prev) => [
-      ...prev,
-      { id, role: "user", content: input },
-    ]);
+    setError(null);
+    setConversationMessages(nextConversation);
     setLoading(true);
 
-    timerRef.current = setTimeout(() => {
-      setConversationMessages((prev) => [
-        ...prev,
-        {
-          id: `${id}-assistant`,
-          role: "assistant",
-          content:
-            "Understood. I can break that down by runway impact, burn trend, and scenario risk once your data source is connected.",
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      ]);
+        body: JSON.stringify({
+          messages: nextConversation.map(({ role, content }) => ({
+            role,
+            content,
+          })),
+        }),
+      });
+
+      const payload = (await response.json()) as ChatApiResponse;
+
+      if (!response.ok || !payload.success || !payload.data?.message?.content) {
+        throw new Error(
+          payload.error?.message ?? "AI-BOSS could not respond right now."
+        );
+      }
+
+      setConversationMessages(
+        mapApiConversationToRecords(payload.data.conversation)
+      );
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "AI-BOSS could not respond right now."
+      );
+      setConversationMessages((prev) => prev.filter((message) => message.id !== id));
+    } finally {
       setLoading(false);
-    }, 900);
+    }
   };
 
   return (
@@ -91,6 +139,11 @@ export function ChatContainer({ fullName, email }: ChatContainerProps) {
         }}
       >
         <Stack spacing={1.25} sx={{ pb: 2 }}>
+          {error ? (
+            <Alert severity="error" sx={{ alignSelf: "stretch" }}>
+              {error}
+            </Alert>
+          ) : null}
           {messages.map((message) => (
             <ChatMessage
               key={message.id}

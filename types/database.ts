@@ -40,6 +40,7 @@ export interface DecisionLog {
   user_id: string
   user_query: string
   ai_response: string
+  conversation_history: unknown
   tools_used: unknown
   data_accessed: unknown
   calculations: unknown

@@ -1,6 +1,6 @@
 import { Box, Divider, Paper, Stack, Typography } from "@mui/material";
 import { dashboardTokens } from "@/app/theme";
-import { ChatContainer } from "./chat/ChatContainer";
+import { ChatContainer } from "./ChatContainer";
 
 interface ChatSidebarProps {
   fullName: string | null;

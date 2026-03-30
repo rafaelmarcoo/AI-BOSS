@@ -8,39 +8,45 @@ export function DashboardHeader() {
   return (
     <Box
       sx={{
-        px: { xs: 3, sm: 4 },
-        py: 3,
+        px: { xs: 2, sm: 4 },
+        py: { xs: 1.5, sm: 3 },
         bgcolor: dashboardTokens.sidebarV2,
         borderBottom: "1px solid",
         borderBottomColor: dashboardTokens.border,
       }}
     >
       <Stack
-        direction={{ xs: "column", sm: "row" }}
+        direction="row"
         spacing={2}
-        alignItems={{ xs: "flex-start", sm: "center" }}
+        alignItems="center"
         justifyContent="space-between"
       >
-        {/* Left: Title + Nav buttons */}
+        {/* Left: Title + Nav */}
         <Stack
           direction="row"
           spacing={1.5}
           alignItems="center"
           flexWrap="wrap"
           useFlexGap
+          sx={{ minWidth: 0 }}
         >
-          <Stack spacing={0.5}>
+          {/* Title — hide subtitle on small screens */}
+          <Stack spacing={0.25}>
             <Typography
-              variant="h4"
+              variant={{ xs: "h6", sm: "h4" } as any}
               component="h1"
               fontWeight={700}
               color="common.white"
+              sx={{ fontSize: { xs: "1rem", sm: undefined } }}
             >
-              AI-BOSS Platform
+              AI-BOSS
             </Typography>
             <Typography
               variant="body2"
-              sx={{ color: dashboardTokens.textMuted }}
+              sx={{
+                color: dashboardTokens.textMuted,
+                display: { xs: "none", sm: "block" },
+              }}
             >
               Barebones workspace for NZ/AU SME finance teams.
             </Typography>
@@ -48,15 +54,20 @@ export function DashboardHeader() {
 
           <Button
             variant="contained"
+            size="small"
             sx={{ borderRadius: 0.5, color: "common.white" }}
           >
             Dashboard
           </Button>
+
+          {/* Nav items — hide on xs */}
           {NAV_ITEMS.map((item) => (
             <Button
               key={item}
+              size="small"
               sx={{
                 color: dashboardTokens.textMuted,
+                display: { xs: "none", sm: "inline-flex" },
               }}
             >
               {item}

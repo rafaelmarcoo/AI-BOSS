@@ -4,9 +4,9 @@ import { Box } from "@mui/material";
 import { COOKIE_ACCESS_TOKEN } from "@/lib/supabase";
 import { getCurrentUserProfile } from "@/lib/auth";
 import { dashboardTokens } from "@/app/theme";
-import { ChatSidebar } from "./chat-sidebar";
-import { DashboardHeader } from "./dashboard-header";
-import { RunwaySection } from "./runway-section";
+import { ChatSidebar } from "./chat/sidebar";
+import { DashboardHeader } from "./header";
+import { RunwaySection } from "./runway";
 
 export default async function DashboardPage() {
   const cookieStore = await cookies();

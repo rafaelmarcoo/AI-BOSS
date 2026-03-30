@@ -57,6 +57,18 @@ export interface SignInPayload {
   password: string
 }
 
+// Keep the accepted chat roles narrow so the API contract stays predictable.
+export type ChatMessageRole = 'user' | 'assistant'
+
+export interface ChatMessagePayload {
+  role: ChatMessageRole
+  content: string
+}
+
+export interface ChatPayload {
+  messages: ChatMessagePayload[]
+}
+
 export function validateSignUpPayload(payload: unknown): ValidationResult<SignUpPayload> {
   const details: Record<string, string> = {}
   const input = typeof payload === 'object' && payload !== null ? payload : {}
@@ -143,6 +155,71 @@ export function validateSignInPayload(payload: unknown): ValidationResult<SignIn
     data: {
       email: email.toLowerCase(),
       password,
+    },
+  }
+}
+
+export function validateChatPayload(payload: unknown): ValidationResult<ChatPayload> {
+  const details: Record<string, string> = {}
+  const input = typeof payload === 'object' && payload !== null ? payload : {}
+  const rawMessages = Reflect.get(input, 'messages')
+
+  // Reject early if the caller sends the wrong top-level shape.
+  if (!Array.isArray(rawMessages)) {
+    details.messages = 'messages must be an array.'
+    return {
+      success: false,
+      details,
+    }
+  }
+
+  if (rawMessages.length === 0) {
+    details.messages = 'messages must contain at least one message.'
+  }
+
+  // Build a sanitized messages array while collecting field-specific validation errors.
+  const messages = rawMessages.flatMap((message, index) => {
+    if (typeof message !== 'object' || message === null) {
+      details[`messages.${index}`] = 'Each message must be an object.'
+      return []
+    }
+
+    const role = Reflect.get(message, 'role')
+    const content = readTrimmedString(
+      Reflect.get(message, 'content'),
+      `messages.${index}.content`,
+      details
+    )
+
+    if (role !== 'user' && role !== 'assistant') {
+      details[`messages.${index}.role`] = 'role must be either "user" or "assistant".'
+      return []
+    }
+
+    if (!content) {
+      return []
+    }
+
+    return [
+      {
+        role,
+        content,
+      },
+    ]
+  })
+
+  // If any message failed validation, do not return a partial conversation.
+  if (Object.keys(details).length > 0 || messages.length !== rawMessages.length) {
+    return {
+      success: false,
+      details,
+    }
+  }
+
+  return {
+    success: true,
+    data: {
+      messages,
     },
   }
 }

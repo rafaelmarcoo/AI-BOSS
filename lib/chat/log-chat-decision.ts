@@ -1,0 +1,55 @@
+import { ApiError } from '@/lib/api/errors'
+import { ChatMessagePayload } from '@/lib/api/validation'
+import { createAdminSupabaseClient } from '@/lib/supabase'
+
+interface LogChatDecisionParams {
+  userId: string
+  messages: ChatMessagePayload[]
+  aiResponse: string
+  modelUsed: string
+  tokensUsed: number | null
+  responseTimeMs: number
+}
+
+export async function logChatDecision({
+  userId,
+  messages,
+  aiResponse,
+  modelUsed,
+  tokensUsed,
+  responseTimeMs,
+}: LogChatDecisionParams) {
+  const lastUserMessage = [...messages]
+    .reverse()
+    .find((message) => message.role === 'user')
+
+  if (!lastUserMessage) {
+    throw new ApiError(
+      400,
+      'BAD_REQUEST',
+      'A chat request must include at least one user message.'
+    )
+  }
+
+  const supabase = createAdminSupabaseClient()
+
+  // Store the latest user prompt in the main text column and preserve the
+  // full conversation in its own JSONB column so future chat features do not
+  // have to overload unrelated audit fields.
+  const { error } = await supabase.from('decision_log').insert({
+    user_id: userId,
+    user_query: lastUserMessage.content,
+    ai_response: aiResponse,
+    conversation_history: messages,
+    tools_used: [],
+    data_accessed: null,
+    calculations: null,
+    model_used: modelUsed,
+    tokens_used: tokensUsed,
+    response_time_ms: responseTimeMs,
+  })
+
+  if (error) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to log chat decision.')
+  }
+}

@@ -117,6 +117,7 @@ Audit trail of every AI interaction and decision.
 | user_id | UUID (FK) | References users(id) |
 | user_query | TEXT | What the user asked |
 | ai_response | TEXT | What the AI responded |
+| conversation_history | JSONB | Full chat exchange used to generate the response |
 | tools_used | JSONB | Which tools were called |
 | data_accessed | JSONB | What data was retrieved |
 | calculations | JSONB | Calculations performed |
@@ -159,6 +160,7 @@ users (1) ──< (many) decision_log
 
 All schema changes are tracked in `db/migrations/`:
 - `001_initial_schema.sql` - Initial database setup
+- `002_add_conversation_history_to_decision_log.sql` - Adds a dedicated JSONB field for chat transcripts
 
 ---
 

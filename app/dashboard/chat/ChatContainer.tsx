@@ -1,23 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Box, Stack } from "@mui/material";
+import { useEffect, useRef } from "react";
+import { Alert, Box, Button, Stack } from "@mui/material";
 import { ChatInput } from "./ChatInput";
-import { ChatMessage, type ChatRole } from "./ChatMessage";
-
-interface ChatRecord {
-  id: string;
-  role: ChatRole;
-  content: string;
-}
+import { ChatMessage } from "./ChatMessage";
+import { useChatConversation } from "./useChatConversation";
+import type { ChatRecord } from "./types";
 
 interface ChatContainerProps {
   fullName: string | null;
   email: string;
 }
 
-export function ChatContainer({ fullName, email }: ChatContainerProps) {
-  const [messages, setMessages] = useState<ChatRecord[]>([
+function createStarterMessages(fullName: string | null, email: string): ChatRecord[] {
+  return [
     {
       id: "welcome",
       role: "assistant",
@@ -28,39 +24,19 @@ export function ChatContainer({ fullName, email }: ChatContainerProps) {
       role: "assistant",
       content: 'Try asking: "What is our runway if revenue stays flat?"',
     },
-  ]);
-  const [loading, setLoading] = useState(false);
+  ];
+}
+
+export function ChatContainer({ fullName, email }: ChatContainerProps) {
+  const starterMessages = createStarterMessages(fullName, email);
+  const { conversationMessages, loading, error, sendMessage, retryMessage } =
+    useChatConversation();
   const bottomRef = useRef<HTMLDivElement | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const messages = [...starterMessages, ...conversationMessages];
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, loading]);
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
-
-  const handleSend = (input: string) => {
-    const id = Date.now().toString();
-    setMessages((prev) => [...prev, { id, role: "user", content: input }]);
-    setLoading(true);
-
-    timerRef.current = setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `${id}-assistant`,
-          role: "assistant",
-          content:
-            "Understood. I can break that down by runway impact, burn trend, and scenario risk once your data source is connected.",
-        },
-      ]);
-      setLoading(false);
-    }, 900);
-  };
+  }, [conversationMessages, fullName, email, loading]);
 
   return (
     <Box
@@ -82,11 +58,27 @@ export function ChatContainer({ fullName, email }: ChatContainerProps) {
         }}
       >
         <Stack spacing={1.25} sx={{ pb: 2 }}>
+          {error ? (
+            <Alert
+              severity="error"
+              sx={{ alignSelf: "stretch" }}
+              action={
+                error.failedMessageId ? (
+                  <Button color="inherit" size="small" onClick={retryMessage}>
+                    Retry
+                  </Button>
+                ) : null
+              }
+            >
+              {error.message}
+            </Alert>
+          ) : null}
           {messages.map((message) => (
             <ChatMessage
               key={message.id}
               role={message.role}
               content={message.content}
+              status={message.status}
             />
           ))}
           {loading ? <ChatMessage role="assistant" isLoading /> : null}
@@ -96,7 +88,7 @@ export function ChatContainer({ fullName, email }: ChatContainerProps) {
 
       {/* Pinned input bar */}
       <Box sx={{ flex: "0 0 auto", pt: 2 }}>
-        <ChatInput onSend={handleSend} disabled={loading} />
+        <ChatInput onSend={sendMessage} disabled={loading} />
       </Box>
     </Box>
   );

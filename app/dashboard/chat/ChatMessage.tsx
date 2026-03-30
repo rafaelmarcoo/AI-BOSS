@@ -3,11 +3,13 @@ import { keyframes } from "@mui/system";
 import { dashboardTokens } from "@/app/theme";
 
 export type ChatRole = "user" | "assistant";
+export type ChatMessageStatus = "failed";
 
 interface ChatMessageProps {
   role: ChatRole;
   content?: string;
   isLoading?: boolean;
+  status?: ChatMessageStatus;
 }
 
 const typing = keyframes`
@@ -25,6 +27,7 @@ export function ChatMessage({
   role,
   content,
   isLoading = false,
+  status,
 }: ChatMessageProps) {
   const isUser = role === "user";
 
@@ -73,7 +76,20 @@ export function ChatMessage({
             ))}
           </Stack>
         ) : (
-          content
+          <Stack spacing={0.75}>
+            <Box>{content}</Box>
+            {status === "failed" ? (
+              <Box
+                component="span"
+                sx={{
+                  fontSize: 12,
+                  color: "rgba(255,255,255,0.78)",
+                }}
+              >
+                Failed to send
+              </Box>
+            ) : null}
+          </Stack>
         )}
       </Paper>
     </Box>

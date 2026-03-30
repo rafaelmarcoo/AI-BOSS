@@ -13,12 +13,16 @@ export function ChatSidebar({ fullName, email }: ChatSidebarProps) {
       sx={{
         display: "flex",
         flexDirection: "column",
+        height: "100%",
+        minHeight: 0,
+        overflow: "hidden",
         borderRight: { md: "1px solid" },
         borderRightColor: { md: dashboardTokens.border },
         bgcolor: dashboardTokens.sidebarV2,
       }}
     >
-      <Box sx={{ p: 3 }}>
+      {/* Header — fixed height */}
+      <Box sx={{ p: 3, flex: "0 0 auto" }}>
         <Stack spacing={0.5}>
           <Typography
             variant="h5"
@@ -36,13 +40,24 @@ export function ChatSidebar({ fullName, email }: ChatSidebarProps) {
 
       <Divider sx={{ borderColor: dashboardTokens.border }} />
 
+      {/* Body — fills remaining height */}
       <Box
-        sx={{ p: 3, flex: 1, display: "flex", flexDirection: "column", gap: 2 }}
+        sx={{
+          p: 3,
+          flex: "1 1 0",
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          overflow: "hidden",
+        }}
       >
+        {/* Welcome card — fixed height */}
         <Paper
           elevation={0}
           sx={{
             p: 2.5,
+            flex: "0 0 auto",
             borderRadius: 1,
             bgcolor: dashboardTokens.surfaceSoft,
             border: "1px solid",
@@ -63,6 +78,7 @@ export function ChatSidebar({ fullName, email }: ChatSidebarProps) {
           </Stack>
         </Paper>
 
+        {/* Chat — fills remaining height and scrolls internally */}
         <ChatContainer fullName={fullName} email={email} />
       </Box>
     </Box>

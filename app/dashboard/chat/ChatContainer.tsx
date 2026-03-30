@@ -39,9 +39,7 @@ export function ChatContainer({ fullName, email }: ChatContainerProps) {
 
   useEffect(() => {
     return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
+      if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, []);
 
@@ -67,15 +65,23 @@ export function ChatContainer({ fullName, email }: ChatContainerProps) {
   return (
     <Box
       sx={{
-        flex: 1,
+        flex: "1 1 0",
         minHeight: 0,
         display: "flex",
         flexDirection: "column",
-        gap: 1.5,
+        overflow: "hidden",
       }}
     >
-      <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", pr: 0.5 }}>
-        <Stack spacing={1.25}>
+      {/* Scrollable messages area */}
+      <Box
+        sx={{
+          flex: "1 1 0",
+          minHeight: 0,
+          overflow: "auto",
+          pr: 0.5,
+        }}
+      >
+        <Stack spacing={1.25} sx={{ pb: 2 }}>
           {messages.map((message) => (
             <ChatMessage
               key={message.id}
@@ -88,7 +94,10 @@ export function ChatContainer({ fullName, email }: ChatContainerProps) {
         </Stack>
       </Box>
 
-      <ChatInput onSend={handleSend} disabled={loading} />
+      {/* Pinned input bar */}
+      <Box sx={{ flex: "0 0 auto", pt: 2 }}>
+        <ChatInput onSend={handleSend} disabled={loading} />
+      </Box>
     </Box>
   );
 }

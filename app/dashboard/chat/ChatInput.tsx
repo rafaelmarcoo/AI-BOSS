@@ -31,8 +31,10 @@ export function ChatInput({ onSend, disabled = false }: ChatInputProps) {
         }
         variant="outlined"
         size="small"
-        onChange={(event) => setValue(event.target.value)}
-        onKeyDown={(event) => {
+        onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+          setValue(event.target.value)
+        }
+        onKeyDown={(event: React.KeyboardEvent<HTMLInputElement>) => {
           if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault();
             submit();

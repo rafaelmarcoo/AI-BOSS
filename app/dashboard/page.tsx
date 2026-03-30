@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { Box, Container, Paper } from "@mui/material";
+import { Box } from "@mui/material";
 import { COOKIE_ACCESS_TOKEN } from "@/lib/supabase";
 import { getCurrentUserProfile } from "@/lib/auth";
 import { dashboardTokens } from "@/app/theme";
@@ -23,45 +23,36 @@ export default async function DashboardPage() {
   const { profile } = currentUser;
 
   return (
-    <Box component="main" sx={{ bgcolor: dashboardTokens.shell }}>
-      <Container
-        disableGutters
-        maxWidth={false}
-        sx={{ height: "100vh", width: "100vw" }}
-      >
-        <Paper
-          elevation={0}
-          sx={{
-            height: "100%",
-            overflow: "hidden",
-            borderColor: dashboardTokens.border,
-            bgcolor: dashboardTokens.shell,
-          }}
-        >
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", md: "360px 1fr" },
-              height: "100%",
-            }}
-          >
-            {/* Left: Chat Sidebar */}
-            <ChatSidebar fullName={profile.full_name} email={profile.email} />
+    <Box
+      component="main"
+      sx={{
+        display: "grid",
+        gridTemplateColumns: { xs: "1fr", md: "360px 1fr" },
+        gridTemplateRows: { xs: "50vh 50vh", md: "100vh" },
+        height: "100vh",
+        overflow: "hidden",
+        bgcolor: dashboardTokens.shell,
+      }}
+    >
+      {/* Left: Chat Sidebar */}
+      <ChatSidebar fullName={profile.full_name} email={profile.email} />
 
-            {/* Right: Header + Runway */}
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                bgcolor: dashboardTokens.surfaceV2,
-              }}
-            >
-              <DashboardHeader />
-              <RunwaySection />
-            </Box>
-          </Box>
-        </Paper>
-      </Container>
+      {/* Right: Header + Runway */}
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+          minHeight: 0,
+          overflow: "hidden",
+          bgcolor: dashboardTokens.surfaceV2,
+        }}
+      >
+        <DashboardHeader />
+        <Box sx={{ flex: "1 1 0", minHeight: 0, overflow: "auto" }}>
+          <RunwaySection />
+        </Box>
+      </Box>
     </Box>
   );
 }

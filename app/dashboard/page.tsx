@@ -26,30 +26,64 @@ export default async function DashboardPage() {
     <Box
       component="main"
       sx={{
-        display: "grid",
-        gridTemplateColumns: { xs: "1fr", md: "360px 1fr" },
-        gridTemplateRows: { xs: "50vh 50vh", md: "100vh" },
-        height: "100vh",
-        overflow: "hidden",
         bgcolor: dashboardTokens.shell,
+        // Desktop: locked to viewport, no page scroll
+        height: { md: "100vh" },
+        overflow: { md: "hidden" },
+        display: "flex",
+        flexDirection: "column",
       }}
     >
-      {/* Left: Chat Sidebar */}
-      <ChatSidebar fullName={profile.full_name} email={profile.email} />
-
-      {/* Right: Header + Runway */}
+      {/* Header — sticky on mobile so it stays visible while scrolling */}
       <Box
         sx={{
-          display: "flex",
-          flexDirection: "column",
-          height: "100%",
-          minHeight: 0,
-          overflow: "hidden",
-          bgcolor: dashboardTokens.surfaceV2,
+          flex: "0 0 auto",
+          position: { xs: "sticky", md: "relative" },
+          top: 0,
+          zIndex: 10,
         }}
       >
         <DashboardHeader />
-        <Box sx={{ flex: "1 1 0", minHeight: 0, overflow: "auto" }}>
+      </Box>
+
+      {/* Body */}
+      <Box
+        sx={{
+          flex: { md: "1 1 0" },
+          minHeight: { md: 0 },
+          display: { xs: "flex", md: "grid" },
+          flexDirection: { xs: "column", md: undefined },
+          gridTemplateColumns: { md: "360px 1fr" },
+          // Desktop: no overflow (children handle their own scroll)
+          overflow: { md: "hidden" },
+        }}
+      >
+        {/* Chat */}
+        <Box
+          sx={{
+            // Mobile: fixed 70vh tall, chat scrolls internally
+            height: { xs: "70vh", md: "100%" },
+            flex: { xs: "0 0 70vh", md: undefined },
+            minHeight: { md: 0 },
+            overflow: "hidden",
+            borderBottom: { xs: "1px solid", md: "none" },
+            borderBottomColor: { xs: dashboardTokens.border },
+          }}
+        >
+          <ChatSidebar fullName={profile.full_name} email={profile.email} />
+        </Box>
+
+        {/* Runway — on mobile: natural height so page scrolls to reveal it */}
+        <Box
+          sx={{
+            // Mobile: min 80vh so there's plenty to scroll into
+            minHeight: { xs: "80vh", md: 0 },
+            flex: { xs: "0 0 auto", md: undefined },
+            // Desktop: scroll within the panel
+            overflow: { xs: "visible", md: "auto" },
+            bgcolor: dashboardTokens.surfaceV2,
+          }}
+        >
           <RunwaySection />
         </Box>
       </Box>

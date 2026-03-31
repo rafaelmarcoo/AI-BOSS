@@ -129,6 +129,46 @@ export async function listUserConversations(userId: string) {
   return (data ?? []) as Conversation[]
 }
 
+export async function renameConversation(
+  conversationId: string,
+  userId: string,
+  title: string | null
+) {
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase
+    .from('conversations')
+    .update({
+      title,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', conversationId)
+    .eq('user_id', userId)
+    .select('id, user_id, title, created_at, updated_at')
+    .single()
+
+  if (error || !data) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to rename conversation.')
+  }
+
+  return data as Conversation
+}
+
+export async function deleteConversation(
+  conversationId: string,
+  userId: string
+) {
+  const supabase = createAdminSupabaseClient()
+  const { error } = await supabase
+    .from('conversations')
+    .delete()
+    .eq('id', conversationId)
+    .eq('user_id', userId)
+
+  if (error) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to delete conversation.')
+  }
+}
+
 export function mapConversationMessagesToPayload(
   messages: ConversationMessage[]
 ): ChatMessagePayload[] {

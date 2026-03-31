@@ -51,6 +51,18 @@ export interface ConversationDetailApiResponse {
   };
 }
 
+export interface ConversationMutationApiResponse {
+  success: boolean;
+  data?: {
+    conversation?: ChatConversationSummary;
+    deleted?: boolean;
+    conversationId?: string;
+  };
+  error?: {
+    message?: string;
+  };
+}
+
 export interface ChatErrorState {
   message: string;
   failedMessageId: string | null;

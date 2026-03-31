@@ -35,9 +35,64 @@ export interface PolicyRule {
   updated_at: string
 }
 
+export interface Conversation {
+  id: string
+  user_id: string
+  title: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ConversationMessage {
+  id: string
+  conversation_id: string
+  user_id: string
+  role: 'user' | 'assistant'
+  content: string
+  citations: unknown
+  created_at: string
+}
+
+export interface Document {
+  id: string
+  user_id: string
+  conversation_id: string | null
+  file_name: string
+  file_type: 'pdf' | 'csv'
+  mime_type: string
+  storage_path: string
+  status: 'uploaded' | 'processing' | 'ready' | 'failed'
+  document_type: string | null
+  raw_text: string | null
+  metadata: unknown
+  error_message: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface DocumentChunk {
+  id: string
+  document_id: string
+  user_id: string
+  chunk_index: number
+  content: string
+  source_page: number | null
+  metadata: unknown
+  embedding: number[] | null
+  created_at: string
+}
+
 export interface DecisionLog {
   id: string
   user_id: string
+  conversation_id: string | null
+  assistant_message_id: string | null
+  event_type:
+    | 'chat_completion'
+    | 'document_ingestion'
+    | 'retrieval'
+    | 'tool_call'
+    | 'calculation'
   user_query: string
   ai_response: string
   conversation_history: unknown

@@ -1,4 +1,5 @@
 import type { ChatMessageStatus, ChatRole } from "./ChatMessage";
+import type { Conversation } from "@/types/database";
 
 export interface ChatRecord {
   id: string;
@@ -17,6 +18,32 @@ export interface ChatApiResponse {
   data?: {
     conversationId: string;
     message: ChatApiMessage;
+    conversation: ChatApiMessage[];
+  };
+  error?: {
+    message?: string;
+  };
+}
+
+export type ChatConversationSummary = Pick<
+  Conversation,
+  "id" | "title" | "created_at" | "updated_at"
+>;
+
+export interface ConversationsApiResponse {
+  success: boolean;
+  data?: {
+    conversations: ChatConversationSummary[];
+  };
+  error?: {
+    message?: string;
+  };
+}
+
+export interface ConversationDetailApiResponse {
+  success: boolean;
+  data?: {
+    conversationId: string;
     conversation: ChatApiMessage[];
   };
   error?: {

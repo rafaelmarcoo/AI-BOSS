@@ -4,12 +4,16 @@ import { useEffect, useRef } from "react";
 import { Alert, Box, Button, Stack } from "@mui/material";
 import { ChatInput } from "./ChatInput";
 import { ChatMessage } from "./ChatMessage";
-import { useChatConversation } from "./useChatConversation";
-import type { ChatRecord } from "./types";
+import type { ChatErrorState, ChatRecord } from "./types";
 
 interface ChatContainerProps {
   fullName: string | null;
   email: string;
+  conversationMessages: ChatRecord[];
+  loading: boolean;
+  error: ChatErrorState | null;
+  onSendMessage: (input: string) => Promise<void>;
+  onRetryMessage: () => Promise<void>;
 }
 
 function createStarterMessages(fullName: string | null, email: string): ChatRecord[] {
@@ -27,10 +31,16 @@ function createStarterMessages(fullName: string | null, email: string): ChatReco
   ];
 }
 
-export function ChatContainer({ fullName, email }: ChatContainerProps) {
+export function ChatContainer({
+  fullName,
+  email,
+  conversationMessages,
+  loading,
+  error,
+  onSendMessage,
+  onRetryMessage,
+}: ChatContainerProps) {
   const starterMessages = createStarterMessages(fullName, email);
-  const { conversationMessages, loading, error, sendMessage, retryMessage } =
-    useChatConversation();
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const messages = [...starterMessages, ...conversationMessages];
 
@@ -64,7 +74,7 @@ export function ChatContainer({ fullName, email }: ChatContainerProps) {
               sx={{ alignSelf: "stretch" }}
               action={
                 error.failedMessageId ? (
-                  <Button color="inherit" size="small" onClick={retryMessage}>
+                  <Button color="inherit" size="small" onClick={() => void onRetryMessage()}>
                     Retry
                   </Button>
                 ) : null
@@ -88,7 +98,7 @@ export function ChatContainer({ fullName, email }: ChatContainerProps) {
 
       {/* Pinned input bar */}
       <Box sx={{ flex: "0 0 auto", pt: 2 }}>
-        <ChatInput onSend={sendMessage} disabled={loading} />
+        <ChatInput onSend={(value) => void onSendMessage(value)} disabled={loading} />
       </Box>
     </Box>
   );

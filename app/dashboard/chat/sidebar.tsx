@@ -1,6 +1,20 @@
-import { Box, Divider, Paper, Stack, Typography } from "@mui/material";
+"use client";
+
+import { useEffect, useState } from "react";
+import {
+  Box,
+  Button,
+  Divider,
+  List,
+  ListItemButton,
+  ListItemText,
+  Paper,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { dashboardTokens } from "@/app/theme";
 import { ChatContainer } from "./ChatContainer";
+import { useChatConversation } from "./useChatConversation";
 
 interface ChatSidebarProps {
   fullName: string | null;
@@ -8,6 +22,34 @@ interface ChatSidebarProps {
 }
 
 export function ChatSidebar({ fullName, email }: ChatSidebarProps) {
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const {
+    conversationId,
+    conversationMessages,
+    loading,
+    error,
+    conversations,
+    historyLoading,
+    sendMessage,
+    retryMessage,
+    selectConversation,
+    startNewConversation,
+  } = useChatConversation();
+
+  useEffect(() => {
+    setSelectedConversationId(conversationId);
+  }, [conversationId]);
+
+  const handleSelectConversation = async (conversationId: string) => {
+    setSelectedConversationId(conversationId);
+    await selectConversation(conversationId);
+  };
+
+  const handleStartNewConversation = () => {
+    setSelectedConversationId(null);
+    startNewConversation();
+  };
+
   return (
     <Box
       sx={{
@@ -88,7 +130,98 @@ export function ChatSidebar({ fullName, email }: ChatSidebarProps) {
           </Stack>
         </Paper>
 
-        <ChatContainer fullName={fullName} email={email} />
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2,
+            flex: "0 0 auto",
+            borderRadius: 1,
+            bgcolor: dashboardTokens.surfaceSoft,
+            border: "1px solid",
+            borderColor: dashboardTokens.border,
+            color: "common.white",
+          }}
+        >
+          <Stack spacing={1.5}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+            >
+              <Typography variant="subtitle2" fontWeight={600}>
+                History
+              </Typography>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={handleStartNewConversation}
+                sx={{
+                  borderRadius: 999,
+                  color: "common.white",
+                  borderColor: dashboardTokens.borderMuted,
+                  fontSize: "0.75rem",
+                }}
+              >
+                New chat
+              </Button>
+            </Stack>
+
+            <Box sx={{ maxHeight: 180, overflow: "auto" }}>
+              {historyLoading ? (
+                <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
+                  Loading conversations...
+                </Typography>
+              ) : conversations.length === 0 ? (
+                <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
+                  No saved conversations yet.
+                </Typography>
+              ) : (
+                <List disablePadding>
+                  {conversations.map((conversation) => (
+                    <ListItemButton
+                      key={conversation.id}
+                      selected={selectedConversationId === conversation.id}
+                      onClick={() => void handleSelectConversation(conversation.id)}
+                      sx={{
+                        px: 1.25,
+                        py: 0.75,
+                        borderRadius: 1,
+                        alignItems: "flex-start",
+                        "&.Mui-selected": {
+                          bgcolor: dashboardTokens.surfaceAlt,
+                        },
+                      }}
+                    >
+                      <ListItemText
+                        primary={conversation.title ?? "Untitled conversation"}
+                        secondary={new Date(conversation.updated_at).toLocaleString()}
+                        primaryTypographyProps={{
+                          color: "common.white",
+                          fontSize: 14,
+                          lineHeight: 1.3,
+                        }}
+                        secondaryTypographyProps={{
+                          color: dashboardTokens.textMuted,
+                          fontSize: 12,
+                        }}
+                      />
+                    </ListItemButton>
+                  ))}
+                </List>
+              )}
+            </Box>
+          </Stack>
+        </Paper>
+
+        <ChatContainer
+          fullName={fullName}
+          email={email}
+          conversationMessages={conversationMessages}
+          loading={loading}
+          error={error}
+          onSendMessage={sendMessage}
+          onRetryMessage={retryMessage}
+        />
       </Box>
     </Box>
   );

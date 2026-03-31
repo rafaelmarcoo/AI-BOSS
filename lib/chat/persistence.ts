@@ -110,6 +110,25 @@ export async function listConversationMessages(
   return (data ?? []) as ConversationMessage[]
 }
 
+export async function listUserConversations(userId: string) {
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase
+    .from('conversations')
+    .select('id, user_id, title, created_at, updated_at')
+    .eq('user_id', userId)
+    .order('updated_at', { ascending: false })
+
+  if (error) {
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to load conversations.'
+    )
+  }
+
+  return (data ?? []) as Conversation[]
+}
+
 export function mapConversationMessagesToPayload(
   messages: ConversationMessage[]
 ): ChatMessagePayload[] {

@@ -15,6 +15,7 @@ export interface ChatApiMessage {
 export interface ChatApiResponse {
   success: boolean;
   data?: {
+    conversationId: string;
     message: ChatApiMessage;
     conversation: ChatApiMessage[];
   };

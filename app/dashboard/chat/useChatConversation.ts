@@ -22,6 +22,7 @@ function mapApiConversationToRecords(messages: ChatApiMessage[]): ChatRecord[] {
 
 export function useChatConversation() {
   const [conversationMessages, setConversationMessages] = useState<ChatRecord[]>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ChatErrorState | null>(null);
 
@@ -45,6 +46,7 @@ export function useChatConversation() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          ...(conversationId ? { conversationId } : {}),
           messages: nextConversation.map(({ role, content }) => ({
             role,
             content,
@@ -59,6 +61,8 @@ export function useChatConversation() {
           payload.error?.message ?? "AI-BOSS could not respond right now."
         );
       }
+
+      setConversationId(payload.data.conversationId);
 
       setConversationMessages(
         mapApiConversationToRecords(payload.data.conversation)

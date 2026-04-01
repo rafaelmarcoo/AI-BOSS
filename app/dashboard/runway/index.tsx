@@ -1,15 +1,8 @@
-import {
-  Box,
-  Button,
-  ButtonGroup,
-  Paper,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Box, Button, Paper, Stack, Typography } from "@mui/material";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
-import BarChartIcon from "@mui/icons-material/BarChart";
 import { dashboardTokens } from "@/app/theme";
 import { MetricCard } from "../MetricCard";
+import { BurnRateChart } from "../BurnRateChart";
 
 interface DashboardMetrics {
   cashBalance: number | null;
@@ -24,8 +17,6 @@ interface DashboardMetrics {
 interface RunwaySectionProps {
   metrics: DashboardMetrics;
 }
-
-const TIME_FILTERS = ["1M", "3M", "6M", "YTD"];
 
 // Helper to format currency
 function formatCurrency(value: number | null | undefined): string {
@@ -148,73 +139,8 @@ export function RunwaySection({ metrics }: RunwaySectionProps) {
           />
         </Box>
 
-        {/* Financial Overview Card */}
-        <Paper
-          elevation={0}
-          sx={{
-            p: 3,
-            borderRadius: 1,
-            bgcolor: dashboardTokens.runwayV2,
-            color: "common.white",
-            border: "1px solid",
-            borderColor: dashboardTokens.border,
-          }}
-        >
-          <Stack spacing={2}>
-            <Stack
-              direction="row"
-              alignItems="center"
-              justifyContent="space-between"
-            >
-              <Typography variant="h6" fontWeight={700}>
-                Financial Overview
-              </Typography>
-              <ButtonGroup size="small">
-                {TIME_FILTERS.map((filter) => (
-                  <Button
-                    key={filter}
-                    variant={filter === "3M" ? "contained" : "outlined"}
-                    sx={{
-                      color:
-                        filter === "3M"
-                          ? "common.white"
-                          : dashboardTokens.textMuted,
-                      borderColor: dashboardTokens.borderMuted,
-                      fontSize: "0.75rem",
-                      minWidth: 40,
-                    }}
-                  >
-                    {filter}
-                  </Button>
-                ))}
-              </ButtonGroup>
-            </Stack>
-
-            <Box
-              sx={{
-                height: 160,
-                border: "1px solid",
-                borderColor: dashboardTokens.border,
-                borderRadius: 1,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 1,
-              }}
-            >
-              <BarChartIcon
-                sx={{ color: dashboardTokens.textMuted, fontSize: 32 }}
-              />
-              <Typography
-                variant="body2"
-                sx={{ color: dashboardTokens.textMuted }}
-              >
-                Connect a data source to see your charts
-              </Typography>
-            </Box>
-          </Stack>
-        </Paper>
+        {/* Financial Overview Chart */}
+        <BurnRateChart />
       </Stack>
     </Box>
   );

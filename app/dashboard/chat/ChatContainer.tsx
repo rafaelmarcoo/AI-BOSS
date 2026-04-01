@@ -1,15 +1,31 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Alert, Box, Button, Stack } from "@mui/material";
+import {
+  Alert,
+  Box,
+  Button,
+  IconButton,
+  Stack,
+  Typography,
+} from "@mui/material";
+import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import { ChatInput } from "./ChatInput";
 import { ChatMessage } from "./ChatMessage";
-import { useChatConversation } from "./useChatConversation";
-import type { ChatRecord } from "./types";
+import type { ChatErrorState, ChatRecord } from "./types";
+import { dashboardTokens } from "@/app/theme";
 
 interface ChatContainerProps {
   fullName: string | null;
   email: string;
+  activeConversationTitle: string | null;
+  conversationMessages: ChatRecord[];
+  historyLoading: boolean;
+  loading: boolean;
+  error: ChatErrorState | null;
+  onOpenHistory: () => void;
+  onSendMessage: (input: string) => Promise<void>;
+  onRetryMessage: () => Promise<void>;
 }
 
 function createStarterMessages(fullName: string | null, email: string): ChatRecord[] {
@@ -17,22 +33,27 @@ function createStarterMessages(fullName: string | null, email: string): ChatReco
     {
       id: "welcome",
       role: "assistant",
-      content: `Hi ${fullName ?? email} - I can help you understand your current financial position.`,
-    },
-    {
-      id: "hint",
-      role: "assistant",
-      content: 'Try asking: "What is our runway if revenue stays flat?"',
+      content: `Hi ${fullName ?? email}. I can help you understand your current financial position.`,
     },
   ];
 }
 
-export function ChatContainer({ fullName, email }: ChatContainerProps) {
+export function ChatContainer({
+  fullName,
+  email,
+  activeConversationTitle,
+  conversationMessages,
+  historyLoading,
+  loading,
+  error,
+  onOpenHistory,
+  onSendMessage,
+  onRetryMessage,
+}: ChatContainerProps) {
   const starterMessages = createStarterMessages(fullName, email);
-  const { conversationMessages, loading, error, sendMessage, retryMessage } =
-    useChatConversation();
   const bottomRef = useRef<HTMLDivElement | null>(null);
-  const messages = [...starterMessages, ...conversationMessages];
+  const messages =
+    conversationMessages.length === 0 ? starterMessages : conversationMessages;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -46,49 +67,132 @@ export function ChatContainer({ fullName, email }: ChatContainerProps) {
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
+        bgcolor: dashboardTokens.sidebarV2,
       }}
     >
-      {/* Scrollable messages area */}
       <Box
         sx={{
           flex: "1 1 0",
           minHeight: 0,
-          overflow: "auto",
-          pr: 0.5,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
         }}
       >
-        <Stack spacing={1.25} sx={{ pb: 2 }}>
-          {error ? (
-            <Alert
-              severity="error"
-              sx={{ alignSelf: "stretch" }}
-              action={
-                error.failedMessageId ? (
-                  <Button color="inherit" size="small" onClick={retryMessage}>
-                    Retry
-                  </Button>
-                ) : null
-              }
+        <Box
+          sx={{
+            px: 1.25,
+            py: 1,
+            borderBottom: "1px solid",
+            borderBottomColor: dashboardTokens.border,
+            bgcolor: dashboardTokens.sidebarV2,
+          }}
+        >
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <IconButton
+              onClick={onOpenHistory}
+              sx={{
+                color: "common.white",
+                border: "1px solid",
+                borderColor: dashboardTokens.border,
+                bgcolor: "rgba(255,255,255,0.03)",
+              }}
             >
-              {error.message}
-            </Alert>
-          ) : null}
-          {messages.map((message) => (
-            <ChatMessage
-              key={message.id}
-              role={message.role}
-              content={message.content}
-              status={message.status}
-            />
-          ))}
-          {loading ? <ChatMessage role="assistant" isLoading /> : null}
-          <Box ref={bottomRef} />
-        </Stack>
-      </Box>
+              <MenuRoundedIcon />
+            </IconButton>
+            <Stack
+              spacing={0.15}
+              sx={{ flex: 1, minWidth: 0, alignItems: "flex-end", pr: 1 }}
+            >
+              <Typography
+                variant="body2"
+                sx={{
+                  color: "common.white",
+                  fontWeight: 600,
+                  maxWidth: "100%",
+                  textOverflow: "ellipsis",
+                  overflow: "hidden",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {activeConversationTitle ?? "New conversation"}
+              </Typography>
+              <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
+                AI-BOSS chat
+              </Typography>
+            </Stack>
+          </Stack>
+        </Box>
 
-      {/* Pinned input bar */}
-      <Box sx={{ flex: "0 0 auto", pt: 2 }}>
-        <ChatInput onSend={sendMessage} disabled={loading} />
+        <Box
+          sx={{
+            flex: "1 1 0",
+            minHeight: 0,
+            overflow: "auto",
+            px: 1.25,
+            py: 1.25,
+          }}
+        >
+          {historyLoading ? (
+            <Stack sx={{ minHeight: "100%", justifyContent: "center" }}>
+              <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
+                Loading your latest conversation...
+              </Typography>
+            </Stack>
+          ) : conversationMessages.length === 0 ? (
+            <Stack spacing={2.5} sx={{ minHeight: "100%", justifyContent: "center" }}>
+              <Stack spacing={1.25} sx={{ maxWidth: 360, color: "common.white", px: 1 }}>
+                <Typography variant="h6" fontWeight={600}>
+                  {starterMessages[0]?.content}
+                </Typography>
+                <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
+                  Try asking about runway, cash flow, burn rate, policy rules, or uploaded documents.
+                </Typography>
+              </Stack>
+            </Stack>
+          ) : (
+            <Stack spacing={1.25} sx={{ pb: 1.25 }}>
+              {error ? (
+                <Alert
+                  severity="error"
+                  sx={{ alignSelf: "stretch" }}
+                  action={
+                    error.failedMessageId ? (
+                      <Button color="inherit" size="small" onClick={() => void onRetryMessage()}>
+                        Retry
+                      </Button>
+                    ) : null
+                  }
+                >
+                  {error.message}
+                </Alert>
+              ) : null}
+              {messages.map((message) => (
+                <ChatMessage
+                  key={message.id}
+                  role={message.role}
+                  content={message.content}
+                  status={message.status}
+                />
+              ))}
+              {loading ? <ChatMessage role="assistant" isLoading /> : null}
+              <Box ref={bottomRef} />
+            </Stack>
+          )}
+        </Box>
+
+        <Box
+          sx={{
+            flex: "0 0 auto",
+            px: 1.25,
+            py: 1,
+            borderTop: "1px solid",
+            borderTopColor: dashboardTokens.border,
+            bgcolor: dashboardTokens.sidebarV2,
+          }}
+        >
+          <ChatInput onSend={(value) => void onSendMessage(value)} disabled={loading} />
+        </Box>
       </Box>
     </Box>
   );

@@ -12,7 +12,11 @@ export async function POST(request: NextRequest) {
   try {
     const { user } = await requireAuthenticatedUser(request)
     const payload = assertValid(validateChatPayload(await readJsonBody(request)))
-    const chatResponse = await generateChatResponse(user.id, payload.messages)
+    const chatResponse = await generateChatResponse(
+      user.id,
+      payload.messages,
+      payload.conversationId
+    )
 
     return successResponse({
       ...chatResponse,

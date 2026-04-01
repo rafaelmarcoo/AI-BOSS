@@ -3,6 +3,7 @@ import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import { dashboardTokens } from "@/app/theme";
 import { MetricCard } from "../MetricCard";
 import { BurnRateChart } from "../BurnRateChart";
+import { RecentActivity } from "../RecentActivity";
 
 interface DashboardMetrics {
   cashBalance: number | null;
@@ -141,6 +142,9 @@ export function RunwaySection({ metrics }: RunwaySectionProps) {
 
         {/* Financial Overview Chart */}
         <BurnRateChart />
+
+        {/* Recent Activity */}
+        <RecentActivity />
       </Stack>
     </Box>
   );

@@ -8,6 +8,16 @@ import { ChatSidebar } from "./chat/sidebar";
 import { DashboardHeader } from "./header";
 import { RunwaySection } from "./runway";
 
+interface DashboardMetrics {
+  cashBalance: number | null;
+  accountsReceivable: number | null;
+  accountsPayable: number | null;
+  monthlyRevenue: number | null;
+  monthlyExpenses: number | null;
+  burnRate: number | null;
+  runwayMonths: number | null;
+}
+
 export default async function DashboardPage() {
   const cookieStore = await cookies();
   const accessToken = cookieStore.get(COOKIE_ACCESS_TOKEN)?.value;
@@ -21,6 +31,52 @@ export default async function DashboardPage() {
   if (!currentUser) redirect("/sign-in");
 
   const { profile } = currentUser;
+
+  // Fetch metrics from API endpoints
+  let metrics: DashboardMetrics = {
+    cashBalance: null,
+    accountsReceivable: null,
+    accountsPayable: null,
+    monthlyRevenue: null,
+    monthlyExpenses: null,
+    burnRate: null,
+    runwayMonths: null,
+  };
+
+  try {
+    // TODO: Call /api/calculate/runway to get runway metrics
+    // const runwayRes = await fetch(
+    //   `${process.env.NEXT_PUBLIC_APP_URL}/api/calculate/runway`,
+    //   {
+    //     headers: {
+    //       Authorization: `Bearer ${accessToken}`,
+    //       "Content-Type": "application/json",
+    //     },
+    //     body: JSON.stringify({ /* payload */ }),
+    //   }
+    // );
+    // const runwayData = await runwayRes.json();
+    // metrics.runwayMonths = runwayData.runway_months;
+    // metrics.burnRate = runwayData.burn_rate;
+
+    // TODO: Call /api/xero/bank-summary to get cash/AR/AP data
+    // const bankRes = await fetch(
+    //   `${process.env.NEXT_PUBLIC_APP_URL}/api/xero/bank-summary`,
+    //   {
+    //     headers: {
+    //       Authorization: `Bearer ${accessToken}`,
+    //     },
+    //   }
+    // );
+    // const bankData = await bankRes.json();
+    // metrics.cashBalance = bankData.cash_balance;
+    // metrics.accountsReceivable = bankData.accounts_receivable;
+    // metrics.accountsPayable = bankData.accounts_payable;
+
+    console.log("Dashboard metrics loaded:", metrics);
+  } catch (error) {
+    console.error("Failed to fetch dashboard metrics:", error);
+  }
 
   return (
     <Box
@@ -84,7 +140,7 @@ export default async function DashboardPage() {
             bgcolor: dashboardTokens.surfaceV2,
           }}
         >
-          <RunwaySection />
+          <RunwaySection metrics={metrics} />
         </Box>
       </Box>
     </Box>

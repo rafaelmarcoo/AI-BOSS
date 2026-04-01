@@ -9,16 +9,41 @@ import {
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import BarChartIcon from "@mui/icons-material/BarChart";
 import { dashboardTokens } from "@/app/theme";
+import { MetricCard } from "../MetricCard";
 
-const METRIC_CARDS = [
-  { label: "MONTHS LEFT", color: "#00e5a0" },
-  { label: "DAILY BURN", color: "#4da6ff" },
-  { label: "NET LOSS", color: "#ff4d6d" },
-];
+interface DashboardMetrics {
+  cashBalance: number | null;
+  accountsReceivable: number | null;
+  accountsPayable: number | null;
+  monthlyRevenue: number | null;
+  monthlyExpenses: number | null;
+  burnRate: number | null;
+  runwayMonths: number | null;
+}
+
+interface RunwaySectionProps {
+  metrics: DashboardMetrics;
+}
 
 const TIME_FILTERS = ["1M", "3M", "6M", "YTD"];
 
-export function RunwaySection() {
+// Helper to format currency
+function formatCurrency(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+  return new Intl.NumberFormat("en-NZ", {
+    style: "currency",
+    currency: "NZD",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+// Helper to format numbers with one decimal
+function formatNumber(value: number | null | undefined, decimals = 1): string {
+  if (value === null || value === undefined) return "—";
+  return value.toFixed(decimals);
+}
+
+export function RunwaySection({ metrics }: RunwaySectionProps) {
   return (
     <Box sx={{ p: { xs: 3, sm: 4 }, flex: 1 }}>
       <Stack spacing={3}>
@@ -85,48 +110,42 @@ export function RunwaySection() {
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" },
+            gridTemplateColumns: { xs: "1fr", md: "repeat(4, 1fr)" },
             gap: 2,
           }}
         >
-          {METRIC_CARDS.map(({ label, color }) => (
-            <Paper
-              key={label}
-              elevation={0}
-              sx={{
-                p: 2.5,
-                borderRadius: 1,
-                bgcolor: dashboardTokens.runwayV2,
-                color: "common.white",
-                border: "1px solid",
-                borderColor: dashboardTokens.border,
-                minHeight: 120,
-              }}
-            >
-              <Stack spacing={1.5}>
-                <Typography
-                  variant="caption"
-                  sx={{ color: dashboardTokens.textMuted, letterSpacing: 1 }}
-                >
-                  {label}
-                </Typography>
-                <Box
-                  sx={{
-                    width: 32,
-                    height: 3,
-                    borderRadius: 999,
-                    bgcolor: color,
-                  }}
-                />
-                <Typography
-                  variant="body2"
-                  sx={{ color: dashboardTokens.textMuted }}
-                >
-                  Connect data source to populate
-                </Typography>
-              </Stack>
-            </Paper>
-          ))}
+          <MetricCard
+            label="CASH BALANCE"
+            value={formatCurrency(metrics.cashBalance)}
+            color="#00e5a0"
+            loading={metrics.cashBalance === null}
+          />
+          <MetricCard
+            label="RUNWAY"
+            value={formatNumber(metrics.runwayMonths)}
+            unit="months"
+            color="#4da6ff"
+            loading={metrics.runwayMonths === null}
+          />
+          <MetricCard
+            label="MONTHLY BURN"
+            value={formatCurrency(metrics.burnRate)}
+            color="#ff4d6d"
+            loading={metrics.burnRate === null}
+          />
+          <MetricCard
+            label="NET LOSS"
+            value={formatCurrency(
+              metrics.monthlyExpenses && metrics.monthlyRevenue
+                ? metrics.monthlyExpenses - metrics.monthlyRevenue
+                : null,
+            )}
+            color="#ffa500"
+            loading={
+              metrics.monthlyExpenses === null ||
+              metrics.monthlyRevenue === null
+            }
+          />
         </Box>
 
         {/* Financial Overview Card */}

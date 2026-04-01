@@ -137,11 +137,19 @@ export function useChatConversation() {
 
       setConversationId(payload.data.conversationId);
       setConversations((prev) => {
-        const nextTitle = input.length > 80 ? `${input.slice(0, 77)}...` : input;
+        const existingConversation = prev.find(
+          (conversation) => conversation.id === payload.data!.conversationId
+        );
+        const nextTitle = existingConversation?.title
+          ? existingConversation.title
+          : input.length > 80
+            ? `${input.slice(0, 77)}...`
+            : input;
         const nextSummary = {
           id: payload.data!.conversationId,
           title: nextTitle,
-          created_at: new Date().toISOString(),
+          created_at:
+            existingConversation?.created_at ?? new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
         const existingWithoutCurrent = prev.filter(

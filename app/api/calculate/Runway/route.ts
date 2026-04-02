@@ -1,31 +1,33 @@
-import { NextRequest, NextResponse } from "next/server";
-import { calculateRunway } from "@/lib/calculations/runway";
- 
+import { NextRequest } from 'next/server'
+import { ApiError } from '@/lib/api/errors'
+import { handleRouteError, successResponse } from '@/lib/api/responses'
+import { readJsonBody } from '@/lib/api/validation'
+import { requireAuthenticatedUser } from '@/lib/auth'
+import { RunwayInputSchema, calculateRunway } from '@/lib/calculations/runway'
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { cash, ar, ap, burn } = body;
- 
-    if (cash === undefined || ar === undefined || ap === undefined || burn === undefined) {
-      return NextResponse.json(
-        { error: "Missing required fields: cash, ar, ap, burn" },
-        { status: 400 }
-      );
+    await requireAuthenticatedUser(request)
+
+    const body = await readJsonBody(request)
+
+    // Validate with the shared Zod schema — converts field-level ZodErrors
+    // into the project's standard ApiError shape so handleRouteError can
+    // format them consistently with the rest of the API
+    const parsed = RunwayInputSchema.safeParse(body)
+    if (!parsed.success) {
+      throw new ApiError(
+        400,
+        'VALIDATION_ERROR',
+        'Invalid runway inputs.',
+        parsed.error.flatten().fieldErrors
+      )
     }
- 
-    if (typeof cash !== "number" || typeof ar !== "number" || typeof ap !== "number" || typeof burn !== "number") {
-      return NextResponse.json(
-        { error: "All fields must be numbers: cash, ar, ap, burn" },
-        { status: 400 }
-      );
-    }
- 
-    const result = calculateRunway({ cash, ar, ap, burn });
-    return NextResponse.json(result, { status: 200 });
+
+    const result = calculateRunway(parsed.data)
+
+    return successResponse(result)
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Internal server error" },
-      { status: 500 }
-    );
+    return handleRouteError(error)
   }
 }

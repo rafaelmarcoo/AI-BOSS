@@ -5,10 +5,12 @@ import { Box } from "@mui/material";
 import { dashboardTokens } from "@/app/theme";
 import { ChatSidebar } from "./chat/sidebar";
 import { RunwaySection } from "./runway";
+import type { DashboardMetrics } from "./runway";
 
 interface ResizablePanelsProps {
   fullName: string | null;
   email: string;
+  metrics: DashboardMetrics;
 }
 
 const MIN_CHAT_WIDTH = 280;
@@ -19,6 +21,7 @@ const RESIZER_WIDTH = 12;
 export function ResizablePanels({
   fullName,
   email,
+  metrics,
 }: ResizablePanelsProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [chatWidth, setChatWidth] = useState(DEFAULT_CHAT_WIDTH);
@@ -128,7 +131,7 @@ export function ResizablePanels({
           minWidth: 0,
         }}
       >
-        <RunwaySection />
+        <RunwaySection metrics={metrics} />
       </Box>
     </Box>
   );

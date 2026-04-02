@@ -6,16 +6,7 @@ import { getCurrentUserProfile } from "@/lib/auth";
 import { dashboardTokens } from "@/app/theme";
 import { DashboardHeader } from "./header";
 import { ResizablePanels } from "./ResizablePanels";
-
-interface DashboardMetrics {
-  cashBalance: number | null;
-  accountsReceivable: number | null;
-  accountsPayable: number | null;
-  monthlyRevenue: number | null;
-  monthlyExpenses: number | null;
-  burnRate: number | null;
-  runwayMonths: number | null;
-}
+import type { DashboardMetrics } from "./runway";
 
 export default async function DashboardPage() {
   const cookieStore = await cookies();
@@ -101,48 +92,11 @@ export default async function DashboardPage() {
         <DashboardHeader />
       </Box>
 
-      {/* Body */}
-      <Box
-        sx={{
-          flex: { md: "1 1 0" },
-          minHeight: { md: 0 },
-          display: { xs: "flex", md: "grid" },
-          flexDirection: { xs: "column", md: undefined },
-          gridTemplateColumns: { md: "360px 1fr" },
-          // Desktop: no overflow (children handle their own scroll)
-          overflow: { md: "hidden" },
-        }}
-      >
-        {/* Chat */}
-        <Box
-          sx={{
-            // Mobile: fixed 70vh tall, chat scrolls internally
-            height: { xs: "70vh", md: "100%" },
-            flex: { xs: "0 0 70vh", md: undefined },
-            minHeight: { md: 0 },
-            overflow: "hidden",
-            borderBottom: { xs: "1px solid", md: "none" },
-            borderBottomColor: { xs: dashboardTokens.border },
-          }}
-        >
-          <ChatSidebar fullName={profile.full_name} email={profile.email} />
-        </Box>
-
-        {/* Runway — on mobile: natural height so page scrolls to reveal it */}
-        <Box
-          sx={{
-            // Mobile: min 80vh so there's plenty to scroll into
-            minHeight: { xs: "80vh", md: 0 },
-            flex: { xs: "0 0 auto", md: undefined },
-            // Desktop: scroll within the panel
-            overflow: { xs: "visible", md: "auto" },
-            bgcolor: dashboardTokens.surfaceV2,
-          }}
-        >
-          <RunwaySection metrics={metrics} />
-        </Box>
-      </Box>
-      <ResizablePanels fullName={profile.full_name} email={profile.email} />
+      <ResizablePanels
+        fullName={profile.full_name}
+        email={profile.email}
+        metrics={metrics}
+      />
     </Box>
   );
 }

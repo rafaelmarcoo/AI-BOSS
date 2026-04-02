@@ -5,7 +5,7 @@ import { MetricCard } from "../MetricCard";
 import { BurnRateChart } from "../BurnRateChart";
 import { RecentActivity } from "../RecentActivity";
 
-interface DashboardMetrics {
+export interface DashboardMetrics {
   cashBalance: number | null;
   accountsReceivable: number | null;
   accountsPayable: number | null;

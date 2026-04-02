@@ -4,9 +4,8 @@ import { Box } from "@mui/material";
 import { COOKIE_ACCESS_TOKEN } from "@/lib/supabase";
 import { getCurrentUserProfile } from "@/lib/auth";
 import { dashboardTokens } from "@/app/theme";
-import { ChatSidebar } from "./chat/sidebar";
 import { DashboardHeader } from "./header";
-import { RunwaySection } from "./runway";
+import { ResizablePanels } from "./ResizablePanels";
 
 interface DashboardMetrics {
   cashBalance: number | null;
@@ -143,6 +142,7 @@ export default async function DashboardPage() {
           <RunwaySection metrics={metrics} />
         </Box>
       </Box>
+      <ResizablePanels fullName={profile.full_name} email={profile.email} />
     </Box>
   );
 }

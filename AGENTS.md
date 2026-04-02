@@ -29,3 +29,10 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - Pause for confirmation at major decision points when the choice affects architecture, maintainability, or future extensibility.
 - Add concise comments for non-obvious logic when they help readability.
 - Favor maintainable structure and separation of concerns over quick inline implementations.
+
+## Database Change Standard
+
+- When changing the database schema, always update the migration files, [`docs/database-schema.md`](/Users/rafaelmarco/Repositories/ai-boss/docs/database-schema.md), and [`types/database.ts`](/Users/rafaelmarco/Repositories/ai-boss/types/database.ts) in the same piece of work.
+- Treat migration SQL as the database source of truth, and keep [`types/database.ts`](/Users/rafaelmarco/Repositories/ai-boss/types/database.ts) in sync so application code can rely on typed row shapes.
+- When reading or writing database-backed app code, refer to [`types/database.ts`](/Users/rafaelmarco/Repositories/ai-boss/types/database.ts) instead of re-declaring duplicate table interfaces in feature files unless there is a strong reason not to.
+- When implementing features that touch database-backed data, use [`types/database.ts`](/Users/rafaelmarco/Repositories/ai-boss/types/database.ts) as the application source of truth for row and entity shapes, and only create feature-local types when they represent view models or transformed data rather than raw database records.

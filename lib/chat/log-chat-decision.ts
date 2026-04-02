@@ -4,6 +4,8 @@ import { createAdminSupabaseClient } from '@/lib/supabase'
 
 interface LogChatDecisionParams {
   userId: string
+  conversationId: string
+  assistantMessageId: string
   messages: ChatMessagePayload[]
   aiResponse: string
   modelUsed: string
@@ -13,6 +15,8 @@ interface LogChatDecisionParams {
 
 export async function logChatDecision({
   userId,
+  conversationId,
+  assistantMessageId,
   messages,
   aiResponse,
   modelUsed,
@@ -38,6 +42,9 @@ export async function logChatDecision({
   // have to overload unrelated audit fields.
   const { error } = await supabase.from('decision_log').insert({
     user_id: userId,
+    conversation_id: conversationId,
+    assistant_message_id: assistantMessageId,
+    event_type: 'chat_completion',
     user_query: lastUserMessage.content,
     ai_response: aiResponse,
     conversation_history: messages,

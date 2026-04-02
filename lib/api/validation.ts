@@ -66,6 +66,7 @@ export interface ChatMessagePayload {
 }
 
 export interface ChatPayload {
+  conversationId?: string
   messages: ChatMessagePayload[]
 }
 
@@ -163,6 +164,7 @@ export function validateChatPayload(payload: unknown): ValidationResult<ChatPayl
   const details: Record<string, string> = {}
   const input = typeof payload === 'object' && payload !== null ? payload : {}
   const rawMessages = Reflect.get(input, 'messages')
+  const rawConversationId = Reflect.get(input, 'conversationId')
 
   // Reject early if the caller sends the wrong top-level shape.
   if (!Array.isArray(rawMessages)) {
@@ -216,9 +218,26 @@ export function validateChatPayload(payload: unknown): ValidationResult<ChatPayl
     }
   }
 
+  if (
+    rawConversationId !== undefined &&
+    (typeof rawConversationId !== 'string' || !rawConversationId.trim())
+  ) {
+    details.conversationId = 'conversationId must be a non-empty string.'
+  }
+
+  if (Object.keys(details).length > 0) {
+    return {
+      success: false,
+      details,
+    }
+  }
+
   return {
     success: true,
     data: {
+      ...(typeof rawConversationId === 'string' && rawConversationId.trim()
+        ? { conversationId: rawConversationId.trim() }
+        : {}),
       messages,
     },
   }

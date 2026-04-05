@@ -23,3 +23,24 @@ export interface DocumentsListResponse {
 export interface CreateDocumentResponse {
   document: DocumentSummary
 }
+
+export interface DocumentChunkInsert {
+  document_id: string
+  user_id: string
+  chunk_index: number
+  content: string
+  source_page: number | null
+  metadata: unknown
+  embedding: null
+}
+
+export interface ParsedPdfPage {
+  pageNumber: number
+  text: string
+}
+
+export interface ParsedDocumentResult {
+  rawText: string
+  metadata: unknown
+  chunks: DocumentChunkInsert[]
+}

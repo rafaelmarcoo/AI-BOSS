@@ -1,11 +1,14 @@
+import { after } from 'next/server'
 import { NextRequest } from 'next/server'
 import { requireAuthenticatedUser } from '@/lib/auth'
 import { handleRouteError, successResponse } from '@/lib/api/responses'
 import {
   createDocumentRecord,
   listUserDocuments,
+  updateDocumentRecord,
   uploadDocumentFile,
 } from '@/lib/documents/persistence'
+import { processDocument } from '@/lib/documents/process'
 import {
   readOptionalConversationId,
   validateDocumentUpload,
@@ -48,10 +51,18 @@ export async function POST(request: NextRequest) {
       storagePath,
       conversationId,
     })
+    const processingDocument = await updateDocumentRecord(document.id, user.id, {
+      status: 'processing',
+      error_message: null,
+    })
+
+    after(async () => {
+      await processDocument(processingDocument.id, user.id)
+    })
 
     return successResponse<CreateDocumentResponse>(
       {
-        document,
+        document: processingDocument,
       },
       { status: 201 }
     )

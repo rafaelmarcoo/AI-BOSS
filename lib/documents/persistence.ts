@@ -2,7 +2,8 @@ import { randomUUID } from 'crypto'
 import { ApiError } from '@/lib/api/errors'
 import { createAdminSupabaseClient } from '@/lib/supabase'
 import { DOCUMENTS_STORAGE_BUCKET } from '@/lib/documents/constants'
-import type { DocumentSummary } from '@/lib/documents/types'
+import type { Document, DocumentChunk } from '@/types/database'
+import type { DocumentChunkInsert, DocumentSummary } from '@/lib/documents/types'
 import type { SupportedDocumentType } from '@/lib/documents/constants'
 
 const DOCUMENT_SUMMARY_SELECT = `
@@ -14,6 +15,23 @@ const DOCUMENT_SUMMARY_SELECT = `
   storage_path,
   status,
   document_type,
+  metadata,
+  error_message,
+  created_at,
+  updated_at
+`
+
+const DOCUMENT_FULL_SELECT = `
+  id,
+  user_id,
+  conversation_id,
+  file_name,
+  file_type,
+  mime_type,
+  storage_path,
+  status,
+  document_type,
+  raw_text,
   metadata,
   error_message,
   created_at,
@@ -94,4 +112,102 @@ export async function createDocumentRecord(params: {
   }
 
   return data as DocumentSummary
+}
+
+export async function getDocumentById(documentId: string, userId: string) {
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase
+    .from('documents')
+    .select(DOCUMENT_FULL_SELECT)
+    .eq('id', documentId)
+    .eq('user_id', userId)
+    .single()
+
+  if (error || !data) {
+    throw new ApiError(404, 'NOT_FOUND', 'Document not found.')
+  }
+
+  return data as Document
+}
+
+export async function updateDocumentRecord(
+  documentId: string,
+  userId: string,
+  updates: Partial<
+    Pick<Document, 'status' | 'raw_text' | 'metadata' | 'error_message'>
+  >
+) {
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase
+    .from('documents')
+    .update(updates)
+    .eq('id', documentId)
+    .eq('user_id', userId)
+    .select(DOCUMENT_SUMMARY_SELECT)
+    .single()
+
+  if (error || !data) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to update document.')
+  }
+
+  return data as DocumentSummary
+}
+
+export async function downloadDocumentFile(storagePath: string) {
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase.storage
+    .from(DOCUMENTS_STORAGE_BUCKET)
+    .download(storagePath)
+
+  if (error || !data) {
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to download the uploaded document.'
+    )
+  }
+
+  return new Uint8Array(await data.arrayBuffer())
+}
+
+export async function replaceDocumentChunks(
+  documentId: string,
+  userId: string,
+  chunks: DocumentChunkInsert[]
+) {
+  const supabase = createAdminSupabaseClient()
+  const { error: deleteError } = await supabase
+    .from('document_chunks')
+    .delete()
+    .eq('document_id', documentId)
+    .eq('user_id', userId)
+
+  if (deleteError) {
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to clear existing document chunks.'
+    )
+  }
+
+  if (chunks.length === 0) {
+    return [] as DocumentChunk[]
+  }
+
+  const { data, error } = await supabase
+    .from('document_chunks')
+    .insert(chunks)
+    .select(
+      'id, document_id, user_id, chunk_index, content, source_page, metadata, embedding, created_at'
+    )
+
+  if (error) {
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to save document chunks.'
+    )
+  }
+
+  return (data ?? []) as DocumentChunk[]
 }

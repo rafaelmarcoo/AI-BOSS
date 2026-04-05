@@ -1,0 +1,97 @@
+import { randomUUID } from 'crypto'
+import { ApiError } from '@/lib/api/errors'
+import { createAdminSupabaseClient } from '@/lib/supabase'
+import { DOCUMENTS_STORAGE_BUCKET } from '@/lib/documents/constants'
+import type { DocumentSummary } from '@/lib/documents/types'
+import type { SupportedDocumentType } from '@/lib/documents/constants'
+
+const DOCUMENT_SUMMARY_SELECT = `
+  id,
+  conversation_id,
+  file_name,
+  file_type,
+  mime_type,
+  storage_path,
+  status,
+  document_type,
+  metadata,
+  error_message,
+  created_at,
+  updated_at
+`
+
+function sanitizeFileName(fileName: string) {
+  return fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
+}
+
+function createStoragePath(userId: string, fileName: string) {
+  return `${userId}/${randomUUID()}-${sanitizeFileName(fileName)}`
+}
+
+export async function listUserDocuments(userId: string) {
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase
+    .from('documents')
+    .select(DOCUMENT_SUMMARY_SELECT)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to load documents.')
+  }
+
+  return (data ?? []) as DocumentSummary[]
+}
+
+export async function uploadDocumentFile(params: {
+  userId: string
+  file: File
+}) {
+  const supabase = createAdminSupabaseClient()
+  const storagePath = createStoragePath(params.userId, params.file.name)
+  const { error } = await supabase.storage
+    .from(DOCUMENTS_STORAGE_BUCKET)
+    .upload(storagePath, params.file, {
+      contentType: params.file.type || undefined,
+      upsert: false,
+    })
+
+  if (error) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to upload document file.')
+  }
+
+  return {
+    storagePath,
+  }
+}
+
+export async function createDocumentRecord(params: {
+  userId: string
+  fileName: string
+  fileType: SupportedDocumentType
+  mimeType: string
+  storagePath: string
+  conversationId: string | null
+}) {
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase
+    .from('documents')
+    .insert({
+      user_id: params.userId,
+      conversation_id: params.conversationId,
+      file_name: params.fileName,
+      file_type: params.fileType,
+      mime_type: params.mimeType,
+      storage_path: params.storagePath,
+      status: 'uploaded',
+      metadata: null,
+    })
+    .select(DOCUMENT_SUMMARY_SELECT)
+    .single()
+
+  if (error || !data) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to create document.')
+  }
+
+  return data as DocumentSummary
+}

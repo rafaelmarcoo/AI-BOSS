@@ -1,0 +1,48 @@
+import { ApiError } from '@/lib/api/errors'
+import {
+  readOptionalConversationId,
+  validateDocumentUpload,
+} from '@/lib/documents/validation'
+
+describe('document upload validation', () => {
+  it('accepts a pdf file upload', () => {
+    const file = new File(['hello'], 'report.pdf', {
+      type: 'application/pdf',
+    })
+
+    expect(validateDocumentUpload(file)).toMatchObject({
+      file,
+      fileType: 'pdf',
+    })
+  })
+
+  it('accepts a csv file upload by extension', () => {
+    const file = new File(['name,value'], 'forecast.csv', {
+      type: 'application/octet-stream',
+    })
+
+    expect(validateDocumentUpload(file)).toMatchObject({
+      file,
+      fileType: 'csv',
+    })
+  })
+
+  it('rejects unsupported uploads', () => {
+    const file = new File(['hello'], 'notes.txt', {
+      type: 'text/plain',
+    })
+
+    expect(() => validateDocumentUpload(file)).toThrow(ApiError)
+    expect(() => validateDocumentUpload(file)).toThrow(
+      'Only PDF and CSV uploads are supported right now.'
+    )
+  })
+
+  it('reads an optional conversation id', () => {
+    expect(readOptionalConversationId(' conversation-123 ')).toBe(
+      'conversation-123'
+    )
+    expect(readOptionalConversationId('   ')).toBeNull()
+    expect(readOptionalConversationId(null)).toBeNull()
+  })
+})

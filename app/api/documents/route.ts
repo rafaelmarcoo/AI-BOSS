@@ -4,6 +4,7 @@ import { requireAuthenticatedUser } from '@/lib/auth'
 import { handleRouteError, successResponse } from '@/lib/api/responses'
 import {
   createDocumentRecord,
+  deleteDocumentFile,
   listUserDocuments,
   updateDocumentRecord,
   uploadDocumentFile,
@@ -43,18 +44,34 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       file,
     })
-    const document = await createDocumentRecord({
-      userId: user.id,
-      fileName: file.name,
-      fileType,
-      mimeType: file.type || 'application/octet-stream',
-      storagePath,
-      conversationId,
-    })
-    const processingDocument = await updateDocumentRecord(document.id, user.id, {
-      status: 'processing',
-      error_message: null,
-    })
+
+    let processingDocument
+
+    try {
+      const document = await createDocumentRecord({
+        userId: user.id,
+        fileName: file.name,
+        fileType,
+        mimeType: file.type || 'application/octet-stream',
+        storagePath,
+        conversationId,
+      })
+      processingDocument = await updateDocumentRecord(document.id, user.id, {
+        status: 'processing',
+        error_message: null,
+      })
+    } catch (error) {
+      try {
+        await deleteDocumentFile(storagePath)
+      } catch (cleanupError) {
+        console.error(
+          `Failed to clean up uploaded file for ${file.name}.`,
+          cleanupError
+        )
+      }
+
+      throw error
+    }
 
     after(async () => {
       await processDocument(processingDocument.id, user.id)

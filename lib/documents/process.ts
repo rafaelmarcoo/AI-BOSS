@@ -2,6 +2,7 @@ import { ApiError } from '@/lib/api/errors'
 import { logDocumentIngestion } from '@/lib/documents/log-document-ingestion'
 import { parseDocumentContent } from '@/lib/documents/parsing'
 import {
+  deleteDocumentFile,
   downloadDocumentFile,
   getDocumentById,
   replaceDocumentChunks,
@@ -45,6 +46,15 @@ export async function processDocument(documentId: string, userId: string) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Document processing failed.'
+
+    try {
+      await deleteDocumentFile(document.storage_path)
+    } catch (cleanupError) {
+      console.error(
+        `Failed to clean up storage object for ${document.file_name}.`,
+        cleanupError
+      )
+    }
 
     await updateDocumentRecord(document.id, document.user_id, {
       status: 'failed',

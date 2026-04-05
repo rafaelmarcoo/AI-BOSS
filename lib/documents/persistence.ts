@@ -46,6 +46,53 @@ function createStoragePath(userId: string, fileName: string) {
   return `${userId}/${randomUUID()}-${sanitizeFileName(fileName)}`
 }
 
+async function ensureDocumentsBucketExists() {
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase.storage.listBuckets()
+
+  if (error) {
+    console.error('Failed to list Supabase storage buckets.', error)
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to access document storage.',
+      error.message
+    )
+  }
+
+  const existingBucket = data?.find(
+    (bucket) => bucket.name === DOCUMENTS_STORAGE_BUCKET
+  )
+
+  if (existingBucket) {
+    return
+  }
+
+  const { error: createError } = await supabase.storage.createBucket(
+    DOCUMENTS_STORAGE_BUCKET,
+    {
+      public: false,
+      fileSizeLimit: '15MB',
+      allowedMimeTypes: [
+        'application/pdf',
+        'text/csv',
+        'application/csv',
+        'application/vnd.ms-excel',
+      ],
+    }
+  )
+
+  if (createError && createError.message !== 'Bucket already exists') {
+    console.error('Failed to create Supabase storage bucket.', createError)
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to initialize document storage.',
+      createError.message
+    )
+  }
+}
+
 export async function listUserDocuments(userId: string) {
   const supabase = createAdminSupabaseClient()
   const { data, error } = await supabase
@@ -65,6 +112,8 @@ export async function uploadDocumentFile(params: {
   userId: string
   file: File
 }) {
+  await ensureDocumentsBucketExists()
+
   const supabase = createAdminSupabaseClient()
   const storagePath = createStoragePath(params.userId, params.file.name)
   const { error } = await supabase.storage
@@ -75,11 +124,37 @@ export async function uploadDocumentFile(params: {
     })
 
   if (error) {
-    throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to upload document file.')
+    console.error('Failed to upload document file to Supabase Storage.', error)
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to upload document file.',
+      error.message
+    )
   }
 
   return {
     storagePath,
+  }
+}
+
+export async function deleteDocumentFile(storagePath: string) {
+  const supabase = createAdminSupabaseClient()
+  const { error } = await supabase.storage
+    .from(DOCUMENTS_STORAGE_BUCKET)
+    .remove([storagePath])
+
+  if (error) {
+    console.error(
+      'Failed to delete document file from Supabase Storage.',
+      error
+    )
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to clean up document file.',
+      error.message
+    )
   }
 }
 
@@ -108,7 +183,13 @@ export async function createDocumentRecord(params: {
     .single()
 
   if (error || !data) {
-    throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to create document.')
+    console.error('Failed to create document row.', error)
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to create document.',
+      error?.message
+    )
   }
 
   return data as DocumentSummary
@@ -147,7 +228,13 @@ export async function updateDocumentRecord(
     .single()
 
   if (error || !data) {
-    throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to update document.')
+    console.error('Failed to update document row.', error)
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to update document.',
+      error?.message
+    )
   }
 
   return data as DocumentSummary

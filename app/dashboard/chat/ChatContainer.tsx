@@ -11,8 +11,13 @@ import {
 } from "@mui/material";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import { ChatInput } from "./ChatInput";
+import { DocumentList } from "./DocumentList";
 import { ChatMessage } from "./ChatMessage";
-import type { ChatErrorState, ChatRecord } from "./types";
+import type {
+  ChatErrorState,
+  ChatRecord,
+  DocumentSummaryView,
+} from "./types";
 import { dashboardTokens } from "@/app/theme";
 
 interface ChatContainerProps {
@@ -20,11 +25,16 @@ interface ChatContainerProps {
   email: string;
   activeConversationTitle: string | null;
   conversationMessages: ChatRecord[];
+  documents: DocumentSummaryView[];
+  documentsLoading: boolean;
+  documentsError: string | null;
   historyLoading: boolean;
   loading: boolean;
+  uploading: boolean;
   error: ChatErrorState | null;
   onOpenHistory: () => void;
   onSendMessage: (input: string) => Promise<void>;
+  onUploadDocument: (file: File) => Promise<void>;
   onRetryMessage: () => Promise<void>;
 }
 
@@ -43,11 +53,16 @@ export function ChatContainer({
   email,
   activeConversationTitle,
   conversationMessages,
+  documents,
+  documentsLoading,
+  documentsError,
   historyLoading,
   loading,
+  uploading,
   error,
   onOpenHistory,
   onSendMessage,
+  onUploadDocument,
   onRetryMessage,
 }: ChatContainerProps) {
   const starterMessages = createStarterMessages(fullName, email);
@@ -124,6 +139,12 @@ export function ChatContainer({
           </Stack>
         </Box>
 
+        <DocumentList
+          documents={documents}
+          loading={documentsLoading}
+          error={documentsError}
+        />
+
         <Box
           sx={{
             flex: "1 1 0",
@@ -191,7 +212,12 @@ export function ChatContainer({
             bgcolor: dashboardTokens.sidebarV2,
           }}
         >
-          <ChatInput onSend={(value) => void onSendMessage(value)} disabled={loading} />
+          <ChatInput
+            onSend={(value) => void onSendMessage(value)}
+            onUploadDocument={onUploadDocument}
+            disabled={loading}
+            uploadDisabled={uploading}
+          />
         </Box>
       </Box>
     </Box>

@@ -127,10 +127,11 @@ async function parsePdfDocument(
   const parser = new PDFParse({ data: fileBytes })
 
   try {
-    const [textResult, infoResult] = await Promise.all([
-      parser.getText(),
-      parser.getInfo({ parsePageInfo: true }),
-    ])
+    // pdf-parse/pdfjs does not safely support these calls concurrently on the
+    // same parser instance. Running them sequentially avoids DataCloneError
+    // failures on otherwise valid PDFs.
+    const textResult = await parser.getText()
+    const infoResult = await parser.getInfo({ parsePageInfo: true })
     const pages: ParsedPdfPage[] = textResult.pages
       .map((page) => ({
         pageNumber: page.num,
@@ -161,6 +162,8 @@ async function parsePdfDocument(
     if (error instanceof ApiError) {
       throw error
     }
+
+    console.error(`Failed to parse PDF ${document.file_name}.`, error)
 
     throw new ApiError(
       500,

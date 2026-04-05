@@ -1,5 +1,6 @@
 import type { ChatMessageStatus, ChatRole } from "./ChatMessage";
 import type { Conversation } from "@/types/database";
+import type { DocumentSummary } from "@/lib/documents/types";
 
 export interface ChatRecord {
   id: string;
@@ -66,4 +67,26 @@ export interface ConversationMutationApiResponse {
 export interface ChatErrorState {
   message: string;
   failedMessageId: string | null;
+}
+
+export type DocumentSummaryView = DocumentSummary;
+
+export interface DocumentsApiResponse {
+  success: boolean;
+  data?: {
+    documents: DocumentSummaryView[];
+  };
+  error?: {
+    message?: string;
+  };
+}
+
+export interface UploadDocumentApiResponse {
+  success: boolean;
+  data?: {
+    document: DocumentSummaryView;
+  };
+  error?: {
+    message?: string;
+  };
 }

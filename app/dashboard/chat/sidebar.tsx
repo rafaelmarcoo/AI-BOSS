@@ -27,6 +27,7 @@ import ForumRoundedIcon from "@mui/icons-material/ForumRounded";
 import { dashboardTokens } from "@/app/theme";
 import { ChatContainer } from "./ChatContainer";
 import { useChatConversation } from "./useChatConversation";
+import { useDocuments } from "./useDocuments";
 
 interface ChatSidebarProps {
   fullName: string | null;
@@ -55,6 +56,13 @@ export function ChatSidebar({ fullName, email }: ChatSidebarProps) {
     renameConversation,
     deleteConversation,
   } = useChatConversation();
+  const {
+    documents,
+    documentsLoading,
+    uploading,
+    documentsError,
+    uploadDocument,
+  } = useDocuments(conversationId);
 
   const activeConversation =
     conversations.find((conversation) => conversation.id === conversationId) ?? null;
@@ -169,11 +177,16 @@ export function ChatSidebar({ fullName, email }: ChatSidebarProps) {
           email={email}
           activeConversationTitle={activeConversation?.title ?? null}
           conversationMessages={conversationMessages}
+          documents={documents}
+          documentsLoading={documentsLoading}
+          documentsError={documentsError}
           historyLoading={historyLoading}
           loading={loading}
+          uploading={uploading}
           error={error}
           onOpenHistory={() => setHistoryOpen(true)}
           onSendMessage={sendMessage}
+          onUploadDocument={uploadDocument}
           onRetryMessage={retryMessage}
         />
       </Box>

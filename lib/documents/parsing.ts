@@ -1,3 +1,5 @@
+import { join } from 'node:path'
+
 import { ApiError } from '@/lib/api/errors'
 import { createCsvChunks, createPdfChunks } from '@/lib/documents/chunking'
 import type {
@@ -5,6 +7,18 @@ import type {
   ParsedPdfPage,
 } from '@/lib/documents/types'
 import type { Document } from '@/types/database'
+
+interface PdfDocumentOptions {
+  data: Uint8Array
+  disableWorker: boolean
+  standardFontDataUrl: string
+  verbosity: number
+}
+
+const PDFJS_STANDARD_FONT_DATA_PATH = `${join(
+  process.cwd(),
+  'node_modules/pdfjs-dist/standard_fonts'
+)}/`
 
 function normalizeWhitespace(value: string) {
   return value
@@ -123,21 +137,37 @@ async function parsePdfDocument(
   document: Pick<Document, 'id' | 'user_id' | 'file_type' | 'file_name'>,
   fileBytes: Uint8Array
 ) {
-  const { PDFParse } = await import('pdf-parse')
-  const parser = new PDFParse({ data: fileBytes })
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  const loadingTask = pdfjs.getDocument({
+    data: fileBytes,
+    disableWorker: true,
+    standardFontDataUrl: PDFJS_STANDARD_FONT_DATA_PATH,
+    verbosity: pdfjs.VerbosityLevel.ERRORS,
+  } as PdfDocumentOptions)
 
   try {
-    // pdf-parse/pdfjs does not safely support these calls concurrently on the
-    // same parser instance. Running them sequentially avoids DataCloneError
-    // failures on otherwise valid PDFs.
-    const textResult = await parser.getText()
-    const infoResult = await parser.getInfo({ parsePageInfo: true })
-    const pages: ParsedPdfPage[] = textResult.pages
-      .map((page) => ({
-        pageNumber: page.num,
-        text: normalizeWhitespace(page.text),
-      }))
-      .filter((page) => page.text)
+    const pdf = await loadingTask.promise
+    const pages: ParsedPdfPage[] = []
+
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      const page = await pdf.getPage(pageNumber)
+      const textContent = await page.getTextContent()
+      const text = normalizeWhitespace(
+        textContent.items
+          .map((item) => ('str' in item ? item.str : ''))
+          .filter(Boolean)
+          .join(' ')
+      )
+
+      if (text) {
+        pages.push({
+          pageNumber,
+          text,
+        })
+      }
+
+      page.cleanup()
+    }
 
     if (pages.length === 0) {
       throw new ApiError(
@@ -150,7 +180,7 @@ async function parsePdfDocument(
     return {
       rawText: pages.map((page) => page.text).join('\n\n'),
       metadata: {
-        pageCount: infoResult.total,
+        pageCount: pdf.numPages,
       },
       chunks: createPdfChunks({
         documentId: document.id,
@@ -171,7 +201,7 @@ async function parsePdfDocument(
       `Failed to parse PDF ${document.file_name}.`
     )
   } finally {
-    await parser.destroy()
+    await loadingTask.destroy()
   }
 }
 

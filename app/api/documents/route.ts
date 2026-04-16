@@ -19,6 +19,8 @@ import type {
   DocumentsListResponse,
 } from '@/lib/documents/types'
 
+export const runtime = 'nodejs'
+
 export async function GET(request: NextRequest) {
   try {
     const { user } = await requireAuthenticatedUser(request)

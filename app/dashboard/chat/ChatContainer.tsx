@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -67,6 +67,7 @@ export function ChatContainer({
 }: ChatContainerProps) {
   const starterMessages = createStarterMessages(fullName, email);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const [documentsOpen, setDocumentsOpen] = useState(false);
   const messages =
     conversationMessages.length === 0 ? starterMessages : conversationMessages;
 
@@ -143,6 +144,8 @@ export function ChatContainer({
           documents={documents}
           loading={documentsLoading}
           error={documentsError}
+          open={documentsOpen}
+          onToggle={() => setDocumentsOpen((current) => !current)}
         />
 
         <Box

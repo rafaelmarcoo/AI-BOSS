@@ -1,6 +1,8 @@
+import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import { ChatMessagePayload } from '@/lib/api/validation'
 import { ApiError } from '@/lib/api/errors'
-import { createOpenAIChatCompletion } from '@/lib/openai/chat'
+import { runAgent } from '@/lib/ai/agent'
+import { CHAT_MODEL } from '@/lib/chat/system-prompt'
 import { logChatDecision } from '@/lib/chat/log-chat-decision'
 import {
   getOrCreateConversation,
@@ -41,19 +43,22 @@ export async function generateChatResponse(
   })
 
   const persistedMessages = await listConversationMessages(conversation.id, userId)
-  const completion = await createOpenAIChatCompletion(
-    mapConversationMessagesToPayload(persistedMessages)
-  )
-  const assistantMessage = {
-    role: 'assistant' as const,
-    content: completion.content,
-  }
+  const chatHistory = mapConversationMessagesToPayload(persistedMessages)
+    .filter((m) => m.role !== 'user' || m.content !== latestUserMessage.content)
+    .map((m) =>
+      m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content)
+    )
+
+  // Run the agent - tools will be registered here in Card 11
+  const agentResponse = await runAgent(latestUserMessage.content, chatHistory)
+
   const savedAssistantMessage = await insertConversationMessage({
     conversationId: conversation.id,
     userId,
-    role: assistantMessage.role,
-    content: assistantMessage.content,
+    role: 'assistant',
+    content: agentResponse,
   })
+
   const updatedConversationMessages = await listConversationMessages(
     conversation.id,
     userId
@@ -64,15 +69,15 @@ export async function generateChatResponse(
     conversationId: conversation.id,
     assistantMessageId: savedAssistantMessage.id,
     messages: mapConversationMessagesToPayload(updatedConversationMessages),
-    aiResponse: assistantMessage.content,
-    modelUsed: completion.model,
-    tokensUsed: completion.tokensUsed,
+    aiResponse: agentResponse,
+    modelUsed: CHAT_MODEL,
+    tokensUsed: null, // LangChain does not expose token counts at this level
     responseTimeMs: Date.now() - startedAt,
   })
 
   return {
     conversationId: conversation.id,
-    message: assistantMessage,
+    message: { role: 'assistant' as const, content: agentResponse },
     conversation: mapConversationMessagesToPayload(updatedConversationMessages),
   }
 }

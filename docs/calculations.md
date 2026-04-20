@@ -5,7 +5,8 @@
 **Formula:** `runway_months = (cash + AR - AP) / monthly_burn_rate`
 
 **Implemented in:** `lib/calculations/runway.ts` — `calculateRunway()`
-**API endpoint:** `POST /api/calculate/Runway`
+**Persistence service:** `lib/services/runway-service.ts`
+**API endpoint:** `POST /api/calculate/runway`
 
 ---
 
@@ -43,4 +44,6 @@ Cash alone understates available liquidity. AR is money already earned that will
 
 ### Where results are stored
 
-Runway results are saved to the `financial_snapshots` table in the `runway_months` column. See `docs/database-schema.md` for the full table definition.
+Runway results are saved to the `financial_snapshots` table in the `runway_months`
+column through the runway service. See `docs/database-schema.md` for the full
+table definition.

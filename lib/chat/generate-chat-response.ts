@@ -1,4 +1,5 @@
 import { HumanMessage, AIMessage } from '@langchain/core/messages'
+import { getAgentTools } from '@/lib/ai/tool-registry'
 import { ChatMessagePayload } from '@/lib/api/validation'
 import { ApiError } from '@/lib/api/errors'
 import { runAgent } from '@/lib/ai/agent'
@@ -48,8 +49,11 @@ export async function generateChatResponse(
       m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content)
     )
 
-  // Run the agent - tools will be registered here in Card 11
-  const agentResponse = await runAgent(latestUserMessage.content, chatHistory)
+  const agentResponse = await runAgent(
+    latestUserMessage.content,
+    chatHistory,
+    getAgentTools()
+  )
 
   const savedAssistantMessage = await insertConversationMessage({
     conversationId: conversation.id,
@@ -71,6 +75,7 @@ export async function generateChatResponse(
     aiResponse: agentResponse.content,
     modelUsed: CHAT_MODEL,
     tokensUsed: agentResponse.tokensUsed,
+    toolsUsed: agentResponse.toolsUsed,
     responseTimeMs: Date.now() - startedAt,
   })
 

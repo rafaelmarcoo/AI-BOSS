@@ -9,11 +9,17 @@ import {
 import { ApiError } from '@/lib/api/errors'
 import { CHAT_MODEL, AGENT_SYSTEM_PROMPT } from '@/lib/chat/system-prompt'
 import { adaptToolsToLangChain } from '@/lib/ai/tools'
-import type { StructuredTool } from '@/lib/tools/contracts'
+import type { AppTool } from '@/lib/tools/contracts'
+
+export interface AgentToolUsage {
+  tool: string
+  args: unknown
+}
 
 export interface AgentRunResult {
   content: string
   tokensUsed: number | null
+  toolsUsed: AgentToolUsage[]
 }
 
 function createAgentModel() {
@@ -49,7 +55,7 @@ function readTotalTokens(message: BaseMessage) {
 export async function runAgent(
   input: string,
   chatHistory: BaseMessage[] = [],
-  tools: Array<StructuredTool<unknown, unknown>> = [],
+  tools: AppTool[] = [],
 ): Promise<AgentRunResult> {
   const model = createAgentModel()
   const langChainTools = adaptToolsToLangChain(tools)
@@ -63,6 +69,7 @@ export async function runAgent(
 
   const MAX_ITERATIONS = 10
   let totalTokensUsed = 0
+  const toolsUsed: AgentToolUsage[] = []
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     const response = await llm.invoke(messages)
@@ -76,12 +83,18 @@ export async function runAgent(
             ? response.content
             : JSON.stringify(response.content),
         tokensUsed: totalTokensUsed > 0 ? totalTokensUsed : null,
+        toolsUsed,
       }
     }
 
     for (const toolCall of response.tool_calls) {
       const tool = langChainTools.find(t => t.name === toolCall.name)
       if (!tool) continue
+
+      toolsUsed.push({
+        tool: toolCall.name,
+        args: toolCall.args,
+      })
 
       const result = await tool.invoke(toolCall.args)
       messages.push(new ToolMessage({ content: String(result), tool_call_id: toolCall.id ?? '' }))

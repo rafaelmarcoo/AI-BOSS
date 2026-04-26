@@ -23,6 +23,7 @@ try {
 }
 
 import { runAgent } from '../lib/ai/agent'
+import { getAgentTools } from '../lib/ai/tool-registry'
 
 const DIVIDER = '─'.repeat(60)
 
@@ -32,9 +33,18 @@ async function runTest(label: string, input: string) {
   console.log(`USER: ${input}`)
   console.log(DIVIDER)
 
-  const response = await runAgent(input)
+  const response = await runAgent(input, [], getAgentTools())
   console.log(`AGENT: ${response.content}`)
   console.log(`TOKENS: ${response.tokensUsed ?? 'unknown'}`)
+  console.log(
+    `TOOLS: ${
+      response.toolsUsed.length > 0
+        ? response.toolsUsed
+            .map(({ tool, args }) => `${tool} ${JSON.stringify(args)}`)
+            .join(', ')
+        : 'none'
+    }`
+  )
 }
 
 async function main() {
@@ -52,12 +62,12 @@ async function main() {
   )
 
   await runTest(
-    'Financial question (no tools)',
+    'Financial question',
     'What is cash runway and why does it matter for my business?'
   )
 
   await runTest(
-    'Runway question (no tools registered yet)',
+    'Runway question (tool-enabled)',
     "What's my runway if I have $100,000 cash, $20,000 in receivables, $5,000 in payables, and I burn $10,000 a month?"
   )
 

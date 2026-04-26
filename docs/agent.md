@@ -44,7 +44,7 @@ import { calculateRunwayTool } from '@/lib/tools/financial/calculate-runway'
 const response = await runAgent(input, chatHistory, [calculateRunwayTool])
 ```
 
-Card 11 registers the first tool — `calculate_runway`.
+The current app registry lives in `lib/ai/tool-registry.ts` and registers the first tool: `calculate_runway`.
 
 ---
 
@@ -53,6 +53,7 @@ Card 11 registers the first tool — `calculate_runway`.
 | File | Purpose |
 |------|---------|
 | `lib/ai/agent.ts` | Agent logic and tool-calling loop |
+| `lib/ai/tool-registry.ts` | App-owned tool registry for the agent |
 | `lib/chat/system-prompt.ts` | Model name and system prompts |
 | `lib/ai/tools.ts` | Adapter from app tools into LangChain tools |
 | `scripts/test-agent.ts` | Local test script — run with `npm run test:agent` |

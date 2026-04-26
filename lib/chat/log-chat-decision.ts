@@ -1,6 +1,7 @@
 import { ApiError } from '@/lib/api/errors'
 import { ChatMessagePayload } from '@/lib/api/validation'
 import { createAdminSupabaseClient } from '@/lib/supabase'
+import type { AgentToolUsage } from '@/lib/ai/agent'
 
 interface LogChatDecisionParams {
   userId: string
@@ -10,6 +11,7 @@ interface LogChatDecisionParams {
   aiResponse: string
   modelUsed: string
   tokensUsed: number | null
+  toolsUsed: AgentToolUsage[]
   responseTimeMs: number
 }
 
@@ -21,6 +23,7 @@ export async function logChatDecision({
   aiResponse,
   modelUsed,
   tokensUsed,
+  toolsUsed,
   responseTimeMs,
 }: LogChatDecisionParams) {
   const lastUserMessage = [...messages]
@@ -48,7 +51,7 @@ export async function logChatDecision({
     user_query: lastUserMessage.content,
     ai_response: aiResponse,
     conversation_history: messages,
-    tools_used: [],
+    tools_used: toolsUsed,
     data_accessed: null,
     calculations: null,
     model_used: modelUsed,

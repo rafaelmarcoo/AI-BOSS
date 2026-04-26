@@ -1,5 +1,8 @@
 import { tool, type StructuredTool as LangChainStructuredTool } from '@langchain/core/tools'
-import type { StructuredTool as AppStructuredTool } from '@/lib/tools/contracts'
+import type {
+  AppTool,
+  StructuredTool as AppStructuredTool,
+} from '@/lib/tools/contracts'
 
 export function adaptToolToLangChain<TInput, TOutput>(
   appTool: AppStructuredTool<TInput, TOutput>
@@ -15,7 +18,7 @@ export function adaptToolToLangChain<TInput, TOutput>(
 }
 
 export function adaptToolsToLangChain(
-  appTools: Array<AppStructuredTool<unknown, unknown>>
+  appTools: AppTool[]
 ): LangChainStructuredTool[] {
   return appTools.map(adaptToolToLangChain)
 }

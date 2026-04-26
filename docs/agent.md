@@ -33,7 +33,9 @@ The loop has a maximum of 10 iterations to prevent infinite loops.
 
 ## Registering Tools
 
-Tools are passed into `runAgent()` as an array. Each tool must extend `StructuredTool` from `@langchain/core/tools`.
+Tools are passed into `runAgent()` as an array. In the current LangChain implementation, those entries are LangChain `StructuredTool`s.
+
+For the wider application architecture, treat the agent as the orchestration layer and keep reusable business tooling behind the `lib/tools/` boundary that exists on `main`. That keeps financial logic portable for future MCP-style adapters, policy enforcement, and explainable tool responses.
 
 ```ts
 import { runAgent } from '@/lib/ai/agent'
@@ -51,4 +53,4 @@ Card 11 registers the first tool — `calculate_runway`.
 |------|---------|
 | `lib/ai/agent.ts` | Agent logic and tool-calling loop |
 | `lib/chat/system-prompt.ts` | Model name and system prompts |
-| `Scripts/test-agent.ts` | Local test script — run with `npm run test:agent` |
+| `scripts/test-agent.ts` | Local test script — run with `npm run test:agent` |

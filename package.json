@@ -8,14 +8,18 @@
     "start": "next start",
     "lint": "eslint",
     "test": "jest --passWithNoTests",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "test:agent": "tsx scripts/test-agent.ts"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
+    "@langchain/core": "^1.1.38",
+    "@langchain/openai": "^1.4.1",
     "@mui/icons-material": "^7.3.9",
     "@mui/material": "^7.3.9",
     "@supabase/supabase-js": "^2.99.3",
+    "langchain": "^1.2.39",
     "next": "16.2.1",
     "pdfjs-dist": "^5.4.296",
     "react": "19.2.4",
@@ -37,6 +41,7 @@
     "jest": "^30.3.0",
     "jest-environment-jsdom": "^30.3.0",
     "tailwindcss": "^4",
+    "tsx": "^4.19.4",
     "typescript": "^5"
   }
 }

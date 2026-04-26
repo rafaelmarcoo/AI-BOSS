@@ -85,6 +85,8 @@ AI-BOSS/
 ├── components/           # React components
 ├── db/                   # Supabase/Postgres helpers and SQL scripts
 ├── docs/                 # Project documentation and guides
+├── scripts/              # Manual developer scripts and local AI harnesses
+├── __tests__/            # Automated Jest tests
 ├── lib/                  # Utilities, helpers, supabase clients
 ├── public/               # Static assets
 ├── types/                # Shared TypeScript types
@@ -149,7 +151,14 @@ npm run start        # Start production server
 npm run lint         # Run ESLint
 npm test             # Run Jest test suite
 npm run test:watch   # Run Jest in watch mode
+npm run test:agent   # Run the local LangChain agent harness
 ```
+
+### Scripts vs tests
+
+- Use `scripts/` for manual developer-run entrypoints such as local AI harnesses, migration helpers, or one-off verification tools.
+- Use `__tests__/` or feature-local `__tests__/` folders for automated Jest coverage that should be safe to run in CI.
+- Prefer automated tests for deterministic logic. Keep scripts for flows that require live APIs, local credentials, or human inspection.
 
 ## 🧪 Testing
 
@@ -186,13 +195,30 @@ If no tests have been written yet, Jest may report that no tests were found. Tha
 
 ### Recommended test structure
 
-Keep tests inside a root `__tests__/` folder so the structure stays easy to scan as the project grows:
+The repo currently uses two valid patterns:
+
+- Root `__tests__/` for cross-cutting app or library tests
+- Feature-local `__tests__/` folders for tightly scoped domain logic
+
+Examples from `main` include document tests in root `__tests__/` and calculation tests colocated near the implementation.
+
+A good default is:
 
 ```text
 __tests__/
 ├── api/          # Route handler tests
 ├── components/   # React component tests
 └── lib/          # Pure utility and business-logic tests
+```
+
+For feature-local tests, keep the same naming convention inside the feature folder:
+
+```text
+lib/
+└── calculations/
+    ├── runway.ts
+    └── __tests__/
+        └── runway.test.ts
 ```
 
 Use these naming conventions:
@@ -204,7 +230,7 @@ Examples:
 
 - `__tests__/components/chat-message.test.tsx`
 - `__tests__/api/health.route.test.ts`
-- `__tests__/lib/runway.test.ts`
+- `lib/calculations/__tests__/runway.test.ts`
 
 ### What we should test
 

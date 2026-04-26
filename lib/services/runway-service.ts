@@ -12,6 +12,10 @@ export interface StoredRunwayResult {
   snapshotStored: true
 }
 
+export function calculateRunwayResult(input: RunwayInput): RunwayResult {
+  return calculateRunway(input)
+}
+
 export function validateRunwayInput(input: unknown): RunwayInput {
   const parsed = RunwayInputSchema.safeParse(input)
 
@@ -31,7 +35,7 @@ export async function calculateAndStoreRunwaySnapshot(
   userId: string,
   input: RunwayInput
 ): Promise<StoredRunwayResult> {
-  const result = calculateRunway(input)
+  const result = calculateRunwayResult(input)
   const supabase = createAdminSupabaseClient()
   const { error } = await supabase.from('financial_snapshots').insert({
     user_id: userId,

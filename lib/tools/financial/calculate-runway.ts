@@ -1,9 +1,9 @@
 import {
-  calculateRunway,
   RunwayInput,
   RunwayInputSchema,
   RunwayResult,
 } from '@/lib/calculations/runway'
+import { calculateRunwayResult } from '@/lib/services/runway-service'
 import { StructuredTool } from '@/lib/tools/contracts'
 
 export const calculateRunwayTool: StructuredTool<RunwayInput, RunwayResult> = {
@@ -12,6 +12,6 @@ export const calculateRunwayTool: StructuredTool<RunwayInput, RunwayResult> = {
     'Calculate runway months from cash, accounts receivable, accounts payable, and burn rate.',
   inputSchema: RunwayInputSchema,
   handler(input) {
-    return calculateRunway(input)
+    return calculateRunwayResult(input)
   },
 }

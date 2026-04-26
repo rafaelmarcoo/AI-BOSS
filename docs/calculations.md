@@ -6,6 +6,7 @@
 
 **Implemented in:** `lib/calculations/runway.ts` — `calculateRunway()`
 **Persistence service:** `lib/services/runway-service.ts`
+**Agent tool wrapper:** `lib/tools/financial/calculate-runway.ts`
 **API endpoint:** `POST /api/calculate/runway`
 
 ---
@@ -44,6 +45,11 @@ Cash alone understates available liquidity. AR is money already earned that will
 
 ### Where results are stored
 
-Runway results are saved to the `financial_snapshots` table in the `runway_months`
+Runway calculation is shared across two consumers:
+
+- the direct API route, which validates inputs and stores a snapshot through the runway service
+- the chat agent tool, which reuses the shared runway service calculation operation without storing a snapshot
+
+Runway snapshots are saved to the `financial_snapshots` table in the `runway_months`
 column through the runway service. See `docs/database-schema.md` for the full
 table definition.

@@ -33,7 +33,8 @@ async function runTest(label: string, input: string) {
   console.log(DIVIDER)
 
   const response = await runAgent(input)
-  console.log(`AGENT: ${response}`)
+  console.log(`AGENT: ${response.content}`)
+  console.log(`TOKENS: ${response.tokensUsed ?? 'unknown'}`)
 }
 
 async function main() {

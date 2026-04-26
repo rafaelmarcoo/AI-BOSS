@@ -43,8 +43,7 @@ export async function generateChatResponse(
   })
 
   const persistedMessages = await listConversationMessages(conversation.id, userId)
-  const chatHistory = mapConversationMessagesToPayload(persistedMessages)
-    .filter((m) => m.role !== 'user' || m.content !== latestUserMessage.content)
+  const chatHistory = mapConversationMessagesToPayload(persistedMessages.slice(0, -1))
     .map((m) =>
       m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content)
     )
@@ -56,7 +55,7 @@ export async function generateChatResponse(
     conversationId: conversation.id,
     userId,
     role: 'assistant',
-    content: agentResponse,
+    content: agentResponse.content,
   })
 
   const updatedConversationMessages = await listConversationMessages(
@@ -69,15 +68,15 @@ export async function generateChatResponse(
     conversationId: conversation.id,
     assistantMessageId: savedAssistantMessage.id,
     messages: mapConversationMessagesToPayload(updatedConversationMessages),
-    aiResponse: agentResponse,
+    aiResponse: agentResponse.content,
     modelUsed: CHAT_MODEL,
-    tokensUsed: null, // LangChain does not expose token counts at this level
+    tokensUsed: agentResponse.tokensUsed,
     responseTimeMs: Date.now() - startedAt,
   })
 
   return {
     conversationId: conversation.id,
-    message: { role: 'assistant' as const, content: agentResponse },
+    message: { role: 'assistant' as const, content: agentResponse.content },
     conversation: mapConversationMessagesToPayload(updatedConversationMessages),
   }
 }

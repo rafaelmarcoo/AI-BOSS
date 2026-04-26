@@ -51,4 +51,4 @@ Card 11 registers the first tool — `calculate_runway`.
 |------|---------|
 | `lib/ai/agent.ts` | Agent logic and tool-calling loop |
 | `lib/chat/system-prompt.ts` | Model name and system prompts |
-| `scripts/test-agent.ts` | Local test script — run with `npm run test:agent` |
+| `Scripts/test-agent.ts` | Local test script — run with `npm run test:agent` |

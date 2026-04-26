@@ -13,7 +13,7 @@ AI-BOSS uses a LangChain-powered agent to handle user queries. The agent support
 
 | Setting | Value |
 |---------|-------|
-| Model | `gpt-4o-mini` |
+| Model | `gpt-4o-mini-2024-07-18` |
 | Temperature | `0` (deterministic responses) |
 | Provider | OpenAI via `@langchain/openai` |
 
@@ -33,12 +33,13 @@ The loop has a maximum of 10 iterations to prevent infinite loops.
 
 ## Registering Tools
 
-Tools are passed into `runAgent()` as an array. In the current LangChain implementation, those entries are LangChain `StructuredTool`s.
+Tools are passed into `runAgent()` as an array of app-owned tools from `lib/tools/`. The agent adapts them into LangChain tools internally.
 
-For the wider application architecture, treat the agent as the orchestration layer and keep reusable business tooling behind the `lib/tools/` boundary that exists on `main`. That keeps financial logic portable for future MCP-style adapters, policy enforcement, and explainable tool responses.
+For the wider application architecture, treat the agent as the orchestration layer and keep reusable business tooling behind the `lib/tools/` boundary. That keeps financial logic portable for future MCP-style adapters, policy enforcement, and explainable tool responses.
 
 ```ts
 import { runAgent } from '@/lib/ai/agent'
+import { calculateRunwayTool } from '@/lib/tools/financial/calculate-runway'
 
 const response = await runAgent(input, chatHistory, [calculateRunwayTool])
 ```
@@ -53,4 +54,5 @@ Card 11 registers the first tool — `calculate_runway`.
 |------|---------|
 | `lib/ai/agent.ts` | Agent logic and tool-calling loop |
 | `lib/chat/system-prompt.ts` | Model name and system prompts |
+| `lib/ai/tools.ts` | Adapter from app tools into LangChain tools |
 | `scripts/test-agent.ts` | Local test script — run with `npm run test:agent` |

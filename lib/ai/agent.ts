@@ -1,5 +1,4 @@
 import { ChatOpenAI } from '@langchain/openai'
-import { StructuredTool } from '@langchain/core/tools'
 import {
   AIMessage,
   BaseMessage,
@@ -9,6 +8,8 @@ import {
 } from '@langchain/core/messages'
 import { ApiError } from '@/lib/api/errors'
 import { CHAT_MODEL, AGENT_SYSTEM_PROMPT } from '@/lib/chat/system-prompt'
+import { adaptToolsToLangChain } from '@/lib/ai/tools'
+import type { StructuredTool } from '@/lib/tools/contracts'
 
 export interface AgentRunResult {
   content: string
@@ -48,10 +49,11 @@ function readTotalTokens(message: BaseMessage) {
 export async function runAgent(
   input: string,
   chatHistory: BaseMessage[] = [],
-  tools: StructuredTool[] = [],
+  tools: Array<StructuredTool<unknown, unknown>> = [],
 ): Promise<AgentRunResult> {
   const model = createAgentModel()
-  const llm = tools.length > 0 ? model.bindTools(tools) : model
+  const langChainTools = adaptToolsToLangChain(tools)
+  const llm = langChainTools.length > 0 ? model.bindTools(langChainTools) : model
 
   const messages: BaseMessage[] = [
     new SystemMessage(AGENT_SYSTEM_PROMPT),
@@ -78,7 +80,7 @@ export async function runAgent(
     }
 
     for (const toolCall of response.tool_calls) {
-      const tool = tools.find(t => t.name === toolCall.name)
+      const tool = langChainTools.find(t => t.name === toolCall.name)
       if (!tool) continue
 
       const result = await tool.invoke(toolCall.args)

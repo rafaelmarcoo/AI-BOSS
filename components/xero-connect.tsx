@@ -64,16 +64,23 @@ export default function XeroConnect({ onStatusChange }: XeroConnectProps) {
     const params = new URLSearchParams(window.location.search)
     const xeroParam = params.get('xero')
 
-    if (xeroParam === 'connected') {
-      setToast({ message: 'Xero connected successfully!', severity: 'success' })
-      const url = new URL(window.location.href)
-      url.searchParams.delete('xero')
-      window.history.replaceState({}, '', url.toString()) // remove ?xero= without page reload
-    } else if (xeroParam === 'error') {
-      setToast({ message: 'Failed to connect to Xero. Please try again.', severity: 'error' })
+    if (xeroParam) {
+      // Clean the URL regardless of which param value we got
       const url = new URL(window.location.href)
       url.searchParams.delete('xero')
       window.history.replaceState({}, '', url.toString())
+
+      if (xeroParam === 'connected') {
+        setToast({ message: 'Xero connected successfully!', severity: 'success' })
+      } else if (xeroParam === 'no_tenant') {
+        // This happens when the user's Xero account exists but has no organisation set up
+        setToast({
+          message: 'No Xero organisation found. Please make sure you have a company set up in Xero.',
+          severity: 'error',
+        })
+      } else if (xeroParam === 'error') {
+        setToast({ message: 'Failed to connect to Xero. Please try again.', severity: 'error' })
+      }
     }
   }, [fetchStatus])
 

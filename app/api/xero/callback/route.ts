@@ -82,17 +82,6 @@ export async function GET(request: NextRequest) {
     const encryptedAccess = await encryptToken(tokens.access_token)
     const encryptedRefresh = await encryptToken(tokens.refresh_token)
 
-    /*await supabase.from('xero_connections').upsert({
-      user_id: user.id,
-      tenant_id: tenant.tenantId,
-      tenant_name: tenant.tenantName,
-      access_token_enc: encryptedAccess,
-      refresh_token_enc: encryptedRefresh,
-      expires_at: expiresAt,
-      connected_at: new Date().toISOString(),
-    })
-
-    return NextResponse.redirect(`${appUrl}/dashboard?xero=connected`)*/
     const { error: upsertError } = await supabase.from('xero_connections').upsert({
       user_id: user.id,
       tenant_id: tenant.tenantId,

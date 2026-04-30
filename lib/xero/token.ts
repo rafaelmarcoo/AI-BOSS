@@ -76,7 +76,7 @@ export async function getValidXeroToken(userId: string): Promise<string> {
   const encryptedAccess = await encryptToken(tokens.access_token)
   const encryptedRefresh = await encryptToken(tokens.refresh_token)
 
-  await supabase
+  const { error: updateError } = await supabase
     .from('xero_connections')
     .update({
       access_token_enc: encryptedAccess,
@@ -84,8 +84,12 @@ export async function getValidXeroToken(userId: string): Promise<string> {
       expires_at: newExpiresAt,
     })
     .eq('user_id', userId)
+  
+  // If we can't save the new tokens, throw so the calling route knows
+  if (updateError) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to save refreshed Xero tokens.')
+   }
 
-  // Return the plain text access token so the calling route can use it immediately
-  // No need to decrypt it again — we already have it from the refresh response
   return tokens.access_token
+
 }

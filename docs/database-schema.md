@@ -199,4 +199,32 @@ Planned for Sprint 2+:
 
 ---
 
+## xero_connections
+
+Stores Xero OAuth tokens per user after they connect their Xero account.
+Tokens are encrypted using AES-256-GCM before storage — see `lib/xero/crypto.ts`.
+
+| Column | Type | Description |
+|---|---|---|
+| id | UUID | Primary key |
+| user_id | UUID | References public.users(id) |
+| tenant_id | TEXT | Xero organisation ID |
+| tenant_name | TEXT | e.g. "Demo Company (NZ)" |
+| access_token_enc | TEXT | AES-256-GCM encrypted access token |
+| refresh_token_enc | TEXT | AES-256-GCM encrypted refresh token |
+| expires_at | TIMESTAMPTZ | When the access token expires |
+| connected_at | TIMESTAMPTZ | When the user first connected |
+
+## xero_oauth_states
+
+Temporary table used only during the OAuth handshake for CSRF protection.
+Rows are created in `/api/xero/connect` and deleted immediately in `/api/xero/callback`.
+
+| Column | Type | Description |
+|---|---|---|
+| id | UUID | Primary key |
+| user_id | UUID | References public.users(id) |
+| state | TEXT | Random UUID used as CSRF token |
+| created_at | TIMESTAMPTZ | When the state was created |
+
 **Last Updated:** March 22, 2025 by Rafael Manubay

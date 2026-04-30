@@ -72,8 +72,6 @@ export async function GET(request: NextRequest) {
       tenantName: string
     }>
 
-    // Debug log — remove before opening PR
-    console.log('Xero connections:', JSON.stringify(connections))
 
     const tenant = connections[0]
     if (!tenant) {

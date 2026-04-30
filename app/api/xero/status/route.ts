@@ -13,17 +13,14 @@ export async function GET(request: NextRequest) {
     const { user } = await requireAuthenticatedUser(request)
     const supabase = createAdminSupabaseClient()
 
-    console.log('Status check for user:', user.id)
 
     // Look up the Xero connection for this user
-    const { data: connection, error: connError } = await supabase
+    const { data: connection } = await supabase
       .from('xero_connections')
       .select('tenant_id, tenant_name, connected_at, expires_at')
       .eq('user_id', user.id)
       .single()
 
-    console.log('Connection found:', JSON.stringify(connection))
-    console.log('Connection error:', JSON.stringify(connError))
 
     if (!connection) {
       return successResponse({ connected: false })

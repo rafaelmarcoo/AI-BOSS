@@ -15,11 +15,14 @@ export async function getValidXeroToken(userId: string): Promise<string> {
     .from('xero_connections')
     .select('access_token_enc, refresh_token_enc, expires_at')
     .eq('user_id', userId)
-    .single()
+    .maybeSingle()
 
-  // If no connection found the user hasn't connected Xero yet
+  // If no connection found the user hasn't connected Xero yet - Error 500
   // or they disconnected — throw a 404 so the route can handle it
-  if (error || !connection) {
+  if (error) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to load Xero connection.')
+  }
+  if (!connection) {
     throw new ApiError(404, 'NOT_FOUND', 'No Xero connection found for user.')
   }
 
@@ -47,6 +50,7 @@ export async function getValidXeroToken(userId: string): Promise<string> {
   // Xero returns a brand new access token and refresh token
   const response = await fetch('https://identity.xero.com/connect/token', {
     method: 'POST',
+    signal: AbortSignal.timeout(10_000),
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
       Authorization: `Basic ${Buffer.from(`${XERO_CLIENT_ID}:${XERO_CLIENT_SECRET}`).toString('base64')}`,

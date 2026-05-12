@@ -1,6 +1,7 @@
 import { Box, Button, Paper, Stack, Typography } from "@mui/material";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import { dashboardTokens } from "@/app/theme";
+import { XeroConnect } from "@/components/xero-connect";
 import { MetricCard } from "../MetricCard";
 import { BurnRateChart } from "../BurnRateChart";
 import { RecentActivity } from "../RecentActivity";
@@ -97,6 +98,8 @@ export function RunwaySection({ metrics }: RunwaySectionProps) {
             </Button>
           </Stack>
         </Paper>
+
+        <XeroConnect />
 
         {/* Metric Cards */}
         <Box

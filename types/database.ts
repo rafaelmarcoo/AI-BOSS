@@ -82,6 +82,25 @@ export interface DocumentChunk {
   created_at: string
 }
 
+export interface XeroConnection {
+  id: string
+  user_id: string
+  tenant_id: string
+  tenant_name: string
+  access_token_enc: string
+  refresh_token_enc: string
+  expires_at: string
+  connected_at: string
+  updated_at: string
+}
+
+export interface XeroOAuthState {
+  id: string
+  user_id: string
+  state: string
+  created_at: string
+}
+
 export interface DecisionLog {
   id: string
   user_id: string

@@ -2,13 +2,13 @@
 
 **Database:** Supabase (PostgreSQL)  
 **Created:** March 22, 2025  
-**Last Updated:** March 31, 2026
+**Last Updated:** May 12, 2026
 
 ---
 
 ## Overview
 
-The database now consists of 8 main tables:
+The database now consists of 10 main tables:
 - **users** - User profiles (extends Supabase Auth)
 - **conversations** - User-owned chat threads
 - **conversation_messages** - Individual chat messages inside a thread
@@ -17,6 +17,8 @@ The database now consists of 8 main tables:
 - **decision_log** - Audit trail of AI actions, tool usage, retrieval, and calculations
 - **documents** - Uploaded user files stored in Supabase Storage
 - **document_chunks** - Chunked document content used for semantic retrieval
+- **xero_connections** - Encrypted Xero OAuth connection per user
+- **xero_oauth_states** - Temporary OAuth state values used for CSRF protection
 
 ---
 
@@ -262,6 +264,54 @@ Stores chunked document content and embeddings for semantic retrieval.
 
 ---
 
+### 9. xero_connections
+
+Stores the current Xero OAuth connection for a user. Tokens are encrypted with
+AES-GCM before storage and are only decrypted server-side when calling Xero or
+revoking a connection.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID (PK) | Primary key |
+| user_id | UUID (FK) | References users(id), unique per user |
+| tenant_id | TEXT | Xero organisation ID |
+| tenant_name | TEXT | Xero organisation display name |
+| access_token_enc | TEXT | Encrypted Xero access token |
+| refresh_token_enc | TEXT | Encrypted Xero refresh token |
+| expires_at | TIMESTAMP | Access token expiry |
+| connected_at | TIMESTAMP | Time the user connected Xero |
+| updated_at | TIMESTAMP | Last token refresh or connection update |
+
+**RLS Policies:**
+- Users can view, insert, update, and delete their own Xero connection only
+
+**Indexes:**
+- `idx_xero_connections_user_id` on user_id
+
+---
+
+### 10. xero_oauth_states
+
+Stores short-lived state values during the Xero OAuth redirect flow. A state row
+is created when the user starts connecting Xero and deleted after callback
+validation.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID (PK) | Primary key |
+| user_id | UUID (FK) | References users(id), unique per user |
+| state | TEXT | Random OAuth state value used for CSRF protection |
+| created_at | TIMESTAMP | State creation time |
+
+**RLS Policies:**
+- Users can view, insert, update, and delete their own OAuth state only
+
+**Indexes:**
+- `idx_xero_oauth_states_user_id` on user_id
+- `idx_xero_oauth_states_created_at` on created_at (DESC)
+
+---
+
 ## Relationships
 ```
 users (1) ──< (many) conversations
@@ -271,6 +321,8 @@ users (1) ──< (many) policy_rules
 users (1) ──< (many) decision_log
 users (1) ──< (many) documents
 documents (1) ──< (many) document_chunks
+users (1) ──< (one) xero_connections
+users (1) ──< (one) xero_oauth_states
 ```
 
 ---
@@ -281,6 +333,7 @@ All schema changes are tracked in `db/migrations/`:
 - `001_initial_schema.sql` - Initial database setup
 - `002_add_conversation_history_to_decision_log.sql` - Adds a dedicated JSONB field for chat transcripts
 - `003_chat_rag_schema_foundation.sql` - Adds chat history tables, document tables, and vector-ready chunk storage
+- `004_xero_oauth.sql` - Adds encrypted Xero OAuth connections and temporary OAuth states
 
 ---
 
@@ -330,11 +383,10 @@ ORDER BY created_at ASC;
 ## Future Enhancements
 
 Planned for Sprint 2+:
-- **xero_connections** table - Store Xero OAuth tokens
 - **scenarios** table - Store "what-if" scenario configurations
 - **forecasts** table - Store AI-generated forecasts
 - **document extraction pipeline** - Promote uploaded document data into structured financial snapshots
 
 ---
 
-**Last Updated:** March 31, 2026 by Rafael Manubay
+**Last Updated:** May 12, 2026 by Rafael Manubay

@@ -8,11 +8,11 @@
 
 ## Overview
 
-The database now consists of 11 main tables:
+The database now consists of 12 main tables:
 - **users** - User profiles (extends Supabase Auth)
 - **conversations** - User-owned chat threads
 - **conversation_messages** - Individual chat messages inside a thread
-- **financial_snapshots** - Point-in-time financial data from Xero
+- **financial_snapshots** - Legacy point-in-time financial data snapshots
 - **policy_rules** - Business rules and compliance policies
 - **decision_log** - Audit trail of AI actions, tool usage, retrieval, and calculations
 - **documents** - Uploaded user files stored in Supabase Storage
@@ -20,6 +20,7 @@ The database now consists of 11 main tables:
 - **data_connections** - Provider-neutral registry for user financial data sources
 - **xero_connections** - Xero-specific encrypted OAuth credential/details table
 - **oauth_connection_states** - Temporary OAuth state values used for CSRF protection
+- **financial_metric_observations** - Source-aware normalized financial metric values
 
 ---
 
@@ -97,7 +98,9 @@ Stores the actual user/assistant transcript for each conversation.
 
 ### 4. financial_snapshots
 
-Stores financial data snapshots from Xero (or manual entry).
+Legacy table for financial data snapshots from Xero (or manual entry). New
+source-aware dashboard, tool, and agent workflows should use
+`financial_metric_observations` instead.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -350,11 +353,50 @@ callback validation.
 
 ---
 
+### 12. financial_metric_observations
+
+Stores normalized financial metric values from Xero, uploaded documents, manual
+inputs, and demo data. This table is the long-term source of truth for
+source-aware metric values. Each row is one observation for one metric key from
+one source/period, rather than a wide snapshot of all metrics.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID (PK) | Primary key |
+| user_id | UUID (FK) | References users(id) |
+| connection_id | UUID (FK) | Optional source connection from data_connections |
+| document_id | UUID (FK) | Optional uploaded document source |
+| metric_key | TEXT | Canonical key: `cash`, `accounts_receivable`, `accounts_payable`, `monthly_revenue`, `monthly_expenses`, `burn_rate`, or `runway_months` |
+| value | NUMERIC(18,4) | Normalized metric value |
+| currency | TEXT | Optional ISO currency code such as `NZD` or `AUD` |
+| period_start | DATE | Optional period start for period-based metrics |
+| period_end | DATE | Optional period end for period-based metrics |
+| as_of_date | DATE | Optional point-in-time date for balance metrics |
+| source_type | TEXT | `xero`, `document`, `manual`, or `demo` |
+| source_label | TEXT | User-facing source label |
+| confidence | NUMERIC(4,3) | Confidence score from 0 to 1 |
+| evidence | JSONB | Evidence reference such as document page, row range, chunk, URL, or excerpt |
+| raw_data | JSONB | Source-specific raw extraction/normalization payload |
+| created_at | TIMESTAMP | Record creation time |
+| updated_at | TIMESTAMP | Last update time |
+
+**RLS Policies:**
+- Users can view, insert, update, and delete their own metric observations only
+
+**Indexes:**
+- `idx_financial_metric_observations_user_metric_updated` on (user_id, metric_key, updated_at DESC)
+- `idx_financial_metric_observations_user_source` on (user_id, source_type)
+- `idx_financial_metric_observations_connection_id` on connection_id
+- `idx_financial_metric_observations_document_id` on document_id
+- `idx_financial_metric_observations_as_of_date` on as_of_date (DESC)
+
+---
+
 ## Relationships
 ```
 users (1) ──< (many) conversations
 conversations (1) ──< (many) conversation_messages
-users (1) ──< (many) financial_snapshots
+users (1) ──< (many) financial_snapshots [legacy]
 users (1) ──< (many) policy_rules
 users (1) ──< (many) decision_log
 users (1) ──< (many) documents
@@ -362,6 +404,9 @@ documents (1) ──< (many) document_chunks
 users (1) ──< (many) data_connections
 data_connections (1) ──< (one) xero_connections
 users (1) ──< (many) oauth_connection_states
+users (1) ──< (many) financial_metric_observations
+data_connections (1) ──< (many) financial_metric_observations
+documents (1) ──< (many) financial_metric_observations
 ```
 
 ---
@@ -374,6 +419,7 @@ All schema changes are tracked in `db/migrations/`:
 - `003_chat_rag_schema_foundation.sql` - Adds chat history tables, document tables, and vector-ready chunk storage
 - `004_xero_oauth.sql` - Adds encrypted Xero OAuth connections and temporary OAuth states
 - `005_data_connections_foundation.sql` - Adds provider-neutral data connections, generic OAuth states, links Xero credentials, and drops the old Xero-only OAuth state table
+- `006_financial_metric_observations.sql` - Adds source-aware normalized financial metric observation storage
 
 ---
 
@@ -387,6 +433,14 @@ SELECT * FROM financial_snapshots
 WHERE user_id = $1
 ORDER BY snapshot_date DESC
 LIMIT 1;
+```
+
+**Get latest available value for each metric key:**
+```sql
+SELECT DISTINCT ON (metric_key) *
+FROM financial_metric_observations
+WHERE user_id = $1
+ORDER BY metric_key, updated_at DESC;
 ```
 
 **Get user's active policy rules:**
@@ -425,7 +479,8 @@ ORDER BY created_at ASC;
 Planned for Sprint 2+:
 - **scenarios** table - Store "what-if" scenario configurations
 - **forecasts** table - Store AI-generated forecasts
-- **document extraction pipeline** - Promote uploaded document data into structured financial snapshots
+- **document extraction pipeline** - Promote uploaded document data into structured financial metric observations
+- **financial_snapshots deprecation** - Stop writing legacy snapshots once metric observations cover dashboard/tool use cases
 
 ---
 

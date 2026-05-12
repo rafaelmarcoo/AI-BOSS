@@ -7,6 +7,8 @@ import {
   type FinancialMetricSet,
   type FinancialMetricValue,
 } from '@/lib/financial-data'
+import { mapObservationRowToMetric } from '@/lib/financial-data/observation-mapping'
+import type { FinancialMetricObservation } from '@/types/database'
 
 describe('financial metric domain model', () => {
   it('recognizes canonical financial metric keys', () => {
@@ -92,5 +94,53 @@ describe('financial metric domain model', () => {
       expect(metric.provenance.sourceType).toBe('document')
       expect(metric.provenance.evidence?.sourcePage).toBe(4)
     }
+  })
+
+  it('maps database observation rows to shared metric values', () => {
+    const row: FinancialMetricObservation = {
+      id: 'observation-123',
+      user_id: 'user-123',
+      connection_id: null,
+      document_id: 'document-123',
+      metric_key: 'monthly_expenses',
+      value: 18500,
+      currency: 'NZD',
+      period_start: '2026-04-01',
+      period_end: '2026-04-30',
+      as_of_date: null,
+      source_type: 'document',
+      source_label: 'April P&L.csv',
+      confidence: 0.92,
+      evidence: {
+        documentId: 'document-123',
+        sourceRowStart: 2,
+        sourceRowEnd: 20,
+      },
+      raw_data: {},
+      created_at: '2026-05-12T00:00:00.000Z',
+      updated_at: '2026-05-12T01:00:00.000Z',
+    }
+
+    expect(mapObservationRowToMetric(row)).toEqual({
+      status: 'available',
+      key: 'monthly_expenses',
+      value: 18500,
+      currency: 'NZD',
+      periodStart: '2026-04-01',
+      periodEnd: '2026-04-30',
+      asOfDate: null,
+      provenance: {
+        sourceType: 'document',
+        sourceLabel: 'April P&L.csv',
+        sourceId: 'document-123',
+        evidence: {
+          documentId: 'document-123',
+          sourceRowStart: 2,
+          sourceRowEnd: 20,
+        },
+      },
+      confidence: 0.92,
+      updatedAt: '2026-05-12T01:00:00.000Z',
+    })
   })
 })

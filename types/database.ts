@@ -1,3 +1,6 @@
+import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
+import type { FinancialMetricSourceType } from '@/lib/financial-data/types'
+
 export interface User {
   id: string
   email: string
@@ -124,6 +127,26 @@ export interface XeroConnection {
   refresh_token_enc: string
   expires_at: string
   connected_at: string
+  updated_at: string
+}
+
+export interface FinancialMetricObservation {
+  id: string
+  user_id: string
+  connection_id: string | null
+  document_id: string | null
+  metric_key: FinancialMetricKey
+  value: number
+  currency: string | null
+  period_start: string | null
+  period_end: string | null
+  as_of_date: string | null
+  source_type: FinancialMetricSourceType
+  source_label: string
+  confidence: number
+  evidence: unknown
+  raw_data: unknown
+  created_at: string
   updated_at: string
 }
 

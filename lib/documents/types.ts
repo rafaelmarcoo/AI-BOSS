@@ -39,8 +39,20 @@ export interface ParsedPdfPage {
   text: string
 }
 
+export interface ParsedCsvRow {
+  rowNumber: number
+  values: string[]
+  cells: Record<string, string>
+}
+
+export interface ParsedCsvData {
+  headers: string[]
+  rows: ParsedCsvRow[]
+}
+
 export interface ParsedDocumentResult {
   rawText: string
   metadata: unknown
   chunks: DocumentChunkInsert[]
+  csvData?: ParsedCsvData
 }

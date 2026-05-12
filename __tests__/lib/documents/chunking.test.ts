@@ -28,6 +28,59 @@ describe('document chunking', () => {
     })
     expect(result.rawText).toContain('Row 1')
     expect(result.rawText).toContain('month: Jan')
+    expect(result.csvData?.headers).toEqual(['month', 'revenue', 'expenses'])
+    expect(result.csvData?.rows).toHaveLength(3)
+    expect(result.csvData?.rows[0]).toMatchObject({
+      rowNumber: 1,
+      values: ['Jan', '1000', '600'],
+      cells: {
+        month: 'Jan',
+        revenue: '1000',
+        expenses: '600',
+      },
+    })
+  })
+
+  it('skips csv title rows before the real header row', async () => {
+    const csv = Buffer.from(
+      [
+        'Table 1',
+        'Account,Amount,Currency,Date,,,',
+        'Cash at bank,120000,NZD,2026-05-12,,,',
+        'Debtors,45000,NZD,2026-05-12,,,',
+      ].join('\r\n')
+    )
+    const result = await parseDocumentContent(
+      {
+        id: 'doc-1',
+        user_id: 'user-1',
+        file_type: 'csv',
+        file_name: 'test csv.csv',
+      },
+      csv
+    )
+
+    expect(result.metadata).toMatchObject({
+      headers: [
+        'Account',
+        'Amount',
+        'Currency',
+        'Date',
+        'column_5',
+        'column_6',
+        'column_7',
+      ],
+      rowCount: 2,
+      skippedRowCount: 1,
+    })
+    expect(result.rawText).toContain('Account: Cash at bank')
+    expect(result.rawText).toContain('Amount: 120000')
+    expect(result.csvData?.rows[0]?.cells).toMatchObject({
+      Account: 'Cash at bank',
+      Amount: '120000',
+      Currency: 'NZD',
+      Date: '2026-05-12',
+    })
   })
 
   it('creates page-aware pdf chunks', () => {

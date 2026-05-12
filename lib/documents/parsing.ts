@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { ApiError } from '@/lib/api/errors'
 import { createCsvChunks, createPdfChunks } from '@/lib/documents/chunking'
 import type {
+  ParsedCsvRow,
   ParsedDocumentResult,
   ParsedPdfPage,
 } from '@/lib/documents/types'
@@ -105,6 +106,50 @@ function normalizeHeaders(headers: string[]) {
   return headers.map((header, index) => header || `column_${index + 1}`)
 }
 
+function normalizeHeaderText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/[^a-z0-9 ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function rowHasHeaderCandidate(row: string[], candidates: string[]) {
+  const normalizedCells = row.map(normalizeHeaderText)
+
+  return candidates.some((candidate) =>
+    normalizedCells.includes(normalizeHeaderText(candidate))
+  )
+}
+
+function findCsvHeaderRowIndex(rows: string[][]) {
+  const labelHeaderCandidates = [
+    'metric',
+    'name',
+    'label',
+    'account',
+    'account name',
+    'description',
+    'category',
+  ]
+  const amountHeaderCandidates = [
+    'value',
+    'amount',
+    'balance',
+    'total',
+    'closing balance',
+  ]
+
+  const detectedHeaderIndex = rows.findIndex(
+    (row) =>
+      rowHasHeaderCandidate(row, labelHeaderCandidates) &&
+      rowHasHeaderCandidate(row, amountHeaderCandidates)
+  )
+
+  return detectedHeaderIndex >= 0 ? detectedHeaderIndex : 0
+}
+
 function createCsvRowBlock(
   headers: string[],
   row: string[],
@@ -116,6 +161,20 @@ function createCsvRowBlock(
   })
 
   return `Row ${rowNumber}\n${pairs.join('\n')}`
+}
+
+function createStructuredCsvRows(
+  headers: string[],
+  rows: string[][]
+): ParsedCsvRow[] {
+  return rows.map((row, index) => ({
+    rowNumber: index + 1,
+    values: row,
+    cells: headers.reduce<Record<string, string>>((cells, header, cellIndex) => {
+      cells[header] = row[cellIndex]?.trim() ?? ''
+      return cells
+    }, {}),
+  }))
 }
 
 export async function parseDocumentContent(
@@ -221,8 +280,9 @@ function parseCsvDocument(
       )
     }
 
-    const headers = normalizeHeaders(rows[0] ?? [])
-    const dataRows = rows.slice(1)
+    const headerRowIndex = findCsvHeaderRowIndex(rows)
+    const headers = normalizeHeaders(rows[headerRowIndex] ?? [])
+    const dataRows = rows.slice(headerRowIndex + 1)
 
     if (dataRows.length === 0) {
       throw new ApiError(
@@ -235,6 +295,7 @@ function parseCsvDocument(
     const rowBlocks = dataRows.map((row, index) =>
       createCsvRowBlock(headers, row, index + 1)
     )
+    const structuredRows = createStructuredCsvRows(headers, dataRows)
     const rawText = [
       `Columns: ${headers.join(', ')}`,
       ...rowBlocks,
@@ -245,6 +306,11 @@ function parseCsvDocument(
       metadata: {
         headers,
         rowCount: dataRows.length,
+        skippedRowCount: headerRowIndex,
+      },
+      csvData: {
+        headers,
+        rows: structuredRows,
       },
       chunks: createCsvChunks({
         documentId: document.id,

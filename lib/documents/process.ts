@@ -1,6 +1,8 @@
 import { ApiError } from '@/lib/api/errors'
 import { logDocumentIngestion } from '@/lib/documents/log-document-ingestion'
 import { parseDocumentContent } from '@/lib/documents/parsing'
+import { extractCsvFinancialMetrics } from '@/lib/financial-data/extraction/csv'
+import { saveFinancialMetricObservation } from '@/lib/financial-data/persistence'
 import {
   deleteDocumentFile,
   downloadDocumentFile,
@@ -8,6 +10,56 @@ import {
   replaceDocumentChunks,
   updateDocumentRecord,
 } from '@/lib/documents/persistence'
+import type { ParsedDocumentResult } from '@/lib/documents/types'
+
+function addMetricObservationCount(
+  metadata: unknown,
+  metricObservationCount: number
+) {
+  if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
+    return {
+      ...metadata,
+      metricObservationCount,
+    }
+  }
+
+  return {
+    metricObservationCount,
+  }
+}
+
+async function saveCsvMetricObservations(params: {
+  document: Awaited<ReturnType<typeof getDocumentById>>
+  parsedDocument: ParsedDocumentResult
+}) {
+  if (params.document.file_type !== 'csv' || !params.parsedDocument.csvData) {
+    return 0
+  }
+
+  const extractedAt = new Date().toISOString()
+  const metrics = extractCsvFinancialMetrics({
+    csvData: params.parsedDocument.csvData,
+    documentId: params.document.id,
+    sourceLabel: params.document.file_name,
+    extractedAt,
+  })
+
+  await Promise.all(
+    metrics.map((metric) =>
+      saveFinancialMetricObservation({
+        userId: params.document.user_id,
+        documentId: params.document.id,
+        metric,
+        rawData: {
+          extractor: 'deterministic_csv_v1',
+          fileName: params.document.file_name,
+        },
+      })
+    )
+  )
+
+  return metrics.length
+}
 
 export async function processDocument(documentId: string, userId: string) {
   const startedAt = Date.now()
@@ -26,10 +78,19 @@ export async function processDocument(documentId: string, userId: string) {
     }
 
     await replaceDocumentChunks(document.id, document.user_id, parsedDocument.chunks)
+    const metricObservationCount = await saveCsvMetricObservations({
+      document,
+      parsedDocument,
+    })
+    const metadata = addMetricObservationCount(
+      parsedDocument.metadata,
+      metricObservationCount
+    )
+
     await updateDocumentRecord(document.id, document.user_id, {
       status: 'ready',
       raw_text: parsedDocument.rawText,
-      metadata: parsedDocument.metadata,
+      metadata,
       error_message: null,
     })
     await logDocumentIngestion({
@@ -39,7 +100,7 @@ export async function processDocument(documentId: string, userId: string) {
       fileName: document.file_name,
       status: 'ready',
       chunkCount: parsedDocument.chunks.length,
-      metadata: parsedDocument.metadata,
+      metadata,
       errorMessage: null,
       responseTimeMs: Date.now() - startedAt,
     })

@@ -28,10 +28,26 @@ function getBasicAuthHeader() {
 
 export async function getValidXeroToken(userId: string) {
   const supabase = createAdminSupabaseClient()
+  const { data: dataConnection, error: dataConnectionError } = await supabase
+    .from('data_connections')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('provider', 'xero')
+    .eq('status', 'connected')
+    .maybeSingle()
+
+  if (dataConnectionError) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to load Xero connection.')
+  }
+
+  if (!dataConnection) {
+    throw new ApiError(404, 'NOT_FOUND', 'No connected Xero source found for user.')
+  }
+
   const { data: connection, error } = await supabase
     .from('xero_connections')
     .select('access_token_enc, refresh_token_enc, expires_at')
-    .eq('user_id', userId)
+    .eq('connection_id', dataConnection.id)
     .maybeSingle()
 
   if (error) {
@@ -82,7 +98,7 @@ export async function getValidXeroToken(userId: string) {
       expires_at,
       updated_at: new Date().toISOString(),
     })
-    .eq('user_id', userId)
+    .eq('connection_id', dataConnection.id)
 
   if (updateError) {
     throw new ApiError(

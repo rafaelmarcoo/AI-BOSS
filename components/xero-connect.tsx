@@ -20,9 +20,10 @@ import { dashboardTokens } from "@/app/theme";
 
 interface XeroStatus {
   connected: boolean;
+  demo?: boolean;
   tenantName?: string;
   connectedAt?: string;
-  expiresAt?: string;
+  expiresAt?: string | null;
 }
 
 interface XeroConnectProps {
@@ -173,13 +174,26 @@ export function XeroConnect({ onStatusChange }: XeroConnectProps) {
                     sx={{ color: dashboardTokens.textMuted }}
                   />
                 ) : status?.connected ? (
-                  <Chip
-                    size="small"
-                    icon={<CheckCircleIcon />}
-                    label="Connected"
-                    color="success"
-                    variant="outlined"
-                  />
+                  <>
+                    <Chip
+                      size="small"
+                      icon={<CheckCircleIcon />}
+                      label="Connected"
+                      color="success"
+                      variant="outlined"
+                    />
+                    {status.demo ? (
+                      <Chip
+                        size="small"
+                        label="Demo"
+                        sx={{
+                          color: "#facc15",
+                          borderColor: "rgba(250, 204, 21, 0.4)",
+                        }}
+                        variant="outlined"
+                      />
+                    ) : null}
+                  </>
                 ) : (
                   <Chip
                     size="small"
@@ -195,7 +209,9 @@ export function XeroConnect({ onStatusChange }: XeroConnectProps) {
               </Stack>
 
               <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
-                {status?.connected
+                {status?.demo
+                  ? "Demo Xero data is enabled for this environment."
+                  : status?.connected
                   ? status.tenantName ?? "Accounting data connected"
                   : "Connect accounting data for source-aware metrics."}
               </Typography>
@@ -210,7 +226,7 @@ export function XeroConnect({ onStatusChange }: XeroConnectProps) {
             </Stack>
           </Stack>
 
-          {status?.connected ? (
+          {status?.connected && !status.demo ? (
             <Button
               type="button"
               variant="outlined"
@@ -231,6 +247,20 @@ export function XeroConnect({ onStatusChange }: XeroConnectProps) {
               }}
             >
               {isDisconnecting ? "Disconnecting" : "Disconnect"}
+            </Button>
+          ) : status?.connected && status.demo ? (
+            <Button
+              type="button"
+              variant="outlined"
+              size="small"
+              disabled
+              sx={{
+                borderRadius: 1,
+                color: dashboardTokens.textMuted,
+                borderColor: dashboardTokens.borderMuted,
+              }}
+            >
+              Demo mode
             </Button>
           ) : (
             <Button

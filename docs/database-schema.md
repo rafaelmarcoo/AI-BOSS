@@ -8,7 +8,7 @@
 
 ## Overview
 
-The database now consists of 10 main tables:
+The database now consists of 11 main tables:
 - **users** - User profiles (extends Supabase Auth)
 - **conversations** - User-owned chat threads
 - **conversation_messages** - Individual chat messages inside a thread
@@ -17,8 +17,9 @@ The database now consists of 10 main tables:
 - **decision_log** - Audit trail of AI actions, tool usage, retrieval, and calculations
 - **documents** - Uploaded user files stored in Supabase Storage
 - **document_chunks** - Chunked document content used for semantic retrieval
-- **xero_connections** - Encrypted Xero OAuth connection per user
-- **xero_oauth_states** - Temporary OAuth state values used for CSRF protection
+- **data_connections** - Provider-neutral registry for user financial data sources
+- **xero_connections** - Xero-specific encrypted OAuth credential/details table
+- **oauth_connection_states** - Temporary OAuth state values used for CSRF protection
 
 ---
 
@@ -264,16 +265,50 @@ Stores chunked document content and embeddings for semantic retrieval.
 
 ---
 
-### 9. xero_connections
+### 9. data_connections
 
-Stores the current Xero OAuth connection for a user. Tokens are encrypted with
-AES-GCM before storage and are only decrypted server-side when calling Xero or
-revoking a connection.
+Provider-neutral registry for all financial data sources a user has connected,
+uploaded, or made available. Provider-specific credential tables link back to
+this table.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID (PK) | Primary key |
-| user_id | UUID (FK) | References users(id), unique per user |
+| user_id | UUID (FK) | References users(id) |
+| provider | TEXT | `xero`, `csv`, `pdf`, `manual`, or `demo` |
+| status | TEXT | `connected`, `disconnected`, `available`, or `error` |
+| display_name | TEXT | User-facing source name |
+| source_label | TEXT | Short provider/source label |
+| last_synced_at | TIMESTAMP | Last successful source sync |
+| connected_at | TIMESTAMP | When the source connected |
+| disconnected_at | TIMESTAMP | When the source disconnected |
+| error_message | TEXT | Latest connection/source error if any |
+| metadata | JSONB | Provider-neutral source metadata |
+| created_at | TIMESTAMP | Record creation time |
+| updated_at | TIMESTAMP | Last source state update |
+
+**RLS Policies:**
+- Users can view, insert, update, and delete their own data connections only
+
+**Indexes:**
+- `idx_data_connections_user_id` on user_id
+- `idx_data_connections_provider` on provider
+- `idx_data_connections_status` on status
+
+---
+
+### 10. xero_connections
+
+Stores Xero-specific tenant details and OAuth credentials. This table links to
+`data_connections`, which is the source of truth for user-visible connection
+state. Tokens are encrypted with AES-GCM before storage and are only decrypted
+server-side when calling Xero or revoking a connection.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID (PK) | Primary key |
+| connection_id | UUID (FK) | References data_connections(id), unique |
+| user_id | UUID (FK) | Legacy owner reference kept for compatibility |
 | tenant_id | TEXT | Xero organisation ID |
 | tenant_name | TEXT | Xero organisation display name |
 | access_token_enc | TEXT | Encrypted Xero access token |
@@ -287,28 +322,31 @@ revoking a connection.
 
 **Indexes:**
 - `idx_xero_connections_user_id` on user_id
+- `idx_xero_connections_connection_id` on connection_id
 
 ---
 
-### 10. xero_oauth_states
+### 11. oauth_connection_states
 
-Stores short-lived state values during the Xero OAuth redirect flow. A state row
-is created when the user starts connecting Xero and deleted after callback
-validation.
+Stores short-lived state values during OAuth redirect flows. A state row is
+created when the user starts connecting an OAuth provider and deleted after
+callback validation.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID (PK) | Primary key |
 | user_id | UUID (FK) | References users(id), unique per user |
+| provider | TEXT | OAuth provider, currently `xero` |
 | state | TEXT | Random OAuth state value used for CSRF protection |
+| redirect_path | TEXT | Path to return to after OAuth completes |
 | created_at | TIMESTAMP | State creation time |
 
 **RLS Policies:**
 - Users can view, insert, update, and delete their own OAuth state only
 
 **Indexes:**
-- `idx_xero_oauth_states_user_id` on user_id
-- `idx_xero_oauth_states_created_at` on created_at (DESC)
+- `idx_oauth_connection_states_user_provider` on (user_id, provider)
+- `idx_oauth_connection_states_created_at` on created_at (DESC)
 
 ---
 
@@ -321,8 +359,9 @@ users (1) ──< (many) policy_rules
 users (1) ──< (many) decision_log
 users (1) ──< (many) documents
 documents (1) ──< (many) document_chunks
-users (1) ──< (one) xero_connections
-users (1) ──< (one) xero_oauth_states
+users (1) ──< (many) data_connections
+data_connections (1) ──< (one) xero_connections
+users (1) ──< (many) oauth_connection_states
 ```
 
 ---
@@ -334,6 +373,7 @@ All schema changes are tracked in `db/migrations/`:
 - `002_add_conversation_history_to_decision_log.sql` - Adds a dedicated JSONB field for chat transcripts
 - `003_chat_rag_schema_foundation.sql` - Adds chat history tables, document tables, and vector-ready chunk storage
 - `004_xero_oauth.sql` - Adds encrypted Xero OAuth connections and temporary OAuth states
+- `005_data_connections_foundation.sql` - Adds provider-neutral data connections, generic OAuth states, links Xero credentials, and drops the old Xero-only OAuth state table
 
 ---
 

@@ -46,9 +46,10 @@ export async function GET(request: NextRequest) {
     const supabase = createAdminSupabaseClient()
 
     const { data: stateRow, error: stateError } = await supabase
-      .from('xero_oauth_states')
+      .from('oauth_connection_states')
       .select('state')
       .eq('user_id', user.id)
+      .eq('provider', 'xero')
       .eq('state', state)
       .maybeSingle()
 
@@ -56,7 +57,11 @@ export async function GET(request: NextRequest) {
       return redirectToDashboard('error')
     }
 
-    await supabase.from('xero_oauth_states').delete().eq('user_id', user.id)
+    await supabase
+      .from('oauth_connection_states')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('provider', 'xero')
 
     const tokenResponse = await fetch(XERO_TOKEN_URL, {
       method: 'POST',
@@ -102,10 +107,35 @@ export async function GET(request: NextRequest) {
     }
 
     const now = new Date().toISOString()
+    const { data: dataConnection, error: dataConnectionError } = await supabase
+      .from('data_connections')
+      .upsert(
+        {
+          user_id: user.id,
+          provider: 'xero',
+          status: 'connected',
+          display_name: tenant.tenantName,
+          source_label: 'Xero',
+          connected_at: now,
+          disconnected_at: null,
+          error_message: null,
+          metadata: { tenantId: tenant.tenantId },
+          updated_at: now,
+        },
+        { onConflict: 'user_id,provider' }
+      )
+      .select('id')
+      .single()
+
+    if (dataConnectionError || !dataConnection) {
+      return redirectToDashboard('error')
+    }
+
     const { error: upsertError } = await supabase
       .from('xero_connections')
       .upsert(
         {
+          connection_id: dataConnection.id,
           user_id: user.id,
           tenant_id: tenant.tenantId,
           tenant_name: tenant.tenantName,

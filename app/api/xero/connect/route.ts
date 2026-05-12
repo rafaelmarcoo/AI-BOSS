@@ -40,13 +40,15 @@ export async function GET(request: NextRequest) {
     const state = crypto.randomUUID()
     const supabase = createAdminSupabaseClient()
 
-    const { error } = await supabase.from('xero_oauth_states').upsert(
+    const { error } = await supabase.from('oauth_connection_states').upsert(
       {
         user_id: user.id,
+        provider: 'xero',
         state,
+        redirect_path: '/dashboard',
         created_at: new Date().toISOString(),
       },
-      { onConflict: 'user_id' }
+      { onConflict: 'user_id,provider' }
     )
 
     if (error) {

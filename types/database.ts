@@ -82,8 +82,41 @@ export interface DocumentChunk {
   created_at: string
 }
 
+export type DataConnectionProvider = 'xero' | 'csv' | 'pdf' | 'manual' | 'demo'
+export type DataConnectionStatus =
+  | 'connected'
+  | 'disconnected'
+  | 'available'
+  | 'error'
+
+export interface DataConnection {
+  id: string
+  user_id: string
+  provider: DataConnectionProvider
+  status: DataConnectionStatus
+  display_name: string
+  source_label: string
+  last_synced_at: string | null
+  connected_at: string | null
+  disconnected_at: string | null
+  error_message: string | null
+  metadata: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface OAuthConnectionState {
+  id: string
+  user_id: string
+  provider: DataConnectionProvider
+  state: string
+  redirect_path: string
+  created_at: string
+}
+
 export interface XeroConnection {
   id: string
+  connection_id: string
   user_id: string
   tenant_id: string
   tenant_name: string
@@ -92,13 +125,6 @@ export interface XeroConnection {
   expires_at: string
   connected_at: string
   updated_at: string
-}
-
-export interface XeroOAuthState {
-  id: string
-  user_id: string
-  state: string
-  created_at: string
 }
 
 export interface DecisionLog {

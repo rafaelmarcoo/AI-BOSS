@@ -33,21 +33,36 @@ export async function POST(request: NextRequest) {
     const { user } = await requireAuthenticatedUser(request)
     const supabase = createAdminSupabaseClient()
 
-    const { data: connection, error: fetchError } = await supabase
-      .from('xero_connections')
-      .select('refresh_token_enc')
+    const { data: dataConnection, error: dataConnectionError } = await supabase
+      .from('data_connections')
+      .select('id')
       .eq('user_id', user.id)
+      .eq('provider', 'xero')
       .maybeSingle()
 
-    if (fetchError) {
+    if (dataConnectionError) {
       throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to load Xero connection.')
     }
 
-    if (!connection) {
+    if (!dataConnection) {
       return successResponse({ disconnected: true })
     }
 
+    const { data: connection, error: fetchError } = await supabase
+      .from('xero_connections')
+      .select('refresh_token_enc')
+      .eq('connection_id', dataConnection.id)
+      .maybeSingle()
+
+    if (fetchError) {
+      throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to load Xero credentials.')
+    }
+
     try {
+      if (!connection) {
+        throw new Error('No Xero credentials found to revoke.')
+      }
+
       const refreshToken = await decryptToken(connection.refresh_token_enc)
 
       await fetch(XERO_REVOCATION_URL, {
@@ -69,10 +84,29 @@ export async function POST(request: NextRequest) {
     const { error: deleteError } = await supabase
       .from('xero_connections')
       .delete()
-      .eq('user_id', user.id)
+      .eq('connection_id', dataConnection.id)
 
     if (deleteError) {
       throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to disconnect Xero.')
+    }
+
+    const now = new Date().toISOString()
+    const { error: updateError } = await supabase
+      .from('data_connections')
+      .update({
+        status: 'disconnected',
+        disconnected_at: now,
+        error_message: null,
+        updated_at: now,
+      })
+      .eq('id', dataConnection.id)
+
+    if (updateError) {
+      throw new ApiError(
+        500,
+        'INTERNAL_ERROR',
+        'Failed to update Xero connection state.'
+      )
     }
 
     return successResponse(

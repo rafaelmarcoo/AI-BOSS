@@ -56,16 +56,17 @@ export async function runAgent(
   input: string,
   chatHistory: BaseMessage[] = [],
   tools: AppTool[] = [],
+  contextMessages: BaseMessage[] = []
 ): Promise<AgentRunResult> {
   const model = createAgentModel()
   const langChainTools = adaptToolsToLangChain(tools)
   const llm = langChainTools.length > 0 ? model.bindTools(langChainTools) : model
 
-  const messages: BaseMessage[] = [
-    new SystemMessage(AGENT_SYSTEM_PROMPT),
-    ...chatHistory,
-    new HumanMessage(input),
-  ]
+  const messages = buildAgentMessages({
+    input,
+    chatHistory,
+    contextMessages,
+  })
 
   const MAX_ITERATIONS = 10
   let totalTokensUsed = 0
@@ -102,4 +103,17 @@ export async function runAgent(
   }
 
   throw new Error('Agent exceeded maximum iterations without producing a response.')
+}
+
+export function buildAgentMessages(params: {
+  input: string
+  chatHistory?: BaseMessage[]
+  contextMessages?: BaseMessage[]
+}) {
+  return [
+    new SystemMessage(AGENT_SYSTEM_PROMPT),
+    ...(params.contextMessages ?? []),
+    ...(params.chatHistory ?? []),
+    new HumanMessage(params.input),
+  ]
 }

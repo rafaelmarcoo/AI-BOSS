@@ -5,6 +5,7 @@ import { ApiError } from '@/lib/api/errors'
 import { runAgent } from '@/lib/ai/agent'
 import { CHAT_MODEL } from '@/lib/chat/system-prompt'
 import { logChatDecision } from '@/lib/chat/log-chat-decision'
+import { buildChatContext } from '@/lib/chat/build-chat-context'
 import {
   getOrCreateConversation,
   insertConversationMessage,
@@ -48,11 +49,16 @@ export async function generateChatResponse(
     .map((m) =>
       m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content)
     )
+  const chatContext = await buildChatContext({
+    userId,
+    query: latestUserMessage.content,
+  })
 
   const agentResponse = await runAgent(
     latestUserMessage.content,
     chatHistory,
-    getAgentTools()
+    getAgentTools(),
+    chatContext.messages
   )
 
   const savedAssistantMessage = await insertConversationMessage({

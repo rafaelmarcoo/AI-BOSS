@@ -70,10 +70,10 @@ export function useDocuments(
       setDocuments((previousDocuments) => {
         const nextDocuments = payload.data!.documents;
 
-        if (
-          didAnyDocumentFinishProcessing(previousDocuments, nextDocuments)
-        ) {
-          onDocumentsProcessedRef.current?.();
+        if (didAnyDocumentFinishProcessing(previousDocuments, nextDocuments)) {
+          window.setTimeout(() => {
+            onDocumentsProcessedRef.current?.();
+          }, 0);
         }
 
         return nextDocuments;

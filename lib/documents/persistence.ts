@@ -298,3 +298,65 @@ export async function replaceDocumentChunks(
 
   return (data ?? []) as DocumentChunk[]
 }
+
+export async function listUserEmbeddedDocumentChunks(userId: string) {
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase
+    .from('document_chunks')
+    .select(
+      `
+        id,
+        document_id,
+        user_id,
+        chunk_index,
+        content,
+        source_page,
+        metadata,
+        embedding,
+        created_at,
+        documents!inner(file_name, file_type)
+      `
+    )
+    .eq('user_id', userId)
+    .not('embedding', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(200)
+
+  if (error) {
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to load document chunks for retrieval.'
+    )
+  }
+
+  return ((data ?? []) as unknown as Array<
+    Omit<DocumentChunk, 'embedding'> & {
+      embedding: number[]
+      documents:
+        | {
+            file_name: string
+            file_type: Document['file_type']
+          }
+        | Array<{
+            file_name: string
+            file_type: Document['file_type']
+          }>
+    }
+  >).flatMap((row) => {
+    const document = Array.isArray(row.documents)
+      ? row.documents[0]
+      : row.documents
+
+    if (!document) {
+      return []
+    }
+
+    return [
+      {
+        ...row,
+        documents: document,
+      },
+    ]
+  })
+}

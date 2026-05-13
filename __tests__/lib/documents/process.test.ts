@@ -7,6 +7,7 @@ import {
 } from '@/lib/documents/persistence'
 import { logDocumentIngestion } from '@/lib/documents/log-document-ingestion'
 import { saveFinancialMetricObservation } from '@/lib/financial-data/persistence'
+import { embedDocumentChunks } from '@/lib/documents/embeddings'
 
 jest.mock('@/lib/documents/persistence', () => ({
   deleteDocumentFile: jest.fn(),
@@ -24,6 +25,11 @@ jest.mock('@/lib/financial-data/persistence', () => ({
   saveFinancialMetricObservation: jest.fn(),
 }))
 
+jest.mock('@/lib/documents/embeddings', () => ({
+  DOCUMENT_EMBEDDING_MODEL: 'text-embedding-3-small',
+  embedDocumentChunks: jest.fn(),
+}))
+
 const mockGetDocumentById = jest.mocked(getDocumentById)
 const mockDownloadDocumentFile = jest.mocked(downloadDocumentFile)
 const mockReplaceDocumentChunks = jest.mocked(replaceDocumentChunks)
@@ -32,6 +38,7 @@ const mockLogDocumentIngestion = jest.mocked(logDocumentIngestion)
 const mockSaveFinancialMetricObservation = jest.mocked(
   saveFinancialMetricObservation
 )
+const mockEmbedDocumentChunks = jest.mocked(embedDocumentChunks)
 
 describe('processDocument', () => {
   beforeEach(() => {
@@ -52,6 +59,12 @@ describe('processDocument', () => {
       updated_at: '2026-05-12T00:00:00.000Z',
     })
     mockLogDocumentIngestion.mockResolvedValue(undefined)
+    mockEmbedDocumentChunks.mockImplementation(async (chunks) =>
+      chunks.map((chunk) => ({
+        ...chunk,
+        embedding: [1, 0, 0],
+      }))
+    )
     mockSaveFinancialMetricObservation.mockResolvedValue({
       id: 'observation-123',
       user_id: 'user-123',
@@ -121,8 +134,18 @@ describe('processDocument', () => {
           headers: ['Account', 'Amount', 'Currency', 'Date'],
           rowCount: 1,
           metricObservationCount: 1,
+          embeddingModel: 'text-embedding-3-small',
         }),
       })
+    )
+    expect(mockReplaceDocumentChunks).toHaveBeenCalledWith(
+      'document-123',
+      'user-123',
+      expect.arrayContaining([
+        expect.objectContaining({
+          embedding: [1, 0, 0],
+        }),
+      ])
     )
   })
 })

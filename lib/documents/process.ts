@@ -1,4 +1,8 @@
 import { ApiError } from '@/lib/api/errors'
+import {
+  DOCUMENT_EMBEDDING_MODEL,
+  embedDocumentChunks,
+} from '@/lib/documents/embeddings'
 import { logDocumentIngestion } from '@/lib/documents/log-document-ingestion'
 import { parseDocumentContent } from '@/lib/documents/parsing'
 import { extractCsvFinancialMetrics } from '@/lib/financial-data/extraction/csv'
@@ -14,17 +18,20 @@ import type { ParsedDocumentResult } from '@/lib/documents/types'
 
 function addMetricObservationCount(
   metadata: unknown,
-  metricObservationCount: number
+  metricObservationCount: number,
+  embeddingModel: string
 ) {
   if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
     return {
       ...metadata,
       metricObservationCount,
+      embeddingModel,
     }
   }
 
   return {
     metricObservationCount,
+    embeddingModel,
   }
 }
 
@@ -77,14 +84,17 @@ export async function processDocument(documentId: string, userId: string) {
       )
     }
 
-    await replaceDocumentChunks(document.id, document.user_id, parsedDocument.chunks)
+    const embeddedChunks = await embedDocumentChunks(parsedDocument.chunks)
+
+    await replaceDocumentChunks(document.id, document.user_id, embeddedChunks)
     const metricObservationCount = await saveCsvMetricObservations({
       document,
       parsedDocument,
     })
     const metadata = addMetricObservationCount(
       parsedDocument.metadata,
-      metricObservationCount
+      metricObservationCount,
+      DOCUMENT_EMBEDDING_MODEL
     )
 
     await updateDocumentRecord(document.id, document.user_id, {

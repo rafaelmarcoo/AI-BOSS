@@ -31,7 +31,7 @@ export interface DocumentChunkInsert {
   content: string
   source_page: number | null
   metadata: unknown
-  embedding: null
+  embedding: number[] | null
 }
 
 export interface ParsedPdfPage {

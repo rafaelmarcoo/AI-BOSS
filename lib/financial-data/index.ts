@@ -9,7 +9,16 @@ export {
   isAvailableMetric,
   isUnavailableMetric,
 } from '@/lib/financial-data/metrics'
+export {
+  buildRunwayInputFromMetrics,
+  fillUnavailableMetrics,
+  summarizeMetricAvailability,
+} from '@/lib/financial-data/read-model'
 export type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
+export type {
+  CompleteFinancialMetricSet,
+  SourceAwareMetricReadResult,
+} from '@/lib/financial-data/read-model'
 export type {
   AvailableFinancialMetricValue,
   FinancialMetricAvailabilityReason,

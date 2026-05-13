@@ -4,9 +4,13 @@ import { Box } from "@mui/material";
 import { COOKIE_ACCESS_TOKEN } from "@/lib/supabase";
 import { getCurrentUserProfile } from "@/lib/auth";
 import { dashboardTokens } from "@/app/theme";
+import {
+  fillUnavailableMetrics,
+  type CompleteFinancialMetricSet,
+} from "@/lib/financial-data";
+import { readSourceAwareMetrics } from "@/lib/financial-data/read-service";
 import { DashboardHeader } from "./header";
 import { ResizablePanels } from "./ResizablePanels";
-import type { DashboardMetrics } from "./runway";
 
 export default async function DashboardPage() {
   const cookieStore = await cookies();
@@ -22,48 +26,10 @@ export default async function DashboardPage() {
 
   const { profile } = currentUser;
 
-  // Fetch metrics from API endpoints
-  let metrics: DashboardMetrics = {
-    cashBalance: null,
-    accountsReceivable: null,
-    accountsPayable: null,
-    monthlyRevenue: null,
-    monthlyExpenses: null,
-    burnRate: null,
-    runwayMonths: null,
-  };
+  let metrics: CompleteFinancialMetricSet = fillUnavailableMetrics({});
 
   try {
-    // TODO: Call /api/calculate/runway to get runway metrics
-    // const runwayRes = await fetch(
-    //   `${process.env.NEXT_PUBLIC_APP_URL}/api/calculate/runway`,
-    //   {
-    //     headers: {
-    //       Authorization: `Bearer ${accessToken}`,
-    //       "Content-Type": "application/json",
-    //     },
-    //     body: JSON.stringify({ /* payload */ }),
-    //   }
-    // );
-    // const runwayData = await runwayRes.json();
-    // metrics.runwayMonths = runwayData.runway_months;
-    // metrics.burnRate = runwayData.burn_rate;
-
-    // TODO: Call /api/xero/bank-summary to get cash/AR/AP data
-    // const bankRes = await fetch(
-    //   `${process.env.NEXT_PUBLIC_APP_URL}/api/xero/bank-summary`,
-    //   {
-    //     headers: {
-    //       Authorization: `Bearer ${accessToken}`,
-    //     },
-    //   }
-    // );
-    // const bankData = await bankRes.json();
-    // metrics.cashBalance = bankData.cash_balance;
-    // metrics.accountsReceivable = bankData.accounts_receivable;
-    // metrics.accountsPayable = bankData.accounts_payable;
-
-    console.log("Dashboard metrics loaded:", metrics);
+    metrics = (await readSourceAwareMetrics(currentUser.user.id)).metrics;
   } catch (error) {
     console.error("Failed to fetch dashboard metrics:", error);
   }

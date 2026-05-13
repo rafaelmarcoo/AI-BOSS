@@ -2,22 +2,19 @@ import { Box, Button, Paper, Stack, Typography } from "@mui/material";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import { dashboardTokens } from "@/app/theme";
 import { DataSourcesPanel } from "@/components/data-sources-panel";
+import {
+  getMetricNumber,
+  isAvailableMetric,
+  type CompleteFinancialMetricSet,
+  type FinancialMetricKey,
+  type FinancialMetricValue,
+} from "@/lib/financial-data";
 import { MetricCard } from "../MetricCard";
 import { BurnRateChart } from "../BurnRateChart";
 import { RecentActivity } from "../RecentActivity";
 
-export interface DashboardMetrics {
-  cashBalance: number | null;
-  accountsReceivable: number | null;
-  accountsPayable: number | null;
-  monthlyRevenue: number | null;
-  monthlyExpenses: number | null;
-  burnRate: number | null;
-  runwayMonths: number | null;
-}
-
 interface RunwaySectionProps {
-  metrics: DashboardMetrics;
+  metrics: CompleteFinancialMetricSet;
 }
 
 // Helper to format currency
@@ -36,7 +33,46 @@ function formatNumber(value: number | null | undefined, decimals = 1): string {
   return value.toFixed(decimals);
 }
 
+function formatSource(metric: FinancialMetricValue) {
+  if (!isAvailableMetric(metric)) {
+    return "Unavailable";
+  }
+
+  if (metric.provenance.sourceType === "document") {
+    return `CSV: ${metric.provenance.sourceLabel}`;
+  }
+
+  if (metric.provenance.sourceType === "demo") {
+    return `Demo: ${metric.provenance.sourceLabel}`;
+  }
+
+  return metric.provenance.sourceLabel;
+}
+
+function getSourceTone(metric: FinancialMetricValue) {
+  return isAvailableMetric(metric) ? "available" : "unavailable";
+}
+
+function formatMetricValue(
+  metrics: CompleteFinancialMetricSet,
+  key: FinancialMetricKey,
+  formatter: (value: number | null | undefined) => string
+) {
+  return formatter(getMetricNumber(metrics, key));
+}
+
 export function RunwaySection({ metrics }: RunwaySectionProps) {
+  const monthlyRevenue = getMetricNumber(metrics, "monthly_revenue");
+  const monthlyExpenses = getMetricNumber(metrics, "monthly_expenses");
+  const netLoss =
+    monthlyRevenue !== null && monthlyExpenses !== null
+      ? monthlyExpenses - monthlyRevenue
+      : null;
+  const netLossSource =
+    monthlyRevenue !== null && monthlyExpenses !== null
+      ? "Derived from revenue/expenses"
+      : "Unavailable";
+
   return (
     <Box sx={{ p: { xs: 3, sm: 4 }, flex: 1 }}>
       <Stack spacing={3}>
@@ -79,8 +115,8 @@ export function RunwaySection({ metrics }: RunwaySectionProps) {
                   variant="body2"
                   sx={{ color: dashboardTokens.textMuted }}
                 >
-                  This area will eventually hold summary cards, charts, and
-                  ledger tabs.
+                  Source-aware metrics from connected systems and uploaded
+                  financial documents.
                 </Typography>
               </Stack>
             </Stack>
@@ -105,41 +141,74 @@ export function RunwaySection({ metrics }: RunwaySectionProps) {
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "repeat(4, 1fr)" },
+            gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", xl: "repeat(4, 1fr)" },
             gap: 2,
           }}
         >
           <MetricCard
             label="CASH BALANCE"
-            value={formatCurrency(metrics.cashBalance)}
+            value={formatMetricValue(metrics, "cash", formatCurrency)}
             color="#00e5a0"
-            loading={metrics.cashBalance === null}
+            sourceLabel={formatSource(metrics.cash)}
+            sourceTone={getSourceTone(metrics.cash)}
+          />
+          <MetricCard
+            label="ACCOUNTS RECEIVABLE"
+            value={formatMetricValue(
+              metrics,
+              "accounts_receivable",
+              formatCurrency
+            )}
+            color="#38bdf8"
+            sourceLabel={formatSource(metrics.accounts_receivable)}
+            sourceTone={getSourceTone(metrics.accounts_receivable)}
+          />
+          <MetricCard
+            label="ACCOUNTS PAYABLE"
+            value={formatMetricValue(
+              metrics,
+              "accounts_payable",
+              formatCurrency
+            )}
+            color="#f97316"
+            sourceLabel={formatSource(metrics.accounts_payable)}
+            sourceTone={getSourceTone(metrics.accounts_payable)}
           />
           <MetricCard
             label="RUNWAY"
-            value={formatNumber(metrics.runwayMonths)}
+            value={formatMetricValue(metrics, "runway_months", formatNumber)}
             unit="months"
             color="#4da6ff"
-            loading={metrics.runwayMonths === null}
+            sourceLabel={formatSource(metrics.runway_months)}
+            sourceTone={getSourceTone(metrics.runway_months)}
           />
           <MetricCard
             label="MONTHLY BURN"
-            value={formatCurrency(metrics.burnRate)}
+            value={formatMetricValue(metrics, "burn_rate", formatCurrency)}
             color="#ff4d6d"
-            loading={metrics.burnRate === null}
+            sourceLabel={formatSource(metrics.burn_rate)}
+            sourceTone={getSourceTone(metrics.burn_rate)}
+          />
+          <MetricCard
+            label="MONTHLY REVENUE"
+            value={formatMetricValue(metrics, "monthly_revenue", formatCurrency)}
+            color="#22c55e"
+            sourceLabel={formatSource(metrics.monthly_revenue)}
+            sourceTone={getSourceTone(metrics.monthly_revenue)}
+          />
+          <MetricCard
+            label="MONTHLY EXPENSES"
+            value={formatMetricValue(metrics, "monthly_expenses", formatCurrency)}
+            color="#f43f5e"
+            sourceLabel={formatSource(metrics.monthly_expenses)}
+            sourceTone={getSourceTone(metrics.monthly_expenses)}
           />
           <MetricCard
             label="NET LOSS"
-            value={formatCurrency(
-              metrics.monthlyExpenses && metrics.monthlyRevenue
-                ? metrics.monthlyExpenses - metrics.monthlyRevenue
-                : null,
-            )}
+            value={formatCurrency(netLoss)}
             color="#ffa500"
-            loading={
-              metrics.monthlyExpenses === null ||
-              metrics.monthlyRevenue === null
-            }
+            sourceLabel={netLossSource}
+            sourceTone={netLoss === null ? "unavailable" : "derived"}
           />
         </Box>
 

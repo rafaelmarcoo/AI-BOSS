@@ -32,9 +32,14 @@ import { useDocuments } from "./useDocuments";
 interface ChatSidebarProps {
   fullName: string | null;
   email: string;
+  onDocumentsProcessed?: () => void;
 }
 
-export function ChatSidebar({ fullName, email }: ChatSidebarProps) {
+export function ChatSidebar({
+  fullName,
+  email,
+  onDocumentsProcessed,
+}: ChatSidebarProps) {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
@@ -62,7 +67,7 @@ export function ChatSidebar({ fullName, email }: ChatSidebarProps) {
     uploading,
     documentsError,
     uploadDocument,
-  } = useDocuments(conversationId);
+  } = useDocuments(conversationId, { onDocumentsProcessed });
 
   const activeConversation =
     conversations.find((conversation) => conversation.id === conversationId) ?? null;

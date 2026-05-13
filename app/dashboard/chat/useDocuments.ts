@@ -9,6 +9,10 @@ import type {
 
 const POLL_INTERVAL_MS = 2500;
 
+interface UseDocumentsOptions {
+  onDocumentsProcessed?: () => void;
+}
+
 function hasPendingDocuments(documents: DocumentSummaryView[]) {
   return documents.some(
     (document) =>
@@ -16,12 +20,39 @@ function hasPendingDocuments(documents: DocumentSummaryView[]) {
   );
 }
 
-export function useDocuments(conversationId: string | null) {
+function isPendingStatus(status: DocumentSummaryView["status"]) {
+  return status === "uploaded" || status === "processing";
+}
+
+function didAnyDocumentFinishProcessing(
+  previousDocuments: DocumentSummaryView[],
+  nextDocuments: DocumentSummaryView[]
+) {
+  const previousStatuses = new Map(
+    previousDocuments.map((document) => [document.id, document.status])
+  );
+
+  return nextDocuments.some((document) => {
+    const previousStatus = previousStatuses.get(document.id);
+
+    return Boolean(previousStatus && isPendingStatus(previousStatus) && !isPendingStatus(document.status));
+  });
+}
+
+export function useDocuments(
+  conversationId: string | null,
+  options: UseDocumentsOptions = {}
+) {
   const [documents, setDocuments] = useState<DocumentSummaryView[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [documentsError, setDocumentsError] = useState<string | null>(null);
   const pollingRef = useRef<number | null>(null);
+  const onDocumentsProcessedRef = useRef(options.onDocumentsProcessed);
+
+  useEffect(() => {
+    onDocumentsProcessedRef.current = options.onDocumentsProcessed;
+  }, [options.onDocumentsProcessed]);
 
   const loadDocuments = async (toggleLoading = true) => {
     if (toggleLoading) {
@@ -36,7 +67,17 @@ export function useDocuments(conversationId: string | null) {
         throw new Error(payload.error?.message ?? "Could not load documents.");
       }
 
-      setDocuments(payload.data.documents);
+      setDocuments((previousDocuments) => {
+        const nextDocuments = payload.data!.documents;
+
+        if (
+          didAnyDocumentFinishProcessing(previousDocuments, nextDocuments)
+        ) {
+          onDocumentsProcessedRef.current?.();
+        }
+
+        return nextDocuments;
+      });
       setDocumentsError(null);
     } catch (error) {
       setDocumentsError(

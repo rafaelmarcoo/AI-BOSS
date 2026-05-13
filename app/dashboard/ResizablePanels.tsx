@@ -1,16 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Box } from "@mui/material";
 import { dashboardTokens } from "@/app/theme";
 import { ChatSidebar } from "./chat/sidebar";
 import { RunwaySection } from "./runway";
-import type { DashboardMetrics } from "./runway";
+import type { CompleteFinancialMetricSet } from "@/lib/financial-data";
 
 interface ResizablePanelsProps {
   fullName: string | null;
   email: string;
-  metrics: DashboardMetrics;
+  metrics: CompleteFinancialMetricSet;
 }
 
 const MIN_CHAT_WIDTH = 280;
@@ -23,6 +24,7 @@ export function ResizablePanels({
   email,
   metrics,
 }: ResizablePanelsProps) {
+  const router = useRouter();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [chatWidth, setChatWidth] = useState(DEFAULT_CHAT_WIDTH);
   const [isDragging, setIsDragging] = useState(false);
@@ -86,7 +88,11 @@ export function ResizablePanels({
           borderBottomColor: { xs: dashboardTokens.border },
         }}
       >
-        <ChatSidebar fullName={fullName} email={email} />
+        <ChatSidebar
+          fullName={fullName}
+          email={email}
+          onDocumentsProcessed={() => router.refresh()}
+        />
       </Box>
 
       <Box

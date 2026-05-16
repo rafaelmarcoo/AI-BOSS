@@ -14,6 +14,11 @@ interface ResizablePanelsProps {
   metrics: CompleteFinancialMetricSet;
 }
 
+interface SelectionChatPrompt {
+  id: string;
+  text: string;
+}
+
 const MIN_CHAT_WIDTH = 280;
 const MAX_CHAT_WIDTH = 720;
 const DEFAULT_CHAT_WIDTH = 360;
@@ -28,6 +33,15 @@ export function ResizablePanels({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [chatWidth, setChatWidth] = useState(DEFAULT_CHAT_WIDTH);
   const [isDragging, setIsDragging] = useState(false);
+  const [pendingChatPrompt, setPendingChatPrompt] =
+    useState<SelectionChatPrompt | null>(null);
+
+  const handleAskChatbot = (selectionText: string) => {
+    setPendingChatPrompt({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      text: selectionText,
+    });
+  };
 
   useEffect(() => {
     if (!isDragging) {
@@ -45,7 +59,7 @@ export function ResizablePanels({
       const nextWidth = event.clientX - bounds.left;
       const clampedWidth = Math.max(
         MIN_CHAT_WIDTH,
-        Math.min(MAX_CHAT_WIDTH, nextWidth)
+        Math.min(MAX_CHAT_WIDTH, nextWidth),
       );
 
       setChatWidth(clampedWidth);
@@ -92,6 +106,8 @@ export function ResizablePanels({
           fullName={fullName}
           email={email}
           onDocumentsProcessed={() => router.refresh()}
+          selectionPrompt={pendingChatPrompt}
+          onSelectionPromptHandled={() => setPendingChatPrompt(null)}
         />
       </Box>
 
@@ -137,7 +153,7 @@ export function ResizablePanels({
           minWidth: 0,
         }}
       >
-        <RunwaySection metrics={metrics} />
+        <RunwaySection metrics={metrics} onAskChatbot={handleAskChatbot} />
       </Box>
     </Box>
   );

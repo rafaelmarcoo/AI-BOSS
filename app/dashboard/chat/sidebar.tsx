@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -29,24 +29,40 @@ import { ChatContainer } from "./ChatContainer";
 import { useChatConversation } from "./useChatConversation";
 import { useDocuments } from "./useDocuments";
 
+interface SelectionChatPrompt {
+  id: string;
+  text: string;
+}
+
 interface ChatSidebarProps {
   fullName: string | null;
   email: string;
   onDocumentsProcessed?: () => void;
+  selectionPrompt?: SelectionChatPrompt | null;
+  onSelectionPromptHandled?: () => void;
 }
 
 export function ChatSidebar({
   fullName,
   email,
   onDocumentsProcessed,
+  selectionPrompt,
+  onSelectionPromptHandled,
 }: ChatSidebarProps) {
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [selectedConversationId, setSelectedConversationId] = useState<
+    string | null
+  >(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
-  const [menuConversationId, setMenuConversationId] = useState<string | null>(null);
+  const [menuConversationId, setMenuConversationId] = useState<string | null>(
+    null,
+  );
   const [renameValue, setRenameValue] = useState("");
-  const [renamingConversationId, setRenamingConversationId] = useState<string | null>(null);
+  const [renamingConversationId, setRenamingConversationId] = useState<
+    string | null
+  >(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const lastHandledPromptId = useRef<string | null>(null);
   const {
     conversationId,
     conversationMessages,
@@ -70,11 +86,28 @@ export function ChatSidebar({
   } = useDocuments(conversationId, { onDocumentsProcessed });
 
   const activeConversation =
-    conversations.find((conversation) => conversation.id === conversationId) ?? null;
+    conversations.find((conversation) => conversation.id === conversationId) ??
+    null;
 
   useEffect(() => {
     setSelectedConversationId(conversationId);
   }, [conversationId]);
+
+  useEffect(() => {
+    if (!selectionPrompt) {
+      return;
+    }
+
+    if (lastHandledPromptId.current === selectionPrompt.id) {
+      return;
+    }
+
+    lastHandledPromptId.current = selectionPrompt.id;
+
+    void sendMessage(selectionPrompt.text).finally(() => {
+      onSelectionPromptHandled?.();
+    });
+  }, [onSelectionPromptHandled, selectionPrompt, sendMessage]);
 
   const handleSelectConversation = async (conversationId: string) => {
     setSelectedConversationId(conversationId);
@@ -93,7 +126,7 @@ export function ChatSidebar({
   const openConversationMenu = (
     event: React.MouseEvent<HTMLElement>,
     conversationId: string,
-    title: string | null
+    title: string | null,
   ) => {
     event.stopPropagation();
     setMenuAnchorEl(event.currentTarget);
@@ -129,7 +162,7 @@ export function ChatSidebar({
       setActionError(
         error instanceof Error
           ? error.message
-          : "Could not rename the conversation."
+          : "Could not rename the conversation.",
       );
     }
   };
@@ -147,7 +180,7 @@ export function ChatSidebar({
       setActionError(
         error instanceof Error
           ? error.message
-          : "Could not delete the conversation."
+          : "Could not delete the conversation.",
       );
     }
   };
@@ -224,7 +257,10 @@ export function ChatSidebar({
                 <Typography variant="subtitle1" fontWeight={700}>
                   Chats
                 </Typography>
-                <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
+                <Typography
+                  variant="caption"
+                  sx={{ color: dashboardTokens.textMuted }}
+                >
                   {fullName ?? email}
                 </Typography>
               </Box>
@@ -264,11 +300,17 @@ export function ChatSidebar({
             }}
           >
             {historyLoading ? (
-              <Typography variant="body2" sx={{ color: dashboardTokens.textMuted, p: 1 }}>
+              <Typography
+                variant="body2"
+                sx={{ color: dashboardTokens.textMuted, p: 1 }}
+              >
                 Loading conversations...
               </Typography>
             ) : conversations.length === 0 ? (
-              <Typography variant="body2" sx={{ color: dashboardTokens.textMuted, p: 1 }}>
+              <Typography
+                variant="body2"
+                sx={{ color: dashboardTokens.textMuted, p: 1 }}
+              >
                 No saved conversations yet.
               </Typography>
             ) : (
@@ -277,7 +319,9 @@ export function ChatSidebar({
                   <ListItem key={conversation.id} disablePadding>
                     <ListItemButton
                       selected={selectedConversationId === conversation.id}
-                      onClick={() => void handleSelectConversation(conversation.id)}
+                      onClick={() =>
+                        void handleSelectConversation(conversation.id)
+                      }
                       sx={{
                         px: 1.25,
                         py: 1,
@@ -302,7 +346,9 @@ export function ChatSidebar({
                     >
                       <ListItemText
                         primary={conversation.title ?? "Untitled conversation"}
-                        secondary={new Date(conversation.updated_at).toLocaleString()}
+                        secondary={new Date(
+                          conversation.updated_at,
+                        ).toLocaleString()}
                         primaryTypographyProps={{
                           color: "common.white",
                           fontSize: 14,
@@ -320,7 +366,7 @@ export function ChatSidebar({
                           openConversationMenu(
                             event,
                             conversation.id,
-                            conversation.title
+                            conversation.title,
                           )
                         }
                         sx={{
@@ -352,7 +398,10 @@ export function ChatSidebar({
         }}
       >
         <MenuItem onClick={startRenameConversation}>Rename</MenuItem>
-        <MenuItem onClick={() => void handleDeleteConversation()} sx={{ color: "#fca5a5" }}>
+        <MenuItem
+          onClick={() => void handleDeleteConversation()}
+          sx={{ color: "#fca5a5" }}
+        >
           Delete
         </MenuItem>
       </Menu>
@@ -395,10 +444,16 @@ export function ChatSidebar({
           />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={closeRenameDialog} sx={{ color: dashboardTokens.textMuted }}>
+          <Button
+            onClick={closeRenameDialog}
+            sx={{ color: dashboardTokens.textMuted }}
+          >
             Cancel
           </Button>
-          <Button onClick={() => void submitRenameConversation()} variant="contained">
+          <Button
+            onClick={() => void submitRenameConversation()}
+            variant="contained"
+          >
             Save
           </Button>
         </DialogActions>

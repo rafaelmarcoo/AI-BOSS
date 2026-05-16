@@ -12,9 +12,11 @@ import {
 import { MetricCard } from "../MetricCard";
 import { BurnRateChart } from "../BurnRateChart";
 import { RecentActivity } from "../RecentActivity";
+import { RunwaySelectionPrompt } from "./selection-prompt";
 
 interface RunwaySectionProps {
   metrics: CompleteFinancialMetricSet;
+  onAskChatbot: (selectionText: string) => void;
 }
 
 // Helper to format currency
@@ -56,14 +58,17 @@ function getSourceTone(metric: FinancialMetricValue) {
 function formatMetricValue(
   metrics: CompleteFinancialMetricSet,
   key: FinancialMetricKey,
-  formatter: (value: number | null | undefined) => string
+  formatter: (value: number | null | undefined) => string,
 ) {
   return formatter(getMetricNumber(metrics, key));
 }
 
-export function RunwaySection({ metrics }: RunwaySectionProps) {
+export function RunwaySection({ metrics, onAskChatbot }: RunwaySectionProps) {
   const monthlyRevenue = getMetricNumber(metrics, "monthly_revenue");
   const monthlyExpenses = getMetricNumber(metrics, "monthly_expenses");
+  const cashBalance = getMetricNumber(metrics, "cash");
+  const runwayMonths = getMetricNumber(metrics, "runway_months");
+  const burnRate = getMetricNumber(metrics, "burn_rate");
   const netLoss =
     monthlyRevenue !== null && monthlyExpenses !== null
       ? monthlyExpenses - monthlyRevenue
@@ -76,6 +81,11 @@ export function RunwaySection({ metrics }: RunwaySectionProps) {
   return (
     <Box sx={{ p: { xs: 3, sm: 4 }, flex: 1 }}>
       <Stack spacing={3}>
+        <RunwaySelectionPrompt
+          onAskChatbot={onAskChatbot}
+          summaryText={`Runway is ${formatNumber(runwayMonths)} months with cash at ${formatCurrency(cashBalance)} and monthly burn at ${formatCurrency(burnRate)}.`}
+        />
+
         {/* Runway Status Header Card */}
         <Paper
           elevation={0}
@@ -141,7 +151,11 @@ export function RunwaySection({ metrics }: RunwaySectionProps) {
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", xl: "repeat(4, 1fr)" },
+            gridTemplateColumns: {
+              xs: "1fr",
+              sm: "repeat(2, 1fr)",
+              xl: "repeat(4, 1fr)",
+            },
             gap: 2,
           }}
         >
@@ -157,7 +171,7 @@ export function RunwaySection({ metrics }: RunwaySectionProps) {
             value={formatMetricValue(
               metrics,
               "accounts_receivable",
-              formatCurrency
+              formatCurrency,
             )}
             color="#38bdf8"
             sourceLabel={formatSource(metrics.accounts_receivable)}
@@ -168,7 +182,7 @@ export function RunwaySection({ metrics }: RunwaySectionProps) {
             value={formatMetricValue(
               metrics,
               "accounts_payable",
-              formatCurrency
+              formatCurrency,
             )}
             color="#f97316"
             sourceLabel={formatSource(metrics.accounts_payable)}
@@ -191,14 +205,22 @@ export function RunwaySection({ metrics }: RunwaySectionProps) {
           />
           <MetricCard
             label="MONTHLY REVENUE"
-            value={formatMetricValue(metrics, "monthly_revenue", formatCurrency)}
+            value={formatMetricValue(
+              metrics,
+              "monthly_revenue",
+              formatCurrency,
+            )}
             color="#22c55e"
             sourceLabel={formatSource(metrics.monthly_revenue)}
             sourceTone={getSourceTone(metrics.monthly_revenue)}
           />
           <MetricCard
             label="MONTHLY EXPENSES"
-            value={formatMetricValue(metrics, "monthly_expenses", formatCurrency)}
+            value={formatMetricValue(
+              metrics,
+              "monthly_expenses",
+              formatCurrency,
+            )}
             color="#f43f5e"
             sourceLabel={formatSource(metrics.monthly_expenses)}
             sourceTone={getSourceTone(metrics.monthly_expenses)}

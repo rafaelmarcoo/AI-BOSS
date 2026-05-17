@@ -241,6 +241,7 @@ export function ChatSidebar({
             borderRight: "1px solid",
             borderRightColor: dashboardTokens.border,
             p: { xs: 1.25, sm: 1.5 },
+            overflowX: "hidden",
           },
         }}
       >
@@ -327,6 +328,7 @@ export function ChatSidebar({
                         py: 1,
                         borderRadius: 2.5,
                         alignItems: "flex-start",
+                        minWidth: 0,
                         bgcolor:
                           selectedConversationId === conversation.id
                             ? "rgba(255,255,255,0.10)"
@@ -359,6 +361,7 @@ export function ChatSidebar({
                           color: dashboardTokens.textMuted,
                           fontSize: 12,
                         }}
+                        sx={{ minWidth: 0, pr: 1 }}
                       />
                       <IconButton
                         size="small"
@@ -372,6 +375,8 @@ export function ChatSidebar({
                         sx={{
                           color: dashboardTokens.textMuted,
                           alignSelf: "center",
+                          flex: "0 0 auto",
+                          mr: -0.5,
                         }}
                       >
                         <MoreHorizRoundedIcon fontSize="small" />

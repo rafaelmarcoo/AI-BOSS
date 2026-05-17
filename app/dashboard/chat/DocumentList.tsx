@@ -4,7 +4,6 @@ import {
   Alert,
   Box,
   Chip,
-  Collapse,
   CircularProgress,
   Stack,
   Typography,
@@ -65,9 +64,11 @@ export function DocumentList({
   return (
     <Stack
       sx={{
+        position: "relative",
+        zIndex: 3,
         borderBottom: "1px solid",
         borderBottomColor: dashboardTokens.border,
-        bgcolor: "rgba(255,255,255,0.02)",
+        bgcolor: dashboardTokens.sidebarV2,
       }}
     >
       <Box
@@ -143,15 +144,23 @@ export function DocumentList({
         </Stack>
       </Box>
 
-      <Collapse in={open} timeout={160} unmountOnExit>
+      {open ? (
         <Stack
           id="chat-documents-panel"
           spacing={1}
           sx={{
+            position: "absolute",
+            top: "100%",
+            left: 0,
+            right: 0,
             px: 1.25,
-            pb: 1,
-            maxHeight: 260,
+            py: 1,
+            maxHeight: { xs: "58vh", md: 360 },
             overflow: "auto",
+            bgcolor: dashboardTokens.sidebarV2,
+            borderBottom: "1px solid",
+            borderBottomColor: dashboardTokens.border,
+            boxShadow: "0 18px 40px rgba(0,0,0,0.42)",
           }}
         >
           {error ? (
@@ -166,7 +175,7 @@ export function DocumentList({
             </Typography>
           ) : (
             <Stack spacing={0.85}>
-              {documents.slice(0, 4).map((document) => {
+              {documents.map((document) => {
                 const status = getStatusColor(document.status);
 
                 return (
@@ -236,7 +245,7 @@ export function DocumentList({
             </Stack>
           )}
         </Stack>
-      </Collapse>
+      ) : null}
     </Stack>
   );
 }

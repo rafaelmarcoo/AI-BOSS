@@ -5,16 +5,7 @@ import type {
   Conversation,
   ConversationMessage,
 } from '@/types/database'
-
-function createConversationTitle(message: string) {
-  const trimmed = message.trim()
-
-  if (!trimmed) {
-    return null
-  }
-
-  return trimmed.length > 80 ? `${trimmed.slice(0, 77)}...` : trimmed
-}
+import { createConversationTitle } from '@/lib/chat/conversation-title'
 
 export async function getOrCreateConversation(
   userId: string,

@@ -11,6 +11,7 @@ import type {
   ConversationMutationApiResponse,
   ConversationsApiResponse,
 } from "./types";
+import { createConversationTitle } from "@/lib/chat/conversation-title";
 
 function createChatId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -140,11 +141,8 @@ export function useChatConversation() {
         const existingConversation = prev.find(
           (conversation) => conversation.id === payload.data!.conversationId
         );
-        const nextTitle = existingConversation?.title
-          ? existingConversation.title
-          : input.length > 80
-            ? `${input.slice(0, 77)}...`
-            : input;
+        const nextTitle =
+          existingConversation?.title ?? createConversationTitle(input);
         const nextSummary = {
           id: payload.data!.conversationId,
           title: nextTitle,

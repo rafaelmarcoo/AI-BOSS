@@ -78,6 +78,11 @@ async function main() {
     "What's my current runway based on my actual financial data?"
   )
 
+  await runTest(
+    'Scenario modelling — what if I hire someone',
+    "What happens to my runway if I hire someone for $8,000 a month?"
+  )
+
   console.log(`\n${DIVIDER}`)
   console.log('All tests completed.')
 }

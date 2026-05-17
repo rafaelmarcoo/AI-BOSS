@@ -101,7 +101,7 @@ export function RunwaySelectionPrompt({
           >
             <Chip
               icon={<HighlightAltRoundedIcon />}
-              label="Selection prompt demo"
+              label="AI-BOSS insight"
               size="small"
               sx={{
                 color: "#bfdbfe",
@@ -114,7 +114,7 @@ export function RunwaySelectionPrompt({
               variant="caption"
               sx={{ color: dashboardTokens.textMuted }}
             >
-              Highlight the sentence below to surface a chatbot prompt.
+              Runway summary
             </Typography>
           </Stack>
 
@@ -162,11 +162,8 @@ export function RunwaySelectionPrompt({
         >
           <Stack spacing={1.5}>
             <Stack spacing={0.5}>
-              <Typography
-                variant="overline"
-                sx={{ color: dashboardTokens.textMuted }}
-              >
-                Ask the chatbot about this highlight
+              <Typography variant="overline" sx={{ color: dashboardTokens.textMuted }}>
+                Ask AI-BOSS
               </Typography>
               <Typography
                 variant="body2"
@@ -175,14 +172,6 @@ export function RunwaySelectionPrompt({
                 {selectionText}
               </Typography>
             </Stack>
-
-            <Typography
-              variant="caption"
-              sx={{ color: dashboardTokens.textMuted }}
-            >
-              This is the selection popup you would see before sending the
-              context into chat.
-            </Typography>
 
             <Stack direction="row" spacing={1} justifyContent="flex-end">
               <Button

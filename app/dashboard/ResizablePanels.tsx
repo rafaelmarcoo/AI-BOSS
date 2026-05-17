@@ -39,7 +39,7 @@ export function ResizablePanels({
   const handleAskChatbot = (selectionText: string) => {
     setPendingChatPrompt({
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      text: selectionText,
+      text: `Can you explain this dashboard highlight and what it means for the business?\n\n"${selectionText}"`,
     });
   };
 

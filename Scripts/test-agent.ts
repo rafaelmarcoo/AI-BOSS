@@ -79,8 +79,13 @@ async function main() {
   )
 
   await runTest(
-    'Scenario modelling — what if I hire someone',
+    'Scenario modelling: what if I hire someone',
     "What happens to my runway if I hire someone for $8,000 a month?"
+  )
+
+  await runTest(
+    'Runway history: show me the trend',
+    'How has my runway changed over the last few months?'
   )
 
   console.log(`\n${DIVIDER}`)

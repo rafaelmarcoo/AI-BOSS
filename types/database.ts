@@ -10,22 +10,6 @@ export interface User {
   updated_at: string
 }
 
-export interface FinancialSnapshot {
-  id: string
-  user_id: string
-  snapshot_date: string
-  cash_balance: number
-  accounts_receivable: number
-  accounts_payable: number
-  monthly_revenue: number
-  monthly_expenses: number
-  burn_rate: number | null
-  runway_months: number | null
-  data_source: 'xero' | 'manual'
-  raw_data: unknown
-  created_at: string
-}
-
 export interface PolicyRule {
   id: string
   user_id: string

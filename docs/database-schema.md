@@ -2,17 +2,16 @@
 
 **Database:** Supabase (PostgreSQL)  
 **Created:** March 22, 2025  
-**Last Updated:** May 12, 2026
+**Last Updated:** May 18, 2026
 
 ---
 
 ## Overview
 
-The database now consists of 12 main tables:
+The database now consists of 11 main tables:
 - **users** - User profiles (extends Supabase Auth)
 - **conversations** - User-owned chat threads
 - **conversation_messages** - Individual chat messages inside a thread
-- **financial_snapshots** - Legacy point-in-time financial data snapshots
 - **policy_rules** - Business rules and compliance policies
 - **decision_log** - Audit trail of AI actions, tool usage, retrieval, and calculations
 - **documents** - Uploaded user files stored in Supabase Storage
@@ -96,38 +95,7 @@ Stores the actual user/assistant transcript for each conversation.
 
 ---
 
-### 4. financial_snapshots
-
-Legacy table for financial data snapshots from Xero (or manual entry). New
-source-aware dashboard, tool, and agent workflows should use
-`financial_metric_observations` instead.
-
-| Column | Type | Description |
-|--------|------|-------------|
-| id | UUID (PK) | Primary key |
-| user_id | UUID (FK) | References users(id) |
-| snapshot_date | TIMESTAMP | When snapshot was taken |
-| cash_balance | DECIMAL(12,2) | Current cash on hand |
-| accounts_receivable | DECIMAL(12,2) | Money owed to business (AR) |
-| accounts_payable | DECIMAL(12,2) | Money business owes (AP) |
-| monthly_revenue | DECIMAL(12,2) | Revenue this month |
-| monthly_expenses | DECIMAL(12,2) | Expenses this month |
-| burn_rate | DECIMAL(12,2) | Monthly cash burn |
-| runway_months | DECIMAL(5,2) | Calculated runway |
-| data_source | TEXT | 'xero' or 'manual' |
-| raw_data | JSONB | Full Xero API response |
-| created_at | TIMESTAMP | Record creation time |
-
-**RLS Policies:**
-- Users can view, insert, update, and delete their own snapshots only
-
-**Indexes:**
-- `idx_financial_snapshots_user_id` on user_id
-- `idx_financial_snapshots_date` on snapshot_date (DESC)
-
----
-
-### 5. policy_rules
+### 4. policy_rules
 
 Business rules and compliance policies set by the user.
 
@@ -161,7 +129,7 @@ Business rules and compliance policies set by the user.
 
 ---
 
-### 6. decision_log
+### 5. decision_log
 
 Audit trail of every AI interaction and system action. This is no longer the
 source of truth for chat history. Chat messages now live in
@@ -210,7 +178,7 @@ assistant turn.
 
 ---
 
-### 7. documents
+### 6. documents
 
 Stores uploaded user files and their ingestion state.
 
@@ -242,7 +210,7 @@ Stores uploaded user files and their ingestion state.
 
 ---
 
-### 8. document_chunks
+### 7. document_chunks
 
 Stores chunked document content and embeddings for semantic retrieval.
 
@@ -268,7 +236,7 @@ Stores chunked document content and embeddings for semantic retrieval.
 
 ---
 
-### 9. data_connections
+### 8. data_connections
 
 Provider-neutral registry for all financial data sources a user has connected,
 uploaded, or made available. Provider-specific credential tables link back to
@@ -300,7 +268,7 @@ this table.
 
 ---
 
-### 10. xero_connections
+### 9. xero_connections
 
 Stores Xero-specific tenant details and OAuth credentials. This table links to
 `data_connections`, which is the source of truth for user-visible connection
@@ -329,7 +297,7 @@ server-side when calling Xero or revoking a connection.
 
 ---
 
-### 11. oauth_connection_states
+### 10. oauth_connection_states
 
 Stores short-lived state values during OAuth redirect flows. A state row is
 created when the user starts connecting an OAuth provider and deleted after
@@ -353,7 +321,7 @@ callback validation.
 
 ---
 
-### 12. financial_metric_observations
+### 11. financial_metric_observations
 
 Stores normalized financial metric values from Xero, uploaded documents, manual
 inputs, and demo data. This table is the long-term source of truth for
@@ -396,7 +364,6 @@ one source/period, rather than a wide snapshot of all metrics.
 ```
 users (1) ──< (many) conversations
 conversations (1) ──< (many) conversation_messages
-users (1) ──< (many) financial_snapshots [legacy]
 users (1) ──< (many) policy_rules
 users (1) ──< (many) decision_log
 users (1) ──< (many) documents
@@ -420,20 +387,13 @@ All schema changes are tracked in `db/migrations/`:
 - `004_xero_oauth.sql` - Adds encrypted Xero OAuth connections and temporary OAuth states
 - `005_data_connections_foundation.sql` - Adds provider-neutral data connections, generic OAuth states, links Xero credentials, and drops the old Xero-only OAuth state table
 - `006_financial_metric_observations.sql` - Adds source-aware normalized financial metric observation storage
+- `007_drop_financial_snapshots.sql` - Drops the legacy financial snapshots table
 
 ---
 
 ## Access Patterns
 
 ### Common Queries
-
-**Get latest financial snapshot:**
-```sql
-SELECT * FROM financial_snapshots
-WHERE user_id = $1
-ORDER BY snapshot_date DESC
-LIMIT 1;
-```
 
 **Get latest available value for each metric key:**
 ```sql
@@ -480,8 +440,7 @@ Planned for Sprint 2+:
 - **scenarios** table - Store "what-if" scenario configurations
 - **forecasts** table - Store AI-generated forecasts
 - **document extraction pipeline** - Promote uploaded document data into structured financial metric observations
-- **financial_snapshots deprecation** - Stop writing legacy snapshots once metric observations cover dashboard/tool use cases
 
 ---
 
-**Last Updated:** May 12, 2026 by Rafael Manubay
+**Last Updated:** May 18, 2026 by Rafael Manubay

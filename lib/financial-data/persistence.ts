@@ -5,6 +5,7 @@ import type {
   AvailableFinancialMetricValue,
   FinancialMetricSet,
 } from '@/lib/financial-data/types'
+import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
 import type { FinancialMetricObservation } from '@/types/database'
 
 const FINANCIAL_METRIC_OBSERVATION_SELECT = `
@@ -106,4 +107,33 @@ export async function listLatestFinancialMetricValues(userId: string) {
   }
 
   return metrics
+}
+
+export async function listFinancialMetricObservationHistory(params: {
+  userId: string
+  metricKey: FinancialMetricKey
+  limit?: number
+}) {
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase
+    .from('financial_metric_observations')
+    .select(FINANCIAL_METRIC_OBSERVATION_SELECT)
+    .eq('user_id', params.userId)
+    .eq('metric_key', params.metricKey)
+    .order('as_of_date', { ascending: false, nullsFirst: false })
+    .order('period_end', { ascending: false, nullsFirst: false })
+    .order('updated_at', { ascending: false })
+    .limit(params.limit ?? 6)
+
+  if (error) {
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to load financial metric observation history.'
+    )
+  }
+
+  return ((data ?? []) as FinancialMetricObservation[])
+    .map(mapObservationRowToMetric)
+    .reverse()
 }

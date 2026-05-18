@@ -9,7 +9,7 @@
     "lint": "eslint",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
-    "test:agent": "tsx scripts/test-agent.ts"
+    "test:agent": "tsx Scripts/test-agent.ts"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -24,6 +24,7 @@
     "pdfjs-dist": "^5.4.296",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "react-markdown": "^10.1.0",
     "recharts": "^3.8.1",
     "zod": "^4.3.6"
   },

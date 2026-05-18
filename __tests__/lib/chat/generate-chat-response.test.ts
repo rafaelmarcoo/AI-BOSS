@@ -2,6 +2,7 @@ import { SystemMessage } from '@langchain/core/messages'
 import { generateChatResponse } from '@/lib/chat/generate-chat-response'
 import { buildChatContext } from '@/lib/chat/build-chat-context'
 import { runAgent } from '@/lib/ai/agent'
+import { getAgentTools } from '@/lib/ai/tool-registry'
 import {
   getOrCreateConversation,
   insertConversationMessage,
@@ -39,6 +40,7 @@ jest.mock('@/lib/chat/log-chat-decision', () => ({
 
 const mockBuildChatContext = jest.mocked(buildChatContext)
 const mockRunAgent = jest.mocked(runAgent)
+const mockGetAgentTools = jest.mocked(getAgentTools)
 const mockGetOrCreateConversation = jest.mocked(getOrCreateConversation)
 const mockInsertConversationMessage = jest.mocked(insertConversationMessage)
 const mockListConversationMessages = jest.mocked(listConversationMessages)
@@ -131,6 +133,7 @@ describe('generateChatResponse', () => {
       userId: 'user-123',
       query: 'What is my runway?',
     })
+    expect(mockGetAgentTools).toHaveBeenCalledWith('user-123')
     expect(mockRunAgent).toHaveBeenCalledWith(
       'What is my runway?',
       [],

@@ -47,9 +47,8 @@ Cash alone understates available liquidity. AR is money already earned that will
 
 Runway calculation is shared across two consumers:
 
-- the direct API route, which validates inputs and stores a snapshot through the runway service
-- the chat agent tool, which reuses the shared runway service calculation operation without storing a snapshot
+- the direct API route, which validates inputs and returns the calculated result
+- the chat agent tool, which reuses the shared runway calculation operation
 
-Runway snapshots are saved to the `financial_snapshots` table in the `runway_months`
-column through the runway service. See `docs/database-schema.md` for the full
-table definition.
+Historical and forecast trend tools use `financial_metric_observations`,
+specifically `runway_months` observations, rather than legacy snapshot rows.

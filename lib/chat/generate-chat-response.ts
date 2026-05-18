@@ -57,7 +57,7 @@ export async function generateChatResponse(
   const agentResponse = await runAgent(
     latestUserMessage.content,
     chatHistory,
-    getAgentTools(),
+    getAgentTools(userId),
     chatContext.messages
   )
 

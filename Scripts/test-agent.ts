@@ -33,7 +33,7 @@ async function runTest(label: string, input: string) {
   console.log(`USER: ${input}`)
   console.log(DIVIDER)
 
-  const response = await runAgent(input, [], getAgentTools())
+  const response = await runAgent(input, [], getAgentTools('local-test-user'))
   console.log(`AGENT: ${response.content}`)
   console.log(`TOKENS: ${response.tokensUsed ?? 'unknown'}`)
   console.log(

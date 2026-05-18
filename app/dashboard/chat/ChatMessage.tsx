@@ -1,6 +1,27 @@
 import { Box, Paper, Stack } from "@mui/material";
 import { keyframes } from "@mui/system";
+import ReactMarkdown from "react-markdown";
 import { dashboardTokens } from "@/app/theme";
+
+const assistantMarkdownSx = {
+  "& *": { boxSizing: "border-box" },
+  "& p": { m: 0, lineHeight: 1.45 },
+  "& p + p": { mt: 0.75 },
+  "& ul, & ol": { pl: 2.25, my: 0.5 },
+  "& li": { my: 0.25, lineHeight: 1.45 },
+  "& li > p": { m: 0 },
+  "& strong": { fontWeight: 700 },
+  "& h1, & h2, & h3, & h4": {
+    fontSize: "0.98em",
+    lineHeight: 1.35,
+    fontWeight: 700,
+    mt: 0.75,
+    mb: 0.35,
+  },
+  "& h1:first-child, & h2:first-child, & h3:first-child, & h4:first-child": {
+    mt: 0,
+  },
+};
 
 export type ChatRole = "user" | "assistant";
 export type ChatMessageStatus = "failed";
@@ -49,9 +70,9 @@ export function ChatMessage({
           borderColor: dashboardTokens.border,
           bgcolor: isUser ? "#2563eb" : "#4b5563",
           color: "common.white",
-          whiteSpace: "pre-wrap",
           wordBreak: "break-word",
           lineHeight: 1.45,
+          whiteSpace: isUser ? "pre-wrap" : "normal",
         }}
       >
         {isLoading ? (
@@ -77,7 +98,15 @@ export function ChatMessage({
           </Stack>
         ) : (
           <Stack spacing={0.75}>
-            <Box>{content}</Box>
+            {isUser ? (
+              <Box sx={{ whiteSpace: "pre-wrap" }}>{content}</Box>
+            ) : (
+              <Box sx={assistantMarkdownSx}>
+                <ReactMarkdown>
+                  {(content ?? "").replace(/\n{3,}/g, "\n\n")}
+                </ReactMarkdown>
+              </Box>
+            )}
             {status === "failed" ? (
               <Box
                 component="span"

@@ -1,4 +1,8 @@
 import { z } from 'zod'
+import {
+  assessRunwayPolicy,
+  type RunwayPolicy,
+} from '@/lib/calculations/runway-policy'
 
 export const RunwayInputSchema = z.object({
   cash: z.number().nonnegative('Cash must be non-negative.'),
@@ -21,6 +25,7 @@ export interface RunwayBreakdown {
 export interface RunwayResult {
   runway_months: number
   calculation_breakdown: RunwayBreakdown
+  policy: RunwayPolicy
 }
 
 export function calculateRunway(input: RunwayInput): RunwayResult {
@@ -38,5 +43,6 @@ export function calculateRunway(input: RunwayInput): RunwayResult {
       netAvailableCash,
       formula: `(${cash} + ${ar} - ${ap}) / ${burn} = ${runwayMonths} months`,
     },
+    policy: assessRunwayPolicy(runwayMonths),
   }
 }

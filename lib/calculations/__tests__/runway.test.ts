@@ -7,6 +7,7 @@ describe('calculateRunway', () => {
       const result = calculateRunway({ cash: 100000, ar: 0, ap: 0, burn: 10000 })
 
       expect(result.runway_months).toBe(10)
+      expect(result.policy.status).toBe('healthy')
     })
 
     it('calculates runway with AR and AP', () => {
@@ -30,6 +31,7 @@ describe('calculateRunway', () => {
       const result = calculateRunway({ cash: 0, ar: 0, ap: 0, burn: 10000 })
 
       expect(result.runway_months).toBe(0)
+      expect(result.policy.status).toBe('urgent')
     })
 
     it('returns negative runway when AP exceeds cash plus AR', () => {
@@ -56,6 +58,29 @@ describe('calculateRunway', () => {
       expect(result.calculation_breakdown.formula).toBe(
         '(100000 + 0 - 0) / 10000 = 10 months'
       )
+    })
+  })
+
+  describe('policy', () => {
+    it('marks runway under 3 months as urgent', () => {
+      expect(
+        calculateRunway({ cash: 20000, ar: 0, ap: 0, burn: 10000 }).policy
+          .status
+      ).toBe('urgent')
+    })
+
+    it('marks runway under 6 months as caution', () => {
+      expect(
+        calculateRunway({ cash: 50000, ar: 0, ap: 0, burn: 10000 }).policy
+          .status
+      ).toBe('caution')
+    })
+
+    it('marks runway at 6 months or above as healthy', () => {
+      expect(
+        calculateRunway({ cash: 60000, ar: 0, ap: 0, burn: 10000 }).policy
+          .status
+      ).toBe('healthy')
     })
   })
 

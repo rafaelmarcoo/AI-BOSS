@@ -29,27 +29,28 @@ export async function GET(request: NextRequest) {
       return successResponse({ connected: false })
     }
 
-    const { data: xeroConnection, error: xeroConnectionError } = await supabase
-      .from('xero_connections')
+    const { data: oauthToken, error: oauthTokenError } = await supabase
+      .from('oauth_tokens')
       .select('tenant_id, tenant_name, expires_at, updated_at')
       .eq('connection_id', dataConnection.id)
+      .eq('provider', 'xero')
       .maybeSingle()
 
-    if (xeroConnectionError) {
-      throw xeroConnectionError
+    if (oauthTokenError) {
+      throw oauthTokenError
     }
 
-    if (!xeroConnection) {
+    if (!oauthToken) {
       return successResponse({ connected: false })
     }
 
     return successResponse({
       connected: true,
-      tenantId: xeroConnection.tenant_id,
-      tenantName: xeroConnection.tenant_name,
+      tenantId: oauthToken.tenant_id,
+      tenantName: oauthToken.tenant_name,
       connectedAt: dataConnection.connected_at,
-      expiresAt: xeroConnection.expires_at,
-      updatedAt: xeroConnection.updated_at,
+      expiresAt: oauthToken.expires_at,
+      updatedAt: oauthToken.updated_at,
     })
   } catch (error) {
     return handleRouteError(error)

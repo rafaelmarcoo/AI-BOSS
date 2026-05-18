@@ -45,9 +45,10 @@ export async function getValidXeroToken(userId: string) {
   }
 
   const { data: connection, error } = await supabase
-    .from('xero_connections')
+    .from('oauth_tokens')
     .select('access_token_enc, refresh_token_enc, expires_at')
     .eq('connection_id', dataConnection.id)
+    .eq('provider', 'xero')
     .maybeSingle()
 
   if (error) {
@@ -91,7 +92,7 @@ export async function getValidXeroToken(userId: string) {
 
   const expires_at = new Date(Date.now() + tokens.expires_in * 1000).toISOString()
   const { error: updateError } = await supabase
-    .from('xero_connections')
+    .from('oauth_tokens')
     .update({
       access_token_enc: await encryptToken(tokens.access_token),
       refresh_token_enc: await encryptToken(tokens.refresh_token),
@@ -99,6 +100,7 @@ export async function getValidXeroToken(userId: string) {
       updated_at: new Date().toISOString(),
     })
     .eq('connection_id', dataConnection.id)
+    .eq('provider', 'xero')
 
   if (updateError) {
     throw new ApiError(

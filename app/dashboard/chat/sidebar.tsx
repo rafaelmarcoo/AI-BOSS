@@ -1,5 +1,5 @@
 "use client";
-
+ 
 import { useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -28,12 +28,12 @@ import { dashboardTokens } from "@/app/theme";
 import { ChatContainer } from "./ChatContainer";
 import { useChatConversation } from "./useChatConversation";
 import { useDocuments } from "./useDocuments";
-
+ 
 interface SelectionChatPrompt {
   id: string;
   text: string;
 }
-
+ 
 interface ChatSidebarProps {
   fullName: string | null;
   email: string;
@@ -41,7 +41,7 @@ interface ChatSidebarProps {
   selectionPrompt?: SelectionChatPrompt | null;
   onSelectionPromptHandled?: () => void;
 }
-
+ 
 export function ChatSidebar({
   fullName,
   email,
@@ -84,45 +84,45 @@ export function ChatSidebar({
     documentsError,
     uploadDocument,
   } = useDocuments(conversationId, { onDocumentsProcessed });
-
+ 
   const activeConversation =
     conversations.find((conversation) => conversation.id === conversationId) ??
     null;
-
+ 
   useEffect(() => {
     setSelectedConversationId(conversationId);
   }, [conversationId]);
-
+ 
   useEffect(() => {
     if (!selectionPrompt) {
       return;
     }
-
+ 
     if (lastHandledPromptId.current === selectionPrompt.id) {
       return;
     }
-
+ 
     lastHandledPromptId.current = selectionPrompt.id;
-
+ 
     void sendMessage(selectionPrompt.text).finally(() => {
       onSelectionPromptHandled?.();
     });
   }, [onSelectionPromptHandled, selectionPrompt, sendMessage]);
-
+ 
   const handleSelectConversation = async (conversationId: string) => {
     setSelectedConversationId(conversationId);
     setActionError(null);
     await selectConversation(conversationId);
     setHistoryOpen(false);
   };
-
+ 
   const handleStartNewConversation = () => {
     setSelectedConversationId(null);
     setActionError(null);
     startNewConversation();
     setHistoryOpen(false);
   };
-
+ 
   const openConversationMenu = (
     event: React.MouseEvent<HTMLElement>,
     conversationId: string,
@@ -133,27 +133,27 @@ export function ChatSidebar({
     setMenuConversationId(conversationId);
     setRenameValue(title ?? "");
   };
-
+ 
   const closeConversationMenu = () => {
     setMenuAnchorEl(null);
     setMenuConversationId(null);
   };
-
+ 
   const startRenameConversation = () => {
     setRenamingConversationId(menuConversationId);
     closeConversationMenu();
   };
-
+ 
   const closeRenameDialog = () => {
     setRenamingConversationId(null);
     setRenameValue("");
   };
-
+ 
   const submitRenameConversation = async () => {
     if (!renamingConversationId) {
       return;
     }
-
+ 
     try {
       setActionError(null);
       await renameConversation(renamingConversationId, renameValue);
@@ -166,12 +166,12 @@ export function ChatSidebar({
       );
     }
   };
-
+ 
   const handleDeleteConversation = async () => {
     if (!menuConversationId) {
       return;
     }
-
+ 
     try {
       setActionError(null);
       await deleteConversation(menuConversationId);
@@ -184,7 +184,7 @@ export function ChatSidebar({
       );
     }
   };
-
+ 
   return (
     <Box
       sx={{
@@ -234,33 +234,46 @@ export function ChatSidebar({
         onClose={() => setHistoryOpen(false)}
         PaperProps={{
           sx: {
-            width: { xs: "100vw", sm: 360 },
-            maxWidth: { sm: "100vw" },
+            width: { xs: "100vw", sm: 380 },
+            maxWidth: "100vw",
             bgcolor: "#080910",
             color: "common.white",
             borderRight: "1px solid",
             borderRightColor: dashboardTokens.border,
-            p: { xs: 1.25, sm: 1.5 },
+            p: { xs: 1, sm: 1.5 },
+            boxSizing: "border-box",
             overflowX: "hidden",
           },
         }}
       >
-        <Stack spacing={1.5} sx={{ height: "100%" }}>
+        <Stack spacing={1.5} sx={{ height: "100%", minWidth: 0 }}>
           <Stack
-            direction="row"
+            direction={{ xs: "column", sm: "row" }}
             alignItems="center"
             justifyContent="space-between"
-            sx={{ px: 0.5, pt: 0.5 }}
+            spacing={1}
+            sx={{ px: 0.5, pt: 0.5, minWidth: 0 }}
           >
-            <Stack direction="row" spacing={1} alignItems="center">
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              sx={{ minWidth: 0, width: "100%" }}
+            >
               <ForumRoundedIcon sx={{ color: "common.white" }} />
-              <Box>
+              <Box sx={{ minWidth: 0 }}>
                 <Typography variant="subtitle1" fontWeight={700}>
                   Chats
                 </Typography>
                 <Typography
                   variant="caption"
-                  sx={{ color: dashboardTokens.textMuted }}
+                  sx={{
+                    color: dashboardTokens.textMuted,
+                    display: "block",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
                 >
                   {fullName ?? email}
                 </Typography>
@@ -272,6 +285,7 @@ export function ChatSidebar({
               startIcon={<AddRoundedIcon fontSize="small" />}
               onClick={handleStartNewConversation}
               sx={{
+                alignSelf: { xs: "stretch", sm: "center" },
                 borderRadius: 999,
                 color: "common.white",
                 borderColor: dashboardTokens.borderMuted,
@@ -281,7 +295,7 @@ export function ChatSidebar({
               New chat
             </Button>
           </Stack>
-
+ 
           {actionError ? (
             <Alert
               severity="error"
@@ -291,7 +305,7 @@ export function ChatSidebar({
               {actionError}
             </Alert>
           ) : null}
-
+ 
           <Box
             sx={{
               flex: "1 1 0",
@@ -315,19 +329,22 @@ export function ChatSidebar({
                 No saved conversations yet.
               </Typography>
             ) : (
-              <List disablePadding sx={{ display: "grid", gap: 0.75 }}>
+              <List disablePadding sx={{ display: "grid", gap: 0.75, minWidth: 0 }}>
                 {conversations.map((conversation) => (
-                  <ListItem key={conversation.id} disablePadding>
+                  <ListItem key={conversation.id} disablePadding sx={{ minWidth: 0 }}>
                     <ListItemButton
                       selected={selectedConversationId === conversation.id}
                       onClick={() =>
                         void handleSelectConversation(conversation.id)
                       }
                       sx={{
+                        width: "100%",
                         px: 1.25,
                         py: 1,
                         borderRadius: 2.5,
-                        alignItems: "flex-start",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
                         minWidth: 0,
                         bgcolor:
                           selectedConversationId === conversation.id
@@ -360,8 +377,9 @@ export function ChatSidebar({
                         secondaryTypographyProps={{
                           color: dashboardTokens.textMuted,
                           fontSize: 12,
+                          noWrap: true,
                         }}
-                        sx={{ minWidth: 0, pr: 1 }}
+                        sx={{ minWidth: 0, flex: "1 1 auto", mr: 0.25 }}
                       />
                       <IconButton
                         size="small"
@@ -374,9 +392,16 @@ export function ChatSidebar({
                         }
                         sx={{
                           color: dashboardTokens.textMuted,
-                          alignSelf: "center",
-                          flex: "0 0 auto",
-                          mr: -0.5,
+                          flex: "0 0 34px",
+                          width: 34,
+                          height: 34,
+                          mr: -0.25,
+                          border: "1px solid",
+                          borderColor: "transparent",
+                          "&:hover": {
+                            borderColor: dashboardTokens.borderMuted,
+                            bgcolor: "rgba(255,255,255,0.06)",
+                          },
                         }}
                       >
                         <MoreHorizRoundedIcon fontSize="small" />

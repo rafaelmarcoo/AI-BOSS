@@ -46,10 +46,6 @@ export function useChatConversation() {
 
         const nextConversations = payload.data?.conversations ?? [];
         setConversations(nextConversations);
-
-        if (nextConversations.length > 0) {
-          await loadConversation(nextConversations[0].id, false);
-        }
       } catch {
         setConversations([]);
       } finally {

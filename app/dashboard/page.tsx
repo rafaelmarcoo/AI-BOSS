@@ -11,6 +11,8 @@ import {
 import { readSourceAwareMetrics } from "@/lib/financial-data/read-service";
 import { DashboardHeader } from "./header";
 import { ResizablePanels } from "./ResizablePanels";
+import { SyncWatcher } from "@/components/sync-watcher";
+//import { SyncWatcher } from "@/components/sync-watcher";
 
 export default async function DashboardPage() {
   const cookieStore = await cookies();
@@ -58,6 +60,7 @@ export default async function DashboardPage() {
         <DashboardHeader />
       </Box>
 
+      <SyncWatcher />
       <ResizablePanels
         fullName={profile.full_name}
         email={profile.email}

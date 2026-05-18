@@ -23,7 +23,8 @@ function formatCurrency(value: number | null | undefined): string {
   return new Intl.NumberFormat("en-NZ", {
     style: "currency",
     currency: "NZD",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value);
 }
 

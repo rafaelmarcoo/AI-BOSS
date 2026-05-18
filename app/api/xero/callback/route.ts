@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuthenticatedUser } from '@/lib/auth'
 import { createAdminSupabaseClient } from '@/lib/supabase'
 import { encryptToken } from '@/lib/xero/crypto'
+// --- START: xero initial sync imports ---
+import { XeroAdapter } from '@/lib/integrations/adapters/xero'
+import type { NormalizedFinancialData } from '@/lib/integrations/types'
+// --- END: xero initial sync imports ---
 
 const XERO_TOKEN_URL = 'https://identity.xero.com/connect/token'
 const XERO_CONNECTIONS_URL = 'https://api.xero.com/connections'
@@ -153,6 +157,58 @@ export async function GET(request: NextRequest) {
     if (upsertError) {
       return redirectToDashboard('error')
     }
+
+    // --- START: xero initial sync — write snapshot so dashboard shows data on first load ---
+    try {
+      const xeroAdapter = new XeroAdapter()
+      const xeroTokens = {
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        expiresAt: new Date(Date.now() + tokens.expires_in * 1000),
+        tenantId: tenant.tenantId,
+        tenantName: tenant.tenantName,
+      }
+      const snapshot = await xeroAdapter.getFinancialSnapshot(xeroTokens)
+      const today = new Date()
+      const periodStart = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`
+
+      type MetricKey =
+        | 'cash'
+        | 'accounts_receivable'
+        | 'accounts_payable'
+        | 'monthly_revenue'
+        | 'monthly_expenses'
+
+      const METRIC_MAP: Array<{ key: MetricKey; field: keyof NormalizedFinancialData }> = [
+        { key: 'cash', field: 'cashBalance' },
+        { key: 'accounts_receivable', field: 'accountsReceivable' },
+        { key: 'accounts_payable', field: 'accountsPayable' },
+        { key: 'monthly_revenue', field: 'monthlyRevenue' },
+        { key: 'monthly_expenses', field: 'monthlyExpenses' },
+      ]
+
+      await supabase.from('financial_metric_observations').insert(
+        METRIC_MAP.map(({ key, field }) => ({
+          user_id: user.id,
+          connection_id: dataConnection.id,
+          metric_key: key,
+          value: snapshot[field] as number,
+          currency: snapshot.currency,
+          period_start: periodStart,
+          period_end: snapshot.asOf,
+          as_of_date: snapshot.asOf,
+          source_type: 'xero',
+          source_label: tenant.tenantName,
+          confidence: 1,
+          evidence: {},
+          raw_data: snapshot.raw as object,
+        }))
+      )
+    } catch (syncErr) {
+      // Don't fail the connect flow if snapshot fails — data will arrive via webhook later
+      console.error('[xero:callback] initial sync failed:', syncErr)
+    }
+    // --- END: xero initial sync ---
 
     return redirectToDashboard('connected')
   } catch (error) {

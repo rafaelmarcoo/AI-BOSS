@@ -134,12 +134,11 @@ export async function GET(request: NextRequest) {
     }
 
     const { error: upsertError } = await supabase
-      .from('oauth_tokens')
+      .from('xero_connections')
       .upsert(
         {
           connection_id: dataConnection.id,
           user_id: user.id,
-          provider: 'xero',
           tenant_id: tenant.tenantId,
           tenant_name: tenant.tenantName,
           access_token_enc: await encryptToken(tokens.access_token),
@@ -150,7 +149,7 @@ export async function GET(request: NextRequest) {
           connected_at: now,
           updated_at: now,
         },
-        { onConflict: 'user_id,provider' }
+        { onConflict: 'user_id' }
       )
 
     if (upsertError) {

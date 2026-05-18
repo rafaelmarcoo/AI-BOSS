@@ -49,10 +49,9 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: connection, error: fetchError } = await supabase
-      .from('oauth_tokens')
+      .from('xero_connections')
       .select('refresh_token_enc')
       .eq('connection_id', dataConnection.id)
-      .eq('provider', 'xero')
       .maybeSingle()
 
     if (fetchError) {
@@ -83,10 +82,9 @@ export async function POST(request: NextRequest) {
     }
 
     const { error: deleteError } = await supabase
-      .from('oauth_tokens')
+      .from('xero_connections')
       .delete()
       .eq('connection_id', dataConnection.id)
-      .eq('provider', 'xero')
 
     if (deleteError) {
       throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to disconnect Xero.')

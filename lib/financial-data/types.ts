@@ -1,13 +1,6 @@
 import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
 
-export type FinancialMetricSourceType =
-  | 'xero'
-  | 'quickbooks'
-  | 'freshbooks'
-  | 'myob'
-  | 'document'
-  | 'manual'
-  | 'demo'
+export type FinancialMetricSourceType = 'xero' | 'document' | 'manual' | 'demo'
 
 export type FinancialMetricAvailabilityReason =
   | 'not_connected'

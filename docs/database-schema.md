@@ -17,7 +17,7 @@ The database now consists of 11 main tables:
 - **documents** - Uploaded user files stored in Supabase Storage
 - **document_chunks** - Chunked document content used for semantic retrieval
 - **data_connections** - Provider-neutral registry for user financial data sources
-- **oauth_tokens** - Provider-neutral encrypted OAuth credential/details table
+- **xero_connections** - Xero-specific encrypted OAuth credential/details table
 - **oauth_connection_states** - Temporary OAuth state values used for CSRF protection
 - **financial_metric_observations** - Source-aware normalized financial metric values
 
@@ -239,13 +239,14 @@ Stores chunked document content and embeddings for semantic retrieval.
 ### 8. data_connections
 
 Provider-neutral registry for all financial data sources a user has connected,
-uploaded, or made available. OAuth credential rows link back to this table.
+uploaded, or made available. Provider-specific credential tables link back to
+this table.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID (PK) | Primary key |
 | user_id | UUID (FK) | References users(id) |
-| provider | TEXT | `xero`, `quickbooks`, `freshbooks`, `myob`, `csv`, `pdf`, `manual`, or `demo` |
+| provider | TEXT | `xero`, `csv`, `pdf`, `manual`, or `demo` |
 | status | TEXT | `connected`, `disconnected`, `available`, or `error` |
 | display_name | TEXT | User-facing source name |
 | source_label | TEXT | Short provider/source label |
@@ -267,33 +268,32 @@ uploaded, or made available. OAuth credential rows link back to this table.
 
 ---
 
-### 9. oauth_tokens
+### 9. xero_connections
 
-Stores provider-neutral tenant details and OAuth credentials for accounting
-providers. This table links to `data_connections`, which is the source of truth
-for user-visible connection state. Tokens are encrypted with AES-GCM before
-storage and are only decrypted server-side when calling or revoking a provider.
+Stores Xero-specific tenant details and OAuth credentials. This table links to
+`data_connections`, which is the source of truth for user-visible connection
+state. Tokens are encrypted with AES-GCM before storage and are only decrypted
+server-side when calling Xero or revoking a connection.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID (PK) | Primary key |
 | connection_id | UUID (FK) | References data_connections(id), unique |
-| user_id | UUID (FK) | References users(id) |
-| provider | TEXT | `xero`, `quickbooks`, `freshbooks`, or `myob` |
-| tenant_id | TEXT | Provider tenant/company/organisation ID |
-| tenant_name | TEXT | Provider tenant/company/organisation display name |
-| access_token_enc | TEXT | Encrypted provider access token |
-| refresh_token_enc | TEXT | Encrypted provider refresh token |
+| user_id | UUID (FK) | Legacy owner reference kept for compatibility |
+| tenant_id | TEXT | Xero organisation ID |
+| tenant_name | TEXT | Xero organisation display name |
+| access_token_enc | TEXT | Encrypted Xero access token |
+| refresh_token_enc | TEXT | Encrypted Xero refresh token |
 | expires_at | TIMESTAMP | Access token expiry |
-| connected_at | TIMESTAMP | Time the user connected the provider |
+| connected_at | TIMESTAMP | Time the user connected Xero |
 | updated_at | TIMESTAMP | Last token refresh or connection update |
 
 **RLS Policies:**
-- Users can view, insert, update, and delete their own OAuth tokens only
+- Users can view, insert, update, and delete their own Xero connection only
 
 **Indexes:**
-- `idx_oauth_tokens_user_provider` on (user_id, provider)
-- `idx_oauth_tokens_connection_id` on connection_id
+- `idx_xero_connections_user_id` on user_id
+- `idx_xero_connections_connection_id` on connection_id
 
 ---
 
@@ -307,7 +307,7 @@ callback validation.
 |--------|------|-------------|
 | id | UUID (PK) | Primary key |
 | user_id | UUID (FK) | References users(id), unique per user |
-| provider | TEXT | OAuth provider such as `xero`, `quickbooks`, `freshbooks`, or `myob` |
+| provider | TEXT | OAuth provider, currently `xero` |
 | state | TEXT | Random OAuth state value used for CSRF protection |
 | redirect_path | TEXT | Path to return to after OAuth completes |
 | created_at | TIMESTAMP | State creation time |
@@ -340,7 +340,7 @@ one source/period, rather than a wide snapshot of all metrics.
 | period_start | DATE | Optional period start for period-based metrics |
 | period_end | DATE | Optional period end for period-based metrics |
 | as_of_date | DATE | Optional point-in-time date for balance metrics |
-| source_type | TEXT | `xero`, `quickbooks`, `freshbooks`, `myob`, `document`, `manual`, or `demo` |
+| source_type | TEXT | `xero`, `document`, `manual`, or `demo` |
 | source_label | TEXT | User-facing source label |
 | confidence | NUMERIC(4,3) | Confidence score from 0 to 1 |
 | evidence | JSONB | Evidence reference such as document page, row range, chunk, URL, or excerpt |
@@ -369,7 +369,7 @@ users (1) ──< (many) decision_log
 users (1) ──< (many) documents
 documents (1) ──< (many) document_chunks
 users (1) ──< (many) data_connections
-data_connections (1) ──< (one) oauth_tokens
+data_connections (1) ──< (one) xero_connections
 users (1) ──< (many) oauth_connection_states
 users (1) ──< (many) financial_metric_observations
 data_connections (1) ──< (many) financial_metric_observations
@@ -388,7 +388,6 @@ All schema changes are tracked in `db/migrations/`:
 - `005_data_connections_foundation.sql` - Adds provider-neutral data connections, generic OAuth states, links Xero credentials, and drops the old Xero-only OAuth state table
 - `006_financial_metric_observations.sql` - Adds source-aware normalized financial metric observation storage
 - `007_drop_financial_snapshots.sql` - Drops the legacy financial snapshots table
-- `008_accounting_oauth_tokens.sql` - Adds provider-neutral OAuth tokens and drops the Xero-specific credential table
 
 ---
 

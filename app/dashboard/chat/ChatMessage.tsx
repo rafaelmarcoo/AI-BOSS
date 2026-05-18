@@ -1,6 +1,24 @@
 import { Box, Paper, Stack } from "@mui/material";
 import { keyframes } from "@mui/system";
 import { dashboardTokens } from "@/app/theme";
+import ReactMarkdown from "react-markdown";
+
+const markdownSx = {
+  '& *': { margin: 0, padding: 0, boxSizing: 'border-box' },
+  '& p': { marginBottom: '1px', lineHeight: 1.4 },
+  '& p:last-child': { marginBottom: 0 },
+  '& p:empty': { display: 'none' },
+  '& ul, & ol': { paddingLeft: '14px', marginBottom: '1px' },
+  '& ul:last-child, & ol:last-child': { marginBottom: 0 },
+  '& ul:empty, & ol:empty': { display: 'none' },
+  '& li': { lineHeight: 1.4, marginBottom: 0 },
+  '& li:empty': { display: 'none' },
+  '& li > p': { margin: '0 !important' },
+  '& li > p:empty': { display: 'none' },
+  '& h1, & h2, & h3, & h4': { fontWeight: 700, fontSize: '0.95em', marginTop: '4px', marginBottom: '1px' },
+  '& h1:first-child, & h2:first-child, & h3:first-child': { marginTop: 0 },
+  '& strong': { fontWeight: 700 },
+}
 
 export type ChatRole = "user" | "assistant";
 export type ChatMessageStatus = "failed";
@@ -77,7 +95,18 @@ export function ChatMessage({
           </Stack>
         ) : (
           <Stack spacing={0.75}>
-            <Box>{content}</Box>
+            <Box>
+              {isUser
+                ? content
+                : (
+                  <Box sx={markdownSx}>
+                    <ReactMarkdown>
+                      {(content ?? '').replace(/\n{3,}/g, '\n\n')}
+                    </ReactMarkdown>
+                  </Box>
+                )
+              }
+            </Box>
             {status === "failed" ? (
               <Box
                 component="span"

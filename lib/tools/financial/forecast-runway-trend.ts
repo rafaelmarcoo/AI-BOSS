@@ -89,13 +89,13 @@ export function createForecastRunwayTrendTool(userId: string): StructuredTool<Re
       }
 
       if (cautionMonth) {
-        lines.push(`⚠️  Caution threshold (6 months): projected in ~${cautionMonth} month(s)`)
+        lines.push(`Caution threshold (6 months): projected in ~${cautionMonth} month(s)`)
       } else {
         lines.push('Caution threshold (6 months): not projected within 24 months')
       }
 
       if (urgentMonth) {
-        lines.push(`🚨 Urgent threshold (3 months): projected in ~${urgentMonth} month(s)`)
+        lines.push(`Urgent threshold (3 months): projected in ~${urgentMonth} month(s)`)
       } else {
         lines.push('Urgent threshold (3 months): not projected within 24 months')
       }

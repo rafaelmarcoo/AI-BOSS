@@ -8,199 +8,118 @@ Audience: teammates, supervisors, and Auckland City Mission accountant.
 
 AI-BOSS helps SMEs turn accounting data and uploaded finance documents into source-aware metrics, runway insight, and explainable chat guidance before decisions become expensive.
 
-## Pre-Demo Setup
+## Setup Checklist
 
-Run these before the meeting:
+- Pull latest `main`.
+- Confirm `.env.local` has Supabase keys, `OPENAI_API_KEY`, `TOKEN_ENCRYPTION_KEY`, and `XERO_DEMO_MODE=true` if using demo Xero state.
+- Run `npm run dev`.
+- Sign in before the meeting.
+- Keep this folder open: `demo-assets/`.
+- Use a fresh user or clear old demo documents if you want clean source labels.
 
-```bash
-npx tsc --noEmit
-npm test -- --runInBand
-npm run build
-npm run dev
-```
+## Slide-To-Demo Flow
 
-Expected automated result:
+Use slides 1-7 only, then move into the live product.
 
-- TypeScript passes.
-- Jest passes with 21 suites and 77 tests.
-- Production build passes.
-- Dev server opens on `http://localhost:3000`.
-
-Environment checks:
-
-- `.env.local` has Supabase keys.
-- `.env.local` has `OPENAI_API_KEY` for embeddings/RAG/chat quality.
-- `.env.local` has `TOKEN_ENCRYPTION_KEY`.
-- For demo Xero state, set `XERO_DEMO_MODE=true`.
-- Local Xero callback env should be:
-  - `NEXT_PUBLIC_APP_URL=http://localhost:3000`
-  - `XERO_REDIRECT_URI=http://localhost:3000/api/xero/callback`
-
-Database checks:
-
-- Migration `007_drop_financial_snapshots.sql` has run.
-- Migration `008_accounting_oauth_tokens.sql` has run.
-- `oauth_tokens` exists.
-- `xero_connections` is dropped after migration.
-- `oauth_connection_states` still exists because it is temporary OAuth callback state.
-
-## Demo Story
-
-Use this story:
-
-> AI-BOSS is not trying to replace Xero or an accountant. It sits on top of accounting data and finance documents, turns them into source-aware metrics, and lets a business owner ask decision questions before cash-flow problems become urgent.
+1. Slide 1: Introduce AI-BOSS as privacy-first SME financial decision support.
+2. Slide 2: Emphasise the problem: accounting tools show history, but owners need decision support.
+3. Slide 3: State MVP scope: Xero/CSV data, deterministic metrics, scenario questions, explainable chat, audit logging.
+4. Slide 4: Explain novelty: not replacing Xero; adding simulation, guardrails, citations, and chat reasoning.
+5. Slide 5: Architecture: LLM orchestrates, deterministic tools calculate, Supabase stores user-owned data.
+6. Slide 6: Team delivery: Rafael foundation/data/chat, Kaiden dashboard/chat UI, Hamza connectors, shared testing and workflow.
+7. Slide 7: Timeline: Sprint 2 now has working ingestion, metrics, RAG, and chat context; scenario/policy depth comes next.
 
 ## Live Demo Steps
 
-### 1. Sign In And Show The Dashboard
-
-Click:
-
-- Open `http://localhost:3000`.
-- Sign in.
-- Go to Dashboard.
+### 1. Sign-In And Dashboard
 
 Say:
 
-> I’ll start as a business owner. The app is authenticated, so each user sees their own dashboard, uploads, conversations, and decision context.
+> I’ll start as a business owner. The app is authenticated, so each user sees their own dashboard, documents, conversations, and decision logs.
 
 Show:
 
-- Header/profile is loaded.
-- Chat is on the left.
-- Dashboard metrics are on the right.
-- Documents drawer exists above the chat input.
+- Sign in.
+- Dashboard layout.
+- Xero data connector state.
+- Chat panel on the left and dashboard metrics on the right.
 
-Expected:
-
-- No auth loop.
-- Dashboard loads without crashing.
-- Empty or unavailable metrics are allowed before upload.
-
-### 2. Show Xero Connection State
-
-Click:
-
-- Look at the Xero card in Connect data sources.
+### 2. Xero Connection State
 
 Say:
 
-> The Xero OAuth foundation is in place. We recently moved stored OAuth credentials to a provider-neutral `oauth_tokens` table, while `oauth_connection_states` remains only the short-lived callback state. For this demo we can use Xero demo mode instead of relying on a real tenant.
+> We have the OAuth connection foundation in place. For today we are using demo mode because we do not yet have a real test tenant with useful accounting data.
 
-Expected in demo mode:
+Show:
 
-- Xero card shows Connected.
-- Demo chip appears.
-- Disconnect button is disabled in demo mode.
-
-Expected outside demo mode:
-
-- Xero card shows Connected or Disconnected.
-- Connect goes through `/api/xero/connect`.
-- Callback writes credentials to `oauth_tokens`.
+- Xero status card.
+- Connect/disconnect/demo state if visible.
 
 Avoid overclaiming:
 
-> The provider-neutral backend now supports the shape for Xero, QuickBooks, FreshBooks, and MYOB, but today’s visible stable demo remains Xero plus CSV/PDF ingestion.
+> The important part here is stable connection state and token handling. Full Xero normalisation is deliberately parked until we have real tenant data.
 
-### 3. Upload Baseline CSV Metrics
+### 3. CSV Upload To Structured Metrics
 
 Upload:
 
 `demo-assets/ai-boss-demo-full-metrics.csv`
 
-Click:
-
-- Click the upload icon in chat.
-- Select the CSV.
-- Open the Documents drawer.
-- Wait until the document shows Ready.
-- Refresh dashboard if needed.
-
 Say:
 
-> CSV upload is the deterministic structured metric path. The app extracts known financial labels into `financial_metric_observations`, and that table powers dashboard metrics, chat math, tools, history, and forecasts.
+> CSV uploads are currently the deterministic structured metric path. The app extracts known financial labels into `financial_metric_observations`, which powers the dashboard and chat calculations.
 
-Expected dashboard values:
+Show:
 
-- Cash: `$120,000`
-- Accounts receivable: `$45,000`
-- Accounts payable: `$21,000`
-- Monthly revenue: `$80,000`
-- Monthly expenses: `$52,000`
-- Monthly burn: `$28,000`
-- Runway: `5.4 months`
+- Upload through the chat document button.
+- Wait for processing.
+- Dashboard refreshes with cash, AR, AP, revenue, expenses, burn, and runway.
+- Point out source labels on metric cards.
 
-Ask:
+Ask chat:
 
 ```text
 What is my runway and what source did you use?
 ```
 
-Expected answer:
+Expected:
 
-- Uses structured metrics.
-- Says runway is about `5.4 months`.
-- Mentions the uploaded CSV/source label.
-- Does not cite the PDF because it has not been uploaded yet.
+- Chat uses structured metrics.
+- Mentions uploaded CSV source naturally.
+- Explains runway in plain language.
 
-Ask:
-
-```text
-Which source is my cash balance coming from?
-```
-
-Expected answer:
-
-- Says cash balance is from the uploaded full metrics CSV.
-- Ideally includes the amount `120000 NZD`.
-
-### 4. Demo Scenario Modelling
+### 4. Scenario Modelling Through Chat
 
 Ask:
 
 ```text
-What happens if monthly costs increase by 9000?
+What happens to runway if monthly burn increases to 40000?
 ```
 
-Expected answer:
+Say:
 
-- Treats this as a what-if scenario.
-- Uses current structured cash/burn inputs.
-- Does not save the scenario as an actual metric.
-- Explains runway gets worse.
+> This is our first lightweight scenario modelling path. The agent uses the current structured metrics, changes the scenario input, and calls the deterministic runway calculation tool.
 
-Ask:
+Expected:
+
+- Runway should drop from the baseline.
+- Chat should explain that this is a what-if scenario, not a stored actual metric.
+
+Follow-up:
 
 ```text
 Could we afford to hire someone if that adds 9000 per month to expenses?
 ```
 
-Expected answer:
-
-- Calculates or estimates the impact.
-- Warns about runway pressure.
-- Frames it as decision support, not financial advice.
-
-Say:
-
-> Scenario modelling is read-only. It helps the owner understand tradeoffs without contaminating actual uploaded metrics.
-
-### 5. Upload PDF Board Report For RAG
+### 5. PDF Upload As RAG Evidence
 
 Upload:
 
 `demo-assets/ai-boss-demo-board-report.pdf`
 
-Click:
-
-- Upload through the chat upload icon.
-- Open Documents drawer.
-- Wait until the PDF shows Ready.
-
 Say:
 
-> PDFs are intentionally RAG evidence only. They help chat answer questions about uploaded reports, but they do not become dashboard calculations unless a future extraction flow writes confirmed values into `financial_metric_observations`.
+> PDFs are intentionally treated as RAG evidence. They help chat answer questions about uploaded reports, but they do not become canonical dashboard metrics unless a future extraction step writes confirmed values into the metric observation table.
 
 Ask:
 
@@ -208,14 +127,12 @@ Ask:
 What does the uploaded board report say about cash risk and next actions?
 ```
 
-Expected answer:
+Expected:
 
-- Summarises relevant board-report context.
-- Mentions cash risk and next actions.
-- Uses document context as evidence.
-- Does not claim the PDF changed dashboard metrics.
+- Chat summarises relevant PDF evidence.
+- Chat should not imply the PDF alone changed dashboard metrics.
 
-### 6. Upload Partial Updated Month CSV
+### 6. Partial New CSV And Source Mixing
 
 Upload:
 
@@ -223,17 +140,7 @@ Upload:
 
 Say:
 
-> This file is intentionally partial. It updates cash, revenue, expenses, and burn, but omits AR, AP, and runway. That lets us test source mixing transparently.
-
-Expected dashboard/source behavior:
-
-- Cash updates to `$95,000`.
-- Monthly revenue updates to `$72,000`.
-- Monthly expenses updates to `$61,000`.
-- Monthly burn updates to `$34,000`.
-- AR remains `$45,000` from the older full metrics CSV.
-- AP remains `$21,000` from the older full metrics CSV.
-- Runway remains `5.4 months` from the older full metrics CSV.
+> This newer file only contains some metrics. Current behaviour is latest observation per metric wins, so updated values can mix with older values for missing metrics. That is intentional for now, and source selection/deduplication is a future UX card.
 
 Ask:
 
@@ -241,135 +148,47 @@ Ask:
 What changed after the newer upload, and which metrics are still coming from an older source?
 ```
 
-Expected answer:
+Expected:
 
-- Identifies the newer metrics.
-- Identifies AR/AP/runway as older-source metrics.
-- Does not pretend every metric came from the latest file.
+- Cash, revenue, expenses, burn update.
+- AR/AP/runway may remain older if not supplied by the newer CSV.
+- Chat should be transparent about source mixing.
 
-Ask:
+### 7. Generative UI Selection Prompt
 
-```text
-Which metrics are unavailable?
-```
+Show:
 
-Expected answer:
-
-- After this upload sequence, ideally says core metrics are available.
-- If it lists unavailable metrics, it should not invent values.
-
-### 7. Upload Risky Month CSV
-
-Upload:
-
-`demo-assets/ai-boss-demo-risky-month.csv`
-
-Say:
-
-> Now I’ll upload a later month where cash has fallen and burn has increased. This creates a clean runway decline for history, forecast, and policy-warning tests.
-
-Expected dashboard values:
-
-- Cash: `$52,000`
-- Accounts receivable: `$18,000`
-- Accounts payable: `$27,000`
-- Monthly revenue: `$58,000`
-- Monthly expenses: `$76,000`
-- Monthly burn: `$42,000`
-- Runway: `1.0 month`
-
-Ask:
-
-```text
-Is my runway improving or declining over time?
-```
-
-Expected answer:
-
-- Uses historical observations.
-- Says runway is declining from baseline to risky month.
-- References the uploaded CSV sequence.
-
-Ask:
-
-```text
-If this runway trend continues, when do I hit a risky point?
-```
-
-Expected answer:
-
-- Uses forecast runway trend tool/context.
-- Clearly says it is a rough continuation estimate, not a real prediction.
-- Warns that current runway is already risky or near risky.
-
-### 8. Demo Markdown Rendering
-
-Ask:
-
-```text
-Give me a short action plan in Markdown with three bullet points and one bold warning.
-```
-
-Expected answer:
-
-- Bullets render as bullets.
-- Bold text renders as bold.
-- Assistant message does not show raw Markdown awkwardly.
-
-### 9. Dashboard-To-Chat Selection Prompt
-
-Click:
-
-- Highlight text in the runway summary prompt near the top of the dashboard.
+- Highlight the runway summary text in the dashboard insight card.
 - Click `Ask chatbot`.
 
 Say:
 
-> This links dashboard exploration to chat. A user can select a dashboard insight and send it straight into AI-BOSS for explanation.
+> Kaiden’s latest branch adds a dashboard-to-chat interaction. The user can select a dashboard insight and send it straight into the chat flow, so dashboard exploration and agent reasoning feel connected.
 
 Expected:
 
-- The selected summary is sent to chat.
-- Chat responds to the selected dashboard context.
+- Chat receives a prompt asking it to explain the selected dashboard highlight.
 
-## Backup Questions
+## Stakeholder Questions To Invite
 
-Use these if the room asks for more:
-
-```text
-Explain which numbers came from CSV and which came from the uploaded PDF.
-```
-
-```text
-What would you ask my accountant before I make a hiring decision?
-```
-
-```text
-What are the biggest cash risks in my current data?
-```
-
-```text
-What source did you use for monthly burn?
-```
-
-```text
-Can you show the formula behind the runway estimate?
-```
+- Which accounting systems matter most to Auckland City Mission workflows?
+- Would CSV upload be useful as an interim import path?
+- What metrics should be treated as must-have for cash-flow decision support?
+- What financial policies or thresholds should AI-BOSS check before giving advice?
+- What would make a recommendation trustworthy: source labels, formulas, audit logs, citations, or approval steps?
+- For privacy, what data should never be sent to an LLM?
 
 ## Known Limitations To Say Clearly
 
-- Xero connection state and token storage are implemented, but live Xero normalization depends on useful tenant data.
-- QuickBooks/FreshBooks/MYOB are backend-shaped but not the main visible demo path.
-- CSV extraction is deterministic and label/header based.
-- PDF files are RAG evidence only.
-- Dashboard calculations come from `financial_metric_observations`, not raw chunks.
-- Scenario modelling is chat/tool based, not a saved scenario workspace.
-- Forecast trend is a rough continuation estimate.
+- Xero connection state is working, but deep Xero data normalisation is deferred until we have better test data.
+- CSV metric extraction is deterministic and label/header based, not arbitrary spreadsheet understanding.
+- PDFs are RAG evidence only, not structured dashboard metric sources.
+- Scenario modelling is currently chat/tool based, not yet a saved scenario workspace.
+- Policy enforcement is in the architecture and schema, but not yet fully implemented as a product workflow.
 
 ## If Something Breaks
 
 - If Xero is awkward: say demo mode is intentional and move to CSV upload.
-- If PDF retrieval is slow or weak: say embeddings/RAG need `OPENAI_API_KEY`, then ask a structured metric question.
-- If chat fails: show dashboard metrics and the automated test result.
-- If upload processing takes time: explain the pipeline: document record, parsing, chunks/embeddings, deterministic CSV extraction, observation storage, dashboard refresh.
-- If source mixing looks surprising: explain latest observation per metric wins, and missing metrics stay on their previous source.
+- If PDF retrieval is slow: ask a CSV/metric question and explain embeddings need `OPENAI_API_KEY`.
+- If chat fails: show dashboard source-aware metrics and automated tests.
+- If upload processing takes time: talk through the pipeline: document record, chunking, embeddings, metric extraction, observation storage, dashboard refresh.

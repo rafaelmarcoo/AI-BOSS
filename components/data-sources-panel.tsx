@@ -5,7 +5,18 @@ import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import DescriptionIcon from "@mui/icons-material/Description";
 import TableChartIcon from "@mui/icons-material/TableChart";
 import { dashboardTokens } from "@/app/theme";
-import { XeroConnect } from "@/components/xero-connect";
+// --- COMMENTED OUT: XeroConnect and separate provider cards replaced by unified dropdown ---
+// import { XeroConnect } from "@/components/xero-connect";
+// import { AccountingProviderCard, type ProviderStatus } from "@/components/accounting-provider-card";
+// const ACCOUNTING_PROVIDERS = [{ provider: "quickbooks", ... }, { provider: "freshbooks", ... }, { provider: "myob", ... }]
+// --- END COMMENTED OUT ---
+
+// --- START: unified accounting connect imports ---
+import { useCallback, useEffect, useState } from "react";
+import { Alert, Snackbar } from "@mui/material";
+import { AccountingConnectCard } from "@/components/accounting-connect-card";
+import type { ProviderStatus } from "@/lib/integrations/types";
+// --- END: unified accounting connect imports ---
 
 const UPCOMING_SOURCES = [
   {
@@ -28,7 +39,99 @@ const UPCOMING_SOURCES = [
   },
 ];
 
+// --- COMMENTED OUT: replaced with lint-safe version below ---
+// type IntegrationStatusMap = Record<string, ProviderStatus>;
+// export function DataSourcesPanel() {
+//   const [integrationStatuses, setIntegrationStatuses] = useState<IntegrationStatusMap>({});
+//   const [toast, setToast] = useState<{ message: string; severity: "success" | "error" } | null>(null);
+//   const fetchStatuses = useCallback(async () => {
+//     try {
+//       const res = await fetch("/api/integrations/status", { credentials: "include" });
+//       if (!res.ok) return;
+//       const payload = (await res.json()) as { data: Array<{ provider: string } & ProviderStatus> };
+//       const map: IntegrationStatusMap = {};
+//       for (const entry of payload.data) { map[entry.provider] = entry; }
+//       setIntegrationStatuses(map);
+//     } catch {}
+//   }, []);
+//   useEffect(() => {
+//     fetchStatuses();
+//     const params = new URLSearchParams(window.location.search);
+//     const connected = params.get("integration_connected");
+//     const errored = params.get("integration_error");
+//     if (connected || errored) {
+//       const url = new URL(window.location.href);
+//       url.searchParams.delete("integration_connected");
+//       url.searchParams.delete("integration_error");
+//       window.history.replaceState({}, "", url.toString());
+//       if (connected) { setToast({ message: `${connected.charAt(0).toUpperCase() + connected.slice(1)} connected successfully.`, severity: "success" }); }
+//       else if (errored) { setToast({ message: `Could not connect ${errored}. Please try again.`, severity: "error" }); }
+//     }
+//   }, [fetchStatuses]);
+// --- END COMMENTED OUT ---
+
+// --- START: accounting integrations state and fetch (lint-safe) ---
+type IntegrationStatusMap = Record<string, ProviderStatus>;
+
+function getInitialToast() {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  const connected = params.get("integration_connected");
+  const errored = params.get("integration_error");
+  if (connected) {
+    return {
+      message: `${connected.charAt(0).toUpperCase() + connected.slice(1)} connected successfully.`,
+      severity: "success" as const,
+    };
+  }
+  if (errored) {
+    return {
+      message: `Could not connect ${errored}. Please try again.`,
+      severity: "error" as const,
+    };
+  }
+  return null;
+}
+
 export function DataSourcesPanel() {
+  const [integrationStatuses, setIntegrationStatuses] =
+    useState<IntegrationStatusMap>({});
+  const [toast, setToast] = useState<{
+    message: string;
+    severity: "success" | "error";
+  } | null>(getInitialToast);
+
+  const loadStatuses = useCallback(() => {
+    fetch("/api/integrations/status", { credentials: "include" })
+      .then((res) => res.json())
+      .then((payload: { data: Array<{ provider: string } & ProviderStatus> }) => {
+        const map: IntegrationStatusMap = {};
+        for (const entry of payload.data) {
+          map[entry.provider] = entry;
+        }
+        setIntegrationStatuses(map);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    loadStatuses();
+  }, [loadStatuses]);
+
+  // Clean integration query params from URL after reading them on mount
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (
+      url.searchParams.has("integration_connected") ||
+      url.searchParams.has("integration_error")
+    ) {
+      url.searchParams.delete("integration_connected");
+      url.searchParams.delete("integration_error");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, []);
+// --- END: accounting integrations state and fetch ---
+
   return (
     <Paper
       elevation={0}
@@ -68,7 +171,21 @@ export function DataSourcesPanel() {
           />
         </Stack>
 
+        {/* --- COMMENTED OUT: replaced by unified AccountingConnectCard dropdown ---
         <XeroConnect />
+        <Stack spacing={1.5}>
+          {ACCOUNTING_PROVIDERS.map((p) => (
+            <AccountingProviderCard key={p.provider} ... />
+          ))}
+        </Stack>
+        --- END COMMENTED OUT --- */}
+
+        {/* --- START: unified accounting connect dropdown --- */}
+        <AccountingConnectCard
+          statuses={integrationStatuses}
+          onRefresh={loadStatuses}
+        />
+        {/* --- END: unified accounting connect dropdown --- */}
 
         <Box
           sx={{
@@ -142,6 +259,23 @@ export function DataSourcesPanel() {
           })}
         </Box>
       </Stack>
+
+      {/* --- START: integration toast notification --- */}
+      <Snackbar
+        open={toast !== null}
+        autoHideDuration={5000}
+        onClose={() => setToast(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity={toast?.severity}
+          variant="filled"
+          onClose={() => setToast(null)}
+        >
+          {toast?.message}
+        </Alert>
+      </Snackbar>
+      {/* --- END: integration toast notification --- */}
     </Paper>
   );
 }

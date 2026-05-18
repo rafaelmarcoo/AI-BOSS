@@ -88,6 +88,11 @@ async function main() {
     'How has my runway changed over the last few months?'
   )
 
+  await runTest(
+    'Runway forecast: when will I run out of money',
+    'Based on my current trend, when will my runway become critical?'
+  )
+
   console.log(`\n${DIVIDER}`)
   console.log('All tests completed.')
 }

@@ -234,46 +234,33 @@ export function ChatSidebar({
         onClose={() => setHistoryOpen(false)}
         PaperProps={{
           sx: {
-            width: { xs: "100vw", sm: 380 },
-            maxWidth: "100vw",
+            width: { xs: "100vw", sm: 360 },
+            maxWidth: { sm: "100vw" },
             bgcolor: "#080910",
             color: "common.white",
             borderRight: "1px solid",
             borderRightColor: dashboardTokens.border,
-            p: { xs: 1, sm: 1.5 },
-            boxSizing: "border-box",
+            p: { xs: 1.25, sm: 1.5 },
             overflowX: "hidden",
           },
         }}
       >
-        <Stack spacing={1.5} sx={{ height: "100%", minWidth: 0 }}>
+        <Stack spacing={1.5} sx={{ height: "100%" }}>
           <Stack
-            direction={{ xs: "column", sm: "row" }}
+            direction="row"
             alignItems="center"
             justifyContent="space-between"
-            spacing={1}
-            sx={{ px: 0.5, pt: 0.5, minWidth: 0 }}
+            sx={{ px: 0.5, pt: 0.5 }}
           >
-            <Stack
-              direction="row"
-              spacing={1}
-              alignItems="center"
-              sx={{ minWidth: 0, width: "100%" }}
-            >
+            <Stack direction="row" spacing={1} alignItems="center">
               <ForumRoundedIcon sx={{ color: "common.white" }} />
-              <Box sx={{ minWidth: 0 }}>
+              <Box>
                 <Typography variant="subtitle1" fontWeight={700}>
                   Chats
                 </Typography>
                 <Typography
                   variant="caption"
-                  sx={{
-                    color: dashboardTokens.textMuted,
-                    display: "block",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
+                  sx={{ color: dashboardTokens.textMuted }}
                 >
                   {fullName ?? email}
                 </Typography>
@@ -285,7 +272,6 @@ export function ChatSidebar({
               startIcon={<AddRoundedIcon fontSize="small" />}
               onClick={handleStartNewConversation}
               sx={{
-                alignSelf: { xs: "stretch", sm: "center" },
                 borderRadius: 999,
                 color: "common.white",
                 borderColor: dashboardTokens.borderMuted,
@@ -329,22 +315,19 @@ export function ChatSidebar({
                 No saved conversations yet.
               </Typography>
             ) : (
-              <List disablePadding sx={{ display: "grid", gap: 0.75, minWidth: 0 }}>
+              <List disablePadding sx={{ display: "grid", gap: 0.75 }}>
                 {conversations.map((conversation) => (
-                  <ListItem key={conversation.id} disablePadding sx={{ minWidth: 0 }}>
+                  <ListItem key={conversation.id} disablePadding>
                     <ListItemButton
                       selected={selectedConversationId === conversation.id}
                       onClick={() =>
                         void handleSelectConversation(conversation.id)
                       }
                       sx={{
-                        width: "100%",
                         px: 1.25,
                         py: 1,
                         borderRadius: 2.5,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1,
+                        alignItems: "flex-start",
                         minWidth: 0,
                         bgcolor:
                           selectedConversationId === conversation.id
@@ -377,9 +360,8 @@ export function ChatSidebar({
                         secondaryTypographyProps={{
                           color: dashboardTokens.textMuted,
                           fontSize: 12,
-                          noWrap: true,
                         }}
-                        sx={{ minWidth: 0, flex: "1 1 auto", mr: 0.25 }}
+                        sx={{ minWidth: 0, pr: 1 }}
                       />
                       <IconButton
                         size="small"
@@ -392,16 +374,9 @@ export function ChatSidebar({
                         }
                         sx={{
                           color: dashboardTokens.textMuted,
-                          flex: "0 0 34px",
-                          width: 34,
-                          height: 34,
-                          mr: -0.25,
-                          border: "1px solid",
-                          borderColor: "transparent",
-                          "&:hover": {
-                            borderColor: dashboardTokens.borderMuted,
-                            bgcolor: "rgba(255,255,255,0.06)",
-                          },
+                          alignSelf: "center",
+                          flex: "0 0 auto",
+                          mr: -0.5,
                         }}
                       >
                         <MoreHorizRoundedIcon fontSize="small" />

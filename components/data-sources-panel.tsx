@@ -5,7 +5,7 @@ import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import DescriptionIcon from "@mui/icons-material/Description";
 import TableChartIcon from "@mui/icons-material/TableChart";
 import { dashboardTokens } from "@/app/theme";
-import { AccountingConnect } from "@/components/accounting-connect";
+import { XeroConnect } from "@/components/xero-connect";
 
 const UPCOMING_SOURCES = [
   {
@@ -68,7 +68,7 @@ export function DataSourcesPanel() {
           />
         </Stack>
 
-        <AccountingConnect />
+        <XeroConnect />
 
         <Box
           sx={{

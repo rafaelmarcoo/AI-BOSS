@@ -246,6 +246,7 @@ async function parsePdfDocument(
         userId: document.user_id,
         pages,
       }),
+      pdfPages: pages,
     }
   } catch (error) {
     if (error instanceof ApiError) {

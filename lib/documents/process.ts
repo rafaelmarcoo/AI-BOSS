@@ -6,6 +6,7 @@ import {
 import { logDocumentIngestion } from '@/lib/documents/log-document-ingestion'
 import { parseDocumentContent } from '@/lib/documents/parsing'
 import { extractCsvFinancialMetrics } from '@/lib/financial-data/extraction/csv'
+import { extractPdfFinancialMetrics } from '@/lib/financial-data/extraction/pdf'
 import { saveFinancialMetricObservation } from '@/lib/financial-data/persistence'
 import {
   deleteDocumentFile,
@@ -68,6 +69,39 @@ async function saveCsvMetricObservations(params: {
   return metrics.length
 }
 
+async function savePdfMetricObservations(params: {
+  document: Awaited<ReturnType<typeof getDocumentById>>
+  parsedDocument: ParsedDocumentResult
+}) {
+  if (params.document.file_type !== 'pdf' || !params.parsedDocument.pdfPages) {
+    return 0
+  }
+
+  const extractedAt = new Date().toISOString()
+  const metrics = extractPdfFinancialMetrics({
+    pages: params.parsedDocument.pdfPages,
+    documentId: params.document.id,
+    sourceLabel: params.document.file_name,
+    extractedAt,
+  })
+
+  await Promise.all(
+    metrics.map((metric) =>
+      saveFinancialMetricObservation({
+        userId: params.document.user_id,
+        documentId: params.document.id,
+        metric,
+        rawData: {
+          extractor: 'deterministic_pdf_v1',
+          fileName: params.document.file_name,
+        },
+      })
+    )
+  )
+
+  return metrics.length
+}
+
 export async function processDocument(documentId: string, userId: string) {
   const startedAt = Date.now()
   const document = await getDocumentById(documentId, userId)
@@ -87,10 +121,9 @@ export async function processDocument(documentId: string, userId: string) {
     const embeddedChunks = await embedDocumentChunks(parsedDocument.chunks)
 
     await replaceDocumentChunks(document.id, document.user_id, embeddedChunks)
-    const metricObservationCount = await saveCsvMetricObservations({
-      document,
-      parsedDocument,
-    })
+    const csvMetrics = await saveCsvMetricObservations({ document, parsedDocument })
+    const pdfMetrics = await savePdfMetricObservations({ document, parsedDocument })
+    const metricObservationCount = csvMetrics + pdfMetrics
     const metadata = addMetricObservationCount(
       parsedDocument.metadata,
       metricObservationCount,

@@ -78,14 +78,49 @@ export async function saveFinancialMetricObservation({
   return data as FinancialMetricObservation
 }
 
+// --- COMMENTED OUT: returned observations from all connections including disconnected ones ---
+// export async function listLatestFinancialMetricValues(userId: string) {
+//   const supabase = createAdminSupabaseClient()
+//   const { data, error } = await supabase
+//     .from('financial_metric_observations')
+//     .select(FINANCIAL_METRIC_OBSERVATION_SELECT)
+//     .eq('user_id', userId)
+//     .order('metric_key', { ascending: true })
+//     .order('updated_at', { ascending: false })
+//   ...
+// }
+// --- END COMMENTED OUT ---
+
+// --- START: listLatestFinancialMetricValues — filters to active connections only ---
 export async function listLatestFinancialMetricValues(userId: string) {
   const supabase = createAdminSupabaseClient()
-  const { data, error } = await supabase
+
+  // Only show observations from currently-active connections so that
+  // disconnecting a provider immediately removes its data from the dashboard.
+  // Observations from documents (connection_id IS NULL) are always included.
+  const { data: activeConns } = await supabase
+    .from('data_connections')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('status', 'connected')
+
+  const activeIds = (activeConns ?? []).map((c) => c.id as string)
+
+  let query = supabase
     .from('financial_metric_observations')
     .select(FINANCIAL_METRIC_OBSERVATION_SELECT)
     .eq('user_id', userId)
     .order('metric_key', { ascending: true })
     .order('updated_at', { ascending: false })
+
+  if (activeIds.length > 0) {
+    query = query.or(`connection_id.is.null,connection_id.in.(${activeIds.join(',')})`)
+  } else {
+    // No active connections — only show document-sourced observations
+    query = query.is('connection_id', null)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     throw new ApiError(
@@ -107,3 +142,4 @@ export async function listLatestFinancialMetricValues(userId: string) {
 
   return metrics
 }
+// --- END: listLatestFinancialMetricValues ---

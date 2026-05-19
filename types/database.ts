@@ -69,7 +69,13 @@ export interface DocumentChunk {
   created_at: string
 }
 
-export type DataConnectionProvider = 'xero' | 'csv' | 'pdf' | 'manual' | 'demo'
+export type AccountingProvider = 'xero' | 'quickbooks' | 'freshbooks' | 'myob'
+export type DataConnectionProvider =
+  | AccountingProvider
+  | 'csv'
+  | 'pdf'
+  | 'manual'
+  | 'demo'
 export type DataConnectionStatus =
   | 'connected'
   | 'disconnected'
@@ -101,10 +107,11 @@ export interface OAuthConnectionState {
   created_at: string
 }
 
-export interface XeroConnection {
+export interface OAuthToken {
   id: string
   connection_id: string
   user_id: string
+  provider: AccountingProvider
   tenant_id: string
   tenant_name: string
   access_token_enc: string

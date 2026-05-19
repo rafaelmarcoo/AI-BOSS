@@ -61,6 +61,7 @@ export function ChatInput({
       />
 
       <IconButton
+        aria-label="Upload document"
         onClick={handleChooseFile}
         disabled={uploadDisabled}
         sx={{
@@ -114,6 +115,7 @@ export function ChatInput({
       />
 
       <IconButton
+        aria-label="Send message"
         color="primary"
         onClick={submit}
         disabled={disabled || !value.trim()}

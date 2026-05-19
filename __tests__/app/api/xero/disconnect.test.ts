@@ -38,7 +38,7 @@ function createQuery(result: unknown) {
   return query
 }
 
-function createMutation() {
+function createMutation(result: unknown) {
   const mutation = {
     delete: jest.fn(),
     update: jest.fn(),
@@ -47,7 +47,7 @@ function createMutation() {
 
   mutation.delete.mockReturnValue(mutation)
   mutation.update.mockReturnValue(mutation)
-  mutation.eq.mockReturnValue(mutation)
+  mutation.eq.mockReturnValueOnce(mutation).mockResolvedValue(result)
 
   return mutation
 }
@@ -79,8 +79,8 @@ describe('/api/xero/disconnect', () => {
       data: { refresh_token_enc: 'encrypted-refresh-token' },
       error: null,
     })
-    const deleteMutation = createMutation()
-    const updateMutation = createMutation()
+    const deleteMutation = createMutation({ error: null })
+    const updateMutation = createMutation({ error: null })
 
     const from = jest
       .fn()
@@ -103,6 +103,7 @@ describe('/api/xero/disconnect', () => {
       'connection_id',
       'connection-1'
     )
+    expect(deleteMutation.eq).toHaveBeenCalledWith('provider', 'xero')
     expect(from).toHaveBeenNthCalledWith(4, 'data_connections')
     expect(updateMutation.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -124,8 +125,8 @@ describe('/api/xero/disconnect', () => {
       data: { refresh_token_enc: 'encrypted-refresh-token' },
       error: null,
     })
-    const deleteMutation = createMutation()
-    const updateMutation = createMutation()
+    const deleteMutation = createMutation({ error: null })
+    const updateMutation = createMutation({ error: null })
 
     mockedCreateAdminSupabaseClient.mockReturnValue({
       from: jest
@@ -145,6 +146,7 @@ describe('/api/xero/disconnect', () => {
       'connection_id',
       'connection-1'
     )
+    expect(deleteMutation.eq).toHaveBeenCalledWith('provider', 'xero')
     expect(updateMutation.update).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'disconnected' })
     )

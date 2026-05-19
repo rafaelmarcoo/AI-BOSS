@@ -22,6 +22,7 @@ import SyncProblemIcon from "@mui/icons-material/SyncProblem";
 import { useRouter } from "next/navigation";
 import { dashboardTokens } from "@/app/theme";
 import { XeroConnect } from "@/components/xero-connect";
+import type { ProviderStatus } from "@/lib/integrations/types";
 
 const PROVIDERS = [
   {
@@ -55,14 +56,7 @@ const PROVIDERS = [
 ] as const;
 
 type Provider = (typeof PROVIDERS)[number]["provider"];
-
-interface ProviderStatus {
-  provider: Provider;
-  status: "connected" | "disconnected" | "available" | "error";
-  displayName: string | null;
-  connectedAt: string | null;
-  lastSyncedAt: string | null;
-}
+type StatusMap = Partial<Record<Provider, ProviderStatus>>;
 
 function formatDate(value: string | null) {
   if (!value) return null;
@@ -73,10 +67,23 @@ function formatDate(value: string | null) {
   }).format(new Date(value));
 }
 
+function readStatuses(payload: unknown): ProviderStatus[] {
+  if (
+    !payload ||
+    typeof payload !== "object" ||
+    !("data" in payload) ||
+    !Array.isArray(payload.data)
+  ) {
+    throw new Error("Unexpected accounting status response.");
+  }
+
+  return payload.data as ProviderStatus[];
+}
+
 export function AccountingConnect() {
   const router = useRouter();
   const [selectedProvider, setSelectedProvider] = useState<Provider>("xero");
-  const [statuses, setStatuses] = useState<Record<string, ProviderStatus>>({});
+  const [statuses, setStatuses] = useState<StatusMap>({});
   const [loadingStatuses, setLoadingStatuses] = useState(true);
   const [busyAction, setBusyAction] = useState<"sync" | "disconnect" | null>(
     null,
@@ -105,11 +112,11 @@ export function AccountingConnect() {
         throw new Error("Could not load accounting connection statuses.");
       }
 
-      const payload = (await response.json()) as { data: ProviderStatus[] };
+      const providerStatuses = readStatuses(await response.json());
       setStatuses(
         Object.fromEntries(
-          payload.data.map((status) => [status.provider, status]),
-        ),
+          providerStatuses.map((status) => [status.provider, status]),
+        ) as StatusMap,
       );
     } catch {
       setToast({
@@ -122,6 +129,10 @@ export function AccountingConnect() {
   }, []);
 
   useEffect(() => {
+    void loadStatuses();
+  }, [loadStatuses]);
+
+  const handleXeroStatusChange = useCallback(() => {
     void loadStatuses();
   }, [loadStatuses]);
 
@@ -190,13 +201,16 @@ export function AccountingConnect() {
 
   if (selectedProvider === "xero") {
     return (
-      <Stack spacing={1.5}>
-        <ProviderSelect
-          selectedProvider={selectedProvider}
-          onChange={setSelectedProvider}
-        />
-        <XeroConnect onStatusChange={() => void loadStatuses()} />
-      </Stack>
+      <>
+        <Stack spacing={1.5}>
+          <ProviderSelect
+            selectedProvider={selectedProvider}
+            onChange={setSelectedProvider}
+          />
+          <XeroConnect onStatusChange={handleXeroStatusChange} />
+        </Stack>
+        <StatusToast toast={toast} onClose={() => setToast(null)} />
+      </>
     );
   }
 
@@ -364,20 +378,7 @@ export function AccountingConnect() {
         </Paper>
       </Stack>
 
-      <Snackbar
-        open={toast !== null}
-        autoHideDuration={5000}
-        onClose={() => setToast(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <Alert
-          severity={toast?.severity}
-          variant="filled"
-          onClose={() => setToast(null)}
-        >
-          {toast?.message}
-        </Alert>
-      </Snackbar>
+      <StatusToast toast={toast} onClose={() => setToast(null)} />
     </>
   );
 }
@@ -396,7 +397,6 @@ function ProviderSelect({
         sx={{
           color: dashboardTokens.textMuted,
           textTransform: "uppercase",
-          letterSpacing: 0.8,
         }}
       >
         Accounting provider
@@ -423,5 +423,26 @@ function ProviderSelect({
         ))}
       </Select>
     </Stack>
+  );
+}
+
+function StatusToast({
+  toast,
+  onClose,
+}: {
+  toast: { message: string; severity: "success" | "error" } | null;
+  onClose: () => void;
+}) {
+  return (
+    <Snackbar
+      open={toast !== null}
+      autoHideDuration={5000}
+      onClose={onClose}
+      anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+    >
+      <Alert severity={toast?.severity} variant="filled" onClose={onClose}>
+        {toast?.message}
+      </Alert>
+    </Snackbar>
   );
 }

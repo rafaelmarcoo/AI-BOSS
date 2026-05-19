@@ -33,11 +33,11 @@ export function DashboardHeader() {
           {/* Title — hide subtitle on small screens */}
           <Stack spacing={0.25}>
             <Typography
-              variant={{ xs: "h6", sm: "h4" } as any}
+              variant="h4"
               component="h1"
               fontWeight={700}
               color="common.white"
-              sx={{ fontSize: { xs: "1rem", sm: undefined } }}
+              sx={{ fontSize: { xs: "1rem", sm: "2.125rem" } }}
             >
               AI-BOSS
             </Typography>

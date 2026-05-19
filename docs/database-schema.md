@@ -239,14 +239,13 @@ Stores chunked document content and embeddings for semantic retrieval.
 ### 8. data_connections
 
 Provider-neutral registry for all financial data sources a user has connected,
-uploaded, or made available. Provider-specific credential tables link back to
-this table.
+uploaded, or made available. OAuth credential rows link back to this table.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID (PK) | Primary key |
 | user_id | UUID (FK) | References users(id) |
-| provider | TEXT | `xero`, `csv`, `pdf`, `manual`, or `demo` |
+| provider | TEXT | `xero`, `quickbooks`, `freshbooks`, `myob`, `csv`, `pdf`, `manual`, or `demo` |
 | status | TEXT | `connected`, `disconnected`, `available`, or `error` |
 | display_name | TEXT | User-facing source name |
 | source_label | TEXT | Short provider/source label |
@@ -341,7 +340,7 @@ one source/period, rather than a wide snapshot of all metrics.
 | period_start | DATE | Optional period start for period-based metrics |
 | period_end | DATE | Optional period end for period-based metrics |
 | as_of_date | DATE | Optional point-in-time date for balance metrics |
-| source_type | TEXT | `xero`, `document`, `manual`, or `demo` |
+| source_type | TEXT | `xero`, `quickbooks`, `freshbooks`, `myob`, `document`, `manual`, or `demo` |
 | source_label | TEXT | User-facing source label |
 | confidence | NUMERIC(4,3) | Confidence score from 0 to 1 |
 | evidence | JSONB | Evidence reference such as document page, row range, chunk, URL, or excerpt |

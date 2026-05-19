@@ -1,5 +1,5 @@
 "use client";
- 
+
 import { useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -28,12 +28,12 @@ import { dashboardTokens } from "@/app/theme";
 import { ChatContainer } from "./ChatContainer";
 import { useChatConversation } from "./useChatConversation";
 import { useDocuments } from "./useDocuments";
- 
+
 interface SelectionChatPrompt {
   id: string;
   text: string;
 }
- 
+
 interface ChatSidebarProps {
   fullName: string | null;
   email: string;
@@ -41,7 +41,7 @@ interface ChatSidebarProps {
   selectionPrompt?: SelectionChatPrompt | null;
   onSelectionPromptHandled?: () => void;
 }
- 
+
 export function ChatSidebar({
   fullName,
   email,
@@ -84,45 +84,45 @@ export function ChatSidebar({
     documentsError,
     uploadDocument,
   } = useDocuments(conversationId, { onDocumentsProcessed });
- 
+
   const activeConversation =
     conversations.find((conversation) => conversation.id === conversationId) ??
     null;
- 
+
   useEffect(() => {
     setSelectedConversationId(conversationId);
   }, [conversationId]);
- 
+
   useEffect(() => {
     if (!selectionPrompt) {
       return;
     }
- 
+
     if (lastHandledPromptId.current === selectionPrompt.id) {
       return;
     }
- 
+
     lastHandledPromptId.current = selectionPrompt.id;
- 
+
     void sendMessage(selectionPrompt.text).finally(() => {
       onSelectionPromptHandled?.();
     });
   }, [onSelectionPromptHandled, selectionPrompt, sendMessage]);
- 
+
   const handleSelectConversation = async (conversationId: string) => {
     setSelectedConversationId(conversationId);
     setActionError(null);
     await selectConversation(conversationId);
     setHistoryOpen(false);
   };
- 
+
   const handleStartNewConversation = () => {
     setSelectedConversationId(null);
     setActionError(null);
     startNewConversation();
     setHistoryOpen(false);
   };
- 
+
   const openConversationMenu = (
     event: React.MouseEvent<HTMLElement>,
     conversationId: string,
@@ -133,27 +133,27 @@ export function ChatSidebar({
     setMenuConversationId(conversationId);
     setRenameValue(title ?? "");
   };
- 
+
   const closeConversationMenu = () => {
     setMenuAnchorEl(null);
     setMenuConversationId(null);
   };
- 
+
   const startRenameConversation = () => {
     setRenamingConversationId(menuConversationId);
     closeConversationMenu();
   };
- 
+
   const closeRenameDialog = () => {
     setRenamingConversationId(null);
     setRenameValue("");
   };
- 
+
   const submitRenameConversation = async () => {
     if (!renamingConversationId) {
       return;
     }
- 
+
     try {
       setActionError(null);
       await renameConversation(renamingConversationId, renameValue);
@@ -166,12 +166,12 @@ export function ChatSidebar({
       );
     }
   };
- 
+
   const handleDeleteConversation = async () => {
     if (!menuConversationId) {
       return;
     }
- 
+
     try {
       setActionError(null);
       await deleteConversation(menuConversationId);
@@ -184,7 +184,7 @@ export function ChatSidebar({
       );
     }
   };
- 
+
   return (
     <Box
       sx={{
@@ -295,7 +295,7 @@ export function ChatSidebar({
               New chat
             </Button>
           </Stack>
- 
+
           {actionError ? (
             <Alert
               severity="error"
@@ -305,7 +305,7 @@ export function ChatSidebar({
               {actionError}
             </Alert>
           ) : null}
- 
+
           <Box
             sx={{
               flex: "1 1 0",

@@ -422,11 +422,8 @@ export function ChatSidebar({
                           width: 34,
                           height: 34,
                           mr: -0.25,
-                          border: "1px solid",
-                          borderColor: "transparent",
                           "&:hover": {
-                            borderColor: dashboardTokens.borderMuted,
-                            bgcolor: "rgba(255,255,255,0.06)",
+                            bgcolor: "transparent",
                           },
                         }}
                       >

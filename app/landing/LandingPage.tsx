@@ -192,11 +192,8 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
               width: 44,
               height: 44,
               color: "common.white",
-              border: "1px solid",
-              borderColor: dashboardTokens.border,
-              bgcolor: "rgba(255,255,255,0.03)",
               "&:hover": {
-                bgcolor: "rgba(255,255,255,0.08)",
+                bgcolor: "transparent",
               },
             }}
           >

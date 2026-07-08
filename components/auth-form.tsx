@@ -29,7 +29,7 @@ interface ApiErrorPayload {
 }
 
 function getRedirectTarget(redirectTo?: string) {
-  return redirectTo && redirectTo.startsWith('/') ? redirectTo : '/dashboard'
+  return redirectTo && redirectTo.startsWith('/') ? redirectTo : '/landing'
 }
 
 export function AuthForm({ mode, redirectTo }: AuthFormProps) {

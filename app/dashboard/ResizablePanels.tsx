@@ -12,6 +12,8 @@ interface ResizablePanelsProps {
   fullName: string | null;
   email: string;
   metrics: CompleteFinancialMetricSet;
+  initialConversationId?: string | null;
+  initialMessage?: string | null;
 }
 
 interface SelectionChatPrompt {
@@ -28,6 +30,8 @@ export function ResizablePanels({
   fullName,
   email,
   metrics,
+  initialConversationId = null,
+  initialMessage = null,
 }: ResizablePanelsProps) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -105,7 +109,12 @@ export function ResizablePanels({
         <ChatSidebar
           fullName={fullName}
           email={email}
+          initialConversationId={initialConversationId}
+          initialMessage={initialMessage}
           onDocumentsProcessed={() => router.refresh()}
+          onInitialMessageHandled={() => {
+            window.history.replaceState(null, "", "/dashboard");
+          }}
           selectionPrompt={pendingChatPrompt}
           onSelectionPromptHandled={() => setPendingChatPrompt(null)}
         />

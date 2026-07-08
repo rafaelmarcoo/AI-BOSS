@@ -37,7 +37,10 @@ interface SelectionChatPrompt {
 interface ChatSidebarProps {
   fullName: string | null;
   email: string;
+  initialConversationId?: string | null;
+  initialMessage?: string | null;
   onDocumentsProcessed?: () => void;
+  onInitialMessageHandled?: () => void;
   selectionPrompt?: SelectionChatPrompt | null;
   onSelectionPromptHandled?: () => void;
 }
@@ -45,7 +48,10 @@ interface ChatSidebarProps {
 export function ChatSidebar({
   fullName,
   email,
+  initialConversationId = null,
+  initialMessage = null,
   onDocumentsProcessed,
+  onInitialMessageHandled,
   selectionPrompt,
   onSelectionPromptHandled,
 }: ChatSidebarProps) {
@@ -63,6 +69,7 @@ export function ChatSidebar({
   >(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const lastHandledPromptId = useRef<string | null>(null);
+  const lastHandledInitialMessage = useRef<string | null>(null);
   const {
     conversationId,
     conversationMessages,
@@ -76,7 +83,10 @@ export function ChatSidebar({
     startNewConversation,
     renameConversation,
     deleteConversation,
-  } = useChatConversation();
+  } = useChatConversation({
+    initialConversationId,
+    startEmpty: Boolean(initialMessage) && !initialConversationId,
+  });
   const {
     documents,
     documentsLoading,
@@ -108,6 +118,22 @@ export function ChatSidebar({
       onSelectionPromptHandled?.();
     });
   }, [onSelectionPromptHandled, selectionPrompt, sendMessage]);
+
+  useEffect(() => {
+    if (!initialMessage || historyLoading) {
+      return;
+    }
+
+    if (lastHandledInitialMessage.current === initialMessage) {
+      return;
+    }
+
+    lastHandledInitialMessage.current = initialMessage;
+
+    void sendMessage(initialMessage).finally(() => {
+      onInitialMessageHandled?.();
+    });
+  }, [historyLoading, initialMessage, onInitialMessageHandled, sendMessage]);
 
   const handleSelectConversation = async (conversationId: string) => {
     setSelectedConversationId(conversationId);

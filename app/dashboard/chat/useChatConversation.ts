@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   ChatApiMessage,
   ChatApiResponse,
@@ -25,7 +25,17 @@ function mapApiConversationToRecords(messages: ChatApiMessage[]): ChatRecord[] {
   }));
 }
 
-export function useChatConversation() {
+interface UseChatConversationOptions {
+  initialConversationId?: string | null;
+  startEmpty?: boolean;
+}
+
+export function useChatConversation({
+  initialConversationId = null,
+  startEmpty = false,
+}: UseChatConversationOptions = {}) {
+  const initialConversationIdRef = useRef(initialConversationId);
+  const startEmptyRef = useRef(startEmpty);
   const [conversationMessages, setConversationMessages] = useState<ChatRecord[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
@@ -48,7 +58,9 @@ export function useChatConversation() {
         const nextConversations = payload.data?.conversations ?? [];
         setConversations(nextConversations);
 
-        if (nextConversations.length > 0) {
+        if (initialConversationIdRef.current) {
+          await loadConversation(initialConversationIdRef.current, false);
+        } else if (!startEmptyRef.current && nextConversations.length > 0) {
           await loadConversation(nextConversations[0].id, false);
         }
       } catch {

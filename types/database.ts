@@ -1,5 +1,6 @@
 import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
 import type { FinancialMetricSourceType } from '@/lib/financial-data/types'
+import type { GenUiPlan } from '@/lib/gen-ui/types'
 
 export interface User {
   id: string
@@ -37,6 +38,7 @@ export interface ConversationMessage {
   role: 'user' | 'assistant'
   content: string
   citations: unknown
+  ui_payload: GenUiPlan | null
   created_at: string
 }
 

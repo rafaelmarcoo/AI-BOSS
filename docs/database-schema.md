@@ -84,6 +84,7 @@ Stores the actual user/assistant transcript for each conversation.
 | role | TEXT | `user` or `assistant` |
 | content | TEXT | Message text |
 | citations | JSONB | Optional RAG citations shown with the message |
+| ui_payload | JSONB | Optional validated Gen UI plan rendered in the dashboard for this assistant turn |
 | created_at | TIMESTAMP | Message creation time |
 
 **RLS Policies:**

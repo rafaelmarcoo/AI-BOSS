@@ -6,6 +6,7 @@ import { runAgent } from '@/lib/ai/agent'
 import { CHAT_MODEL } from '@/lib/chat/system-prompt'
 import { logChatDecision } from '@/lib/chat/log-chat-decision'
 import { buildChatContext } from '@/lib/chat/build-chat-context'
+import { planGenUi } from '@/lib/gen-ui/plan-gen-ui'
 import {
   getOrCreateConversation,
   insertConversationMessage,
@@ -60,12 +61,19 @@ export async function generateChatResponse(
     getAgentTools(userId),
     chatContext.messages
   )
+  const uiPlan = await planGenUi({
+    userId,
+    userMessage: latestUserMessage.content,
+    assistantMessage: agentResponse.content,
+    toolsUsed: agentResponse.toolsUsed,
+  })
 
   const savedAssistantMessage = await insertConversationMessage({
     conversationId: conversation.id,
     userId,
     role: 'assistant',
     content: agentResponse.content,
+    uiPayload: uiPlan,
   })
 
   const updatedConversationMessages = await listConversationMessages(
@@ -87,7 +95,12 @@ export async function generateChatResponse(
 
   return {
     conversationId: conversation.id,
-    message: { role: 'assistant' as const, content: agentResponse.content },
+    message: {
+      role: 'assistant' as const,
+      content: agentResponse.content,
+      ui: uiPlan,
+    },
     conversation: mapConversationMessagesToPayload(updatedConversationMessages),
+    ui: uiPlan,
   }
 }

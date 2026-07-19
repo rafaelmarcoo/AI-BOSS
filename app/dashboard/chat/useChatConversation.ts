@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   ChatApiMessage,
   ChatApiResponse,
@@ -12,6 +12,7 @@ import type {
   ConversationsApiResponse,
 } from "./types";
 import { createConversationTitle } from "@/lib/chat/conversation-title";
+import type { GenUiPlan } from "@/lib/gen-ui/types";
 
 function createChatId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -22,17 +23,28 @@ function mapApiConversationToRecords(messages: ChatApiMessage[]): ChatRecord[] {
     id: createChatId(),
     role: message.role,
     content: message.content,
+    ui: message.ui ?? null,
   }));
+}
+
+function getLatestGenUiPlan(messages: ChatApiMessage[]) {
+  return (
+    [...messages]
+      .reverse()
+      .find((message) => message.role === "assistant" && message.ui)?.ui ?? null
+  );
 }
 
 interface UseChatConversationOptions {
   initialConversationId?: string | null;
   startEmpty?: boolean;
+  onGenUiPlan?: (plan: GenUiPlan | null) => void;
 }
 
 export function useChatConversation({
   initialConversationId = null,
   startEmpty = false,
+  onGenUiPlan,
 }: UseChatConversationOptions = {}) {
   const initialConversationIdRef = useRef(initialConversationId);
   const startEmptyRef = useRef(startEmpty);
@@ -42,6 +54,52 @@ export function useChatConversation({
   const [historyLoading, setHistoryLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ChatErrorState | null>(null);
+  const [activeGenUiPlan, setActiveGenUiPlan] = useState<GenUiPlan | null>(null);
+
+  const updateGenUiPlan = useCallback((plan: GenUiPlan | null) => {
+    setActiveGenUiPlan(plan);
+    onGenUiPlan?.(plan);
+  }, [onGenUiPlan]);
+
+  const loadConversation = useCallback(async (
+    nextConversationId: string,
+    toggleLoading = true
+  ) => {
+    if (toggleLoading) {
+      setLoading(true);
+    }
+
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/chat/conversations/${nextConversationId}`);
+      const payload = (await response.json()) as ConversationDetailApiResponse;
+
+      if (!response.ok || !payload.success || !payload.data) {
+        throw new Error(
+          payload.error?.message ?? "Could not load the selected conversation."
+        );
+      }
+
+      setConversationId(payload.data.conversationId);
+      setConversationMessages(
+        mapApiConversationToRecords(payload.data.conversation)
+      );
+      updateGenUiPlan(getLatestGenUiPlan(payload.data.conversation));
+    } catch (requestError) {
+      setError({
+        message:
+          requestError instanceof Error
+            ? requestError.message
+            : "Could not load the selected conversation.",
+        failedMessageId: null,
+      });
+    } finally {
+      if (toggleLoading) {
+        setLoading(false);
+      }
+    }
+  }, [updateGenUiPlan]);
 
   useEffect(() => {
     async function loadConversations() {
@@ -71,46 +129,7 @@ export function useChatConversation({
     }
 
     void loadConversations();
-  }, []);
-
-  const loadConversation = async (
-    nextConversationId: string,
-    toggleLoading = true
-  ) => {
-    if (toggleLoading) {
-      setLoading(true);
-    }
-
-    setError(null);
-
-    try {
-      const response = await fetch(`/api/chat/conversations/${nextConversationId}`);
-      const payload = (await response.json()) as ConversationDetailApiResponse;
-
-      if (!response.ok || !payload.success || !payload.data) {
-        throw new Error(
-          payload.error?.message ?? "Could not load the selected conversation."
-        );
-      }
-
-      setConversationId(payload.data.conversationId);
-      setConversationMessages(
-        mapApiConversationToRecords(payload.data.conversation)
-      );
-    } catch (requestError) {
-      setError({
-        message:
-          requestError instanceof Error
-            ? requestError.message
-            : "Could not load the selected conversation.",
-        failedMessageId: null,
-      });
-    } finally {
-      if (toggleLoading) {
-        setLoading(false);
-      }
-    }
-  };
+  }, [loadConversation]);
 
   const sendMessage = async (
     input: string,
@@ -172,6 +191,9 @@ export function useChatConversation({
       setConversationMessages(
         mapApiConversationToRecords(payload.data.conversation)
       );
+      updateGenUiPlan(
+        payload.data.ui ?? getLatestGenUiPlan(payload.data.conversation)
+      );
     } catch (requestError) {
       const failedMessageId = nextConversation[nextConversation.length - 1]?.id ?? null;
 
@@ -223,6 +245,7 @@ export function useChatConversation({
     setConversationId(null);
     setConversationMessages([]);
     setError(null);
+    updateGenUiPlan(null);
   };
 
   const renameConversation = async (
@@ -282,6 +305,7 @@ export function useChatConversation({
   return {
     conversationId,
     conversationMessages,
+    activeGenUiPlan,
     conversations,
     historyLoading,
     loading,

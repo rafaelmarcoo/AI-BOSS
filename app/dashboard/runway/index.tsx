@@ -2,6 +2,7 @@ import { Box, Button, Paper, Stack, Typography } from "@mui/material";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import { dashboardTokens } from "@/app/theme";
 import { DataSourcesPanel } from "@/components/data-sources-panel";
+import type { GenUiPlan } from "@/lib/gen-ui/types";
 import {
   getMetricNumber,
   isAvailableMetric,
@@ -12,11 +13,15 @@ import {
 import { MetricCard } from "../MetricCard";
 import { BurnRateChart } from "../BurnRateChart";
 import { RecentActivity } from "../RecentActivity";
+import { GenUiCanvas } from "./gen-ui/GenUiCanvas";
 import { RunwaySelectionPrompt } from "./selection-prompt";
+
+type AskChatbotMode = "selection" | "prompt";
 
 interface RunwaySectionProps {
   metrics: CompleteFinancialMetricSet;
-  onAskChatbot: (selectionText: string) => void;
+  genUiPlan: GenUiPlan | null;
+  onAskChatbot: (text: string, mode?: AskChatbotMode) => void;
 }
 
 // Helper to format currency
@@ -63,7 +68,11 @@ function formatMetricValue(
   return formatter(getMetricNumber(metrics, key));
 }
 
-export function RunwaySection({ metrics, onAskChatbot }: RunwaySectionProps) {
+export function RunwaySection({
+  metrics,
+  genUiPlan,
+  onAskChatbot,
+}: RunwaySectionProps) {
   const monthlyRevenue = getMetricNumber(metrics, "monthly_revenue");
   const monthlyExpenses = getMetricNumber(metrics, "monthly_expenses");
   const cashBalance = getMetricNumber(metrics, "cash");
@@ -85,6 +94,8 @@ export function RunwaySection({ metrics, onAskChatbot }: RunwaySectionProps) {
           onAskChatbot={onAskChatbot}
           summaryText={`Runway is ${formatNumber(runwayMonths)} months with cash at ${formatCurrency(cashBalance)} and monthly burn at ${formatCurrency(burnRate)}.`}
         />
+
+        <GenUiCanvas plan={genUiPlan} onAskChatbot={onAskChatbot} />
 
         {/* Runway Status Header Card */}
         <Paper

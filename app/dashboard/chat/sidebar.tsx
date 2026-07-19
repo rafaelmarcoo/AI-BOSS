@@ -28,6 +28,7 @@ import { dashboardTokens } from "@/app/theme";
 import { ChatContainer } from "./ChatContainer";
 import { useChatConversation } from "./useChatConversation";
 import { useDocuments } from "./useDocuments";
+import type { GenUiPlan } from "@/lib/gen-ui/types";
 
 interface SelectionChatPrompt {
   id: string;
@@ -43,6 +44,7 @@ interface ChatSidebarProps {
   onInitialMessageHandled?: () => void;
   selectionPrompt?: SelectionChatPrompt | null;
   onSelectionPromptHandled?: () => void;
+  onGenUiPlan?: (plan: GenUiPlan | null) => void;
 }
 
 export function ChatSidebar({
@@ -54,6 +56,7 @@ export function ChatSidebar({
   onInitialMessageHandled,
   selectionPrompt,
   onSelectionPromptHandled,
+  onGenUiPlan,
 }: ChatSidebarProps) {
   const [selectedConversationId, setSelectedConversationId] = useState<
     string | null
@@ -86,6 +89,7 @@ export function ChatSidebar({
   } = useChatConversation({
     initialConversationId,
     startEmpty: Boolean(initialMessage) && !initialConversationId,
+    onGenUiPlan,
   });
   const {
     documents,

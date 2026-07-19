@@ -6,6 +6,12 @@ import type {
   ConversationMessage,
 } from '@/types/database'
 import { createConversationTitle } from '@/lib/chat/conversation-title'
+import { parseGenUiPlan } from '@/lib/gen-ui/schema'
+import type { GenUiPlan } from '@/lib/gen-ui/types'
+
+export interface ConversationPayloadMessage extends ChatMessagePayload {
+  ui: GenUiPlan | null
+}
 
 export async function getOrCreateConversation(
   userId: string,
@@ -51,6 +57,7 @@ export async function insertConversationMessage(params: {
   role: ChatMessagePayload['role']
   content: string
   citations?: unknown
+  uiPayload?: GenUiPlan | null
 }) {
   const supabase = createAdminSupabaseClient()
   const { data, error } = await supabase
@@ -61,8 +68,11 @@ export async function insertConversationMessage(params: {
       role: params.role,
       content: params.content,
       citations: params.citations ?? null,
+      ui_payload: params.uiPayload ?? null,
     })
-    .select('id, conversation_id, user_id, role, content, citations, created_at')
+    .select(
+      'id, conversation_id, user_id, role, content, citations, ui_payload, created_at'
+    )
     .single()
 
   if (error || !data) {
@@ -85,7 +95,9 @@ export async function listConversationMessages(
   const supabase = createAdminSupabaseClient()
   const { data, error } = await supabase
     .from('conversation_messages')
-    .select('id, conversation_id, user_id, role, content, citations, created_at')
+    .select(
+      'id, conversation_id, user_id, role, content, citations, ui_payload, created_at'
+    )
     .eq('conversation_id', conversationId)
     .eq('user_id', userId)
     .order('created_at', { ascending: true })
@@ -162,9 +174,10 @@ export async function deleteConversation(
 
 export function mapConversationMessagesToPayload(
   messages: ConversationMessage[]
-): ChatMessagePayload[] {
+): ConversationPayloadMessage[] {
   return messages.map((message) => ({
     role: message.role,
     content: message.content,
+    ui: parseGenUiPlan(message.ui_payload),
   }))
 }

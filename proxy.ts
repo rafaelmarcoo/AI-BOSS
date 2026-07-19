@@ -9,9 +9,7 @@ export function proxy(request: NextRequest) {
   const hasAccessToken = Boolean(request.cookies.get(COOKIE_ACCESS_TOKEN)?.value)
 
   if ((pathname.startsWith('/dashboard') || pathname.startsWith('/landing')) && !hasAccessToken) {
-    const signInUrl = new URL('/sign-in', request.url)
-    signInUrl.searchParams.set('redirectTo', `${pathname}${request.nextUrl.search}`)
-    return NextResponse.redirect(signInUrl)
+    return NextResponse.redirect(new URL('/sign-in', request.url))
   }
 
   if (PUBLIC_AUTH_PAGES.includes(pathname) && hasAccessToken) {

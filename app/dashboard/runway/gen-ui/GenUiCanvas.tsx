@@ -22,10 +22,15 @@ import {
   YAxis,
 } from "recharts";
 import { dashboardTokens } from "@/app/theme";
+import { DataSourcesPanel } from "@/components/data-sources-panel";
+import { GEN_UI_WIDGET_CATALOG } from "@/lib/gen-ui/catalog";
+import { MetricCard } from "../../MetricCard";
 import type {
+  DataConnectionsWidget as DataConnectionsWidgetModel,
   GenUiPlan,
   GenUiWidget,
   HighlightExplainerWidget as HighlightExplainerWidgetModel,
+  MetricSnapshotWidget as MetricSnapshotWidgetModel,
   MetricSourceEvidenceWidget as MetricSourceEvidenceWidgetModel,
   MissingDataPanelWidget as MissingDataPanelWidgetModel,
   PlanningChecklistWidget as PlanningChecklistWidgetModel,
@@ -38,6 +43,7 @@ type AskChatbotMode = "selection" | "prompt";
 
 interface GenUiCanvasProps {
   plan: GenUiPlan | null;
+  baselineSummary: string;
   onAskChatbot: (text: string, mode?: AskChatbotMode) => void;
 }
 
@@ -75,6 +81,16 @@ function statusColor(status: RiskThresholdTimelineWidgetModel["data"]["status"])
   if (status === "healthy") return "#34d399";
   return dashboardTokens.textMuted;
 }
+
+const METRIC_COLORS: Record<string, string> = {
+  cash: "#00e5a0",
+  accounts_receivable: "#38bdf8",
+  accounts_payable: "#f97316",
+  runway_months: "#4da6ff",
+  burn_rate: "#ff4d6d",
+  monthly_revenue: "#22c55e",
+  monthly_expenses: "#f43f5e",
+};
 
 function WidgetFrame({
   title,
@@ -125,6 +141,54 @@ function WidgetFrame({
         {children}
       </Stack>
     </Paper>
+  );
+}
+
+function MetricSnapshotWidgetView({
+  widget,
+}: {
+  widget: MetricSnapshotWidgetModel;
+}) {
+  return (
+    <WidgetFrame title={widget.title} reason={widget.reason}>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "repeat(2, minmax(0, 1fr))",
+          },
+          gap: 1.5,
+        }}
+      >
+        {widget.data.metrics.map((metric) => (
+          <MetricCard
+            key={metric.key}
+            label={metric.label}
+            value={metric.value}
+            unit={metric.unit ?? undefined}
+            color={METRIC_COLORS[metric.key] ?? "#94a3b8"}
+            sourceLabel={metric.sourceLabel}
+            sourceTone={metric.sourceTone}
+          />
+        ))}
+      </Box>
+    </WidgetFrame>
+  );
+}
+
+function DataConnectionsWidgetView({
+  widget,
+}: {
+  widget: DataConnectionsWidgetModel;
+}) {
+  return (
+    <WidgetFrame title={widget.title} reason={widget.reason}>
+      <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
+        {widget.data.message}
+      </Typography>
+      <DataSourcesPanel />
+    </WidgetFrame>
   );
 }
 
@@ -530,27 +594,35 @@ function HighlightExplainerWidgetView({
   );
 }
 
-function renderWidget(
-  widget: GenUiWidget,
-  onAskChatbot: (text: string, mode?: AskChatbotMode) => void,
-) {
+interface GenUiWidgetRendererProps {
+  widget: GenUiWidget;
+  onAskChatbot: (text: string, mode?: AskChatbotMode) => void;
+}
+
+export function GenUiWidgetRenderer({
+  widget,
+  onAskChatbot,
+}: GenUiWidgetRendererProps) {
   switch (widget.type) {
+    case "metric_snapshot":
+      return <MetricSnapshotWidgetView widget={widget} />;
+    case "data_connections":
+      return <DataConnectionsWidgetView widget={widget} />;
     case "runway_trend_chart":
-      return <RunwayTrendWidgetView key={widget.id} widget={widget} />;
+      return <RunwayTrendWidgetView widget={widget} />;
     case "scenario_comparison":
-      return <ScenarioComparisonWidgetView key={widget.id} widget={widget} />;
+      return <ScenarioComparisonWidgetView widget={widget} />;
     case "planning_checklist":
-      return <PlanningChecklistWidgetView key={widget.id} widget={widget} />;
+      return <PlanningChecklistWidgetView widget={widget} />;
     case "risk_threshold_timeline":
-      return <RiskThresholdTimelineWidgetView key={widget.id} widget={widget} />;
+      return <RiskThresholdTimelineWidgetView widget={widget} />;
     case "metric_source_evidence":
-      return <MetricSourceEvidenceWidgetView key={widget.id} widget={widget} />;
+      return <MetricSourceEvidenceWidgetView widget={widget} />;
     case "missing_data_panel":
-      return <MissingDataPanelWidgetView key={widget.id} widget={widget} />;
+      return <MissingDataPanelWidgetView widget={widget} />;
     case "highlight_explainer":
       return (
         <HighlightExplainerWidgetView
-          key={widget.id}
           widget={widget}
           onAskChatbot={onAskChatbot}
         />
@@ -558,7 +630,11 @@ function renderWidget(
   }
 }
 
-export function GenUiCanvas({ plan, onAskChatbot }: GenUiCanvasProps) {
+export function GenUiCanvas({
+  plan,
+  baselineSummary,
+  onAskChatbot,
+}: GenUiCanvasProps) {
   const hasPlan = Boolean(plan && plan.widgets.length > 0);
 
   return (
@@ -611,7 +687,7 @@ export function GenUiCanvas({ plan, onAskChatbot }: GenUiCanvasProps) {
               >
                 {hasPlan
                   ? plan?.summary
-                  : "Ask a planning, scenario, trend, or source question to fill this space."}
+                  : "Ready to build a workspace from your next AI-BOSS question."}
               </Typography>
             </Box>
           </Stack>
@@ -630,6 +706,32 @@ export function GenUiCanvas({ plan, onAskChatbot }: GenUiCanvasProps) {
           />
         </Stack>
 
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2.25,
+            borderRadius: 1,
+            bgcolor: "rgba(37, 99, 235, 0.08)",
+            border: "1px solid",
+            borderColor: "rgba(96, 165, 250, 0.25)",
+          }}
+        >
+          <Stack spacing={1}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <HighlightAltRoundedIcon sx={{ color: "#93c5fd", fontSize: 18 }} />
+              <Typography variant="caption" sx={{ color: "#bfdbfe" }}>
+                Runway summary · highlight any workspace text to ask AI-BOSS
+              </Typography>
+            </Stack>
+            <Typography
+              variant="body2"
+              sx={{ color: "common.white", lineHeight: 1.8, userSelect: "text" }}
+            >
+              {baselineSummary}
+            </Typography>
+          </Stack>
+        </Paper>
+
         {hasPlan ? (
           <Box
             sx={{
@@ -638,7 +740,23 @@ export function GenUiCanvas({ plan, onAskChatbot }: GenUiCanvasProps) {
               gap: 2,
             }}
           >
-            {plan?.widgets.map((widget) => renderWidget(widget, onAskChatbot))}
+            {plan?.widgets.map((widget) => (
+              <Box
+                key={widget.id}
+                sx={{
+                  minWidth: 0,
+                  gridColumn: {
+                    xs: "span 1",
+                    xl: `span ${GEN_UI_WIDGET_CATALOG[widget.type].defaultColumnSpan}`,
+                  },
+                }}
+              >
+                <GenUiWidgetRenderer
+                  widget={widget}
+                  onAskChatbot={onAskChatbot}
+                />
+              </Box>
+            ))}
           </Box>
         ) : (
           <Paper
@@ -653,42 +771,12 @@ export function GenUiCanvas({ plan, onAskChatbot }: GenUiCanvasProps) {
           >
             <Stack spacing={1.5}>
               <Typography variant="subtitle2" fontWeight={700}>
-                Example generated layout
+                No generated widgets selected yet
               </Typography>
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: { xs: "1fr", md: "1fr 1fr 1fr" },
-                  gap: 1.25,
-                }}
-              >
-                {[
-                  "Runway trend chart",
-                  "Scenario comparison",
-                  "Risk threshold timing",
-                ].map((label) => (
-                  <Box
-                    key={label}
-                    sx={{
-                      p: 1.25,
-                      borderRadius: 1,
-                      bgcolor: "rgba(255,255,255,0.03)",
-                      border: "1px solid",
-                      borderColor: dashboardTokens.border,
-                    }}
-                  >
-                    <Typography variant="body2" fontWeight={700}>
-                      {label}
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      sx={{ color: dashboardTokens.textMuted }}
-                    >
-                      Appears when the prompt needs it.
-                    </Typography>
-                  </Box>
-                ))}
-              </Box>
+              <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
+                Ask AI-BOSS a runway, metric, source, scenario, or planning question.
+                Only the widgets relevant to that request will appear here.
+              </Typography>
             </Stack>
           </Paper>
         )}

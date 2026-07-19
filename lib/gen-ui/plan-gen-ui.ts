@@ -26,6 +26,11 @@ import {
 import type { AgentToolUsage } from '@/lib/ai/agent'
 import type { SourceAwareMetricReadResult } from '@/lib/financial-data/read-model'
 import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
+import { describeGenUiWidgetCatalog } from '@/lib/gen-ui/catalog'
+import {
+  isDataConnectionRequest,
+  selectMetricKeysForMessage,
+} from '@/lib/gen-ui/selection'
 
 const CAUTION_THRESHOLD = 6
 const URGENT_THRESHOLD = 3
@@ -35,6 +40,7 @@ const PlannerWidgetSchema = z.object({
   type: z.enum(GEN_UI_WIDGET_TYPES),
   title: z.string().optional(),
   reason: z.string().optional(),
+  metricKeys: z.array(z.enum(FINANCIAL_METRIC_KEYS)).max(4).optional(),
 })
 
 const PlannerOutputSchema = z.object({
@@ -99,7 +105,7 @@ function isDashboardRelevant(userMessage: string, source: GenUiSource) {
     return true
   }
 
-  return /\b(runway|burn|cash|forecast|future|plan|planning|trend|scenario|what if|risk|expense|revenue|source|metric|data|cost|hire|saving|threshold)\b/i.test(
+  return /\b(runway|burn|cash|forecast|future|plan|planning|trend|scenario|what if|risk|expense|revenue|source|metric|data|cost|hire|saving|threshold|connect|integration|xero|quickbooks|upload)\b/i.test(
     userMessage
   )
 }
@@ -131,6 +137,25 @@ function defaultWidgetSpecs(
       type: 'highlight_explainer',
       title: 'Highlighted insight',
       reason: 'The user highlighted dashboard text and asked AI-BOSS to explain it.',
+    })
+  }
+
+  const metricKeys = selectMetricKeysForMessage(userMessage)
+
+  if (metricKeys.length > 0) {
+    widgets.push({
+      type: 'metric_snapshot',
+      title: 'Relevant metrics',
+      reason: 'These live metrics directly support the user question.',
+      metricKeys,
+    })
+  }
+
+  if (isDataConnectionRequest(userMessage)) {
+    widgets.push({
+      type: 'data_connections',
+      title: 'Data connections',
+      reason: 'The user is asking about connecting or supplying financial data.',
     })
   }
 
@@ -254,10 +279,9 @@ async function chooseWidgetsWithModel(params: {
         'Return JSON only. Do not include prose, markdown, or data values.',
         `Allowed widget types: ${GEN_UI_WIDGET_TYPES.join(', ')}.`,
         'Choose 0 to 4 widgets. Use empty widgets for unrelated small talk.',
-        'Prefer runway_trend_chart and risk_threshold_timeline for future planning.',
-        'Prefer scenario_comparison for what-if or cost-change questions.',
-        'Prefer metric_source_evidence for source, evidence, or data questions.',
-        'Prefer highlight_explainer when the source is selection.',
+        'For metric_snapshot, return metricKeys with no more than four allowed metric keys.',
+        'Do not return metricKeys for other widget types.',
+        describeGenUiWidgetCatalog(),
       ].join('\n')
     ),
     new HumanMessage(
@@ -279,6 +303,7 @@ async function chooseWidgetsWithModel(params: {
               type: 'runway_trend_chart',
               title: 'short title',
               reason: 'why this widget helps',
+              metricKeys: ['runway_months', 'cash'],
             },
           ],
         },
@@ -299,6 +324,73 @@ async function chooseWidgetsWithModel(params: {
   const parsed = PlannerOutputSchema.safeParse(parsedJson)
 
   return parsed.success ? parsed.data.widgets : null
+}
+
+function buildMetricSnapshotWidget(
+  spec: PlannerWidget,
+  index: number,
+  context: GenUiDataContext
+): GenUiWidget {
+  const selectedKeys =
+    spec.metricKeys && spec.metricKeys.length > 0
+      ? [...new Set(spec.metricKeys)].slice(0, 4)
+      : (['runway_months', 'cash', 'burn_rate'] satisfies FinancialMetricKey[])
+  const metrics = selectedKeys.map((key) => {
+    const metric = context.snapshot.metrics[key]
+
+    if (!isAvailableMetric(metric)) {
+      return {
+        key,
+        label: FINANCIAL_METRIC_LABELS[key],
+        value: '-',
+        unit: key === 'runway_months' ? 'months' : null,
+        sourceLabel: metric.sourceLabel ?? 'Unavailable',
+        sourceTone: 'unavailable' as const,
+      }
+    }
+
+    const sourceLabel =
+      metric.provenance.sourceType === 'document'
+        ? `CSV: ${metric.provenance.sourceLabel}`
+        : metric.provenance.sourceType === 'demo'
+          ? `Demo: ${metric.provenance.sourceLabel}`
+          : metric.provenance.sourceLabel
+
+    return {
+      key,
+      label: FINANCIAL_METRIC_LABELS[key],
+      value:
+        key === 'runway_months'
+          ? formatNumber(metric.value)
+          : formatCurrency(metric.value),
+      unit: key === 'runway_months' ? 'months' : null,
+      sourceLabel,
+      sourceTone: 'available' as const,
+    }
+  })
+
+  return {
+    id: widgetId(spec.type, index),
+    type: 'metric_snapshot',
+    title: spec.title ?? 'Relevant metrics',
+    reason: spec.reason ?? 'AI-BOSS selected the metrics that support this answer.',
+    data: { metrics },
+  }
+}
+
+function buildDataConnectionsWidget(
+  spec: PlannerWidget,
+  index: number
+): GenUiWidget {
+  return {
+    id: widgetId(spec.type, index),
+    type: 'data_connections',
+    title: spec.title ?? 'Data connections',
+    reason: spec.reason ?? 'AI-BOSS selected data connection controls for this request.',
+    data: {
+      message: 'Connect or review the sources that provide financial context to AI-BOSS.',
+    },
+  }
 }
 
 function buildTrendPoints(context: GenUiDataContext): GenUiRunwayPoint[] {
@@ -659,6 +751,10 @@ function hydrateWidget(
   context: GenUiDataContext
 ): GenUiWidget | null {
   switch (spec.type) {
+    case 'metric_snapshot':
+      return buildMetricSnapshotWidget(spec, index, context)
+    case 'data_connections':
+      return buildDataConnectionsWidget(spec, index)
     case 'runway_trend_chart':
       return buildRunwayTrendWidget(spec, index, context)
     case 'scenario_comparison':

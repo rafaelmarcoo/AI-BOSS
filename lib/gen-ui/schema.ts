@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { FINANCIAL_METRIC_KEYS } from '@/lib/financial-data/metric-keys'
 import { GEN_UI_PLAN_VERSION, GEN_UI_WIDGET_TYPES } from '@/lib/gen-ui/types'
 import type { GenUiPlan } from '@/lib/gen-ui/types'
 
@@ -7,6 +8,29 @@ const WidgetBaseSchema = z.object({
   type: z.enum(GEN_UI_WIDGET_TYPES),
   title: z.string(),
   reason: z.string(),
+})
+
+const MetricSnapshotWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('metric_snapshot'),
+  data: z.object({
+    metrics: z.array(
+      z.object({
+        key: z.enum(FINANCIAL_METRIC_KEYS),
+        label: z.string(),
+        value: z.string(),
+        unit: z.string().nullable(),
+        sourceLabel: z.string(),
+        sourceTone: z.enum(['available', 'unavailable', 'derived']),
+      })
+    ).max(4),
+  }),
+})
+
+const DataConnectionsWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('data_connections'),
+  data: z.object({
+    message: z.string(),
+  }),
 })
 
 const RunwayPointSchema = z.object({
@@ -111,6 +135,8 @@ const HighlightExplainerWidgetSchema = WidgetBaseSchema.extend({
 })
 
 export const GenUiWidgetSchema = z.discriminatedUnion('type', [
+  MetricSnapshotWidgetSchema,
+  DataConnectionsWidgetSchema,
   RunwayTrendChartWidgetSchema,
   ScenarioComparisonWidgetSchema,
   PlanningChecklistWidgetSchema,

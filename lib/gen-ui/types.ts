@@ -1,6 +1,10 @@
+import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
+
 export const GEN_UI_PLAN_VERSION = 1
 
 export const GEN_UI_WIDGET_TYPES = [
+  'metric_snapshot',
+  'data_connections',
   'runway_trend_chart',
   'scenario_comparison',
   'planning_checklist',
@@ -19,6 +23,27 @@ export interface GenUiWidgetBase {
   type: GenUiWidgetType
   title: string
   reason: string
+}
+
+export interface MetricSnapshotWidget extends GenUiWidgetBase {
+  type: 'metric_snapshot'
+  data: {
+    metrics: Array<{
+      key: FinancialMetricKey
+      label: string
+      value: string
+      unit: string | null
+      sourceLabel: string
+      sourceTone: 'available' | 'unavailable' | 'derived'
+    }>
+  }
+}
+
+export interface DataConnectionsWidget extends GenUiWidgetBase {
+  type: 'data_connections'
+  data: {
+    message: string
+  }
 }
 
 export interface GenUiRunwayPoint {
@@ -112,6 +137,8 @@ export interface HighlightExplainerWidget extends GenUiWidgetBase {
 }
 
 export type GenUiWidget =
+  | MetricSnapshotWidget
+  | DataConnectionsWidget
   | RunwayTrendChartWidget
   | ScenarioComparisonWidget
   | PlanningChecklistWidget

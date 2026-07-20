@@ -36,18 +36,33 @@ const CAUTION_THRESHOLD = 6
 const URGENT_THRESHOLD = 3
 const MAX_WIDGETS = 4
 
-const PlannerWidgetSchema = z.object({
-  type: z.enum(GEN_UI_WIDGET_TYPES),
-  title: z.string().optional(),
-  reason: z.string().optional(),
-  metricKeys: z.array(z.enum(FINANCIAL_METRIC_KEYS)).max(4).optional(),
+const ModelPlannerWidgetSchema = z.object({
+  type: z.enum(GEN_UI_WIDGET_TYPES).describe('The widget to display.'),
+  title: z.string().nullable().describe('A short widget title, or null to use the default.'),
+  reason: z
+    .string()
+    .nullable()
+    .describe('Why the widget directly helps with this request, or null.'),
+  metricKeys: z
+    .array(z.enum(FINANCIAL_METRIC_KEYS))
+    .max(4)
+    .nullable()
+    .describe('Relevant metric keys for metric_snapshot only; otherwise null.'),
 })
 
 const PlannerOutputSchema = z.object({
-  widgets: z.array(PlannerWidgetSchema).max(MAX_WIDGETS),
-})
+  widgets: z
+    .array(ModelPlannerWidgetSchema)
+    .max(MAX_WIDGETS)
+    .describe('The relevant widgets, or an empty array when none would help.'),
+}).describe('The right-side widget plan for the latest AI-BOSS request.')
 
-type PlannerWidget = z.infer<typeof PlannerWidgetSchema>
+interface PlannerWidget {
+  type: GenUiWidgetType
+  title?: string
+  reason?: string
+  metricKeys?: FinancialMetricKey[]
+}
 
 interface PlanGenUiParams {
   userId: string
@@ -98,16 +113,6 @@ function detectSource(userMessage: string): GenUiSource {
   return /\bdashboard highlight\b|\bhighlight\b/i.test(userMessage)
     ? 'selection'
     : 'chat'
-}
-
-function isDashboardRelevant(userMessage: string, source: GenUiSource) {
-  if (source === 'selection') {
-    return true
-  }
-
-  return /\b(runway|burn|cash|forecast|future|plan|planning|trend|scenario|what if|risk|expense|revenue|source|metric|data|cost|hire|saving|threshold|connect|integration|xero|quickbooks|upload)\b/i.test(
-    userMessage
-  )
 }
 
 function metricValueForPrompt(
@@ -233,18 +238,6 @@ function dedupeWidgetSpecs(widgets: PlannerWidget[]) {
   return deduped
 }
 
-function extractJsonObject(content: string) {
-  const trimmed = content.trim()
-
-  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-    return trimmed
-  }
-
-  const match = trimmed.match(/\{[\s\S]*\}/)
-
-  return match?.[0] ?? null
-}
-
 async function chooseWidgetsWithModel(params: {
   userMessage: string
   assistantMessage: string
@@ -271,16 +264,21 @@ async function chooseWidgetsWithModel(params: {
     temperature: 0,
     apiKey,
   })
-  const response = await model.invoke([
+  const planner = model.withStructuredOutput(PlannerOutputSchema, {
+    name: 'plan_dashboard_widgets',
+    method: 'jsonSchema',
+    strict: true,
+  })
+  const response = await planner.invoke([
     new SystemMessage(
       [
         'You are a UI planner for AI-BOSS.',
         'Choose which right-side dashboard widgets should appear for the latest user question.',
-        'Return JSON only. Do not include prose, markdown, or data values.',
         `Allowed widget types: ${GEN_UI_WIDGET_TYPES.join(', ')}.`,
         'Choose 0 to 4 widgets. Use empty widgets for unrelated small talk.',
         'For metric_snapshot, return metricKeys with no more than four allowed metric keys.',
-        'Do not return metricKeys for other widget types.',
+        'Return null metricKeys for other widget types.',
+        'A widget must add useful visual or actionable context beyond the chat answer.',
         describeGenUiWidgetCatalog(),
       ].join('\n')
     ),
@@ -303,27 +301,21 @@ async function chooseWidgetsWithModel(params: {
               type: 'runway_trend_chart',
               title: 'short title',
               reason: 'why this widget helps',
-              metricKeys: ['runway_months', 'cash'],
+              metricKeys: null,
             },
           ],
         },
       })
     ),
   ])
-  const content =
-    typeof response.content === 'string'
-      ? response.content
-      : JSON.stringify(response.content)
-  const json = extractJsonObject(content)
-
-  if (!json) {
-    return null
-  }
-
-  const parsedJson = JSON.parse(json) as unknown
-  const parsed = PlannerOutputSchema.safeParse(parsedJson)
-
-  return parsed.success ? parsed.data.widgets : null
+  return response.widgets.map((widget) => ({
+    type: widget.type,
+    ...(widget.title ? { title: widget.title } : {}),
+    ...(widget.reason ? { reason: widget.reason } : {}),
+    ...(widget.metricKeys && widget.metricKeys.length > 0
+      ? { metricKeys: widget.metricKeys }
+      : {}),
+  }))
 }
 
 function buildMetricSnapshotWidget(
@@ -780,10 +772,6 @@ export async function planGenUi({
 }: PlanGenUiParams): Promise<GenUiPlan | null> {
   const source = detectSource(userMessage)
 
-  if (!isDashboardRelevant(userMessage, source)) {
-    return null
-  }
-
   const [snapshot, runwayTrend] = await Promise.all([
     readSourceAwareMetrics(userId),
     readRunwayObservationHistory(userId).catch(() => ({
@@ -795,17 +783,26 @@ export async function planGenUi({
   ])
   const fallbackSpecs = defaultWidgetSpecs(userMessage, snapshot, source)
   const selectedText = extractSelectedText(userMessage)
-  const modelSpecs = await chooseWidgetsWithModel({
-    userMessage,
-    assistantMessage,
-    toolsUsed,
-    snapshot,
-    runwayTrend,
-    source,
-  }).catch(() => null)
-  const specs = dedupeWidgetSpecs(
-    modelSpecs && modelSpecs.length > 0 ? modelSpecs : fallbackSpecs
-  )
+  let modelSpecs: PlannerWidget[] | null = null
+
+  try {
+    modelSpecs = await chooseWidgetsWithModel({
+      userMessage,
+      assistantMessage,
+      toolsUsed,
+      snapshot,
+      runwayTrend,
+      source,
+    })
+  } catch (error) {
+    console.error(
+      'Gen UI widget planning failed; using deterministic fallback selection.',
+      error
+    )
+  }
+
+  // A valid empty model response is intentional; fall back only when planning failed.
+  const specs = dedupeWidgetSpecs(modelSpecs ?? fallbackSpecs)
 
   if (specs.length === 0) {
     return null

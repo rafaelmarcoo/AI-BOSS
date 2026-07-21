@@ -42,7 +42,7 @@ const ModelPlannerWidgetSchema = z.object({
   reason: z
     .string()
     .nullable()
-    .describe('Why the widget directly helps with this request, or null.'),
+    .describe('A concise user-facing explanation of why AI-BOSS chose this widget for the request, or null.'),
   metricKeys: z
     .array(z.enum(FINANCIAL_METRIC_KEYS))
     .max(4)
@@ -279,6 +279,8 @@ async function chooseWidgetsWithModel(params: {
         'For metric_snapshot, return metricKeys with no more than four allowed metric keys.',
         'Return null metricKeys for other widget types.',
         'A widget must add useful visual or actionable context beyond the chat answer.',
+        'For every selected widget, write a concise reason explaining why AI-BOSS chose it for this specific request.',
+        'The reason will be shown directly under that widget in the generated UI.',
         describeGenUiWidgetCatalog(),
       ].join('\n')
     ),
@@ -300,7 +302,7 @@ async function chooseWidgetsWithModel(params: {
             {
               type: 'runway_trend_chart',
               title: 'short title',
-              reason: 'why this widget helps',
+              reason: 'why AI-BOSS chose this widget for the request',
               metricKeys: null,
             },
           ],

@@ -135,10 +135,28 @@ function WidgetFrame({
             variant="outlined"
           />
         </Stack>
-        <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
-          {reason}
-        </Typography>
         {children}
+        <Box
+          sx={{
+            pt: 1.25,
+            borderTop: "1px solid",
+            borderColor: dashboardTokens.border,
+          }}
+        >
+          <Typography
+            variant="caption"
+            fontWeight={700}
+            sx={{ color: "#bae6fd", letterSpacing: 0 }}
+          >
+            Why AI-BOSS chose this widget
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{ color: dashboardTokens.textMuted, lineHeight: 1.6, mt: 0.5 }}
+          >
+            {reason}
+          </Typography>
+        </Box>
       </Stack>
     </Paper>
   );

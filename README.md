@@ -10,6 +10,9 @@
 
 ## 🎯 Project Overview
 
+For the verified implementation status, deployment prerequisites, and remaining
+final-stretch gaps, see [Current Project State](docs/current-state.md).
+
 AI-BOSS helps small business founders make better financial decisions through:
 - Real-time financial insights from Xero integration
 - AI-powered forecasting using multi-agent system (LangGraph)

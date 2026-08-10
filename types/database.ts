@@ -2,11 +2,23 @@ import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
 import type { FinancialMetricSourceType } from '@/lib/financial-data/types'
 import type { GenUiPlan } from '@/lib/gen-ui/types'
 
+export type UserType = 'admin' | 'employee'
+export type ConversationVisibility = 'private' | 'company' | 'admins'
+
 export interface User {
   id: string
   email: string
   full_name: string | null
   company_name: string | null
+  user_type: UserType | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Company {
+  id: string
+  name: string
+  created_by: string | null
   created_at: string
   updated_at: string
 }
@@ -26,6 +38,8 @@ export interface PolicyRule {
 export interface Conversation {
   id: string
   user_id: string
+  company_id: string
+  visibility: ConversationVisibility
   title: string | null
   created_at: string
   updated_at: string

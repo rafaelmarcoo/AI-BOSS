@@ -63,6 +63,8 @@ describe('generateChatResponse', () => {
     mockGetOrCreateConversation.mockResolvedValue({
       id: 'conversation-1',
       user_id: 'user-123',
+      company_id: 'company-1',
+      visibility: 'company',
       title: 'What is my runway?',
       created_at: '2026-05-12T00:00:00.000Z',
       updated_at: '2026-05-12T00:00:00.000Z',

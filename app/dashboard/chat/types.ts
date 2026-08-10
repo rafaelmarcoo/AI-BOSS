@@ -1,5 +1,5 @@
 import type { ChatMessageStatus, ChatRole } from "./ChatMessage";
-import type { Conversation } from "@/types/database";
+import type { Conversation, ConversationVisibility } from "@/types/database";
 import type { DocumentSummary } from "@/lib/documents/types";
 import type { GenUiPlan } from "@/lib/gen-ui/types";
 
@@ -23,6 +23,7 @@ export interface ChatApiResponse {
     conversationId: string;
     message: ChatApiMessage;
     conversation: ChatApiMessage[];
+    visibility: ConversationVisibility;
     ui?: GenUiPlan | null;
   };
   error?: {
@@ -33,7 +34,10 @@ export interface ChatApiResponse {
 export type ChatConversationSummary = Pick<
   Conversation,
   "id" | "title" | "created_at" | "updated_at"
->;
+> & {
+  visibility: ConversationVisibility;
+  isOwner: boolean;
+};
 
 export interface ConversationsApiResponse {
   success: boolean;
@@ -50,6 +54,8 @@ export interface ConversationDetailApiResponse {
   data?: {
     conversationId: string;
     conversation: ChatApiMessage[];
+    visibility: ConversationVisibility;
+    isOwner: boolean;
   };
   error?: {
     message?: string;

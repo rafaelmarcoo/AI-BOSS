@@ -71,6 +71,19 @@ export async function POST(request: Request) {
       throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to create user profile.')
     }
 
+    if (payload.userType === 'admin') {
+      const { error: companyError } = await admin.from('companies').insert({
+        name: companyName,
+        created_by: createdUser.user.id,
+      })
+
+      if (companyError) {
+        await admin.from('users').delete().eq('id', createdUser.user.id)
+        await admin.auth.admin.deleteUser(createdUser.user.id)
+        throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to create company.')
+      }
+    }
+
     const supabase = createServerSupabaseClient()
     const { data: signInData, error: signInError } =
       await supabase.auth.signInWithPassword({

@@ -75,6 +75,7 @@ export function ChatSidebar({
   const lastHandledInitialMessage = useRef<string | null>(null);
   const {
     conversationId,
+    isReadOnly,
     conversationMessages,
     loading,
     error,
@@ -244,6 +245,7 @@ export function ChatSidebar({
           fullName={fullName}
           email={email}
           activeConversationTitle={activeConversation?.title ?? null}
+          readOnly={isReadOnly}
           conversationMessages={conversationMessages}
           documents={documents}
           documentsLoading={documentsLoading}
@@ -397,7 +399,7 @@ export function ChatSidebar({
                         primary={conversation.title ?? "Untitled conversation"}
                         secondary={new Date(
                           conversation.updated_at,
-                        ).toLocaleString()}
+                        ).toLocaleString() + (conversation.isOwner ? "" : " · Company chat")}
                         primaryTypographyProps={{
                           color: "common.white",
                           fontSize: 14,
@@ -411,7 +413,7 @@ export function ChatSidebar({
                         }}
                         sx={{ minWidth: 0, flex: "1 1 auto", mr: 0.25 }}
                       />
-                      <IconButton
+                      {conversation.isOwner ? <IconButton
                         size="small"
                         onClick={(event) =>
                           openConversationMenu(
@@ -432,7 +434,7 @@ export function ChatSidebar({
                         }}
                       >
                         <MoreHorizRoundedIcon fontSize="small" />
-                      </IconButton>
+                      </IconButton> : null}
                     </ListItemButton>
                   </ListItem>
                 ))}

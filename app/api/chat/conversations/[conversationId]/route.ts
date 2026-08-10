@@ -3,6 +3,7 @@ import { handleRouteError, successResponse } from '@/lib/api/responses'
 import { requireAuthenticatedUser } from '@/lib/auth'
 import {
   deleteConversation,
+  getCompanyConversation,
   listConversationMessages,
   mapConversationMessagesToPayload,
   renameConversation,
@@ -19,11 +20,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { user } = await requireAuthenticatedUser(request)
     const { conversationId } = await context.params
+    const conversation = await getCompanyConversation(conversationId, user.id)
     const messages = await listConversationMessages(conversationId, user.id)
 
     return successResponse({
       conversationId,
       conversation: mapConversationMessagesToPayload(messages),
+      isOwner: conversation.user_id === user.id,
     })
   } catch (error) {
     return handleRouteError(error)

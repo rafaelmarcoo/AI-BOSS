@@ -24,6 +24,7 @@ interface ChatContainerProps {
   fullName: string | null;
   email: string;
   activeConversationTitle: string | null;
+  readOnly: boolean;
   conversationMessages: ChatRecord[];
   documents: DocumentSummaryView[];
   documentsLoading: boolean;
@@ -52,6 +53,7 @@ export function ChatContainer({
   fullName,
   email,
   activeConversationTitle,
+  readOnly,
   conversationMessages,
   documents,
   documentsLoading,
@@ -134,7 +136,7 @@ export function ChatContainer({
                 {activeConversationTitle ?? "New conversation"}
               </Typography>
               <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
-                AI-BOSS chat
+                {readOnly ? "Company chat · Read only" : "AI-BOSS chat"}
               </Typography>
             </Stack>
           </Stack>
@@ -215,12 +217,19 @@ export function ChatContainer({
             bgcolor: dashboardTokens.sidebarV2,
           }}
         >
-          <ChatInput
-            onSend={(value) => void onSendMessage(value)}
-            onUploadDocument={onUploadDocument}
-            disabled={loading}
-            uploadDisabled={uploading}
-          />
+          {readOnly ? (
+            <Alert severity="info" sx={{ borderRadius: 2 }}>
+              This conversation belongs to a coworker. You can read it, but only
+              its owner can continue or manage it.
+            </Alert>
+          ) : (
+            <ChatInput
+              onSend={(value) => void onSendMessage(value)}
+              onUploadDocument={onUploadDocument}
+              disabled={loading}
+              uploadDisabled={uploading}
+            />
+          )}
         </Box>
       </Box>
     </Box>

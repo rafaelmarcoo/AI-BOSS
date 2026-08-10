@@ -33,7 +33,9 @@ export interface ChatApiResponse {
 export type ChatConversationSummary = Pick<
   Conversation,
   "id" | "title" | "created_at" | "updated_at"
->;
+> & {
+  isOwner: boolean;
+};
 
 export interface ConversationsApiResponse {
   success: boolean;
@@ -50,6 +52,7 @@ export interface ConversationDetailApiResponse {
   data?: {
     conversationId: string;
     conversation: ChatApiMessage[];
+    isOwner: boolean;
   };
   error?: {
     message?: string;

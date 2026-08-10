@@ -16,23 +16,21 @@ describe('company lookup', () => {
       not: jest.fn(),
       order: jest.fn().mockResolvedValue({
         data: [
-          { company_name: 'Zulu Ltd' },
-          { company_name: 'Acme Ltd' },
-          { company_name: 'acme ltd' },
-          { company_name: null },
+          { name: 'Zulu Ltd' },
+          { name: 'Acme Ltd' },
+          { name: 'acme ltd' },
+          { name: null },
         ],
         error: null,
       }),
     }
     query.select.mockReturnValue(query)
-    query.eq.mockReturnValue(query)
-    query.not.mockReturnValue(query)
     mockedCreateAdminSupabaseClient.mockReturnValue({
       from: jest.fn().mockReturnValue(query),
     } as unknown as ReturnType<typeof createAdminSupabaseClient>)
 
     await expect(getJoinableCompanyNames()).resolves.toEqual(['Acme Ltd', 'Zulu Ltd'])
-    expect(query.eq).toHaveBeenCalledWith('user_type', 'admin')
+    expect(query.select).toHaveBeenCalledWith('name')
   })
 
   it('matches a requested company without changing stored spelling', () => {

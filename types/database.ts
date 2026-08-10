@@ -14,6 +14,14 @@ export interface User {
   updated_at: string
 }
 
+export interface Company {
+  id: string
+  name: string
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface PolicyRule {
   id: string
   user_id: string
@@ -29,6 +37,8 @@ export interface PolicyRule {
 export interface Conversation {
   id: string
   user_id: string
+  company_id: string
+  visibility: 'company' | 'private'
   title: string | null
   created_at: string
   updated_at: string

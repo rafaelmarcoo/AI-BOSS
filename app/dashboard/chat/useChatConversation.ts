@@ -50,6 +50,7 @@ export function useChatConversation({
   const startEmptyRef = useRef(startEmpty);
   const [conversationMessages, setConversationMessages] = useState<ChatRecord[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [isReadOnly, setIsReadOnly] = useState(false);
   const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -82,6 +83,7 @@ export function useChatConversation({
       }
 
       setConversationId(payload.data.conversationId);
+      setIsReadOnly(!payload.data.isOwner);
       setConversationMessages(
         mapApiConversationToRecords(payload.data.conversation)
       );
@@ -135,6 +137,10 @@ export function useChatConversation({
     input: string,
     existingMessages = conversationMessages
   ) => {
+    if (isReadOnly) {
+      return;
+    }
+
     const nextConversation = [
       ...existingMessages,
       { id: createChatId(), role: "user" as const, content: input },
@@ -180,6 +186,7 @@ export function useChatConversation({
           created_at:
             existingConversation?.created_at ?? new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          isOwner: true,
         };
         const existingWithoutCurrent = prev.filter(
           (conversation) => conversation.id !== nextSummary.id
@@ -243,6 +250,7 @@ export function useChatConversation({
 
   const startNewConversation = () => {
     setConversationId(null);
+    setIsReadOnly(false);
     setConversationMessages([]);
     setError(null);
     updateGenUiPlan(null);
@@ -304,6 +312,7 @@ export function useChatConversation({
 
   return {
     conversationId,
+    isReadOnly,
     conversationMessages,
     activeGenUiPlan,
     conversations,

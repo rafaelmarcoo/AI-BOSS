@@ -9,6 +9,7 @@ import {
   listConversationMessages,
 } from '@/lib/chat/persistence'
 import { logChatDecision } from '@/lib/chat/log-chat-decision'
+import { planGenUi } from '@/lib/gen-ui/plan-gen-ui'
 
 jest.mock('@/lib/chat/build-chat-context', () => ({
   buildChatContext: jest.fn(),
@@ -38,6 +39,10 @@ jest.mock('@/lib/chat/log-chat-decision', () => ({
   logChatDecision: jest.fn(),
 }))
 
+jest.mock('@/lib/gen-ui/plan-gen-ui', () => ({
+  planGenUi: jest.fn(),
+}))
+
 const mockBuildChatContext = jest.mocked(buildChatContext)
 const mockRunAgent = jest.mocked(runAgent)
 const mockGetAgentTools = jest.mocked(getAgentTools)
@@ -45,6 +50,7 @@ const mockGetOrCreateConversation = jest.mocked(getOrCreateConversation)
 const mockInsertConversationMessage = jest.mocked(insertConversationMessage)
 const mockListConversationMessages = jest.mocked(listConversationMessages)
 const mockLogChatDecision = jest.mocked(logChatDecision)
+const mockPlanGenUi = jest.mocked(planGenUi)
 
 describe('generateChatResponse', () => {
   beforeEach(() => {
@@ -69,6 +75,7 @@ describe('generateChatResponse', () => {
         role: 'user',
         content: 'What is my runway?',
         citations: null,
+        ui_payload: null,
         created_at: '2026-05-12T00:00:00.000Z',
       })
       .mockResolvedValueOnce({
@@ -78,6 +85,7 @@ describe('generateChatResponse', () => {
         role: 'assistant',
         content: 'Your runway is 5.4 months.',
         citations: null,
+        ui_payload: null,
         created_at: '2026-05-12T00:00:00.000Z',
       })
     mockListConversationMessages
@@ -89,6 +97,7 @@ describe('generateChatResponse', () => {
           role: 'user',
           content: 'What is my runway?',
           citations: null,
+          ui_payload: null,
           created_at: '2026-05-12T00:00:00.000Z',
         },
       ])
@@ -100,6 +109,7 @@ describe('generateChatResponse', () => {
           role: 'user',
           content: 'What is my runway?',
           citations: null,
+          ui_payload: null,
           created_at: '2026-05-12T00:00:00.000Z',
         },
         {
@@ -109,6 +119,7 @@ describe('generateChatResponse', () => {
           role: 'assistant',
           content: 'Your runway is 5.4 months.',
           citations: null,
+          ui_payload: null,
           created_at: '2026-05-12T00:00:00.000Z',
         },
       ])
@@ -122,6 +133,7 @@ describe('generateChatResponse', () => {
       tokensUsed: 123,
       toolsUsed: [],
     })
+    mockPlanGenUi.mockResolvedValue(null)
 
     await generateChatResponse(
       'user-123',

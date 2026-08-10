@@ -1,15 +1,7 @@
 import { Box } from '@mui/material'
 import { AuthForm } from '@/components/auth-form'
 
-interface SignUpPageProps {
-  searchParams?: Promise<{
-    redirectTo?: string
-  }>
-}
-
-export default async function SignUpPage({ searchParams }: SignUpPageProps) {
-  const params = await searchParams
-
+export default function SignUpPage() {
   return (
     <Box
       component="main"
@@ -23,7 +15,7 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
         py: 16,
       }}
     >
-      <AuthForm mode="sign-up" redirectTo={params?.redirectTo} />
+      <AuthForm mode="sign-up" />
     </Box>
   )
 }

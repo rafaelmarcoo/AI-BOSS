@@ -23,17 +23,16 @@ export function SignOutButton() {
       type="button"
       onClick={handleSignOut}
       disabled={isSubmitting}
-      variant="outlined"
+      variant="text"
       sx={{
         borderRadius: '999px',
         px: 2.5,
         py: 1.25,
-        borderColor: 'rgba(255, 255, 255, 0.2)',
         color: 'common.white',
+        textTransform: 'none',
         '&:hover': {
-          borderColor: 'primary.light',
-          color: 'primary.light',
-          backgroundColor: 'rgba(255, 255, 255, 0.04)',
+          color: 'common.white',
+          backgroundColor: 'transparent',
         },
       }}
     >

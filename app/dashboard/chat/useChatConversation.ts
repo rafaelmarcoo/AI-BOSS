@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   ChatApiMessage,
   ChatApiResponse,
@@ -12,6 +12,7 @@ import type {
   ConversationsApiResponse,
 } from "./types";
 import { createConversationTitle } from "@/lib/chat/conversation-title";
+import type { GenUiPlan } from "@/lib/gen-ui/types";
 
 function createChatId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -22,46 +23,45 @@ function mapApiConversationToRecords(messages: ChatApiMessage[]): ChatRecord[] {
     id: createChatId(),
     role: message.role,
     content: message.content,
+    ui: message.ui ?? null,
   }));
 }
 
-export function useChatConversation() {
+function getLatestGenUiPlan(messages: ChatApiMessage[]) {
+  return (
+    [...messages]
+      .reverse()
+      .find((message) => message.role === "assistant" && message.ui)?.ui ?? null
+  );
+}
+
+interface UseChatConversationOptions {
+  initialConversationId?: string | null;
+  startEmpty?: boolean;
+  onGenUiPlan?: (plan: GenUiPlan | null) => void;
+}
+
+export function useChatConversation({
+  initialConversationId = null,
+  startEmpty = false,
+  onGenUiPlan,
+}: UseChatConversationOptions = {}) {
+  const initialConversationIdRef = useRef(initialConversationId);
+  const startEmptyRef = useRef(startEmpty);
   const [conversationMessages, setConversationMessages] = useState<ChatRecord[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ChatErrorState | null>(null);
+  const [activeGenUiPlan, setActiveGenUiPlan] = useState<GenUiPlan | null>(null);
 
-  useEffect(() => {
-    async function loadConversations() {
-      try {
-        const response = await fetch("/api/chat/conversations");
-        const payload = (await response.json()) as ConversationsApiResponse;
+  const updateGenUiPlan = useCallback((plan: GenUiPlan | null) => {
+    setActiveGenUiPlan(plan);
+    onGenUiPlan?.(plan);
+  }, [onGenUiPlan]);
 
-        if (!response.ok || !payload.success) {
-          throw new Error(
-            payload.error?.message ?? "Could not load conversation history."
-          );
-        }
-
-        const nextConversations = payload.data?.conversations ?? [];
-        setConversations(nextConversations);
-
-        if (nextConversations.length > 0) {
-          await loadConversation(nextConversations[0].id, false);
-        }
-      } catch {
-        setConversations([]);
-      } finally {
-        setHistoryLoading(false);
-      }
-    }
-
-    void loadConversations();
-  }, []);
-
-  const loadConversation = async (
+  const loadConversation = useCallback(async (
     nextConversationId: string,
     toggleLoading = true
   ) => {
@@ -85,6 +85,7 @@ export function useChatConversation() {
       setConversationMessages(
         mapApiConversationToRecords(payload.data.conversation)
       );
+      updateGenUiPlan(getLatestGenUiPlan(payload.data.conversation));
     } catch (requestError) {
       setError({
         message:
@@ -98,7 +99,37 @@ export function useChatConversation() {
         setLoading(false);
       }
     }
-  };
+  }, [updateGenUiPlan]);
+
+  useEffect(() => {
+    async function loadConversations() {
+      try {
+        const response = await fetch("/api/chat/conversations");
+        const payload = (await response.json()) as ConversationsApiResponse;
+
+        if (!response.ok || !payload.success) {
+          throw new Error(
+            payload.error?.message ?? "Could not load conversation history."
+          );
+        }
+
+        const nextConversations = payload.data?.conversations ?? [];
+        setConversations(nextConversations);
+
+        if (initialConversationIdRef.current) {
+          await loadConversation(initialConversationIdRef.current, false);
+        } else if (!startEmptyRef.current && nextConversations.length > 0) {
+          await loadConversation(nextConversations[0].id, false);
+        }
+      } catch {
+        setConversations([]);
+      } finally {
+        setHistoryLoading(false);
+      }
+    }
+
+    void loadConversations();
+  }, [loadConversation]);
 
   const sendMessage = async (
     input: string,
@@ -160,6 +191,9 @@ export function useChatConversation() {
       setConversationMessages(
         mapApiConversationToRecords(payload.data.conversation)
       );
+      updateGenUiPlan(
+        payload.data.ui ?? getLatestGenUiPlan(payload.data.conversation)
+      );
     } catch (requestError) {
       const failedMessageId = nextConversation[nextConversation.length - 1]?.id ?? null;
 
@@ -211,6 +245,7 @@ export function useChatConversation() {
     setConversationId(null);
     setConversationMessages([]);
     setError(null);
+    updateGenUiPlan(null);
   };
 
   const renameConversation = async (
@@ -270,6 +305,7 @@ export function useChatConversation() {
   return {
     conversationId,
     conversationMessages,
+    activeGenUiPlan,
     conversations,
     historyLoading,
     loading,

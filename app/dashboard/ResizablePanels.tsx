@@ -7,17 +7,22 @@ import { dashboardTokens } from "@/app/theme";
 import { ChatSidebar } from "./chat/sidebar";
 import { RunwaySection } from "./runway";
 import type { CompleteFinancialMetricSet } from "@/lib/financial-data";
+import type { GenUiPlan } from "@/lib/gen-ui/types";
 
 interface ResizablePanelsProps {
   fullName: string | null;
   email: string;
   metrics: CompleteFinancialMetricSet;
+  initialConversationId?: string | null;
+  initialMessage?: string | null;
 }
 
 interface SelectionChatPrompt {
   id: string;
   text: string;
 }
+
+type AskChatbotMode = "selection" | "prompt";
 
 const MIN_CHAT_WIDTH = 280;
 const MAX_CHAT_WIDTH = 720;
@@ -28,6 +33,8 @@ export function ResizablePanels({
   fullName,
   email,
   metrics,
+  initialConversationId = null,
+  initialMessage = null,
 }: ResizablePanelsProps) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -35,11 +42,18 @@ export function ResizablePanels({
   const [isDragging, setIsDragging] = useState(false);
   const [pendingChatPrompt, setPendingChatPrompt] =
     useState<SelectionChatPrompt | null>(null);
+  const [genUiPlan, setGenUiPlan] = useState<GenUiPlan | null>(null);
 
-  const handleAskChatbot = (selectionText: string) => {
+  const handleAskChatbot = (
+    text: string,
+    mode: AskChatbotMode = "selection",
+  ) => {
     setPendingChatPrompt({
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      text: `Can you explain this dashboard highlight and what it means for the business?\n\n"${selectionText}"`,
+      text:
+        mode === "prompt"
+          ? text
+          : `Can you explain this dashboard highlight and what it means for the business?\n\n"${text}"`,
     });
   };
 
@@ -105,9 +119,15 @@ export function ResizablePanels({
         <ChatSidebar
           fullName={fullName}
           email={email}
+          initialConversationId={initialConversationId}
+          initialMessage={initialMessage}
           onDocumentsProcessed={() => router.refresh()}
+          onInitialMessageHandled={() => {
+            window.history.replaceState(null, "", "/dashboard");
+          }}
           selectionPrompt={pendingChatPrompt}
           onSelectionPromptHandled={() => setPendingChatPrompt(null)}
+          onGenUiPlan={setGenUiPlan}
         />
       </Box>
 
@@ -153,7 +173,11 @@ export function ResizablePanels({
           minWidth: 0,
         }}
       >
-        <RunwaySection metrics={metrics} onAskChatbot={handleAskChatbot} />
+        <RunwaySection
+          metrics={metrics}
+          genUiPlan={genUiPlan}
+          onAskChatbot={handleAskChatbot}
+        />
       </Box>
     </Box>
   );

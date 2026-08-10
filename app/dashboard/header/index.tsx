@@ -2,8 +2,6 @@ import { Box, Button, Stack, Typography } from "@mui/material";
 import { SignOutButton } from "@/components/sign-out-button";
 import { dashboardTokens } from "@/app/theme";
 
-const NAV_ITEMS = ["Data Connectors", "Scenarios", "Exports", "Settings"];
-
 export function DashboardHeader() {
   return (
     <Box
@@ -60,19 +58,15 @@ export function DashboardHeader() {
             Dashboard
           </Button>
 
-          {/* Nav items — hide on xs */}
-          {NAV_ITEMS.map((item) => (
-            <Button
-              key={item}
-              size="small"
-              sx={{
-                color: dashboardTokens.textMuted,
-                display: { xs: "none", sm: "inline-flex" },
-              }}
-            >
-              {item}
-            </Button>
-          ))}
+          <Button
+            size="small"
+            sx={{
+              color: dashboardTokens.textMuted,
+              display: { xs: "none", sm: "inline-flex" },
+            }}
+          >
+            Settings
+          </Button>
         </Stack>
 
         {/* Right: Sign out */}

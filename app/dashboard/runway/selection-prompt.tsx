@@ -1,21 +1,20 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useRef, useState } from "react";
 import {
   Box,
   Button,
-  Chip,
   Paper,
   Popover,
   Stack,
   Typography,
 } from "@mui/material";
 import ChatBubbleRoundedIcon from "@mui/icons-material/ChatBubbleRounded";
-import HighlightAltRoundedIcon from "@mui/icons-material/HighlightAltRounded";
 import { dashboardTokens } from "@/app/theme";
 
-interface RunwaySelectionPromptProps {
-  summaryText: string;
+interface SelectableRunwayWorkspaceProps {
+  children: ReactNode;
   onAskChatbot: (selectionText: string) => void;
 }
 
@@ -24,10 +23,10 @@ interface AnchorPosition {
   left: number;
 }
 
-export function RunwaySelectionPrompt({
-  summaryText,
+export function SelectableRunwayWorkspace({
+  children,
   onAskChatbot,
-}: RunwaySelectionPromptProps) {
+}: SelectableRunwayWorkspaceProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [selectionText, setSelectionText] = useState("");
   const [anchorPosition, setAnchorPosition] = useState<AnchorPosition | null>(
@@ -80,57 +79,7 @@ export function RunwaySelectionPrompt({
       onMouseUp={handleMouseUp}
       sx={{ position: "relative" }}
     >
-      <Paper
-        elevation={0}
-        sx={{
-          p: 2.5,
-          borderRadius: 1,
-          bgcolor: "rgba(37, 99, 235, 0.08)",
-          border: "1px solid",
-          borderColor: "rgba(96, 165, 250, 0.25)",
-          color: "common.white",
-          overflow: "hidden",
-        }}
-      >
-        <Stack spacing={1.5}>
-          <Stack
-            direction="row"
-            spacing={1}
-            alignItems="center"
-            flexWrap="wrap"
-          >
-            <Chip
-              icon={<HighlightAltRoundedIcon />}
-              label="AI-BOSS insight"
-              size="small"
-              sx={{
-                color: "#bfdbfe",
-                bgcolor: "rgba(59, 130, 246, 0.12)",
-                borderColor: "rgba(96, 165, 250, 0.25)",
-              }}
-              variant="outlined"
-            />
-            <Typography
-              variant="caption"
-              sx={{ color: dashboardTokens.textMuted }}
-            >
-              Runway summary
-            </Typography>
-          </Stack>
-
-          <Typography
-            variant="body2"
-            sx={{
-              color: "common.white",
-              lineHeight: 1.8,
-              userSelect: "text",
-              cursor: "text",
-            }}
-          >
-            {summaryText}
-          </Typography>
-        </Stack>
-      </Paper>
+      {children}
 
       <Popover
         open={Boolean(selectionText && anchorPosition)}

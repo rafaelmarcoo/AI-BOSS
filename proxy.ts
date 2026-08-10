@@ -8,19 +8,17 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const hasAccessToken = Boolean(request.cookies.get(COOKIE_ACCESS_TOKEN)?.value)
 
-  if (pathname.startsWith('/dashboard') && !hasAccessToken) {
-    const signInUrl = new URL('/sign-in', request.url)
-    signInUrl.searchParams.set('redirectTo', pathname)
-    return NextResponse.redirect(signInUrl)
+  if ((pathname.startsWith('/dashboard') || pathname.startsWith('/landing')) && !hasAccessToken) {
+    return NextResponse.redirect(new URL('/sign-in', request.url))
   }
 
   if (PUBLIC_AUTH_PAGES.includes(pathname) && hasAccessToken) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    return NextResponse.redirect(new URL('/landing', request.url))
   }
 
   return NextResponse.next()
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/sign-in', '/sign-up'],
+  matcher: ['/dashboard/:path*', '/landing/:path*', '/sign-in', '/sign-up'],
 }

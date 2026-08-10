@@ -6,6 +6,7 @@ import {
   validateSignUpPayload,
 } from '@/lib/api/validation'
 import { applySessionCookies } from '@/lib/auth'
+import { findCompanyName, getJoinableCompanyNames } from '@/lib/companies'
 import {
   createAdminSupabaseClient,
   createServerSupabaseClient,
@@ -15,6 +16,28 @@ export async function POST(request: Request) {
   try {
     const payload = assertValid(validateSignUpPayload(await readJsonBody(request)))
     const admin = createAdminSupabaseClient()
+    const companies = await getJoinableCompanyNames()
+    const existingCompanyName = findCompanyName(companies, payload.companyName)
+
+    if (payload.userType === 'admin' && existingCompanyName) {
+      throw new ApiError(
+        400,
+        'VALIDATION_ERROR',
+        'That company already exists. Join it as an employee instead.',
+        { companyName: 'A company with this name already exists.' }
+      )
+    }
+
+    if (payload.userType === 'employee' && !existingCompanyName) {
+      throw new ApiError(
+        400,
+        'VALIDATION_ERROR',
+        'Select an existing company to join.',
+        { companyName: 'Select an existing company.' }
+      )
+    }
+
+    const companyName = existingCompanyName ?? payload.companyName
 
     const { data: createdUser, error: createUserError } =
       await admin.auth.admin.createUser({
@@ -36,7 +59,8 @@ export async function POST(request: Request) {
         id: createdUser.user.id,
         email: payload.email,
         full_name: payload.fullName ?? null,
-        company_name: payload.companyName ?? null,
+        company_name: companyName,
+        user_type: payload.userType,
       },
       {
         onConflict: 'id',
@@ -67,6 +91,8 @@ export async function POST(request: Request) {
         user: {
           id: signInData.user.id,
           email: signInData.user.email,
+          companyName,
+          userType: payload.userType,
         },
         session: {
           accessToken: signInData.session.access_token,

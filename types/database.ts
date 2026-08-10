@@ -2,11 +2,14 @@ import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
 import type { FinancialMetricSourceType } from '@/lib/financial-data/types'
 import type { GenUiPlan } from '@/lib/gen-ui/types'
 
+export type UserType = 'admin' | 'employee'
+
 export interface User {
   id: string
   email: string
   full_name: string | null
   company_name: string | null
+  user_type: UserType | null
   created_at: string
   updated_at: string
 }

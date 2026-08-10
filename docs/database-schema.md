@@ -43,6 +43,7 @@ Extends Supabase Auth with additional profile information.
 | email | TEXT | User email (from auth) |
 | full_name | TEXT | User's full name |
 | company_name | TEXT | User's company name |
+| user_type | TEXT | User role: `admin` or `employee` |
 | created_at | TIMESTAMP | Account creation time |
 | updated_at | TIMESTAMP | Last profile update |
 
@@ -390,6 +391,8 @@ All schema changes are tracked in `db/migrations/`:
 - `006_financial_metric_observations.sql` - Adds source-aware normalized financial metric observation storage
 - `007_drop_financial_snapshots.sql` - Drops the legacy financial snapshots table
 - `008_accounting_oauth_tokens.sql` - Adds provider-neutral OAuth tokens and drops the Xero-specific credential table
+- `009_conversation_message_ui_payload.sql` - Adds validated Gen UI payloads to assistant messages
+- `010_add_user_type.sql` - Adds admin/employee roles used by company signup and joining
 
 ---
 

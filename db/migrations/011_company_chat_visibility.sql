@@ -7,6 +7,9 @@ CREATE TABLE IF NOT EXISTS public.companies (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_companies_normalized_name
+  ON public.companies (LOWER(TRIM(name)));
+
 ALTER TABLE public.conversations
   ADD COLUMN IF NOT EXISTS company_id UUID,
   ADD COLUMN IF NOT EXISTS visibility TEXT DEFAULT 'company';

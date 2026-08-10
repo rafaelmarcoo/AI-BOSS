@@ -46,6 +46,9 @@ Canonical company records used to scope shared conversation access.
 | created_at | TIMESTAMP | Company creation time |
 | updated_at | TIMESTAMP | Last company update |
 
+**Integrity rules:**
+- Company names are unique after trimming and case normalization, so a company cannot be duplicated with different casing.
+
 ### 1. users
 
 Extends Supabase Auth with additional profile information.
@@ -411,7 +414,7 @@ All schema changes are tracked in `db/migrations/`:
 - `007_drop_financial_snapshots.sql` - Drops the legacy financial snapshots table
 - `008_accounting_oauth_tokens.sql` - Adds provider-neutral OAuth tokens and drops the Xero-specific credential table
 - `009_conversation_message_ui_payload.sql` - Adds validated Gen UI payloads to assistant messages
-- `010_add_user_type.sql` - Adds admin/employee roles used by company signup and joining
+- `010_add_user_type.sql` - Adds admin/employee roles used by company signup and joining; existing company accounts are backfilled as admins
 - `011_company_chat_visibility.sql` - Adds company-scoped conversation history and message read access
 - `012_conversation_visibility_modes.sql` - Adds private, company, and admins-only conversation visibility
 

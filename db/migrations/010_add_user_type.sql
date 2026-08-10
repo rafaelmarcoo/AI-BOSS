@@ -2,6 +2,14 @@
 ALTER TABLE public.users
   ADD COLUMN IF NOT EXISTS user_type TEXT;
 
+-- Existing accounts were created before roles existed. They originally created
+-- their company profile, so retain access by treating them as administrators.
+UPDATE public.users
+SET user_type = 'admin'
+WHERE user_type IS NULL
+  AND company_name IS NOT NULL
+  AND TRIM(company_name) <> '';
+
 DO $$
 BEGIN
   IF NOT EXISTS (

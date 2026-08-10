@@ -28,6 +28,7 @@ import { dashboardTokens } from "@/app/theme";
 import { ChatContainer } from "./ChatContainer";
 import { useChatConversation } from "./useChatConversation";
 import { useDocuments } from "./useDocuments";
+import type { GenUiPlan } from "@/lib/gen-ui/types";
 
 interface SelectionChatPrompt {
   id: string;
@@ -37,17 +38,25 @@ interface SelectionChatPrompt {
 interface ChatSidebarProps {
   fullName: string | null;
   email: string;
+  initialConversationId?: string | null;
+  initialMessage?: string | null;
   onDocumentsProcessed?: () => void;
+  onInitialMessageHandled?: () => void;
   selectionPrompt?: SelectionChatPrompt | null;
   onSelectionPromptHandled?: () => void;
+  onGenUiPlan?: (plan: GenUiPlan | null) => void;
 }
 
 export function ChatSidebar({
   fullName,
   email,
+  initialConversationId = null,
+  initialMessage = null,
   onDocumentsProcessed,
+  onInitialMessageHandled,
   selectionPrompt,
   onSelectionPromptHandled,
+  onGenUiPlan,
 }: ChatSidebarProps) {
   const [selectedConversationId, setSelectedConversationId] = useState<
     string | null
@@ -63,6 +72,7 @@ export function ChatSidebar({
   >(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const lastHandledPromptId = useRef<string | null>(null);
+  const lastHandledInitialMessage = useRef<string | null>(null);
   const {
     conversationId,
     conversationMessages,
@@ -76,7 +86,11 @@ export function ChatSidebar({
     startNewConversation,
     renameConversation,
     deleteConversation,
-  } = useChatConversation();
+  } = useChatConversation({
+    initialConversationId,
+    startEmpty: Boolean(initialMessage) && !initialConversationId,
+    onGenUiPlan,
+  });
   const {
     documents,
     documentsLoading,
@@ -108,6 +122,22 @@ export function ChatSidebar({
       onSelectionPromptHandled?.();
     });
   }, [onSelectionPromptHandled, selectionPrompt, sendMessage]);
+
+  useEffect(() => {
+    if (!initialMessage || historyLoading) {
+      return;
+    }
+
+    if (lastHandledInitialMessage.current === initialMessage) {
+      return;
+    }
+
+    lastHandledInitialMessage.current = initialMessage;
+
+    void sendMessage(initialMessage).finally(() => {
+      onInitialMessageHandled?.();
+    });
+  }, [historyLoading, initialMessage, onInitialMessageHandled, sendMessage]);
 
   const handleSelectConversation = async (conversationId: string) => {
     setSelectedConversationId(conversationId);
@@ -396,11 +426,8 @@ export function ChatSidebar({
                           width: 34,
                           height: 34,
                           mr: -0.25,
-                          border: "1px solid",
-                          borderColor: "transparent",
                           "&:hover": {
-                            borderColor: dashboardTokens.borderMuted,
-                            bgcolor: "rgba(255,255,255,0.06)",
+                            bgcolor: "transparent",
                           },
                         }}
                       >

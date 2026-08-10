@@ -12,9 +12,23 @@ import { readSourceAwareMetrics } from "@/lib/financial-data/read-service";
 import { DashboardHeader } from "./header";
 import { ResizablePanels } from "./ResizablePanels";
 
-export default async function DashboardPage() {
+interface DashboardPageProps {
+  searchParams?: Promise<{
+    conversationId?: string;
+    initialMessage?: string;
+  }>;
+}
+
+function normalizeSearchParam(value: string | undefined) {
+  const trimmed = value?.trim();
+
+  return trimmed ? trimmed : null;
+}
+
+export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const cookieStore = await cookies();
   const accessToken = cookieStore.get(COOKIE_ACCESS_TOKEN)?.value;
+  const params = await searchParams;
 
   if (!accessToken) redirect("/sign-in");
 
@@ -62,6 +76,8 @@ export default async function DashboardPage() {
         fullName={profile.full_name}
         email={profile.email}
         metrics={metrics}
+        initialConversationId={normalizeSearchParam(params?.conversationId)}
+        initialMessage={normalizeSearchParam(params?.initialMessage)}
       />
     </Box>
   );

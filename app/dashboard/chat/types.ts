@@ -1,17 +1,20 @@
 import type { ChatMessageStatus, ChatRole } from "./ChatMessage";
 import type { Conversation } from "@/types/database";
 import type { DocumentSummary } from "@/lib/documents/types";
+import type { GenUiPlan } from "@/lib/gen-ui/types";
 
 export interface ChatRecord {
   id: string;
   role: ChatRole;
   content: string;
+  ui?: GenUiPlan | null;
   status?: ChatMessageStatus;
 }
 
 export interface ChatApiMessage {
   role: ChatRole;
   content: string;
+  ui?: GenUiPlan | null;
 }
 
 export interface ChatApiResponse {
@@ -20,6 +23,7 @@ export interface ChatApiResponse {
     conversationId: string;
     message: ChatApiMessage;
     conversation: ChatApiMessage[];
+    ui?: GenUiPlan | null;
   };
   error?: {
     message?: string;

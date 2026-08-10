@@ -17,7 +17,6 @@ type Mode = 'sign-in' | 'sign-up'
 
 interface AuthFormProps {
   mode: Mode
-  redirectTo?: string
 }
 
 interface ApiErrorPayload {
@@ -28,11 +27,7 @@ interface ApiErrorPayload {
   }
 }
 
-function getRedirectTarget(redirectTo?: string) {
-  return redirectTo && redirectTo.startsWith('/') ? redirectTo : '/dashboard'
-}
-
-export function AuthForm({ mode, redirectTo }: AuthFormProps) {
+export function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -77,7 +72,7 @@ export function AuthForm({ mode, redirectTo }: AuthFormProps) {
       return
     }
 
-    router.push(getRedirectTarget(redirectTo))
+    router.replace('/landing')
     router.refresh()
   }
 

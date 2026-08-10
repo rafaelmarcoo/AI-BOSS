@@ -109,9 +109,9 @@ export function ChatContainer({
               onClick={onOpenHistory}
               sx={{
                 color: "common.white",
-                border: "1px solid",
-                borderColor: dashboardTokens.border,
-                bgcolor: "rgba(255,255,255,0.03)",
+                "&:hover": {
+                  bgcolor: "transparent",
+                },
               }}
             >
               <MenuRoundedIcon />

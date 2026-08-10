@@ -75,12 +75,14 @@ Stores chat threads so each user can keep a real message history.
 | user_id | UUID (FK) | References users(id) |
 | company_id | UUID (FK) | References companies(id); company access boundary |
 | title | TEXT | Optional conversation title |
-| visibility | TEXT | `company` or `private` |
+| visibility | TEXT | `private`, `company` (default), or `admins` |
 | created_at | TIMESTAMP | Conversation creation time |
 | updated_at | TIMESTAMP | Last message/update time |
 
 **RLS Policies:**
 - Company members can view company-visible conversations and messages
+- Admins can view admins-only conversations from their company
+- Private conversations are visible only to their owner
 - Only conversation owners can insert, update, or delete their conversations
 
 **Indexes:**
@@ -411,6 +413,7 @@ All schema changes are tracked in `db/migrations/`:
 - `009_conversation_message_ui_payload.sql` - Adds validated Gen UI payloads to assistant messages
 - `010_add_user_type.sql` - Adds admin/employee roles used by company signup and joining
 - `011_company_chat_visibility.sql` - Adds company-scoped conversation history and message read access
+- `012_conversation_visibility_modes.sql` - Adds private, company, and admins-only conversation visibility
 
 ---
 

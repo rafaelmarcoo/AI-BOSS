@@ -13,6 +13,7 @@ import type {
 } from "./types";
 import { createConversationTitle } from "@/lib/chat/conversation-title";
 import type { GenUiPlan } from "@/lib/gen-ui/types";
+import type { ConversationVisibility } from "@/types/database";
 
 function createChatId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -51,6 +52,8 @@ export function useChatConversation({
   const [conversationMessages, setConversationMessages] = useState<ChatRecord[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = useState(false);
+  const [visibility, setVisibility] =
+    useState<ConversationVisibility>("company");
   const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -84,6 +87,7 @@ export function useChatConversation({
 
       setConversationId(payload.data.conversationId);
       setIsReadOnly(!payload.data.isOwner);
+      setVisibility(payload.data.visibility);
       setConversationMessages(
         mapApiConversationToRecords(payload.data.conversation)
       );
@@ -158,6 +162,7 @@ export function useChatConversation({
         },
         body: JSON.stringify({
           ...(conversationId ? { conversationId } : {}),
+          visibility,
           messages: nextConversation.map(({ role, content }) => ({
             role,
             content,
@@ -174,6 +179,7 @@ export function useChatConversation({
       }
 
       setConversationId(payload.data.conversationId);
+      setVisibility(payload.data.visibility);
       setConversations((prev) => {
         const existingConversation = prev.find(
           (conversation) => conversation.id === payload.data!.conversationId
@@ -186,6 +192,7 @@ export function useChatConversation({
           created_at:
             existingConversation?.created_at ?? new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          visibility: payload.data!.visibility,
           isOwner: true,
         };
         const existingWithoutCurrent = prev.filter(
@@ -251,9 +258,42 @@ export function useChatConversation({
   const startNewConversation = () => {
     setConversationId(null);
     setIsReadOnly(false);
+    setVisibility("company");
     setConversationMessages([]);
     setError(null);
     updateGenUiPlan(null);
+  };
+
+  const changeVisibility = async (
+    nextVisibility: ConversationVisibility
+  ) => {
+    if (!conversationId) {
+      setVisibility(nextVisibility);
+      return;
+    }
+
+    const response = await fetch(`/api/chat/conversations/${conversationId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ visibility: nextVisibility }),
+    });
+    const payload = (await response.json()) as ConversationMutationApiResponse;
+
+    if (!response.ok || !payload.success || !payload.data?.conversation) {
+      const message =
+        payload.error?.message ?? "Could not update conversation visibility.";
+      setError({ message, failedMessageId: null });
+      throw new Error(message);
+    }
+
+    setVisibility(payload.data.conversation.visibility);
+    setConversations((prev) =>
+      prev.map((conversation) =>
+        conversation.id === conversationId
+          ? payload.data!.conversation!
+          : conversation
+      )
+    );
   };
 
   const renameConversation = async (
@@ -313,6 +353,8 @@ export function useChatConversation({
   return {
     conversationId,
     isReadOnly,
+    visibility,
+    changeVisibility,
     conversationMessages,
     activeGenUiPlan,
     conversations,

@@ -15,7 +15,8 @@ export async function POST(request: NextRequest) {
     const chatResponse = await generateChatResponse(
       user.id,
       payload.messages,
-      payload.conversationId
+      payload.conversationId,
+      payload.visibility
     )
 
     return successResponse({

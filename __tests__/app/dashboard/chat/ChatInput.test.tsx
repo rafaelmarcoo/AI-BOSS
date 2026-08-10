@@ -38,4 +38,47 @@ describe('ChatInput', () => {
 
     expect(clickSpy).not.toHaveBeenCalled()
   })
+
+  it('defaults to company visibility and lets an employee choose private', async () => {
+    const user = userEvent.setup()
+    const onVisibilityChange = jest.fn()
+    render(
+      <ChatInput
+        onSend={jest.fn()}
+        onUploadDocument={jest.fn()}
+        userType="employee"
+        visibility="company"
+        onVisibilityChange={onVisibilityChange}
+      />
+    )
+
+    await user.click(
+      screen.getByRole('button', { name: 'Chat visibility: Company' })
+    )
+    expect(screen.queryByText('Admins only')).not.toBeInTheDocument()
+    await user.click(screen.getByText('Private'))
+
+    expect(onVisibilityChange).toHaveBeenCalledWith('private')
+  })
+
+  it('shows admins-only visibility to company admins', async () => {
+    const user = userEvent.setup()
+    const onVisibilityChange = jest.fn()
+    render(
+      <ChatInput
+        onSend={jest.fn()}
+        onUploadDocument={jest.fn()}
+        userType="admin"
+        visibility="company"
+        onVisibilityChange={onVisibilityChange}
+      />
+    )
+
+    await user.click(
+      screen.getByRole('button', { name: 'Chat visibility: Company' })
+    )
+    await user.click(screen.getByText('Admins only'))
+
+    expect(onVisibilityChange).toHaveBeenCalledWith('admins')
+  })
 })

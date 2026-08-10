@@ -1,5 +1,5 @@
 import { ApiError } from '@/lib/api/errors'
-import type { UserType } from '@/types/database'
+import type { ConversationVisibility, UserType } from '@/types/database'
 
 export type ValidationResult<T> =
   | { success: true; data: T }
@@ -69,6 +69,7 @@ export interface ChatMessagePayload {
 
 export interface ChatPayload {
   conversationId?: string
+  visibility?: ConversationVisibility
   messages: ChatMessagePayload[]
 }
 
@@ -177,6 +178,7 @@ export function validateChatPayload(payload: unknown): ValidationResult<ChatPayl
   const input = typeof payload === 'object' && payload !== null ? payload : {}
   const rawMessages = Reflect.get(input, 'messages')
   const rawConversationId = Reflect.get(input, 'conversationId')
+  const rawVisibility = Reflect.get(input, 'visibility')
 
   // Reject early if the caller sends the wrong top-level shape.
   if (!Array.isArray(rawMessages)) {
@@ -237,6 +239,15 @@ export function validateChatPayload(payload: unknown): ValidationResult<ChatPayl
     details.conversationId = 'conversationId must be a non-empty string.'
   }
 
+  if (
+    rawVisibility !== undefined &&
+    rawVisibility !== 'private' &&
+    rawVisibility !== 'company' &&
+    rawVisibility !== 'admins'
+  ) {
+    details.visibility = 'visibility must be private, company, or admins.'
+  }
+
   if (Object.keys(details).length > 0) {
     return {
       success: false,
@@ -249,6 +260,11 @@ export function validateChatPayload(payload: unknown): ValidationResult<ChatPayl
     data: {
       ...(typeof rawConversationId === 'string' && rawConversationId.trim()
         ? { conversationId: rawConversationId.trim() }
+        : {}),
+      ...(rawVisibility === 'private' ||
+      rawVisibility === 'company' ||
+      rawVisibility === 'admins'
+        ? { visibility: rawVisibility }
         : {}),
       messages,
     },

@@ -4,6 +4,7 @@ import { createAdminSupabaseClient } from '@/lib/supabase'
 import type {
   Conversation,
   ConversationMessage,
+  ConversationVisibility,
 } from '@/types/database'
 import { createConversationTitle } from '@/lib/chat/conversation-title'
 import { parseGenUiPlan } from '@/lib/gen-ui/schema'
@@ -20,10 +21,19 @@ export interface ConversationPayloadMessage extends ChatMessagePayload {
 export async function getOrCreateConversation(
   userId: string,
   conversationId: string | undefined,
-  firstUserMessage: string
+  firstUserMessage: string,
+  visibility: ConversationVisibility = 'company'
 ) {
   const supabase = createAdminSupabaseClient()
   const company = await getUserCompany(userId)
+
+  if (visibility === 'admins' && company.userType !== 'admin') {
+    throw new ApiError(
+      403,
+      'FORBIDDEN',
+      'Only company admins can create an admins-only conversation.'
+    )
+  }
 
   if (conversationId) {
     const { data, error } = await supabase
@@ -46,7 +56,7 @@ export async function getOrCreateConversation(
     .insert({
       user_id: userId,
       company_id: company.id,
-      visibility: 'company',
+      visibility,
       title: createConversationTitle(firstUserMessage),
     })
     .select(CONVERSATION_COLUMNS)
@@ -128,7 +138,11 @@ export async function listUserConversations(userId: string) {
     .from('conversations')
     .select(CONVERSATION_COLUMNS)
     .eq('company_id', company.id)
-    .eq('visibility', 'company')
+    .or(
+      company.userType === 'admin'
+        ? `user_id.eq.${userId},visibility.in.(company,admins)`
+        : `user_id.eq.${userId},visibility.eq.company`
+    )
     .order('updated_at', { ascending: false })
 
   if (error) {
@@ -153,7 +167,11 @@ export async function getCompanyConversation(
     .select(CONVERSATION_COLUMNS)
     .eq('id', conversationId)
     .eq('company_id', company.id)
-    .eq('visibility', 'company')
+    .or(
+      company.userType === 'admin'
+        ? `user_id.eq.${userId},visibility.in.(company,admins)`
+        : `user_id.eq.${userId},visibility.eq.company`
+    )
     .single()
 
   if (error || !data) {
@@ -182,6 +200,41 @@ export async function renameConversation(
 
   if (error || !data) {
     throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to rename conversation.')
+  }
+
+  return data as Conversation
+}
+
+export async function updateConversationVisibility(
+  conversationId: string,
+  userId: string,
+  visibility: ConversationVisibility
+) {
+  const supabase = createAdminSupabaseClient()
+  const company = await getUserCompany(userId)
+
+  if (visibility === 'admins' && company.userType !== 'admin') {
+    throw new ApiError(
+      403,
+      'FORBIDDEN',
+      'Only company admins can use admins-only visibility.'
+    )
+  }
+
+  const { data, error } = await supabase
+    .from('conversations')
+    .update({
+      visibility,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', conversationId)
+    .eq('user_id', userId)
+    .eq('company_id', company.id)
+    .select(CONVERSATION_COLUMNS)
+    .single()
+
+  if (error || !data) {
+    throw new ApiError(404, 'NOT_FOUND', 'Conversation not found.')
   }
 
   return data as Conversation

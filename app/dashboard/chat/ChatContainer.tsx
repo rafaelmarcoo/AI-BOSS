@@ -19,12 +19,20 @@ import type {
   DocumentSummaryView,
 } from "./types";
 import { dashboardTokens } from "@/app/theme";
+import type {
+  ConversationVisibility,
+  UserType,
+} from "@/types/database";
 
 interface ChatContainerProps {
   fullName: string | null;
   email: string;
+  userType: UserType | null;
   activeConversationTitle: string | null;
   readOnly: boolean;
+  visibility: ConversationVisibility;
+  visibilityLocked: boolean;
+  onVisibilityChange: (visibility: ConversationVisibility) => void;
   conversationMessages: ChatRecord[];
   documents: DocumentSummaryView[];
   documentsLoading: boolean;
@@ -52,8 +60,12 @@ function createStarterMessages(fullName: string | null, email: string): ChatReco
 export function ChatContainer({
   fullName,
   email,
+  userType,
   activeConversationTitle,
   readOnly,
+  visibility,
+  visibilityLocked,
+  onVisibilityChange,
   conversationMessages,
   documents,
   documentsLoading,
@@ -226,6 +238,10 @@ export function ChatContainer({
             <ChatInput
               onSend={(value) => void onSendMessage(value)}
               onUploadDocument={onUploadDocument}
+              userType={userType}
+              visibility={visibility}
+              visibilityDisabled={visibilityLocked}
+              onVisibilityChange={onVisibilityChange}
               disabled={loading}
               uploadDisabled={uploading}
             />

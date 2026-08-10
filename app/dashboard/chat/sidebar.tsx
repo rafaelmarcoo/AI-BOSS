@@ -29,6 +29,7 @@ import { ChatContainer } from "./ChatContainer";
 import { useChatConversation } from "./useChatConversation";
 import { useDocuments } from "./useDocuments";
 import type { GenUiPlan } from "@/lib/gen-ui/types";
+import type { UserType } from "@/types/database";
 
 interface SelectionChatPrompt {
   id: string;
@@ -38,6 +39,7 @@ interface SelectionChatPrompt {
 interface ChatSidebarProps {
   fullName: string | null;
   email: string;
+  userType: UserType | null;
   initialConversationId?: string | null;
   initialMessage?: string | null;
   onDocumentsProcessed?: () => void;
@@ -50,6 +52,7 @@ interface ChatSidebarProps {
 export function ChatSidebar({
   fullName,
   email,
+  userType,
   initialConversationId = null,
   initialMessage = null,
   onDocumentsProcessed,
@@ -76,6 +79,8 @@ export function ChatSidebar({
   const {
     conversationId,
     isReadOnly,
+    visibility,
+    changeVisibility,
     conversationMessages,
     loading,
     error,
@@ -244,8 +249,14 @@ export function ChatSidebar({
         <ChatContainer
           fullName={fullName}
           email={email}
+          userType={userType}
           activeConversationTitle={activeConversation?.title ?? null}
           readOnly={isReadOnly}
+          visibility={visibility}
+          visibilityLocked={isReadOnly}
+          onVisibilityChange={(nextVisibility) => {
+            void changeVisibility(nextVisibility).catch(() => undefined)
+          }}
           conversationMessages={conversationMessages}
           documents={documents}
           documentsLoading={documentsLoading}
@@ -399,7 +410,14 @@ export function ChatSidebar({
                         primary={conversation.title ?? "Untitled conversation"}
                         secondary={new Date(
                           conversation.updated_at,
-                        ).toLocaleString() + (conversation.isOwner ? "" : " · Company chat")}
+                        ).toLocaleString() +
+                          (conversation.visibility === "private"
+                            ? " · Private"
+                            : conversation.visibility === "admins"
+                              ? " · Admins"
+                              : conversation.isOwner
+                                ? ""
+                                : " · Company chat")}
                         primaryTypographyProps={{
                           color: "common.white",
                           fontSize: 14,

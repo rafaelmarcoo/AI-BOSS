@@ -1,4 +1,4 @@
-import { validateSignUpPayload } from '@/lib/api/validation'
+import { validateChatPayload, validateSignUpPayload } from '@/lib/api/validation'
 
 describe('validateSignUpPayload', () => {
   const basePayload = {
@@ -31,6 +31,27 @@ describe('validateSignUpPayload', () => {
     ).toEqual({
       success: false,
       details: { companyName: 'companyName is required.' },
+    })
+  })
+})
+
+describe('validateChatPayload visibility', () => {
+  const messages = [{ role: 'user', content: 'Show my runway' }]
+
+  it.each(['private', 'company', 'admins'] as const)(
+    'accepts %s conversation visibility',
+    (visibility) => {
+      expect(validateChatPayload({ messages, visibility })).toMatchObject({
+        success: true,
+        data: { visibility },
+      })
+    }
+  )
+
+  it('rejects an unsupported visibility mode', () => {
+    expect(validateChatPayload({ messages, visibility: 'public' })).toEqual({
+      success: false,
+      details: { visibility: 'visibility must be private, company, or admins.' },
     })
   })
 })

@@ -3,6 +3,7 @@ import type { FinancialMetricSourceType } from '@/lib/financial-data/types'
 import type { GenUiPlan } from '@/lib/gen-ui/types'
 
 export type UserType = 'admin' | 'employee'
+export type ConversationVisibility = 'private' | 'company' | 'admins'
 
 export interface User {
   id: string
@@ -38,7 +39,7 @@ export interface Conversation {
   id: string
   user_id: string
   company_id: string
-  visibility: 'company' | 'private'
+  visibility: ConversationVisibility
   title: string | null
   created_at: string
   updated_at: string

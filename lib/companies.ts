@@ -39,7 +39,7 @@ export async function getUserCompany(userId: string) {
   const admin = createAdminSupabaseClient()
   const { data: profile, error: profileError } = await admin
     .from('users')
-    .select('company_name')
+    .select('company_name, user_type')
     .eq('id', userId)
     .single()
 
@@ -59,5 +59,9 @@ export async function getUserCompany(userId: string) {
     throw new ApiError(403, 'FORBIDDEN', 'Your company could not be found.')
   }
 
-  return company as { id: string; name: string }
+  return {
+    id: company.id as string,
+    name: company.name as string,
+    userType: profile.user_type as 'admin' | 'employee' | null,
+  }
 }

@@ -8,10 +8,12 @@ import { ChatSidebar } from "./chat/sidebar";
 import { RunwaySection } from "./runway";
 import type { CompleteFinancialMetricSet } from "@/lib/financial-data";
 import type { GenUiPlan } from "@/lib/gen-ui/types";
+import type { UserType } from "@/types/database";
 
 interface ResizablePanelsProps {
   fullName: string | null;
   email: string;
+  userType: UserType | null;
   metrics: CompleteFinancialMetricSet;
   initialConversationId?: string | null;
   initialMessage?: string | null;
@@ -32,6 +34,7 @@ const RESIZER_WIDTH = 12;
 export function ResizablePanels({
   fullName,
   email,
+  userType,
   metrics,
   initialConversationId = null,
   initialMessage = null,
@@ -119,6 +122,7 @@ export function ResizablePanels({
         <ChatSidebar
           fullName={fullName}
           email={email}
+          userType={userType}
           initialConversationId={initialConversationId}
           initialMessage={initialMessage}
           onDocumentsProcessed={() => router.refresh()}

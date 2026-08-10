@@ -8,7 +8,8 @@
 
 ## Overview
 
-The database now consists of 11 main tables:
+The database now consists of 12 main tables:
+- **companies** - Company identities used as shared-data access boundaries
 - **users** - User profiles (extends Supabase Auth)
 - **conversations** - User-owned chat threads
 - **conversation_messages** - Individual chat messages inside a thread
@@ -33,6 +34,18 @@ The database now consists of 11 main tables:
 
 ## Tables
 
+### Companies
+
+Canonical company records used to scope shared conversation access.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID (PK) | Company identifier |
+| name | TEXT | Company display name |
+| created_by | UUID (FK) | User who created the company |
+| created_at | TIMESTAMP | Company creation time |
+| updated_at | TIMESTAMP | Last company update |
+
 ### 1. users
 
 Extends Supabase Auth with additional profile information.
@@ -43,6 +56,7 @@ Extends Supabase Auth with additional profile information.
 | email | TEXT | User email (from auth) |
 | full_name | TEXT | User's full name |
 | company_name | TEXT | User's company name |
+| user_type | TEXT | User role: `admin` or `employee` |
 | created_at | TIMESTAMP | Account creation time |
 | updated_at | TIMESTAMP | Last profile update |
 
@@ -59,12 +73,17 @@ Stores chat threads so each user can keep a real message history.
 |--------|------|-------------|
 | id | UUID (PK) | Primary key |
 | user_id | UUID (FK) | References users(id) |
+| company_id | UUID (FK) | References companies(id); company access boundary |
 | title | TEXT | Optional conversation title |
+| visibility | TEXT | `private`, `company` (default), or `admins` |
 | created_at | TIMESTAMP | Conversation creation time |
 | updated_at | TIMESTAMP | Last message/update time |
 
 **RLS Policies:**
-- Users can view, insert, update, and delete their own conversations only
+- Company members can view company-visible conversations and messages
+- Admins can view admins-only conversations from their company
+- Private conversations are visible only to their owner
+- Only conversation owners can insert, update, or delete their conversations
 
 **Indexes:**
 - `idx_conversations_user_id` on user_id
@@ -364,6 +383,7 @@ one source/period, rather than a wide snapshot of all metrics.
 ## Relationships
 ```
 users (1) ──< (many) conversations
+companies (1) ──< (many) conversations
 conversations (1) ──< (many) conversation_messages
 users (1) ──< (many) policy_rules
 users (1) ──< (many) decision_log
@@ -390,6 +410,10 @@ All schema changes are tracked in `db/migrations/`:
 - `006_financial_metric_observations.sql` - Adds source-aware normalized financial metric observation storage
 - `007_drop_financial_snapshots.sql` - Drops the legacy financial snapshots table
 - `008_accounting_oauth_tokens.sql` - Adds provider-neutral OAuth tokens and drops the Xero-specific credential table
+- `009_conversation_message_ui_payload.sql` - Adds validated Gen UI payloads to assistant messages
+- `010_add_user_type.sql` - Adds admin/employee roles used by company signup and joining
+- `011_company_chat_visibility.sql` - Adds company-scoped conversation history and message read access
+- `012_conversation_visibility_modes.sql` - Adds private, company, and admins-only conversation visibility
 
 ---
 

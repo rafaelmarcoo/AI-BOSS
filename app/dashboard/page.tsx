@@ -75,6 +75,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       <ResizablePanels
         fullName={profile.full_name}
         email={profile.email}
+        userType={profile.user_type}
         metrics={metrics}
         initialConversationId={normalizeSearchParam(params?.conversationId)}
         initialMessage={normalizeSearchParam(params?.initialMessage)}

@@ -13,11 +13,13 @@ import {
   listConversationMessages,
   mapConversationMessagesToPayload,
 } from '@/lib/chat/persistence'
+import type { ConversationVisibility } from '@/types/database'
 
 export async function generateChatResponse(
   userId: string,
   messages: ChatMessagePayload[],
-  conversationId?: string
+  conversationId?: string,
+  visibility: ConversationVisibility = 'company'
 ) {
   const startedAt = Date.now()
   const latestUserMessage = [...messages]
@@ -35,7 +37,8 @@ export async function generateChatResponse(
   const conversation = await getOrCreateConversation(
     userId,
     conversationId,
-    latestUserMessage.content
+    latestUserMessage.content,
+    visibility
   )
 
   await insertConversationMessage({
@@ -95,6 +98,7 @@ export async function generateChatResponse(
 
   return {
     conversationId: conversation.id,
+    visibility: conversation.visibility,
     message: {
       role: 'assistant' as const,
       content: agentResponse.content,

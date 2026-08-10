@@ -65,7 +65,7 @@ export async function getCurrentUserProfile(accessToken: string) {
   const admin = createAdminSupabaseClient()
   const { data: profile, error } = await admin
     .from('users')
-    .select('id, email, full_name, company_name, created_at, updated_at')
+    .select('id, email, full_name, company_name, user_type, created_at, updated_at')
     .eq('id', user.id)
     .single()
 

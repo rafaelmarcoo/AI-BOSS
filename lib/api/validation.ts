@@ -1,4 +1,5 @@
 import { ApiError } from '@/lib/api/errors'
+import type { ConversationVisibility, UserType } from '@/types/database'
 
 export type ValidationResult<T> =
   | { success: true; data: T }
@@ -49,7 +50,8 @@ export interface SignUpPayload {
   email: string
   password: string
   fullName?: string
-  companyName?: string
+  companyName: string
+  userType: UserType
 }
 
 export interface SignInPayload {
@@ -67,6 +69,7 @@ export interface ChatMessagePayload {
 
 export interface ChatPayload {
   conversationId?: string
+  visibility?: ConversationVisibility
   messages: ChatMessagePayload[]
 }
 
@@ -85,7 +88,12 @@ export function validateSignUpPayload(payload: unknown): ValidationResult<SignUp
     details
   )
   const fullName = Reflect.get(input, 'fullName')
-  const companyName = Reflect.get(input, 'companyName')
+  const companyName = readTrimmedString(
+    Reflect.get(input, 'companyName'),
+    'companyName',
+    details
+  )
+  const userType = Reflect.get(input, 'userType')
 
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     details.email = 'email must be a valid email address.'
@@ -99,11 +107,17 @@ export function validateSignUpPayload(payload: unknown): ValidationResult<SignUp
     details.fullName = 'fullName must be a string.'
   }
 
-  if (companyName !== undefined && typeof companyName !== 'string') {
-    details.companyName = 'companyName must be a string.'
+  if (userType !== 'admin' && userType !== 'employee') {
+    details.userType = 'userType must be either "admin" or "employee".'
   }
 
-  if (Object.keys(details).length > 0 || !email || !password) {
+  if (
+    Object.keys(details).length > 0 ||
+    !email ||
+    !password ||
+    !companyName ||
+    (userType !== 'admin' && userType !== 'employee')
+  ) {
     return {
       success: false,
       details,
@@ -115,11 +129,10 @@ export function validateSignUpPayload(payload: unknown): ValidationResult<SignUp
     data: {
       email: email.toLowerCase(),
       password,
+      companyName,
+      userType,
       ...(typeof fullName === 'string' && fullName.trim()
         ? { fullName: fullName.trim() }
-        : {}),
-      ...(typeof companyName === 'string' && companyName.trim()
-        ? { companyName: companyName.trim() }
         : {}),
     },
   }
@@ -165,6 +178,7 @@ export function validateChatPayload(payload: unknown): ValidationResult<ChatPayl
   const input = typeof payload === 'object' && payload !== null ? payload : {}
   const rawMessages = Reflect.get(input, 'messages')
   const rawConversationId = Reflect.get(input, 'conversationId')
+  const rawVisibility = Reflect.get(input, 'visibility')
 
   // Reject early if the caller sends the wrong top-level shape.
   if (!Array.isArray(rawMessages)) {
@@ -225,6 +239,15 @@ export function validateChatPayload(payload: unknown): ValidationResult<ChatPayl
     details.conversationId = 'conversationId must be a non-empty string.'
   }
 
+  if (
+    rawVisibility !== undefined &&
+    rawVisibility !== 'private' &&
+    rawVisibility !== 'company' &&
+    rawVisibility !== 'admins'
+  ) {
+    details.visibility = 'visibility must be private, company, or admins.'
+  }
+
   if (Object.keys(details).length > 0) {
     return {
       success: false,
@@ -237,6 +260,11 @@ export function validateChatPayload(payload: unknown): ValidationResult<ChatPayl
     data: {
       ...(typeof rawConversationId === 'string' && rawConversationId.trim()
         ? { conversationId: rawConversationId.trim() }
+        : {}),
+      ...(rawVisibility === 'private' ||
+      rawVisibility === 'company' ||
+      rawVisibility === 'admins'
+        ? { visibility: rawVisibility }
         : {}),
       messages,
     },

@@ -9,7 +9,7 @@
     "lint": "eslint",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
-    "test:agent": "node --env-file=.env.local --import=tsx scripts/test-agent.ts"
+    "test:agent": "node --env-file=.env.local --import=tsx Scripts/test-agent.ts"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

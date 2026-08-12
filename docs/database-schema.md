@@ -2,23 +2,23 @@
 
 **Database:** Supabase (PostgreSQL)  
 **Created:** March 22, 2025  
-**Last Updated:** May 12, 2026
+**Last Updated:** May 18, 2026
 
 ---
 
 ## Overview
 
 The database now consists of 12 main tables:
+- **companies** - Company identities used as shared-data access boundaries
 - **users** - User profiles (extends Supabase Auth)
 - **conversations** - User-owned chat threads
 - **conversation_messages** - Individual chat messages inside a thread
-- **financial_snapshots** - Legacy point-in-time financial data snapshots
 - **policy_rules** - Business rules and compliance policies
 - **decision_log** - Audit trail of AI actions, tool usage, retrieval, and calculations
 - **documents** - Uploaded user files stored in Supabase Storage
 - **document_chunks** - Chunked document content used for semantic retrieval
 - **data_connections** - Provider-neutral registry for user financial data sources
-- **xero_connections** - Xero-specific encrypted OAuth credential/details table
+- **oauth_tokens** - Provider-neutral encrypted OAuth credential/details table
 - **oauth_connection_states** - Temporary OAuth state values used for CSRF protection
 - **financial_metric_observations** - Source-aware normalized financial metric values
 
@@ -34,6 +34,21 @@ The database now consists of 12 main tables:
 
 ## Tables
 
+### Companies
+
+Canonical company records used to scope shared conversation access.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID (PK) | Company identifier |
+| name | TEXT | Company display name |
+| created_by | UUID (FK) | User who created the company |
+| created_at | TIMESTAMP | Company creation time |
+| updated_at | TIMESTAMP | Last company update |
+
+**Integrity rules:**
+- Company names are unique after trimming and case normalization, so a company cannot be duplicated with different casing.
+
 ### 1. users
 
 Extends Supabase Auth with additional profile information.
@@ -44,6 +59,7 @@ Extends Supabase Auth with additional profile information.
 | email | TEXT | User email (from auth) |
 | full_name | TEXT | User's full name |
 | company_name | TEXT | User's company name |
+| user_type | TEXT | User role: `admin` or `employee` |
 | created_at | TIMESTAMP | Account creation time |
 | updated_at | TIMESTAMP | Last profile update |
 
@@ -60,12 +76,17 @@ Stores chat threads so each user can keep a real message history.
 |--------|------|-------------|
 | id | UUID (PK) | Primary key |
 | user_id | UUID (FK) | References users(id) |
+| company_id | UUID (FK) | References companies(id); company access boundary |
 | title | TEXT | Optional conversation title |
+| visibility | TEXT | `private`, `company` (default), or `admins` |
 | created_at | TIMESTAMP | Conversation creation time |
 | updated_at | TIMESTAMP | Last message/update time |
 
 **RLS Policies:**
-- Users can view, insert, update, and delete their own conversations only
+- Company members can view company-visible conversations and messages
+- Admins can view admins-only conversations from their company
+- Private conversations are visible only to their owner
+- Only conversation owners can insert, update, or delete their conversations
 
 **Indexes:**
 - `idx_conversations_user_id` on user_id
@@ -85,6 +106,7 @@ Stores the actual user/assistant transcript for each conversation.
 | role | TEXT | `user` or `assistant` |
 | content | TEXT | Message text |
 | citations | JSONB | Optional RAG citations shown with the message |
+| ui_payload | JSONB | Optional validated Gen UI plan rendered in the dashboard for this assistant turn |
 | created_at | TIMESTAMP | Message creation time |
 
 **RLS Policies:**
@@ -96,38 +118,7 @@ Stores the actual user/assistant transcript for each conversation.
 
 ---
 
-### 4. financial_snapshots
-
-Legacy table for financial data snapshots from Xero (or manual entry). New
-source-aware dashboard, tool, and agent workflows should use
-`financial_metric_observations` instead.
-
-| Column | Type | Description |
-|--------|------|-------------|
-| id | UUID (PK) | Primary key |
-| user_id | UUID (FK) | References users(id) |
-| snapshot_date | TIMESTAMP | When snapshot was taken |
-| cash_balance | DECIMAL(12,2) | Current cash on hand |
-| accounts_receivable | DECIMAL(12,2) | Money owed to business (AR) |
-| accounts_payable | DECIMAL(12,2) | Money business owes (AP) |
-| monthly_revenue | DECIMAL(12,2) | Revenue this month |
-| monthly_expenses | DECIMAL(12,2) | Expenses this month |
-| burn_rate | DECIMAL(12,2) | Monthly cash burn |
-| runway_months | DECIMAL(5,2) | Calculated runway |
-| data_source | TEXT | 'xero' or 'manual' |
-| raw_data | JSONB | Full Xero API response |
-| created_at | TIMESTAMP | Record creation time |
-
-**RLS Policies:**
-- Users can view, insert, update, and delete their own snapshots only
-
-**Indexes:**
-- `idx_financial_snapshots_user_id` on user_id
-- `idx_financial_snapshots_date` on snapshot_date (DESC)
-
----
-
-### 5. policy_rules
+### 4. policy_rules
 
 Business rules and compliance policies set by the user.
 
@@ -161,7 +152,7 @@ Business rules and compliance policies set by the user.
 
 ---
 
-### 6. decision_log
+### 5. decision_log
 
 Audit trail of every AI interaction and system action. This is no longer the
 source of truth for chat history. Chat messages now live in
@@ -210,7 +201,7 @@ assistant turn.
 
 ---
 
-### 7. documents
+### 6. documents
 
 Stores uploaded user files and their ingestion state.
 
@@ -240,9 +231,12 @@ Stores uploaded user files and their ingestion state.
 - `idx_documents_status` on status
 - `idx_documents_created_at` on created_at (DESC)
 
+**Deletion behaviour:**
+- The server-only `delete_owned_document_and_derived_metrics(document_id, user_id)` function removes a user's document and every financial metric observation derived from it in one database transaction. Its RAG chunks are removed by the document foreign-key cascade. The file itself is removed from private Supabase Storage immediately before this transaction.
+
 ---
 
-### 8. document_chunks
+### 7. document_chunks
 
 Stores chunked document content and embeddings for semantic retrieval.
 
@@ -268,17 +262,16 @@ Stores chunked document content and embeddings for semantic retrieval.
 
 ---
 
-### 9. data_connections
+### 8. data_connections
 
 Provider-neutral registry for all financial data sources a user has connected,
-uploaded, or made available. Provider-specific credential tables link back to
-this table.
+uploaded, or made available. OAuth credential rows link back to this table.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID (PK) | Primary key |
 | user_id | UUID (FK) | References users(id) |
-| provider | TEXT | `xero`, `csv`, `pdf`, `manual`, or `demo` |
+| provider | TEXT | `xero`, `quickbooks`, `freshbooks`, `myob`, `csv`, `pdf`, `manual`, or `demo` |
 | status | TEXT | `connected`, `disconnected`, `available`, or `error` |
 | display_name | TEXT | User-facing source name |
 | source_label | TEXT | Short provider/source label |
@@ -300,36 +293,37 @@ this table.
 
 ---
 
-### 10. xero_connections
+### 9. oauth_tokens
 
-Stores Xero-specific tenant details and OAuth credentials. This table links to
-`data_connections`, which is the source of truth for user-visible connection
-state. Tokens are encrypted with AES-GCM before storage and are only decrypted
-server-side when calling Xero or revoking a connection.
+Stores provider-neutral tenant details and OAuth credentials for accounting
+providers. This table links to `data_connections`, which is the source of truth
+for user-visible connection state. Tokens are encrypted with AES-GCM before
+storage and are only decrypted server-side when calling or revoking a provider.
 
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID (PK) | Primary key |
 | connection_id | UUID (FK) | References data_connections(id), unique |
-| user_id | UUID (FK) | Legacy owner reference kept for compatibility |
-| tenant_id | TEXT | Xero organisation ID |
-| tenant_name | TEXT | Xero organisation display name |
-| access_token_enc | TEXT | Encrypted Xero access token |
-| refresh_token_enc | TEXT | Encrypted Xero refresh token |
+| user_id | UUID (FK) | References users(id) |
+| provider | TEXT | `xero`, `quickbooks`, `freshbooks`, or `myob` |
+| tenant_id | TEXT | Provider tenant/company/organisation ID |
+| tenant_name | TEXT | Provider tenant/company/organisation display name |
+| access_token_enc | TEXT | Encrypted provider access token |
+| refresh_token_enc | TEXT | Encrypted provider refresh token |
 | expires_at | TIMESTAMP | Access token expiry |
-| connected_at | TIMESTAMP | Time the user connected Xero |
+| connected_at | TIMESTAMP | Time the user connected the provider |
 | updated_at | TIMESTAMP | Last token refresh or connection update |
 
 **RLS Policies:**
-- Users can view, insert, update, and delete their own Xero connection only
+- Users can view, insert, update, and delete their own OAuth tokens only
 
 **Indexes:**
-- `idx_xero_connections_user_id` on user_id
-- `idx_xero_connections_connection_id` on connection_id
+- `idx_oauth_tokens_user_provider` on (user_id, provider)
+- `idx_oauth_tokens_connection_id` on connection_id
 
 ---
 
-### 11. oauth_connection_states
+### 10. oauth_connection_states
 
 Stores short-lived state values during OAuth redirect flows. A state row is
 created when the user starts connecting an OAuth provider and deleted after
@@ -339,7 +333,7 @@ callback validation.
 |--------|------|-------------|
 | id | UUID (PK) | Primary key |
 | user_id | UUID (FK) | References users(id), unique per user |
-| provider | TEXT | OAuth provider, currently `xero` |
+| provider | TEXT | OAuth provider such as `xero`, `quickbooks`, `freshbooks`, or `myob` |
 | state | TEXT | Random OAuth state value used for CSRF protection |
 | redirect_path | TEXT | Path to return to after OAuth completes |
 | created_at | TIMESTAMP | State creation time |
@@ -353,7 +347,7 @@ callback validation.
 
 ---
 
-### 12. financial_metric_observations
+### 11. financial_metric_observations
 
 Stores normalized financial metric values from Xero, uploaded documents, manual
 inputs, and demo data. This table is the long-term source of truth for
@@ -372,7 +366,7 @@ one source/period, rather than a wide snapshot of all metrics.
 | period_start | DATE | Optional period start for period-based metrics |
 | period_end | DATE | Optional period end for period-based metrics |
 | as_of_date | DATE | Optional point-in-time date for balance metrics |
-| source_type | TEXT | `xero`, `document`, `manual`, or `demo` |
+| source_type | TEXT | `xero`, `quickbooks`, `freshbooks`, `myob`, `document`, `manual`, or `demo` |
 | source_label | TEXT | User-facing source label |
 | confidence | NUMERIC(4,3) | Confidence score from 0 to 1 |
 | evidence | JSONB | Evidence reference such as document page, row range, chunk, URL, or excerpt |
@@ -395,14 +389,14 @@ one source/period, rather than a wide snapshot of all metrics.
 ## Relationships
 ```
 users (1) ──< (many) conversations
+companies (1) ──< (many) conversations
 conversations (1) ──< (many) conversation_messages
-users (1) ──< (many) financial_snapshots [legacy]
 users (1) ──< (many) policy_rules
 users (1) ──< (many) decision_log
 users (1) ──< (many) documents
 documents (1) ──< (many) document_chunks
 users (1) ──< (many) data_connections
-data_connections (1) ──< (one) xero_connections
+data_connections (1) ──< (one) oauth_tokens
 users (1) ──< (many) oauth_connection_states
 users (1) ──< (many) financial_metric_observations
 data_connections (1) ──< (many) financial_metric_observations
@@ -420,20 +414,19 @@ All schema changes are tracked in `db/migrations/`:
 - `004_xero_oauth.sql` - Adds encrypted Xero OAuth connections and temporary OAuth states
 - `005_data_connections_foundation.sql` - Adds provider-neutral data connections, generic OAuth states, links Xero credentials, and drops the old Xero-only OAuth state table
 - `006_financial_metric_observations.sql` - Adds source-aware normalized financial metric observation storage
+- `007_drop_financial_snapshots.sql` - Drops the legacy financial snapshots table
+- `008_accounting_oauth_tokens.sql` - Adds provider-neutral OAuth tokens and drops the Xero-specific credential table
+- `009_conversation_message_ui_payload.sql` - Adds validated Gen UI payloads to assistant messages
+- `013_delete_document_and_derived_metrics.sql` - Adds atomic owner-only cleanup of a document and its document-derived financial observations
+- `010_add_user_type.sql` - Adds admin/employee roles used by company signup and joining; existing company accounts are backfilled as admins
+- `011_company_chat_visibility.sql` - Adds company-scoped conversation history and message read access
+- `012_conversation_visibility_modes.sql` - Adds private, company, and admins-only conversation visibility
 
 ---
 
 ## Access Patterns
 
 ### Common Queries
-
-**Get latest financial snapshot:**
-```sql
-SELECT * FROM financial_snapshots
-WHERE user_id = $1
-ORDER BY snapshot_date DESC
-LIMIT 1;
-```
 
 **Get latest available value for each metric key:**
 ```sql
@@ -480,8 +473,7 @@ Planned for Sprint 2+:
 - **scenarios** table - Store "what-if" scenario configurations
 - **forecasts** table - Store AI-generated forecasts
 - **document extraction pipeline** - Promote uploaded document data into structured financial metric observations
-- **financial_snapshots deprecation** - Stop writing legacy snapshots once metric observations cover dashboard/tool use cases
 
 ---
 
-**Last Updated:** May 12, 2026 by Rafael Manubay
+**Last Updated:** May 18, 2026 by Rafael Manubay

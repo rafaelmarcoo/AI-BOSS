@@ -1,29 +1,26 @@
 import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
 import type { FinancialMetricSourceType } from '@/lib/financial-data/types'
+import type { GenUiPlan } from '@/lib/gen-ui/types'
+
+export type UserType = 'admin' | 'employee'
+export type ConversationVisibility = 'private' | 'company' | 'admins'
 
 export interface User {
   id: string
   email: string
   full_name: string | null
   company_name: string | null
+  user_type: UserType | null
   created_at: string
   updated_at: string
 }
 
-export interface FinancialSnapshot {
+export interface Company {
   id: string
-  user_id: string
-  snapshot_date: string
-  cash_balance: number
-  accounts_receivable: number
-  accounts_payable: number
-  monthly_revenue: number
-  monthly_expenses: number
-  burn_rate: number | null
-  runway_months: number | null
-  data_source: 'xero' | 'manual'
-  raw_data: unknown
+  name: string
+  created_by: string | null
   created_at: string
+  updated_at: string
 }
 
 export interface PolicyRule {
@@ -41,6 +38,8 @@ export interface PolicyRule {
 export interface Conversation {
   id: string
   user_id: string
+  company_id: string
+  visibility: ConversationVisibility
   title: string | null
   created_at: string
   updated_at: string
@@ -53,6 +52,7 @@ export interface ConversationMessage {
   role: 'user' | 'assistant'
   content: string
   citations: unknown
+  ui_payload: GenUiPlan | null
   created_at: string
 }
 
@@ -85,7 +85,18 @@ export interface DocumentChunk {
   created_at: string
 }
 
-export type DataConnectionProvider = 'xero' | 'csv' | 'pdf' | 'manual' | 'demo'
+/** Result returned by the server-only document cleanup database function. */
+export interface DocumentDeletionResult {
+  deleted: boolean
+}
+
+export type AccountingProvider = 'xero' | 'quickbooks' | 'freshbooks' | 'myob'
+export type DataConnectionProvider =
+  | AccountingProvider
+  | 'csv'
+  | 'pdf'
+  | 'manual'
+  | 'demo'
 export type DataConnectionStatus =
   | 'connected'
   | 'disconnected'
@@ -117,10 +128,11 @@ export interface OAuthConnectionState {
   created_at: string
 }
 
-export interface XeroConnection {
+export interface OAuthToken {
   id: string
   connection_id: string
   user_id: string
+  provider: AccountingProvider
   tenant_id: string
   tenant_name: string
   access_token_enc: string

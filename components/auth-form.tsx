@@ -2,22 +2,28 @@
 
 import NextLink from 'next/link'
 import { useRouter } from 'next/navigation'
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import {
   Alert,
   Button,
+  FormControl,
+  FormHelperText,
+  FormLabel,
   Link as MuiLink,
+  MenuItem,
   Paper,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material'
+import type { UserType } from '@/types/database'
 
 type Mode = 'sign-in' | 'sign-up'
 
 interface AuthFormProps {
   mode: Mode
-  redirectTo?: string
 }
 
 interface ApiErrorPayload {
@@ -28,15 +34,55 @@ interface ApiErrorPayload {
   }
 }
 
-function getRedirectTarget(redirectTo?: string) {
-  return redirectTo && redirectTo.startsWith('/') ? redirectTo : '/dashboard'
+interface CompaniesPayload {
+  success: true
+  data: { companies: string[] }
 }
 
-export function AuthForm({ mode, redirectTo }: AuthFormProps) {
+export function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [userType, setUserType] = useState<UserType | null>(null)
+  const [companies, setCompanies] = useState<string[]>([])
+  const [isLoadingCompanies, setIsLoadingCompanies] = useState(false)
+  const [companiesError, setCompaniesError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (mode !== 'sign-up' || userType !== 'employee') return
+
+    const controller = new AbortController()
+
+    async function loadCompanies() {
+      setIsLoadingCompanies(true)
+      setCompaniesError(null)
+
+      try {
+        const response = await fetch('/api/auth/companies', {
+          credentials: 'include',
+          signal: controller.signal,
+        })
+        const payload = (await response.json().catch(() => null)) as
+          | CompaniesPayload
+          | null
+
+        if (!response.ok || !payload?.success) {
+          throw new Error('Unable to load companies.')
+        }
+
+        setCompanies(payload.data.companies)
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return
+        setCompaniesError('Companies could not be loaded. Please try again.')
+      } finally {
+        if (!controller.signal.aborted) setIsLoadingCompanies(false)
+      }
+    }
+
+    void loadCompanies()
+    return () => controller.abort()
+  }, [mode, userType])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -52,6 +98,7 @@ export function AuthForm({ mode, redirectTo }: AuthFormProps) {
             password: String(formData.get('password') ?? ''),
             fullName: String(formData.get('fullName') ?? ''),
             companyName: String(formData.get('companyName') ?? ''),
+            userType: userType ?? '',
           }
         : {
             email: String(formData.get('email') ?? ''),
@@ -77,7 +124,7 @@ export function AuthForm({ mode, redirectTo }: AuthFormProps) {
       return
     }
 
-    router.push(getRedirectTarget(redirectTo))
+    router.replace('/landing')
     router.refresh()
   }
 
@@ -101,13 +148,16 @@ export function AuthForm({ mode, redirectTo }: AuthFormProps) {
     >
       <Stack spacing={3}>
         <Stack spacing={0.5}>
+          <Typography variant="overline" color="primary" fontWeight={700}>
+            AI-BOSS financial intelligence
+          </Typography>
           <Typography variant="h4" component="h1" fontWeight={600}>
-          {isSignUp ? 'Create your account' : 'Welcome back'}
+          {isSignUp ? 'Create your workspace account' : 'Welcome back'}
           </Typography>
           <Typography variant="body2" color="text.secondary">
           {isSignUp
-            ? 'Set up a secure account to start using AI-BOSS.'
-            : 'Sign in to access protected API routes and your dashboard.'}
+            ? 'Set up a secure account for clear, source-aware financial decisions.'
+            : 'Sign in to your AI-BOSS financial intelligence workspace.'}
           </Typography>
         </Stack>
 
@@ -126,16 +176,70 @@ export function AuthForm({ mode, redirectTo }: AuthFormProps) {
               helperText={fieldErrors.fullName ?? ' '}
             />
 
-            <TextField
-              name="companyName"
-              label="Company name"
-              type="text"
-              placeholder="Acme Ltd"
-              autoComplete="organization"
-              fullWidth
-              error={Boolean(fieldErrors.companyName)}
-              helperText={fieldErrors.companyName ?? ' '}
-            />
+            <FormControl error={Boolean(fieldErrors.userType)}>
+              <FormLabel id="user-type-label">How will you use AI-BOSS?</FormLabel>
+              <ToggleButtonGroup
+                aria-labelledby="user-type-label"
+                value={userType}
+                exclusive
+                fullWidth
+                onChange={(_, nextUserType: UserType | null) => {
+                  if (nextUserType) setUserType(nextUserType)
+                }}
+                sx={{ mt: 1 }}
+              >
+                <ToggleButton value="admin">Create a company</ToggleButton>
+                <ToggleButton value="employee">Join a company</ToggleButton>
+              </ToggleButtonGroup>
+              <FormHelperText>{fieldErrors.userType ?? ' '}</FormHelperText>
+            </FormControl>
+
+            {userType === 'admin' ? (
+              <TextField
+                name="companyName"
+                label="Company name"
+                type="text"
+                placeholder="Acme Ltd"
+                autoComplete="organization"
+                fullWidth
+                required
+                error={Boolean(fieldErrors.companyName)}
+                helperText={
+                  fieldErrors.companyName ?? 'This creates a company employees can join.'
+                }
+              />
+            ) : null}
+
+            {userType === 'employee' ? (
+              <Stack spacing={1}>
+                {companiesError ? <Alert severity="error">{companiesError}</Alert> : null}
+                {!isLoadingCompanies && !companiesError && companies.length === 0 ? (
+                  <Alert severity="info">
+                    No companies are available yet. An admin must create one first.
+                  </Alert>
+                ) : null}
+                <TextField
+                  name="companyName"
+                  label="Company"
+                  select
+                  defaultValue=""
+                  fullWidth
+                  required
+                  disabled={isLoadingCompanies || Boolean(companiesError)}
+                  error={Boolean(fieldErrors.companyName)}
+                  helperText={
+                    fieldErrors.companyName ??
+                    (isLoadingCompanies ? 'Loading companies...' : 'Choose the company you work for.')
+                  }
+                >
+                  {companies.map((companyName) => (
+                    <MenuItem key={companyName} value={companyName}>
+                      {companyName}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Stack>
+            ) : null}
           </Stack>
         ) : null}
 
@@ -150,6 +254,12 @@ export function AuthForm({ mode, redirectTo }: AuthFormProps) {
           error={Boolean(fieldErrors.email)}
           helperText={fieldErrors.email ?? ' '}
         />
+
+        {!isSignUp ? (
+          <MuiLink component={NextLink} href="/forgot-password" underline="hover" sx={{ alignSelf: "flex-start", fontSize: 14 }}>
+            Forgot password?
+          </MuiLink>
+        ) : null}
 
         <TextField
           name="password"
@@ -166,7 +276,10 @@ export function AuthForm({ mode, redirectTo }: AuthFormProps) {
         <Button
           type="submit"
           variant="contained"
-          disabled={isSubmitting}
+          disabled={
+            isSubmitting ||
+            (isSignUp && (!userType || isLoadingCompanies || Boolean(companiesError)))
+          }
           fullWidth
           sx={{
             py: 1.5,

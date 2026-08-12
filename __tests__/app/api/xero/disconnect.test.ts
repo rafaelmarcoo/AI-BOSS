@@ -42,11 +42,12 @@ function createMutation(result: unknown) {
   const mutation = {
     delete: jest.fn(),
     update: jest.fn(),
-    eq: jest.fn().mockResolvedValue(result),
+    eq: jest.fn(),
   }
 
   mutation.delete.mockReturnValue(mutation)
   mutation.update.mockReturnValue(mutation)
+  mutation.eq.mockReturnValueOnce(mutation).mockResolvedValue(result)
 
   return mutation
 }
@@ -97,11 +98,12 @@ describe('/api/xero/disconnect', () => {
 
     expect(response.status).toBe(200)
     expect(payload.data).toEqual({ disconnected: true })
-    expect(from).toHaveBeenNthCalledWith(3, 'xero_connections')
+    expect(from).toHaveBeenNthCalledWith(3, 'oauth_tokens')
     expect(deleteMutation.eq).toHaveBeenCalledWith(
       'connection_id',
       'connection-1'
     )
+    expect(deleteMutation.eq).toHaveBeenCalledWith('provider', 'xero')
     expect(from).toHaveBeenNthCalledWith(4, 'data_connections')
     expect(updateMutation.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -144,6 +146,7 @@ describe('/api/xero/disconnect', () => {
       'connection_id',
       'connection-1'
     )
+    expect(deleteMutation.eq).toHaveBeenCalledWith('provider', 'xero')
     expect(updateMutation.update).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'disconnected' })
     )

@@ -6,17 +6,20 @@ import { runAgent } from '@/lib/ai/agent'
 import { CHAT_MODEL } from '@/lib/chat/system-prompt'
 import { logChatDecision } from '@/lib/chat/log-chat-decision'
 import { buildChatContext } from '@/lib/chat/build-chat-context'
+import { planGenUi } from '@/lib/gen-ui/plan-gen-ui'
 import {
   getOrCreateConversation,
   insertConversationMessage,
   listConversationMessages,
   mapConversationMessagesToPayload,
 } from '@/lib/chat/persistence'
+import type { ConversationVisibility } from '@/types/database'
 
 export async function generateChatResponse(
   userId: string,
   messages: ChatMessagePayload[],
-  conversationId?: string
+  conversationId?: string,
+  visibility: ConversationVisibility = 'company'
 ) {
   const startedAt = Date.now()
   const latestUserMessage = [...messages]
@@ -34,7 +37,8 @@ export async function generateChatResponse(
   const conversation = await getOrCreateConversation(
     userId,
     conversationId,
-    latestUserMessage.content
+    latestUserMessage.content,
+    visibility
   )
 
   await insertConversationMessage({
@@ -60,12 +64,19 @@ export async function generateChatResponse(
     getAgentTools(userId),
     chatContext.messages
   )
+  const uiPlan = await planGenUi({
+    userId,
+    userMessage: latestUserMessage.content,
+    assistantMessage: agentResponse.content,
+    toolsUsed: agentResponse.toolsUsed,
+  })
 
   const savedAssistantMessage = await insertConversationMessage({
     conversationId: conversation.id,
     userId,
     role: 'assistant',
     content: agentResponse.content,
+    uiPayload: uiPlan,
   })
 
   const updatedConversationMessages = await listConversationMessages(
@@ -87,7 +98,13 @@ export async function generateChatResponse(
 
   return {
     conversationId: conversation.id,
-    message: { role: 'assistant' as const, content: agentResponse.content },
+    visibility: conversation.visibility,
+    message: {
+      role: 'assistant' as const,
+      content: agentResponse.content,
+      ui: uiPlan,
+    },
     conversation: mapConversationMessagesToPayload(updatedConversationMessages),
+    ui: uiPlan,
   }
 }

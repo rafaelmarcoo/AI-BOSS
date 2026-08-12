@@ -9,7 +9,14 @@ export async function GET(request: NextRequest) {
     const conversations = await listUserConversations(user.id)
 
     return successResponse({
-      conversations,
+      conversations: conversations.map((conversation) => ({
+        id: conversation.id,
+        title: conversation.title,
+        created_at: conversation.created_at,
+        updated_at: conversation.updated_at,
+        visibility: conversation.visibility,
+        isOwner: conversation.user_id === user.id,
+      })),
     })
   } catch (error) {
     return handleRouteError(error)

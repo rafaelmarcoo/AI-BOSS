@@ -1,0 +1,9 @@
+Table 1
+Account,Amount,Currency,Date
+Cash at bank,52000,NZD,2026-07-12
+Debtors,18000,NZD,2026-07-12
+Creditors,27000,NZD,2026-07-12
+Sales,58000,NZD,2026-06-30
+Operating expenses,76000,NZD,2026-06-30
+Monthly burn,42000,NZD,2026-06-30
+Runway months,1.0,,2026-07-12

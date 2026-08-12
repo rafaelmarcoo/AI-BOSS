@@ -1,5 +1,8 @@
 import { z } from 'zod'
-import { assessRunwayPolicy, RunwayPolicy } from '@/lib/calculations/runway-policy'
+import {
+  assessRunwayPolicy,
+  type RunwayPolicy,
+} from '@/lib/calculations/runway-policy'
 
 export const RunwayInputSchema = z.object({
   cash: z.number().nonnegative('Cash must be non-negative.'),

@@ -1,8 +1,9 @@
+"use client";
+
 import { Box, Button, Stack, Typography } from "@mui/material";
+import Link from "next/link";
 import { SignOutButton } from "@/components/sign-out-button";
 import { dashboardTokens } from "@/app/theme";
-
-const NAV_ITEMS = ["Data Connectors", "Scenarios", "Exports", "Settings"];
 
 export function DashboardHeader() {
   return (
@@ -33,11 +34,11 @@ export function DashboardHeader() {
           {/* Title — hide subtitle on small screens */}
           <Stack spacing={0.25}>
             <Typography
-              variant={{ xs: "h6", sm: "h4" } as any}
+              variant="h4"
               component="h1"
               fontWeight={700}
               color="common.white"
-              sx={{ fontSize: { xs: "1rem", sm: undefined } }}
+              sx={{ fontSize: { xs: "1rem", sm: "2.125rem" } }}
             >
               AI-BOSS
             </Typography>
@@ -53,6 +54,8 @@ export function DashboardHeader() {
           </Stack>
 
           <Button
+            component={Link}
+            href="/dashboard"
             variant="contained"
             size="small"
             sx={{ borderRadius: 0.5, color: "common.white" }}
@@ -60,19 +63,29 @@ export function DashboardHeader() {
             Dashboard
           </Button>
 
-          {/* Nav items — hide on xs */}
-          {NAV_ITEMS.map((item) => (
-            <Button
-              key={item}
-              size="small"
-              sx={{
-                color: dashboardTokens.textMuted,
-                display: { xs: "none", sm: "inline-flex" },
-              }}
-            >
-              {item}
-            </Button>
-          ))}
+          <Button
+            component={Link}
+            href="/dashboard/documents"
+            size="small"
+            sx={{
+              color: dashboardTokens.textMuted,
+              display: { xs: "none", sm: "inline-flex" },
+            }}
+          >
+            Documents
+          </Button>
+
+          <Button
+            component={Link}
+            href="/dashboard/settings"
+            size="small"
+            sx={{
+              color: dashboardTokens.textMuted,
+              display: { xs: "none", sm: "inline-flex" },
+            }}
+          >
+            Settings
+          </Button>
         </Stack>
 
         {/* Right: Sign out */}

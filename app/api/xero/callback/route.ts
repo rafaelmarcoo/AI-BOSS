@@ -6,10 +6,6 @@ import { encryptToken } from '@/lib/xero/crypto'
 const XERO_TOKEN_URL = 'https://identity.xero.com/connect/token'
 const XERO_CONNECTIONS_URL = 'https://api.xero.com/connections'
 
-function getAppUrl() {
-  return process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-}
-
 function getXeroOAuthConfig() {
   const clientId = process.env.XERO_CLIENT_ID
   const clientSecret = process.env.XERO_CLIENT_SECRET
@@ -22,8 +18,14 @@ function getXeroOAuthConfig() {
   return { clientId, clientSecret, redirectUri }
 }
 
-function redirectToDashboard(status: 'connected' | 'error' | 'no_tenant') {
-  return NextResponse.redirect(`${getAppUrl()}/dashboard?xero=${status}`)
+function redirectToDashboard(
+  request: NextRequest,
+  status: 'connected' | 'error' | 'no_tenant'
+) {
+  const redirectUrl = new URL('/dashboard', request.nextUrl.origin)
+  redirectUrl.searchParams.set('xero', status)
+
+  return NextResponse.redirect(redirectUrl)
 }
 
 function getBasicAuthHeader(clientId: string, clientSecret: string) {
@@ -37,7 +39,7 @@ export async function GET(request: NextRequest) {
   const errorParam = searchParams.get('error')
 
   if (errorParam || !code || !state) {
-    return redirectToDashboard('error')
+    return redirectToDashboard(request, 'error')
   }
 
   try {
@@ -54,7 +56,7 @@ export async function GET(request: NextRequest) {
       .maybeSingle()
 
     if (stateError || !stateRow) {
-      return redirectToDashboard('error')
+      return redirectToDashboard(request, 'error')
     }
 
     await supabase
@@ -78,7 +80,7 @@ export async function GET(request: NextRequest) {
     })
 
     if (!tokenResponse.ok) {
-      return redirectToDashboard('error')
+      return redirectToDashboard(request, 'error')
     }
 
     const tokens = (await tokenResponse.json()) as {
@@ -93,7 +95,7 @@ export async function GET(request: NextRequest) {
     })
 
     if (!connectionsResponse.ok) {
-      return redirectToDashboard('error')
+      return redirectToDashboard(request, 'error')
     }
 
     const connections = (await connectionsResponse.json()) as Array<{
@@ -103,7 +105,7 @@ export async function GET(request: NextRequest) {
     const tenant = connections[0]
 
     if (!tenant) {
-      return redirectToDashboard('no_tenant')
+      return redirectToDashboard(request, 'no_tenant')
     }
 
     const now = new Date().toISOString()
@@ -128,15 +130,16 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (dataConnectionError || !dataConnection) {
-      return redirectToDashboard('error')
+      return redirectToDashboard(request, 'error')
     }
 
     const { error: upsertError } = await supabase
-      .from('xero_connections')
+      .from('oauth_tokens')
       .upsert(
         {
           connection_id: dataConnection.id,
           user_id: user.id,
+          provider: 'xero',
           tenant_id: tenant.tenantId,
           tenant_name: tenant.tenantName,
           access_token_enc: await encryptToken(tokens.access_token),
@@ -147,17 +150,17 @@ export async function GET(request: NextRequest) {
           connected_at: now,
           updated_at: now,
         },
-        { onConflict: 'user_id' }
+        { onConflict: 'user_id,provider' }
       )
 
     if (upsertError) {
-      return redirectToDashboard('error')
+      return redirectToDashboard(request, 'error')
     }
 
-    return redirectToDashboard('connected')
+    return redirectToDashboard(request, 'connected')
   } catch (error) {
     console.error(error)
 
-    return redirectToDashboard('error')
+    return redirectToDashboard(request, 'error')
   }
 }

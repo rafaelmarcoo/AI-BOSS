@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   ChatApiMessage,
   ChatApiResponse,
@@ -11,6 +11,9 @@ import type {
   ConversationMutationApiResponse,
   ConversationsApiResponse,
 } from "./types";
+import { createConversationTitle } from "@/lib/chat/conversation-title";
+import type { GenUiPlan } from "@/lib/gen-ui/types";
+import type { ConversationVisibility } from "@/types/database";
 
 function createChatId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -21,42 +24,48 @@ function mapApiConversationToRecords(messages: ChatApiMessage[]): ChatRecord[] {
     id: createChatId(),
     role: message.role,
     content: message.content,
+    ui: message.ui ?? null,
   }));
 }
 
-export function useChatConversation() {
+function getLatestGenUiPlan(messages: ChatApiMessage[]) {
+  return (
+    [...messages]
+      .reverse()
+      .find((message) => message.role === "assistant" && message.ui)?.ui ?? null
+  );
+}
+
+interface UseChatConversationOptions {
+  initialConversationId?: string | null;
+  startEmpty?: boolean;
+  onGenUiPlan?: (plan: GenUiPlan | null) => void;
+}
+
+export function useChatConversation({
+  initialConversationId = null,
+  startEmpty = false,
+  onGenUiPlan,
+}: UseChatConversationOptions = {}) {
+  const initialConversationIdRef = useRef(initialConversationId);
+  const startEmptyRef = useRef(startEmpty);
   const [conversationMessages, setConversationMessages] = useState<ChatRecord[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [isReadOnly, setIsReadOnly] = useState(false);
+  const [visibility, setVisibility] =
+    useState<ConversationVisibility>("company");
   const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ChatErrorState | null>(null);
+  const [activeGenUiPlan, setActiveGenUiPlan] = useState<GenUiPlan | null>(null);
 
-  useEffect(() => {
-    async function loadConversations() {
-      try {
-        const response = await fetch("/api/chat/conversations");
-        const payload = (await response.json()) as ConversationsApiResponse;
+  const updateGenUiPlan = useCallback((plan: GenUiPlan | null) => {
+    setActiveGenUiPlan(plan);
+    onGenUiPlan?.(plan);
+  }, [onGenUiPlan]);
 
-        if (!response.ok || !payload.success) {
-          throw new Error(
-            payload.error?.message ?? "Could not load conversation history."
-          );
-        }
-
-        const nextConversations = payload.data?.conversations ?? [];
-        setConversations(nextConversations);
-      } catch {
-        setConversations([]);
-      } finally {
-        setHistoryLoading(false);
-      }
-    }
-
-    void loadConversations();
-  }, []);
-
-  const loadConversation = async (
+  const loadConversation = useCallback(async (
     nextConversationId: string,
     toggleLoading = true
   ) => {
@@ -77,9 +86,12 @@ export function useChatConversation() {
       }
 
       setConversationId(payload.data.conversationId);
+      setIsReadOnly(!payload.data.isOwner);
+      setVisibility(payload.data.visibility);
       setConversationMessages(
         mapApiConversationToRecords(payload.data.conversation)
       );
+      updateGenUiPlan(getLatestGenUiPlan(payload.data.conversation));
     } catch (requestError) {
       setError({
         message:
@@ -93,12 +105,46 @@ export function useChatConversation() {
         setLoading(false);
       }
     }
-  };
+  }, [updateGenUiPlan]);
+
+  useEffect(() => {
+    async function loadConversations() {
+      try {
+        const response = await fetch("/api/chat/conversations");
+        const payload = (await response.json()) as ConversationsApiResponse;
+
+        if (!response.ok || !payload.success) {
+          throw new Error(
+            payload.error?.message ?? "Could not load conversation history."
+          );
+        }
+
+        const nextConversations = payload.data?.conversations ?? [];
+        setConversations(nextConversations);
+
+        if (initialConversationIdRef.current) {
+          await loadConversation(initialConversationIdRef.current, false);
+        } else if (!startEmptyRef.current && nextConversations.length > 0) {
+          await loadConversation(nextConversations[0].id, false);
+        }
+      } catch {
+        setConversations([]);
+      } finally {
+        setHistoryLoading(false);
+      }
+    }
+
+    void loadConversations();
+  }, [loadConversation]);
 
   const sendMessage = async (
     input: string,
     existingMessages = conversationMessages
   ) => {
+    if (isReadOnly) {
+      return;
+    }
+
     const nextConversation = [
       ...existingMessages,
       { id: createChatId(), role: "user" as const, content: input },
@@ -116,6 +162,7 @@ export function useChatConversation() {
         },
         body: JSON.stringify({
           ...(conversationId ? { conversationId } : {}),
+          visibility,
           messages: nextConversation.map(({ role, content }) => ({
             role,
             content,
@@ -132,21 +179,23 @@ export function useChatConversation() {
       }
 
       setConversationId(payload.data.conversationId);
+      setVisibility(payload.data.visibility);
+      const shouldGenerateAiTitle = !conversationId && !existingMessages.length;
+
       setConversations((prev) => {
         const existingConversation = prev.find(
           (conversation) => conversation.id === payload.data!.conversationId
         );
-        const nextTitle = existingConversation?.title
-          ? existingConversation.title
-          : input.length > 80
-            ? `${input.slice(0, 77)}...`
-            : input;
+        const nextTitle =
+          existingConversation?.title ?? createConversationTitle(input);
         const nextSummary = {
           id: payload.data!.conversationId,
           title: nextTitle,
           created_at:
             existingConversation?.created_at ?? new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          visibility: payload.data!.visibility,
+          isOwner: true,
         };
         const existingWithoutCurrent = prev.filter(
           (conversation) => conversation.id !== nextSummary.id
@@ -155,8 +204,33 @@ export function useChatConversation() {
         return [nextSummary, ...existingWithoutCurrent];
       });
 
+      if (shouldGenerateAiTitle) {
+        void fetch(`/api/chat/conversations/${payload.data.conversationId}/title`, {
+          method: "POST",
+        })
+          .then(async (titleResponse) => {
+            const titlePayload = (await titleResponse.json()) as ConversationMutationApiResponse;
+
+            if (!titleResponse.ok || !titlePayload.success || !titlePayload.data?.conversation) {
+              return;
+            }
+
+            setConversations((prev) =>
+              prev.map((conversation) =>
+                conversation.id === payload.data!.conversationId
+                  ? titlePayload.data!.conversation!
+                  : conversation,
+              ),
+            );
+          })
+          .catch(() => undefined);
+      }
+
       setConversationMessages(
         mapApiConversationToRecords(payload.data.conversation)
+      );
+      updateGenUiPlan(
+        payload.data.ui ?? getLatestGenUiPlan(payload.data.conversation)
       );
     } catch (requestError) {
       const failedMessageId = nextConversation[nextConversation.length - 1]?.id ?? null;
@@ -207,8 +281,43 @@ export function useChatConversation() {
 
   const startNewConversation = () => {
     setConversationId(null);
+    setIsReadOnly(false);
+    setVisibility("company");
     setConversationMessages([]);
     setError(null);
+    updateGenUiPlan(null);
+  };
+
+  const changeVisibility = async (
+    nextVisibility: ConversationVisibility
+  ) => {
+    if (!conversationId) {
+      setVisibility(nextVisibility);
+      return;
+    }
+
+    const response = await fetch(`/api/chat/conversations/${conversationId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ visibility: nextVisibility }),
+    });
+    const payload = (await response.json()) as ConversationMutationApiResponse;
+
+    if (!response.ok || !payload.success || !payload.data?.conversation) {
+      const message =
+        payload.error?.message ?? "Could not update conversation visibility.";
+      setError({ message, failedMessageId: null });
+      throw new Error(message);
+    }
+
+    setVisibility(payload.data.conversation.visibility);
+    setConversations((prev) =>
+      prev.map((conversation) =>
+        conversation.id === conversationId
+          ? payload.data!.conversation!
+          : conversation
+      )
+    );
   };
 
   const renameConversation = async (
@@ -267,7 +376,11 @@ export function useChatConversation() {
 
   return {
     conversationId,
+    isReadOnly,
+    visibility,
+    changeVisibility,
     conversationMessages,
+    activeGenUiPlan,
     conversations,
     historyLoading,
     loading,

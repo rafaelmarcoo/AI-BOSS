@@ -1,33 +1,38 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import {
   Alert,
   Box,
   Button,
   IconButton,
   Stack,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import { ChatInput } from "./ChatInput";
-import { DocumentList } from "./DocumentList";
 import { ChatMessage } from "./ChatMessage";
 import type {
   ChatErrorState,
   ChatRecord,
-  DocumentSummaryView,
 } from "./types";
 import { dashboardTokens } from "@/app/theme";
+import type {
+  ConversationVisibility,
+  UserType,
+} from "@/types/database";
 
 interface ChatContainerProps {
   fullName: string | null;
   email: string;
+  userType: UserType | null;
   activeConversationTitle: string | null;
+  readOnly: boolean;
+  visibility: ConversationVisibility;
+  visibilityLocked: boolean;
+  onVisibilityChange: (visibility: ConversationVisibility) => void;
   conversationMessages: ChatRecord[];
-  documents: DocumentSummaryView[];
-  documentsLoading: boolean;
-  documentsError: string | null;
   historyLoading: boolean;
   loading: boolean;
   uploading: boolean;
@@ -51,11 +56,13 @@ function createStarterMessages(fullName: string | null, email: string): ChatReco
 export function ChatContainer({
   fullName,
   email,
+  userType,
   activeConversationTitle,
+  readOnly,
+  visibility,
+  visibilityLocked,
+  onVisibilityChange,
   conversationMessages,
-  documents,
-  documentsLoading,
-  documentsError,
   historyLoading,
   loading,
   uploading,
@@ -67,7 +74,6 @@ export function ChatContainer({
 }: ChatContainerProps) {
   const starterMessages = createStarterMessages(fullName, email);
   const bottomRef = useRef<HTMLDivElement | null>(null);
-  const [documentsOpen, setDocumentsOpen] = useState(false);
   const messages =
     conversationMessages.length === 0 ? starterMessages : conversationMessages;
 
@@ -109,9 +115,9 @@ export function ChatContainer({
               onClick={onOpenHistory}
               sx={{
                 color: "common.white",
-                border: "1px solid",
-                borderColor: dashboardTokens.border,
-                bgcolor: "rgba(255,255,255,0.03)",
+                "&:hover": {
+                  bgcolor: "transparent",
+                },
               }}
             >
               <MenuRoundedIcon />
@@ -120,33 +126,27 @@ export function ChatContainer({
               spacing={0.15}
               sx={{ flex: 1, minWidth: 0, alignItems: "flex-end", pr: 1 }}
             >
-              <Typography
-                variant="body2"
-                sx={{
-                  color: "common.white",
-                  fontWeight: 600,
-                  maxWidth: "100%",
-                  textOverflow: "ellipsis",
-                  overflow: "hidden",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {activeConversationTitle ?? "New conversation"}
-              </Typography>
+              <Tooltip title={activeConversationTitle ?? "New conversation"}>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: "common.white",
+                    fontWeight: 600,
+                    maxWidth: "100%",
+                    textOverflow: "ellipsis",
+                    overflow: "hidden",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {activeConversationTitle ?? "New conversation"}
+                </Typography>
+              </Tooltip>
               <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
-                AI-BOSS chat
+                {readOnly ? "Company chat · Read only" : "AI-BOSS chat"}
               </Typography>
             </Stack>
           </Stack>
         </Box>
-
-        <DocumentList
-          documents={documents}
-          loading={documentsLoading}
-          error={documentsError}
-          open={documentsOpen}
-          onToggle={() => setDocumentsOpen((current) => !current)}
-        />
 
         <Box
           sx={{
@@ -215,12 +215,23 @@ export function ChatContainer({
             bgcolor: dashboardTokens.sidebarV2,
           }}
         >
-          <ChatInput
-            onSend={(value) => void onSendMessage(value)}
-            onUploadDocument={onUploadDocument}
-            disabled={loading}
-            uploadDisabled={uploading}
-          />
+          {readOnly ? (
+            <Alert severity="info" sx={{ borderRadius: 2 }}>
+              This conversation belongs to a coworker. You can read it, but only
+              its owner can continue or manage it.
+            </Alert>
+          ) : (
+            <ChatInput
+              onSend={(value) => void onSendMessage(value)}
+              onUploadDocument={onUploadDocument}
+              userType={userType}
+              visibility={visibility}
+              visibilityDisabled={visibilityLocked}
+              onVisibilityChange={onVisibilityChange}
+              disabled={loading}
+              uploadDisabled={uploading}
+            />
+          )}
         </Box>
       </Box>
     </Box>

@@ -9,10 +9,6 @@ export interface RunwayPolicy {
 const URGENT_THRESHOLD = 3
 const CAUTION_THRESHOLD = 6
 
-/**
- * Assesses runway health against standard NZ/AU SME thresholds.
- * Under 3 months is urgent, under 6 months is caution, 6+ is healthy.
- */
 export function assessRunwayPolicy(runwayMonths: number): RunwayPolicy {
   if (runwayMonths < URGENT_THRESHOLD) {
     return {

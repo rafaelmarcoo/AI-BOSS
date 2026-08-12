@@ -119,7 +119,7 @@ describe('/api/xero/status', () => {
         },
         error: null,
       },
-      xero_connections: {
+      oauth_tokens: {
         data: {
           tenant_id: 'tenant-1',
           tenant_name: 'Demo Company NZ',

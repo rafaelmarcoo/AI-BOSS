@@ -2,20 +2,15 @@ import { z } from 'zod'
 import { readSourceAwareMetrics } from '@/lib/financial-data/read-service'
 import type { StructuredTool } from '@/lib/tools/contracts'
 
-/**
- * Factory that creates a get_latest_snapshot tool bound to a specific user.
- * The tool fetches the user's latest financial metrics from the database so
- * the agent can answer financial questions without requiring the user to
- * manually provide their numbers.
- */
 export function createGetLatestSnapshotTool(userId: string): StructuredTool<Record<string, never>, string> {
   return {
     name: 'get_latest_snapshot',
     description:
-      'Fetches the latest financial metrics for the current user from the database. ' +
-      'Returns available metrics including cash, accounts receivable, accounts payable, ' +
-      'burn rate, and revenue with their data source and confidence. ' +
-      'Always call this first before calculating runway so you are using real data, not assumed values.',
+      'Fetches the latest verified financial metrics for the current user from the database. ' +
+      'Returns available metrics including cash, accounts receivable, accounts payable, burn rate, ' +
+      'monthly revenue, and monthly expenses — each with its data source and confidence level. ' +
+      'Always call this first before calculating runway, running scenarios, or answering any question ' +
+      'about the current financial position. Never assume or invent metric values.',
     inputSchema: z.object({}),
     async handler() {
       const result = await readSourceAwareMetrics(userId)
@@ -24,7 +19,7 @@ export function createGetLatestSnapshotTool(userId: string): StructuredTool<Reco
         return (
           'No financial data found for this user. ' +
           'They have not connected a data source or uploaded financial documents yet. ' +
-          'Ask them to upload a CSV or connect Xero to get started.'
+          'Ask them to upload a CSV file or connect an accounting platform such as Xero to get started.'
         )
       }
 
@@ -41,16 +36,19 @@ export function createGetLatestSnapshotTool(userId: string): StructuredTool<Reco
         }
       }
 
+      if (result.unavailableMetricCount > 0) {
+        lines.push(`\n${result.unavailableMetricCount} metric(s) unavailable — data has not been provided for these yet.`)
+      }
+
       if (result.runwayInput) {
         lines.push(
-          '\nAll runway inputs are available. ' +
+          '\nAll runway inputs confirmed. ' +
           `Call calculate_runway with: cash=${result.runwayInput.cash}, ` +
           `ar=${result.runwayInput.ar}, ap=${result.runwayInput.ap}, burn=${result.runwayInput.burn}`
         )
       } else {
         lines.push(
-          `\n${result.unavailableMetricCount} metric(s) are missing. ` +
-          'Cannot calculate runway until cash, accounts_receivable, accounts_payable, and burn_rate are all available.'
+          '\nRunway cannot be calculated yet — cash, accounts_receivable, accounts_payable, and burn_rate are all required.'
         )
       }
 

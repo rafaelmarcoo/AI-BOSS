@@ -14,9 +14,11 @@ export function createForecastRunwayTrendTool(userId: string): StructuredTool<Re
   return {
     name: 'forecast_runway_trend',
     description:
-      'Analyses historical runway snapshots to forecast when runway may hit the caution ' +
-      '(6 months) or urgent (3 months) threshold. Use this when the user asks about ' +
-      'predictions, forecasts, or "when will I run out of money".',
+      'Analyses historical runway snapshots to project where runway is heading and when it may hit ' +
+      'the caution (6 months) or urgent (3 months) threshold. ' +
+      'Use this when the user asks about: future runway, cash flow forecasts, financial projections, ' +
+      '"when will I run out of money", "where are we headed", "how long do we have", or any forward-looking financial question. ' +
+      'Always present the output as an estimate based on current trends, not a guaranteed prediction.',
     inputSchema: z.object({}),
     async handler() {
       const supabase = createAdminSupabaseClient()

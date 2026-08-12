@@ -23,10 +23,11 @@ export function createModelScenarioTool(userId: string): StructuredTool<ModelSce
   return {
     name: 'model_scenario',
     description:
-      'Models a simple financial scenario by applying a recurring monthly cost change ' +
-      'and comparing before/after runway. Use this when the user asks "what if I hire someone", ' +
-      '"what if I add an expense", or "what if I cut a cost". ' +
-      'Positive monthly_cost_change = new expense, negative = saving.',
+      'Models a what-if financial scenario by applying a recurring monthly cost change and comparing before/after runway impact. ' +
+      'Use this when the user asks about: hiring a new employee, adding a subscription or expense, cutting a cost, ' +
+      'leasing office space, making any recurring spending change, or any question starting with "what if" or "what would happen if". ' +
+      'Pass a positive monthly_cost_change for new expenses, negative for savings or cost cuts. ' +
+      'Always include a clear label so the output is readable (e.g. "new hire", "office lease", "cut marketing spend").',
     inputSchema: ModelScenarioInputSchema,
     async handler({ monthly_cost_change, label }) {
       const snapshot = await readSourceAwareMetrics(userId)

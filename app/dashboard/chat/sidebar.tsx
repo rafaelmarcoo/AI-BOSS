@@ -98,10 +98,7 @@ export function ChatSidebar({
     onGenUiPlan,
   });
   const {
-    documents,
-    documentsLoading,
     uploading,
-    documentsError,
     uploadDocument,
   } = useDocuments(conversationId, { onDocumentsProcessed });
 
@@ -258,9 +255,6 @@ export function ChatSidebar({
             void changeVisibility(nextVisibility).catch(() => undefined)
           }}
           conversationMessages={conversationMessages}
-          documents={documents}
-          documentsLoading={documentsLoading}
-          documentsError={documentsError}
           historyLoading={historyLoading}
           loading={loading}
           uploading={uploading}

@@ -85,6 +85,11 @@ export interface DocumentChunk {
   created_at: string
 }
 
+/** Result returned by the server-only document cleanup database function. */
+export interface DocumentDeletionResult {
+  deleted: boolean
+}
+
 export type AccountingProvider = 'xero' | 'quickbooks' | 'freshbooks' | 'myob'
 export type DataConnectionProvider =
   | AccountingProvider

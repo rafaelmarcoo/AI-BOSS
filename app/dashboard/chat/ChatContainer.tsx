@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import {
   Alert,
   Box,
@@ -11,12 +11,10 @@ import {
 } from "@mui/material";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import { ChatInput } from "./ChatInput";
-import { DocumentList } from "./DocumentList";
 import { ChatMessage } from "./ChatMessage";
 import type {
   ChatErrorState,
   ChatRecord,
-  DocumentSummaryView,
 } from "./types";
 import { dashboardTokens } from "@/app/theme";
 import type {
@@ -34,9 +32,6 @@ interface ChatContainerProps {
   visibilityLocked: boolean;
   onVisibilityChange: (visibility: ConversationVisibility) => void;
   conversationMessages: ChatRecord[];
-  documents: DocumentSummaryView[];
-  documentsLoading: boolean;
-  documentsError: string | null;
   historyLoading: boolean;
   loading: boolean;
   uploading: boolean;
@@ -67,9 +62,6 @@ export function ChatContainer({
   visibilityLocked,
   onVisibilityChange,
   conversationMessages,
-  documents,
-  documentsLoading,
-  documentsError,
   historyLoading,
   loading,
   uploading,
@@ -81,7 +73,6 @@ export function ChatContainer({
 }: ChatContainerProps) {
   const starterMessages = createStarterMessages(fullName, email);
   const bottomRef = useRef<HTMLDivElement | null>(null);
-  const [documentsOpen, setDocumentsOpen] = useState(false);
   const messages =
     conversationMessages.length === 0 ? starterMessages : conversationMessages;
 
@@ -153,14 +144,6 @@ export function ChatContainer({
             </Stack>
           </Stack>
         </Box>
-
-        <DocumentList
-          documents={documents}
-          loading={documentsLoading}
-          error={documentsError}
-          open={documentsOpen}
-          onToggle={() => setDocumentsOpen((current) => !current)}
-        />
 
         <Box
           sx={{

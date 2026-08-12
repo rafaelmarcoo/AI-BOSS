@@ -231,6 +231,9 @@ Stores uploaded user files and their ingestion state.
 - `idx_documents_status` on status
 - `idx_documents_created_at` on created_at (DESC)
 
+**Deletion behaviour:**
+- The server-only `delete_owned_document_and_derived_metrics(document_id, user_id)` function removes a user's document and every financial metric observation derived from it in one database transaction. Its RAG chunks are removed by the document foreign-key cascade. The file itself is removed from private Supabase Storage immediately before this transaction.
+
 ---
 
 ### 7. document_chunks
@@ -414,6 +417,7 @@ All schema changes are tracked in `db/migrations/`:
 - `007_drop_financial_snapshots.sql` - Drops the legacy financial snapshots table
 - `008_accounting_oauth_tokens.sql` - Adds provider-neutral OAuth tokens and drops the Xero-specific credential table
 - `009_conversation_message_ui_payload.sql` - Adds validated Gen UI payloads to assistant messages
+- `013_delete_document_and_derived_metrics.sql` - Adds atomic owner-only cleanup of a document and its document-derived financial observations
 - `010_add_user_type.sql` - Adds admin/employee roles used by company signup and joining; existing company accounts are backfilled as admins
 - `011_company_chat_visibility.sql` - Adds company-scoped conversation history and message read access
 - `012_conversation_visibility_modes.sql` - Adds private, company, and admins-only conversation visibility

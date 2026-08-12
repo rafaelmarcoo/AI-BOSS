@@ -148,13 +148,16 @@ export function AuthForm({ mode }: AuthFormProps) {
     >
       <Stack spacing={3}>
         <Stack spacing={0.5}>
+          <Typography variant="overline" color="primary" fontWeight={700}>
+            AI-BOSS financial intelligence
+          </Typography>
           <Typography variant="h4" component="h1" fontWeight={600}>
-          {isSignUp ? 'Create your account' : 'Welcome back'}
+          {isSignUp ? 'Create your workspace account' : 'Welcome back'}
           </Typography>
           <Typography variant="body2" color="text.secondary">
           {isSignUp
-            ? 'Set up a secure account to start using AI-BOSS.'
-            : 'Sign in to access protected API routes and your dashboard.'}
+            ? 'Set up a secure account for clear, source-aware financial decisions.'
+            : 'Sign in to your AI-BOSS financial intelligence workspace.'}
           </Typography>
         </Stack>
 
@@ -251,6 +254,12 @@ export function AuthForm({ mode }: AuthFormProps) {
           error={Boolean(fieldErrors.email)}
           helperText={fieldErrors.email ?? ' '}
         />
+
+        {!isSignUp ? (
+          <MuiLink component={NextLink} href="/forgot-password" underline="hover" sx={{ alignSelf: "flex-start", fontSize: 14 }}>
+            Forgot password?
+          </MuiLink>
+        ) : null}
 
         <TextField
           name="password"

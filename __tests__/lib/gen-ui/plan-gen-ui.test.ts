@@ -3,6 +3,7 @@ import { fillUnavailableMetrics } from '@/lib/financial-data/read-model'
 import { readSourceAwareMetrics } from '@/lib/financial-data/read-service'
 import { readRunwayObservationHistory } from '@/lib/financial-data/runway-history'
 import { readFinancialMetricHistory } from '@/lib/financial-data/metric-history'
+import { readFinancialMetricForecast } from '@/lib/financial-data/metric-forecast'
 import { planGenUi } from '@/lib/gen-ui/plan-gen-ui'
 
 const mockPlannerInvoke = jest.fn()
@@ -28,6 +29,9 @@ jest.mock('@/lib/financial-data/runway-history', () => ({
 jest.mock('@/lib/financial-data/metric-history', () => ({
   readFinancialMetricHistory: jest.fn(),
 }))
+jest.mock('@/lib/financial-data/metric-forecast', () => ({
+  readFinancialMetricForecast: jest.fn(),
+}))
 
 const mockChatOpenAI = jest.mocked(ChatOpenAI)
 const mockReadSourceAwareMetrics = jest.mocked(readSourceAwareMetrics)
@@ -35,6 +39,7 @@ const mockReadRunwayObservationHistory = jest.mocked(
   readRunwayObservationHistory
 )
 const mockReadFinancialMetricHistory = jest.mocked(readFinancialMetricHistory)
+const mockReadFinancialMetricForecast = jest.mocked(readFinancialMetricForecast)
 const originalApiKey = process.env.OPENAI_API_KEY
 
 describe('planGenUi', () => {
@@ -73,6 +78,17 @@ describe('planGenUi', () => {
       hasRecordedDateFallback: false,
       hasIncompatibleCurrencies: false,
     })
+    mockReadFinancialMetricForecast.mockResolvedValue({
+      metricKey: 'cash', label: 'Cash', range: 'all', horizon: 3,
+      history: {
+        metricKey: 'cash', label: 'Cash', range: 'all',
+        points: [
+          { date: '2026-05-01', dateSource: 'as_of_date', value: 100, currency: 'NZD', sourceLabel: 'May CSV', sourceType: 'document', confidence: 0.9, updatedAt: '2026-05-01T00:00:00.000Z' },
+          { date: '2026-06-01', dateSource: 'as_of_date', value: 120, currency: 'NZD', sourceLabel: 'June CSV', sourceType: 'document', confidence: 0.9, updatedAt: '2026-06-01T00:00:00.000Z' },
+        ], movement: 'increased', direction: 'improving', firstValue: 100, latestValue: 120, totalChange: 20, percentageChange: 20, averageChange: 20, currency: 'NZD', sourceLabels: ['May CSV', 'June CSV'], hasMixedSources: true, hasRecordedDateFallback: false, hasIncompatibleCurrencies: false,
+      },
+      forecastPoints: [{ date: '2026-07-01', value: 140, kind: 'forecast' }], latestActualValue: 120, monthlySlope: 20, method: 'date_aware_linear_trend', assumptions: [],
+    } as never)
   })
 
   afterAll(() => {
@@ -189,6 +205,24 @@ describe('planGenUi', () => {
     })
     expect(plan?.widgets).toContainEqual(
       expect.objectContaining({ type: 'metric_trend_chart' })
+    )
+  })
+
+  it('always includes a deterministic forecast widget for a metric-specific forecast question', async () => {
+    mockPlannerInvoke.mockResolvedValue({ widgets: [] })
+
+    const plan = await planGenUi({
+      userId: 'user-123',
+      userMessage: 'Forecast our cash for the next 6 months.',
+      assistantMessage: 'Here is the deterministic forecast.',
+      toolsUsed: [],
+    })
+
+    expect(mockReadFinancialMetricForecast).toHaveBeenCalledWith({
+      userId: 'user-123', metricKey: 'cash', range: 'all', horizon: 6,
+    })
+    expect(plan?.widgets).toContainEqual(
+      expect.objectContaining({ type: 'metric_forecast_chart' })
     )
   })
 })

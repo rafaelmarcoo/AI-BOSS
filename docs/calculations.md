@@ -55,3 +55,14 @@ snapshot rows. It supports cash, monthly revenue, monthly expenses, burn rate,
 and runway observations. The analysis is deterministic: it prioritises financial
 reporting dates, preserves source labels, warns when sources are mixed, and does
 not compare values across different currencies.
+
+## Financial Forecasting
+
+Forecasting uses the same historical observations and supports cash, monthly
+revenue, monthly expenses, burn rate, and runway for 3- or 6-month horizons.
+It calculates a date-aware least-squares linear monthly trend over the selected
+history range, then anchors future calendar-month projections to the latest
+actual observation. Runway projections are never below zero; other metrics are
+not clamped. Forecasts are trend-continuation estimates, not guarantees, and
+are unavailable with fewer than two comparable dated observations or multiple
+non-null currencies.

@@ -10,7 +10,6 @@ import {
 import { getMetricNumber, isAvailableMetric } from '@/lib/financial-data/metrics'
 import { readSourceAwareMetrics } from '@/lib/financial-data/read-service'
 import {
-  getMetricObservationDate,
   readRunwayObservationHistory,
   type RunwayTrendSummary,
 } from '@/lib/financial-data/runway-history'
@@ -20,10 +19,14 @@ import {
   type MetricHistorySummary,
 } from '@/lib/financial-data/metric-history'
 import {
+  readFinancialMetricForecast,
+  type ForecastHorizon,
+  type MetricForecastSummary,
+} from '@/lib/financial-data/metric-forecast'
+import {
   GEN_UI_PLAN_VERSION,
   GEN_UI_WIDGET_TYPES,
   type GenUiPlan,
-  type GenUiRunwayPoint,
   type GenUiSource,
   type GenUiWidget,
   type GenUiWidgetType,
@@ -83,6 +86,7 @@ interface GenUiDataContext {
   selectedText: string | null
   userMessage: string
   metricHistory: MetricHistorySummary | null
+  metricForecast: MetricForecastSummary | null
 }
 
 function historicalMetricKeyForMessage(userMessage: string): HistoricalMetricKey | null {
@@ -97,6 +101,24 @@ function historicalMetricKeyForMessage(userMessage: string): HistoricalMetricKey
   if (/\bexpense|cost\b/.test(normalized)) return 'monthly_expenses'
 
   return null
+}
+
+function forecastMetricKeyForMessage(userMessage: string): HistoricalMetricKey | null {
+  if (!/\b(future|forecast|project|next|months?)\b/.test(userMessage.toLowerCase())) {
+    return null
+  }
+
+  if (/\brunway\b/i.test(userMessage)) return 'runway_months'
+  if (/\bcash\b/i.test(userMessage)) return 'cash'
+  if (/\bburn\b/i.test(userMessage)) return 'burn_rate'
+  if (/\brevenue|income\b/i.test(userMessage)) return 'monthly_revenue'
+  if (/\bexpense|cost\b/i.test(userMessage)) return 'monthly_expenses'
+
+  return null
+}
+
+function forecastHorizonForMessage(userMessage: string): ForecastHorizon {
+  return /\b6\s*(?:months?|m)\b/i.test(userMessage) ? 6 : 3
 }
 
 function formatCurrency(value: number | null | undefined) {
@@ -167,12 +189,21 @@ function defaultWidgetSpecs(
 
   const metricKeys = selectMetricKeysForMessage(userMessage)
   const historicalMetricKey = historicalMetricKeyForMessage(userMessage)
+  const forecastMetricKey = forecastMetricKeyForMessage(userMessage)
 
   if (historicalMetricKey) {
     widgets.push({
       type: 'metric_trend_chart',
       title: `Historical ${FINANCIAL_METRIC_LABELS[historicalMetricKey]} trend`,
       reason: 'The question asks how one financial metric has changed over time.',
+    })
+  }
+
+  if (forecastMetricKey) {
+    widgets.push({
+      type: 'metric_forecast_chart',
+      title: `${FINANCIAL_METRIC_LABELS[forecastMetricKey]} forecast`,
+      reason: 'The question asks for a future estimate of one financial metric.',
     })
   }
 
@@ -194,18 +225,13 @@ function defaultWidgetSpecs(
   }
 
   if (/\b(future|forecast|plan|planning|next|months?)\b/.test(normalized)) {
-    widgets.push(
-      {
-        type: 'runway_trend_chart',
-        title: 'Runway trend forecast',
-        reason: 'The question is about future planning or trend direction.',
-      },
-      {
+    if (forecastMetricKey === 'runway_months') {
+      widgets.push({
         type: 'risk_threshold_timeline',
         title: 'Risk threshold timing',
         reason: 'Runway planning needs caution and urgent threshold timing.',
-      }
-    )
+      })
+    }
   }
 
   if (/\b(scenario|what if|increase|decrease|hire|cut|saving|cost)\b/.test(normalized)) {
@@ -329,7 +355,7 @@ async function chooseWidgetsWithModel(params: {
         outputShape: {
           widgets: [
             {
-              type: 'runway_trend_chart',
+              type: 'metric_forecast_chart',
               title: 'short title',
               reason: 'why AI-BOSS chose this widget for the request',
               metricKeys: null,
@@ -416,92 +442,6 @@ function buildDataConnectionsWidget(
   }
 }
 
-function buildTrendPoints(context: GenUiDataContext): GenUiRunwayPoint[] {
-  const currentRunway = getMetricNumber(
-    context.snapshot.metrics,
-    'runway_months'
-  )
-  const actualPoints = context.runwayTrend.observations.map((metric, index) => ({
-    label: metric.asOfDate
-      ? new Date(metric.asOfDate).toLocaleDateString('en-NZ', {
-          month: 'short',
-        })
-      : `Obs ${index + 1}`,
-    date: getMetricObservationDate(metric),
-    runwayMonths: Number(metric.value.toFixed(1)),
-    kind: 'actual' as const,
-  }))
-
-  if (actualPoints.length === 0 && currentRunway !== null) {
-    actualPoints.push({
-      label: 'Now',
-      date: new Date().toISOString(),
-      runwayMonths: Number(currentRunway.toFixed(1)),
-      kind: 'actual',
-    })
-  }
-
-  if (actualPoints.length === 0) {
-    return []
-  }
-
-  const monthlyChange =
-    context.runwayTrend.averageChange !== null
-      ? context.runwayTrend.averageChange
-      : -0.5
-  const lastPoint = actualPoints[actualPoints.length - 1]
-  const forecastPoints = Array.from({ length: 5 }, (_, index) => {
-    const runwayMonths = Math.max(
-      0,
-      Number((lastPoint.runwayMonths + monthlyChange * (index + 1)).toFixed(1))
-    )
-
-    return {
-      label: `+${index + 1}m`,
-      date: null,
-      runwayMonths,
-      kind: 'forecast' as const,
-    }
-  })
-
-  return [...actualPoints, ...forecastPoints]
-}
-
-function buildRunwayTrendWidget(
-  spec: PlannerWidget,
-  index: number,
-  context: GenUiDataContext
-): GenUiWidget | null {
-  const currentRunway = getMetricNumber(
-    context.snapshot.metrics,
-    'runway_months'
-  )
-  const points = buildTrendPoints(context)
-
-  if (points.length === 0) {
-    return null
-  }
-
-  return {
-    id: widgetId(spec.type, index),
-    type: 'runway_trend_chart',
-    title: spec.title ?? 'Runway trend forecast',
-    reason: spec.reason ?? 'AI-BOSS selected a trend view for this question.',
-    data: {
-      points,
-      direction: context.runwayTrend.direction,
-      currentRunway,
-      averageMonthlyChange: context.runwayTrend.averageChange,
-      cautionThreshold: CAUTION_THRESHOLD,
-      urgentThreshold: URGENT_THRESHOLD,
-      note:
-        context.runwayTrend.averageChange === null
-          ? 'Forecast points use a cautious placeholder slope until more runway history is available.'
-          : 'Forecast points extend the observed average runway movement and should be treated as rough planning context.',
-    },
-  }
-}
-
 function buildMetricTrendWidget(
   spec: PlannerWidget,
   index: number,
@@ -535,6 +475,42 @@ function buildMetricTrendWidget(
       note: history.hasMixedSources
         ? `This trend combines sources: ${history.sourceLabels.join(', ')}.`
         : 'Values are based on stored financial observations.',
+    },
+  }
+}
+
+function buildMetricForecastWidget(
+  spec: PlannerWidget,
+  index: number,
+  context: GenUiDataContext
+): GenUiWidget | null {
+  const forecast = context.metricForecast
+
+  if (!forecast || forecast.forecastPoints.length === 0 || forecast.monthlySlope === null) {
+    return null
+  }
+
+  return {
+    id: widgetId(spec.type, index),
+    type: 'metric_forecast_chart',
+    title: spec.title ?? `${forecast.label} forecast`,
+    reason: spec.reason ?? 'AI-BOSS selected a deterministic forecast for this question.',
+    data: {
+      metricKey: forecast.metricKey,
+      label: forecast.label,
+      currency: forecast.history.currency,
+      actualPoints: forecast.history.points.map((point) => ({
+        date: point.date,
+        value: point.value,
+        sourceLabel: point.sourceLabel,
+        confidence: point.confidence,
+      })),
+      forecastPoints: forecast.forecastPoints.map(({ date, value }) => ({ date, value })),
+      horizon: forecast.horizon,
+      monthlySlope: forecast.monthlySlope,
+      hasMixedSources: forecast.history.hasMixedSources,
+      hasRecordedDateFallback: forecast.history.hasRecordedDateFallback,
+      note: forecast.assumptions.join(' '),
     },
   }
 }
@@ -815,10 +791,10 @@ function hydrateWidget(
       return buildMetricSnapshotWidget(spec, index, context)
     case 'data_connections':
       return buildDataConnectionsWidget(spec, index)
-    case 'runway_trend_chart':
-      return buildRunwayTrendWidget(spec, index, context)
     case 'metric_trend_chart':
       return buildMetricTrendWidget(spec, index, context)
+    case 'metric_forecast_chart':
+      return buildMetricForecastWidget(spec, index, context)
     case 'scenario_comparison':
       return buildScenarioComparisonWidget(spec, index, context)
     case 'planning_checklist':
@@ -842,8 +818,10 @@ export async function planGenUi({
 }: PlanGenUiParams): Promise<GenUiPlan | null> {
   const source = detectSource(userMessage)
   const historicalMetricKey = historicalMetricKeyForMessage(userMessage)
+  const forecastMetricKey = forecastMetricKeyForMessage(userMessage)
+  const forecastHorizon = forecastHorizonForMessage(userMessage)
 
-  const [snapshot, runwayTrend, metricHistory] = await Promise.all([
+  const [snapshot, runwayTrend, metricHistory, metricForecast] = await Promise.all([
     readSourceAwareMetrics(userId),
     readRunwayObservationHistory(userId).catch(() => ({
       observations: [],
@@ -853,6 +831,9 @@ export async function planGenUi({
     })),
     historicalMetricKey
       ? readFinancialMetricHistory({ userId, metricKey: historicalMetricKey, range: 'all' }).catch(() => null)
+      : Promise.resolve(null),
+    forecastMetricKey
+      ? readFinancialMetricForecast({ userId, metricKey: forecastMetricKey, range: 'all', horizon: forecastHorizon }).catch(() => null)
       : Promise.resolve(null),
   ])
   const fallbackSpecs = defaultWidgetSpecs(userMessage, snapshot, source)
@@ -877,8 +858,10 @@ export async function planGenUi({
 
   // A valid empty model response is intentional; fall back only when planning failed.
   const historySpec = fallbackSpecs.find((spec) => spec.type === 'metric_trend_chart')
+  const forecastSpec = fallbackSpecs.find((spec) => spec.type === 'metric_forecast_chart')
   const specs = dedupeWidgetSpecs([
     ...(historySpec ? [historySpec] : []),
+    ...(forecastSpec ? [forecastSpec] : []),
     ...(modelSpecs ?? fallbackSpecs),
   ])
 
@@ -893,6 +876,7 @@ export async function planGenUi({
     selectedText,
     userMessage,
     metricHistory,
+    metricForecast,
   }
   const widgets = specs
     .map((spec, index) => hydrateWidget(spec, index, context))

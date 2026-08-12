@@ -41,3 +41,14 @@ export type {
   MetricHistoryRange,
   MetricHistorySummary,
 } from '@/lib/financial-data/metric-history'
+export {
+  FORECAST_HORIZONS,
+  isForecastHorizon,
+  readFinancialMetricForecast,
+  summarizeMetricForecast,
+} from '@/lib/financial-data/metric-forecast'
+export type {
+  ForecastHorizon,
+  MetricForecastPoint,
+  MetricForecastSummary,
+} from '@/lib/financial-data/metric-forecast'

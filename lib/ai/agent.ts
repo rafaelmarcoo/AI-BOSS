@@ -56,7 +56,8 @@ export async function runAgent(
   input: string,
   chatHistory: BaseMessage[] = [],
   tools: AppTool[] = [],
-  contextMessages: BaseMessage[] = []
+  contextMessages: BaseMessage[] = [],
+  systemPrompt: string = AGENT_SYSTEM_PROMPT
 ): Promise<AgentRunResult> {
   const model = createAgentModel()
   const langChainTools = adaptToolsToLangChain(tools)
@@ -66,6 +67,7 @@ export async function runAgent(
     input,
     chatHistory,
     contextMessages,
+    systemPrompt,
   })
 
   const MAX_ITERATIONS = 10
@@ -109,9 +111,10 @@ export function buildAgentMessages(params: {
   input: string
   chatHistory?: BaseMessage[]
   contextMessages?: BaseMessage[]
+  systemPrompt?: string
 }) {
   return [
-    new SystemMessage(AGENT_SYSTEM_PROMPT),
+    new SystemMessage(params.systemPrompt ?? AGENT_SYSTEM_PROMPT),
     ...(params.contextMessages ?? []),
     ...(params.chatHistory ?? []),
     new HumanMessage(params.input),

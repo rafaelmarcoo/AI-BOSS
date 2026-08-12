@@ -24,6 +24,11 @@ export interface CreateDocumentResponse {
   document: DocumentSummary
 }
 
+export interface DeleteDocumentResponse {
+  deleted: boolean
+  documentId: string
+}
+
 export interface DocumentChunkInsert {
   document_id: string
   user_id: string

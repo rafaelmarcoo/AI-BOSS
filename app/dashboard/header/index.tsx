@@ -1,4 +1,5 @@
 import { Box, Button, Stack, Typography } from "@mui/material";
+import Link from "next/link";
 import { SignOutButton } from "@/components/sign-out-button";
 import { dashboardTokens } from "@/app/theme";
 
@@ -51,6 +52,8 @@ export function DashboardHeader() {
           </Stack>
 
           <Button
+            component={Link}
+            href="/dashboard"
             variant="contained"
             size="small"
             sx={{ borderRadius: 0.5, color: "common.white" }}
@@ -59,6 +62,20 @@ export function DashboardHeader() {
           </Button>
 
           <Button
+            component={Link}
+            href="/dashboard/documents"
+            size="small"
+            sx={{
+              color: dashboardTokens.textMuted,
+              display: { xs: "none", sm: "inline-flex" },
+            }}
+          >
+            Documents
+          </Button>
+
+          <Button
+            component={Link}
+            href="/dashboard/settings"
             size="small"
             sx={{
               color: dashboardTokens.textMuted,

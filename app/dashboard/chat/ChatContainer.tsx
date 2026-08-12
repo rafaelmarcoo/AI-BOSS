@@ -7,6 +7,7 @@ import {
   Button,
   IconButton,
   Stack,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
@@ -134,19 +135,21 @@ export function ChatContainer({
               spacing={0.15}
               sx={{ flex: 1, minWidth: 0, alignItems: "flex-end", pr: 1 }}
             >
-              <Typography
-                variant="body2"
-                sx={{
-                  color: "common.white",
-                  fontWeight: 600,
-                  maxWidth: "100%",
-                  textOverflow: "ellipsis",
-                  overflow: "hidden",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {activeConversationTitle ?? "New conversation"}
-              </Typography>
+              <Tooltip title={activeConversationTitle ?? "New conversation"}>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: "common.white",
+                    fontWeight: 600,
+                    maxWidth: "100%",
+                    textOverflow: "ellipsis",
+                    overflow: "hidden",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {activeConversationTitle ?? "New conversation"}
+                </Typography>
+              </Tooltip>
               <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
                 {readOnly ? "Company chat · Read only" : "AI-BOSS chat"}
               </Typography>

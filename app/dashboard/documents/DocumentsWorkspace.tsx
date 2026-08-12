@@ -21,6 +21,8 @@ import {
 } from "@mui/material";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
+import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import type { DocumentSummary } from "@/lib/documents/types";
 import { dashboardTokens } from "@/app/theme";
 
@@ -133,26 +135,33 @@ export function DocumentsWorkspace() {
 
   return (
     <Stack spacing={3}>
-      <Stack spacing={0.75}>
-        <Typography variant="h5" fontWeight={700} color="common.white">
-          Documents
-        </Typography>
-        <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
-          Manage your uploaded PDFs and CSVs. Deleting a CSV also removes its derived dashboard, history, and forecast data.
-        </Typography>
+      <Stack direction="row" spacing={1.5} alignItems="flex-start">
+        <Box sx={{ display: "grid", placeItems: "center", width: 44, height: 44, borderRadius: 2.5, bgcolor: "rgba(59,130,246,0.16)", color: "#93c5fd", flex: "0 0 auto" }}>
+          <DescriptionRoundedIcon />
+        </Box>
+        <Stack spacing={0.5}>
+          <Typography variant="h5" fontWeight={700} color="common.white">Documents</Typography>
+          <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
+            Manage your uploaded PDFs and CSVs. Removing a CSV also removes its derived dashboard, history, and forecast data.
+          </Typography>
+        </Stack>
       </Stack>
 
-      <Stack direction={{ xs: "column", md: "row" }} spacing={1.25}>
+      <Box sx={{ p: { xs: 1.25, sm: 1.5 }, border: "1px solid", borderColor: dashboardTokens.border, borderRadius: 3, bgcolor: "rgba(255,255,255,0.025)" }}>
+      <Stack direction={{ xs: "column", lg: "row" }} spacing={1.25}>
         <TextField
           label="Search documents"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search by file name"
+          slotProps={{ input: { startAdornment: <SearchRoundedIcon fontSize="small" sx={{ mr: 1, color: dashboardTokens.textMuted }} /> } }}
           sx={{ flex: 1, minWidth: 200, ...fieldStyles }}
         />
         <FilterSelect label="File type" value={fileFilter} onChange={(value) => setFileFilter(value as FileFilter)} options={[["all", "All files"], ["pdf", "PDF"], ["csv", "CSV"]]} />
         <FilterSelect label="Status" value={statusFilter} onChange={(value) => setStatusFilter(value as StatusFilter)} options={[["all", "All statuses"], ["uploaded", "Uploaded"], ["processing", "Processing"], ["ready", "Ready"], ["failed", "Failed"]]} />
         <FilterSelect label="Sort" value={sort} onChange={(value) => setSort(value as SortOption)} options={[["newest", "Newest first"], ["oldest", "Oldest first"], ["name", "Name A–Z"]]} />
       </Stack>
+      </Box>
 
       {error ? <Alert severity="error">{error}</Alert> : null}
 
@@ -170,29 +179,37 @@ export function DocumentsWorkspace() {
         </Box>
       ) : (
         <Stack spacing={1.25}>
+          <Typography variant="caption" sx={{ color: dashboardTokens.textMuted, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+            {visibleDocuments.length} {visibleDocuments.length === 1 ? "document" : "documents"}
+          </Typography>
           {visibleDocuments.map((document) => {
             const status = statusPresentation(document.status);
 
             return (
               <Box key={document.id} sx={documentCardStyles}>
                 <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={2}>
-                  <Stack spacing={0.6} sx={{ minWidth: 0 }}>
-                    <Typography color="common.white" fontWeight={700} sx={{ overflowWrap: "anywhere" }}>
-                      {document.file_name}
-                    </Typography>
-                    <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-                      <Chip label={document.file_type.toUpperCase()} size="small" />
-                      <Chip label={status.label} size="small" sx={{ color: status.color, borderColor: status.color }} variant="outlined" />
-                      <Typography variant="caption" sx={{ color: dashboardTokens.textMuted, alignSelf: "center" }}>
-                        Uploaded {new Date(document.created_at).toLocaleString()}
+                  <Stack direction="row" spacing={1.5} sx={{ minWidth: 0 }}>
+                    <Box sx={{ width: 40, height: 40, display: "grid", placeItems: "center", borderRadius: 2, color: "#bfdbfe", bgcolor: "rgba(59,130,246,0.13)", flex: "0 0 auto" }}>
+                      <InsertDriveFileOutlinedIcon fontSize="small" />
+                    </Box>
+                    <Stack spacing={0.6} sx={{ minWidth: 0 }}>
+                      <Typography color="common.white" fontWeight={700} sx={{ overflowWrap: "anywhere" }}>
+                        {document.file_name}
                       </Typography>
+                      <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                        <Chip label={document.file_type.toUpperCase()} size="small" sx={fileTypeChipStyles} />
+                        <Chip label={status.label} size="small" sx={{ color: status.color, borderColor: status.color }} variant="outlined" />
+                        <Typography variant="caption" sx={{ color: dashboardTokens.textMuted, alignSelf: "center" }}>
+                          Uploaded {new Date(document.created_at).toLocaleString()}
+                        </Typography>
+                      </Stack>
+                      <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
+                        {document.conversation_id ? "Linked to a chat conversation" : "Workspace upload"}
+                      </Typography>
+                      {document.error_message ? <Alert severity="error">{document.error_message}</Alert> : null}
                     </Stack>
-                    <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
-                      {document.conversation_id ? "Linked to a chat conversation" : "Workspace upload"}
-                    </Typography>
-                    {document.error_message ? <Alert severity="error">{document.error_message}</Alert> : null}
                   </Stack>
-                  <Button color="error" startIcon={<DeleteOutlineRoundedIcon />} onClick={() => setDocumentToDelete(document)} sx={{ alignSelf: { xs: "flex-start", sm: "center" } }}>
+                  <Button color="error" startIcon={<DeleteOutlineRoundedIcon />} onClick={() => setDocumentToDelete(document)} sx={{ alignSelf: { xs: "flex-start", sm: "center" }, borderRadius: 2, px: 1.25 }}>
                     Delete
                   </Button>
                 </Stack>
@@ -221,7 +238,7 @@ export function DocumentsWorkspace() {
 }
 
 const fieldStyles = {
-  "& .MuiOutlinedInput-root": { bgcolor: dashboardTokens.surfaceAlt, color: "common.white" },
+  "& .MuiOutlinedInput-root": { bgcolor: "rgba(255,255,255,0.055)", color: "common.white", borderRadius: 2.25 },
   "& .MuiInputLabel-root": { color: dashboardTokens.textMuted },
 };
 
@@ -237,11 +254,18 @@ const emptyStateStyles = {
 };
 
 const documentCardStyles = {
-  p: 2,
+  p: { xs: 1.5, sm: 2 },
   borderRadius: 3,
   border: "1px solid",
   borderColor: dashboardTokens.border,
-  bgcolor: "rgba(255,255,255,0.03)",
+  bgcolor: "rgba(255,255,255,0.035)",
+  transition: "border-color 160ms ease, background-color 160ms ease",
+  "&:hover": { borderColor: "rgba(147,197,253,0.30)", bgcolor: "rgba(255,255,255,0.05)" },
+};
+
+const fileTypeChipStyles = {
+  bgcolor: "rgba(255,255,255,0.065)",
+  color: "rgba(255,255,255,0.72)",
 };
 
 function FilterSelect({ label, value, onChange, options }: {
@@ -251,7 +275,7 @@ function FilterSelect({ label, value, onChange, options }: {
   options: Array<[string, string]>;
 }) {
   return (
-    <FormControl size="small" sx={{ minWidth: 140, ...fieldStyles }}>
+    <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: 150 }, ...fieldStyles }}>
       <InputLabel>{label}</InputLabel>
       <Select label={label} value={value} onChange={(event) => onChange(event.target.value)}>
         {options.map(([optionValue, optionLabel]) => <MenuItem key={optionValue} value={optionValue}>{optionLabel}</MenuItem>)}

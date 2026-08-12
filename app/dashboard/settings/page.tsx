@@ -24,11 +24,16 @@ export default async function SettingsPage() {
           <Typography variant="h5" fontWeight={700} color="common.white">Account settings</Typography>
           <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>Manage your AI-BOSS workspace account.</Typography>
         </Stack>
-        <Box sx={{ p: 2.5, border: "1px solid", borderColor: dashboardTokens.border, borderRadius: 3, bgcolor: "rgba(255,255,255,0.03)" }}>
-          <Stack spacing={0.75}>
-            <Typography color="common.white" fontWeight={700}>{profile.full_name ?? "AI-BOSS user"}</Typography>
-            <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>{profile.email}</Typography>
-            <Stack direction="row" spacing={0.75}><Chip size="small" label={profile.user_type ?? "member"} /><Chip size="small" label={profile.company_name ?? "No company"} /></Stack>
+        <Box sx={{ p: { xs: 2, sm: 2.5 }, border: "1px solid", borderColor: dashboardTokens.border, borderRadius: 3, bgcolor: "rgba(255,255,255,0.03)" }}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "center" }} justifyContent="space-between">
+            <Stack spacing={0.75}>
+              <Typography color="common.white" fontWeight={700}>{profile.full_name ?? "AI-BOSS user"}</Typography>
+              <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>{profile.email}</Typography>
+            </Stack>
+            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+              <Chip size="small" label={`Role: ${profile.user_type ?? "member"}`} sx={{ bgcolor: "rgba(59,130,246,0.18)", color: "#bfdbfe", fontWeight: 600 }} />
+              <Chip size="small" label={profile.company_name ?? "No company"} sx={{ bgcolor: "rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.84)", fontWeight: 600 }} />
+            </Stack>
           </Stack>
         </Box>
         <PasswordSettingsForm />

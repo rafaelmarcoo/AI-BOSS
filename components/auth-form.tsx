@@ -19,6 +19,7 @@ import {
   Typography,
 } from '@mui/material'
 import type { UserType } from '@/types/database'
+import { authCardStyles, authFieldStyles } from '@/components/auth-ui'
 
 type Mode = 'sign-in' | 'sign-up'
 
@@ -135,26 +136,17 @@ export function AuthForm({ mode }: AuthFormProps) {
       component="form"
       onSubmit={handleSubmit}
       elevation={0}
-      sx={{
-        width: '100%',
-        maxWidth: 448,
-        p: { xs: 3, sm: 4 },
-        borderRadius: '2rem',
-        border: '1px solid',
-        borderColor: 'divider',
-        bgcolor: 'background.paper',
-        boxShadow: '0 24px 80px rgba(15, 23, 42, 0.10)',
-      }}
+      sx={authCardStyles}
     >
       <Stack spacing={3}>
         <Stack spacing={0.5}>
-          <Typography variant="overline" color="primary" fontWeight={700}>
+          <Typography variant="overline" sx={{ color: "#93c5fd" }} fontWeight={700}>
             AI-BOSS financial intelligence
           </Typography>
-          <Typography variant="h4" component="h1" fontWeight={600}>
+          <Typography variant="h4" component="h1" fontWeight={600} color="common.white">
           {isSignUp ? 'Create your workspace account' : 'Welcome back'}
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.68)" }}>
           {isSignUp
             ? 'Set up a secure account for clear, source-aware financial decisions.'
             : 'Sign in to your AI-BOSS financial intelligence workspace.'}
@@ -174,10 +166,11 @@ export function AuthForm({ mode }: AuthFormProps) {
               fullWidth
               error={Boolean(fieldErrors.fullName)}
               helperText={fieldErrors.fullName ?? ' '}
+              sx={authFieldStyles}
             />
 
             <FormControl error={Boolean(fieldErrors.userType)}>
-              <FormLabel id="user-type-label">How will you use AI-BOSS?</FormLabel>
+              <FormLabel id="user-type-label" sx={{ color: "rgba(255,255,255,0.76)" }}>How will you use AI-BOSS?</FormLabel>
               <ToggleButtonGroup
                 aria-labelledby="user-type-label"
                 value={userType}
@@ -186,7 +179,7 @@ export function AuthForm({ mode }: AuthFormProps) {
                 onChange={(_, nextUserType: UserType | null) => {
                   if (nextUserType) setUserType(nextUserType)
                 }}
-                sx={{ mt: 1 }}
+                sx={{ mt: 1, "& .MuiToggleButton-root": { color: "rgba(255,255,255,0.72)", borderColor: "rgba(255,255,255,0.16)" }, "& .Mui-selected": { color: "common.white !important", bgcolor: "rgba(59,130,246,0.26) !important" } }}
               >
                 <ToggleButton value="admin">Create a company</ToggleButton>
                 <ToggleButton value="employee">Join a company</ToggleButton>
@@ -207,6 +200,7 @@ export function AuthForm({ mode }: AuthFormProps) {
                 helperText={
                   fieldErrors.companyName ?? 'This creates a company employees can join.'
                 }
+                sx={authFieldStyles}
               />
             ) : null}
 
@@ -231,6 +225,7 @@ export function AuthForm({ mode }: AuthFormProps) {
                     fieldErrors.companyName ??
                     (isLoadingCompanies ? 'Loading companies...' : 'Choose the company you work for.')
                   }
+                  sx={authFieldStyles}
                 >
                   {companies.map((companyName) => (
                     <MenuItem key={companyName} value={companyName}>
@@ -253,13 +248,8 @@ export function AuthForm({ mode }: AuthFormProps) {
           required
           error={Boolean(fieldErrors.email)}
           helperText={fieldErrors.email ?? ' '}
+          sx={authFieldStyles}
         />
-
-        {!isSignUp ? (
-          <MuiLink component={NextLink} href="/forgot-password" underline="hover" sx={{ alignSelf: "flex-start", fontSize: 14 }}>
-            Forgot password?
-          </MuiLink>
-        ) : null}
 
         <TextField
           name="password"
@@ -271,7 +261,14 @@ export function AuthForm({ mode }: AuthFormProps) {
           required
           error={Boolean(fieldErrors.password)}
           helperText={fieldErrors.password ?? ' '}
+          sx={authFieldStyles}
         />
+
+        {!isSignUp ? (
+          <MuiLink component={NextLink} href="/forgot-password" underline="hover" sx={{ alignSelf: "flex-end", fontSize: 14, color: "#bfdbfe" }}>
+            Forgot password?
+          </MuiLink>
+        ) : null}
 
         <Button
           type="submit"
@@ -281,10 +278,7 @@ export function AuthForm({ mode }: AuthFormProps) {
             (isSignUp && (!userType || isLoadingCompanies || Boolean(companiesError)))
           }
           fullWidth
-          sx={{
-            py: 1.5,
-            borderRadius: '999px',
-          }}
+          sx={{ py: 1.5, borderRadius: '999px', bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' } }}
         >
           {isSubmitting
             ? 'Working...'
@@ -293,13 +287,13 @@ export function AuthForm({ mode }: AuthFormProps) {
               : 'Sign in'}
         </Button>
 
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.68)" }}>
           {isSignUp ? 'Already have an account?' : 'Need an account?'}{' '}
           <MuiLink
             component={NextLink}
             href={isSignUp ? '/sign-in' : '/sign-up'}
             underline="hover"
-            sx={{ fontWeight: 600, color: 'text.primary' }}
+            sx={{ fontWeight: 600, color: '#bfdbfe' }}
           >
             {isSignUp ? 'Sign in' : 'Sign up'}
           </MuiLink>

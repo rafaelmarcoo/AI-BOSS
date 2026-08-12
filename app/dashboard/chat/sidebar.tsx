@@ -330,7 +330,7 @@ export function ChatSidebar({
               direction="row"
               spacing={1}
               alignItems="center"
-              sx={{ minWidth: 0, width: "100%" }}
+              sx={{ minWidth: 0, flex: "1 1 auto" }}
             >
               <Box
                 sx={{
@@ -375,6 +375,9 @@ export function ChatSidebar({
                 borderColor: dashboardTokens.borderMuted,
                 textTransform: "none",
                 whiteSpace: "nowrap",
+                flex: "0 0 auto",
+                minWidth: 0,
+                px: { xs: 1, sm: 1.25 },
               }}
             >
               New chat

@@ -102,9 +102,12 @@ describe('financial agent tools', () => {
 
     const result = await createGetLatestSnapshotTool('user-123').handler({})
 
-    expect(result).toContain('Latest financial metrics')
+    expect(result).toContain('4 metric(s) available')
     expect(result).toContain('cash: 120000 NZD')
     expect(result).toContain('source: demo.csv')
+    // The tool must hand the agent the confirmed runway inputs so it can
+    // call calculate_runway without inventing values.
+    expect(result).toContain('cash=120000, ar=45000, ap=21000, burn=28000')
     expect(mockReadSourceAwareMetrics).toHaveBeenCalledWith('user-123')
   })
 
@@ -119,7 +122,7 @@ describe('financial agent tools', () => {
 
     await expect(
       createGetLatestSnapshotTool('user-123').handler({})
-    ).resolves.toContain('No financial metrics are available yet')
+    ).resolves.toContain('No financial data found')
   })
 
   it('model_scenario compares before and after runway', async () => {
@@ -130,10 +133,12 @@ describe('financial agent tools', () => {
       monthly_cost_change: 9000,
     })
 
-    expect(result).toContain('Scenario: new hire')
-    expect(result).toContain('Before: 5.14 months')
-    expect(result).toContain('After: 3.89 months')
-    expect(result).toContain('Stored financial data was not changed')
+    expect(result).toContain('new hire')
+    // Assert the calculated figures rather than the surrounding label text,
+    // so wording and column alignment can change without breaking the test.
+    expect(result).toContain('5.14 months')
+    expect(result).toContain('3.89 months')
+    expect(result).toContain('has not been changed')
   })
 
   it('model_scenario handles incomplete runway inputs', async () => {
@@ -150,7 +155,7 @@ describe('financial agent tools', () => {
         label: 'new hire',
         monthly_cost_change: 9000,
       })
-    ).resolves.toContain('current runway inputs are incomplete')
+    ).resolves.toContain('financial data is incomplete')
   })
 
   it('model_scenario rejects scenarios with non-positive resulting burn', async () => {

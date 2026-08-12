@@ -15,7 +15,7 @@ export function assessRunwayPolicy(runwayMonths: number): RunwayPolicy {
       status: 'urgent',
       message:
         `Urgent: Your runway of ${runwayMonths} months is critically low. ` +
-        'Immediate action is required; consider cutting costs or securing funding.',
+        `Immediate action is required — consider cutting costs or securing emergency funding now.`,
       thresholdMonths: URGENT_THRESHOLD,
     }
   }
@@ -25,7 +25,7 @@ export function assessRunwayPolicy(runwayMonths: number): RunwayPolicy {
       status: 'caution',
       message:
         `Caution: Your runway of ${runwayMonths} months is below the recommended 6-month buffer. ` +
-        'Review burn rate, collections, and near-term commitments.',
+        `Review your burn rate and consider your fundraising options soon.`,
       thresholdMonths: CAUTION_THRESHOLD,
     }
   }

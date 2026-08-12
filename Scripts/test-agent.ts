@@ -25,6 +25,8 @@ try {
 import { runAgent } from '../lib/ai/agent'
 import { getAgentTools } from '../lib/ai/tool-registry'
 
+const TEST_USER_ID = process.env.TEST_USER_ID ?? '42dc8dcc-dcd1-4340-a8b6-bd45519f5a9d'
+
 const DIVIDER = '─'.repeat(60)
 
 async function runTest(label: string, input: string) {
@@ -33,7 +35,7 @@ async function runTest(label: string, input: string) {
   console.log(`USER: ${input}`)
   console.log(DIVIDER)
 
-  const response = await runAgent(input, [], getAgentTools('local-test-user'))
+  const response = await runAgent(input, [], getAgentTools(TEST_USER_ID))
   console.log(`AGENT: ${response.content}`)
   console.log(`TOKENS: ${response.tokensUsed ?? 'unknown'}`)
   console.log(
@@ -69,6 +71,26 @@ async function main() {
   await runTest(
     'Runway question (tool-enabled)',
     "What's my runway if I have $100,000 cash, $20,000 in receivables, $5,000 in payables, and I burn $10,000 a month?"
+  )
+
+  await runTest(
+    'Snapshot tool: fetch real data from DB',
+    "What's my current runway based on my actual financial data?"
+  )
+
+  await runTest(
+    'Scenario modelling: what if I hire someone',
+    "What happens to my runway if I hire someone for $8,000 a month?"
+  )
+
+  await runTest(
+    'Runway history: show me the trend',
+    'How has my runway changed over the last few months?'
+  )
+
+  await runTest(
+    'Runway forecast: when will I run out of money',
+    'Based on my current trend, when will my runway become critical?'
   )
 
   console.log(`\n${DIVIDER}`)

@@ -60,4 +60,5 @@ export interface ParsedDocumentResult {
   metadata: unknown
   chunks: DocumentChunkInsert[]
   csvData?: ParsedCsvData
+  pdfPages?: ParsedPdfPage[]
 }

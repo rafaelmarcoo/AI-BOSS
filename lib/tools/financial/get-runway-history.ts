@@ -11,13 +11,19 @@ export function createGetRunwayHistoryTool(
   return {
     name: 'get_runway_history',
     description:
-      'Describe historical runway movement from runway_months observations. Use this when the user asks whether runway is improving, declining, or changing over time.',
+      'Retrieves historical runway observations and describes how runway has changed over time. ' +
+      'Use this when the user asks about: historical performance, whether runway or burn rate is improving or worsening, ' +
+      'what changed over recent months, past trends, month-on-month movement, or any question about financial changes over time.',
     inputSchema: z.object({}),
     async handler() {
       const summary = await readRunwayObservationHistory(userId)
 
       if (summary.observations.length === 0) {
-        return 'No runway history is available yet. Upload CSVs that include runway months to build history.'
+        return (
+          'No financial history found yet. ' +
+          'History is recorded as financial data is uploaded over time. ' +
+          'Upload financial data across multiple periods to start building a history.'
+        )
       }
 
       const lines = [

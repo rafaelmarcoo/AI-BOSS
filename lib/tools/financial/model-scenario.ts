@@ -6,27 +6,32 @@ import type { StructuredTool } from '@/lib/tools/contracts'
 const ModelScenarioInputSchema = z.object({
   monthly_cost_change: z
     .number()
-    .describe(
-      'Recurring monthly burn change. Positive means a new cost; negative means a saving or revenue improvement.'
-    ),
-  label: z.string().describe('Short scenario label.'),
+    .describe('Monthly cost change to model in dollars. Positive = new expense, negative = saving.'),
+  label: z
+    .string()
+    .describe('Short label for this scenario, e.g. "new hire", "office lease", "cut marketing".'),
 })
 
 type ModelScenarioInput = z.infer<typeof ModelScenarioInputSchema>
 
-export function createModelScenarioTool(
-  userId: string
-): StructuredTool<ModelScenarioInput, string> {
+export function createModelScenarioTool(userId: string): StructuredTool<ModelScenarioInput, string> {
   return {
     name: 'model_scenario',
     description:
-      'Model a simple what-if scenario by applying a recurring monthly burn change to the current financial metrics and comparing before/after runway. This is read-only and does not change stored data.',
+      'Models a what-if financial scenario by applying a recurring monthly cost change and comparing before/after runway impact. ' +
+      'Use this when the user asks about: hiring a new employee, adding a subscription or expense, cutting a cost, ' +
+      'leasing office space, making any recurring spending change, or any question starting with "what if" or "what would happen if". ' +
+      'Pass a positive monthly_cost_change for new expenses, negative for savings or cost cuts. ' +
+      'Always include a clear label so the output is readable (e.g. "new hire", "office lease", "cut marketing spend").',
     inputSchema: ModelScenarioInputSchema,
     async handler({ monthly_cost_change, label }) {
       const snapshot = await readSourceAwareMetrics(userId)
 
       if (!snapshot.runwayInput) {
-        return 'Cannot model this scenario because current runway inputs are incomplete. Cash, accounts receivable, accounts payable, and burn rate are required.'
+        return (
+          'Cannot model scenario: financial data is incomplete. ' +
+          'Cash, accounts receivable, accounts payable, and burn rate are all required.'
+        )
       }
 
       const { cash, ar, ap, burn } = snapshot.runwayInput
@@ -41,22 +46,26 @@ export function createModelScenarioTool(
 
       const before = calculateRunway({ cash, ar, ap, burn })
       const after = calculateRunway({ cash, ar, ap, burn: scenarioBurn })
-      const runwayDiff = Number(
-        (after.runway_months - before.runway_months).toFixed(2)
-      )
-      const costLabel =
-        monthly_cost_change >= 0
-          ? `+${monthly_cost_change.toLocaleString()}/month`
-          : `-${Math.abs(monthly_cost_change).toLocaleString()}/month`
 
-      return [
-        `Scenario: ${label} (${costLabel})`,
-        `Before: ${before.runway_months} months runway at ${burn.toLocaleString()}/month burn.`,
-        `After: ${after.runway_months} months runway at ${scenarioBurn.toLocaleString()}/month burn.`,
-        `Impact: ${runwayDiff >= 0 ? '+' : ''}${runwayDiff} months.`,
+      const runwayDiff = parseFloat((after.runway_months - before.runway_months).toFixed(2))
+      const diffLabel = runwayDiff >= 0 ? `+${runwayDiff}` : `${runwayDiff}`
+      const costLabel = monthly_cost_change >= 0
+        ? `+$${monthly_cost_change.toLocaleString()}/month`
+        : `-$${Math.abs(monthly_cost_change).toLocaleString()}/month`
+
+      const lines = [
+        `Scenario: "${label}" (${costLabel})`,
+        '',
+        `Before: ${before.runway_months} months runway  |  Burn: $${burn.toLocaleString()}/month`,
+        `After:  ${after.runway_months} months runway  |  Burn: $${scenarioBurn.toLocaleString()}/month`,
+        `Impact: ${diffLabel} months`,
+        '',
         `Assessment: ${after.policy.message}`,
-        'This is a modelled scenario only. Stored financial data was not changed.',
-      ].join('\n')
+        '',
+        'Note: This is a modelled scenario only. Your actual financial data has not been changed.',
+      ]
+
+      return lines.join('\n')
     },
   }
 }

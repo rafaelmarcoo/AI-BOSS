@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { Alert, Button, Paper, Stack, TextField, Typography } from "@mui/material";
+import { authCardStyles, authFieldStyles } from "@/components/auth-ui";
 
 export function PasswordRecoveryForm() {
   const [email, setEmail] = useState("");
@@ -28,18 +29,18 @@ export function PasswordRecoveryForm() {
     <Paper component="form" onSubmit={submit} elevation={0} sx={cardStyles}>
       <Stack spacing={2.5}>
         <Stack spacing={0.5}>
-          <Typography variant="overline" color="primary">AI-BOSS</Typography>
-          <Typography variant="h4" fontWeight={700}>Reset your password</Typography>
-          <Typography color="text.secondary">Enter your email and we’ll send a secure recovery link if an account is available.</Typography>
+          <Typography variant="overline" sx={{ color: "#93c5fd" }}>AI-BOSS</Typography>
+          <Typography variant="h4" color="common.white" fontWeight={700}>Reset your password</Typography>
+          <Typography sx={{ color: "rgba(255,255,255,0.68)" }}>Enter your email and we’ll send a secure recovery link if an account is available.</Typography>
         </Stack>
         {sent ? <Alert severity="success">If an account exists for that email, a password recovery link has been sent.</Alert> : null}
-        <TextField label="Email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
+        <TextField label="Email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} sx={authFieldStyles} />
         <Button type="submit" variant="contained" disabled={submitting} sx={buttonStyles}>{submitting ? "Sending…" : "Send recovery link"}</Button>
-        <Typography variant="body2" color="text.secondary">Remembered it? <Link href="/sign-in">Sign in</Link></Typography>
+        <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.68)" }}>Remembered it? <Link href="/sign-in" style={{ color: "#bfdbfe" }}>Sign in</Link></Typography>
       </Stack>
     </Paper>
   );
 }
 
-const cardStyles = { width: "100%", maxWidth: 448, p: { xs: 3, sm: 4 }, borderRadius: "2rem", border: "1px solid", borderColor: "divider", boxShadow: "0 24px 80px rgba(15, 23, 42, 0.10)" };
+const cardStyles = authCardStyles;
 const buttonStyles = { py: 1.5, borderRadius: "999px" };

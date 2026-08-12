@@ -1,19 +1,12 @@
 import { Box } from '@mui/material'
 import { AuthForm } from '@/components/auth-form'
+import { authPageStyles } from '@/components/auth-ui'
 
 export default function SignInPage() {
   return (
     <Box
       component="main"
-      sx={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'radial-gradient(circle at top, rgba(226,232,240,0.9), rgba(248,250,252,1) 55%)',
-        px: 3,
-        py: 8,
-      }}
+      sx={authPageStyles}
     >
       <AuthForm mode="sign-in" />
     </Box>

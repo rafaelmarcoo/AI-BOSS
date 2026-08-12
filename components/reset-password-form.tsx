@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Alert, Button, Paper, Stack, TextField, Typography } from "@mui/material";
 import { createBrowserSupabaseClient } from "@/lib/supabase";
+import { authCardStyles, authFieldStyles } from "@/components/auth-ui";
 
 export function ResetPasswordForm() {
   const router = useRouter();
@@ -63,15 +64,15 @@ export function ResetPasswordForm() {
     <Paper component="form" onSubmit={submit} elevation={0} sx={cardStyles}>
       <Stack spacing={2.5}>
         <Stack spacing={0.5}>
-          <Typography variant="overline" color="primary">AI-BOSS</Typography>
-          <Typography variant="h4" fontWeight={700}>Choose a new password</Typography>
+          <Typography variant="overline" sx={{ color: "#93c5fd" }}>AI-BOSS</Typography>
+          <Typography variant="h4" color="common.white" fontWeight={700}>Choose a new password</Typography>
         </Stack>
-        {!ready ? <Typography color="text.secondary">Checking your recovery link…</Typography> : null}
+        {!ready ? <Typography sx={{ color: "rgba(255,255,255,0.68)" }}>Checking your recovery link…</Typography> : null}
         {linkError ? <Alert severity="error">{linkError}</Alert> : null}
         {error ? <Alert severity="error">{error}</Alert> : null}
         {!linkError ? <>
-          <TextField name="password" label="New password" type="password" autoComplete="new-password" required disabled={!ready || submitting} />
-          <TextField name="confirmPassword" label="Confirm new password" type="password" autoComplete="new-password" required disabled={!ready || submitting} />
+          <TextField name="password" label="New password" type="password" autoComplete="new-password" required disabled={!ready || submitting} sx={authFieldStyles} />
+          <TextField name="confirmPassword" label="Confirm new password" type="password" autoComplete="new-password" required disabled={!ready || submitting} sx={authFieldStyles} />
           <Button type="submit" variant="contained" disabled={!ready || submitting} sx={buttonStyles}>{submitting ? "Saving…" : "Reset password"}</Button>
         </> : null}
       </Stack>
@@ -79,5 +80,5 @@ export function ResetPasswordForm() {
   );
 }
 
-const cardStyles = { width: "100%", maxWidth: 448, p: { xs: 3, sm: 4 }, borderRadius: "2rem", border: "1px solid", borderColor: "divider", boxShadow: "0 24px 80px rgba(15, 23, 42, 0.10)" };
+const cardStyles = authCardStyles;
 const buttonStyles = { py: 1.5, borderRadius: "999px" };

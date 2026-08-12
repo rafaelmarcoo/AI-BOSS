@@ -11,6 +11,10 @@ import {
 import { logChatDecision } from '@/lib/chat/log-chat-decision'
 import { planGenUi } from '@/lib/gen-ui/plan-gen-ui'
 
+jest.mock('@/lib/agents/coordinator-agent', () => ({
+  runCoordinatorAgent: jest.fn(),
+}))
+
 jest.mock('@/lib/chat/build-chat-context', () => ({
   buildChatContext: jest.fn(),
 }))

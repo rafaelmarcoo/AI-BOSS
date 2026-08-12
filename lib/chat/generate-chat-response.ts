@@ -3,6 +3,7 @@ import { getAgentTools } from '@/lib/ai/tool-registry'
 import { ChatMessagePayload } from '@/lib/api/validation'
 import { ApiError } from '@/lib/api/errors'
 import { runAgent } from '@/lib/ai/agent'
+import { runCoordinatorAgent } from '@/lib/agents/coordinator-agent'
 import { CHAT_MODEL } from '@/lib/chat/system-prompt'
 import { logChatDecision } from '@/lib/chat/log-chat-decision'
 import { buildChatContext } from '@/lib/chat/build-chat-context'
@@ -58,12 +59,16 @@ export async function generateChatResponse(
     query: latestUserMessage.content,
   })
 
-  const agentResponse = await runAgent(
-    latestUserMessage.content,
-    chatHistory,
-    getAgentTools(userId),
-    chatContext.messages
-  )
+  const useMultiAgent = process.env.NEXT_PUBLIC_MULTI_AGENT === 'true'
+
+  const agentResponse = useMultiAgent
+    ? await runCoordinatorAgent(userId, latestUserMessage.content)
+    : await runAgent(
+        latestUserMessage.content,
+        chatHistory,
+        getAgentTools(userId),
+        chatContext.messages
+      )
   const uiPlan = await planGenUi({
     userId,
     userMessage: latestUserMessage.content,

@@ -50,5 +50,8 @@ Runway calculation is shared across two consumers:
 - the direct API route, which validates inputs and returns the calculated result
 - the chat agent tool, which reuses the shared runway calculation operation
 
-Historical and forecast trend tools use `financial_metric_observations`,
-specifically `runway_months` observations, rather than legacy snapshot rows.
+Historical analysis uses `financial_metric_observations`, rather than legacy
+snapshot rows. It supports cash, monthly revenue, monthly expenses, burn rate,
+and runway observations. The analysis is deterministic: it prioritises financial
+reporting dates, preserves source labels, warns when sources are mixed, and does
+not compare values across different currencies.

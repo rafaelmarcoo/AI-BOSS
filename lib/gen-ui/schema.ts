@@ -58,6 +58,28 @@ const RunwayTrendChartWidgetSchema = WidgetBaseSchema.extend({
   }),
 })
 
+const MetricTrendChartWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('metric_trend_chart'),
+  data: z.object({
+    metricKey: z.enum(FINANCIAL_METRIC_KEYS),
+    label: z.string(),
+    currency: z.string().nullable(),
+    points: z.array(
+      z.object({
+        date: z.string(),
+        value: z.number(),
+        sourceLabel: z.string(),
+        confidence: z.number(),
+      })
+    ),
+    direction: z.enum(['improving', 'worsening', 'stable', 'insufficient_data']),
+    totalChange: z.number().nullable(),
+    hasMixedSources: z.boolean(),
+    hasRecordedDateFallback: z.boolean(),
+    note: z.string(),
+  }),
+})
+
 const ScenarioComparisonWidgetSchema = WidgetBaseSchema.extend({
   type: z.literal('scenario_comparison'),
   data: z.object({
@@ -138,6 +160,7 @@ export const GenUiWidgetSchema = z.discriminatedUnion('type', [
   MetricSnapshotWidgetSchema,
   DataConnectionsWidgetSchema,
   RunwayTrendChartWidgetSchema,
+  MetricTrendChartWidgetSchema,
   ScenarioComparisonWidgetSchema,
   PlanningChecklistWidgetSchema,
   RiskThresholdTimelineWidgetSchema,

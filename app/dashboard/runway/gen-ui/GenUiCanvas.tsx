@@ -32,6 +32,7 @@ import type {
   HighlightExplainerWidget as HighlightExplainerWidgetModel,
   MetricSnapshotWidget as MetricSnapshotWidgetModel,
   MetricSourceEvidenceWidget as MetricSourceEvidenceWidgetModel,
+  MetricTrendChartWidget as MetricTrendChartWidgetModel,
   MissingDataPanelWidget as MissingDataPanelWidgetModel,
   PlanningChecklistWidget as PlanningChecklistWidgetModel,
   RiskThresholdTimelineWidget as RiskThresholdTimelineWidgetModel,
@@ -540,6 +541,67 @@ function MetricSourceEvidenceWidgetView({
   );
 }
 
+function MetricTrendChartWidgetView({
+  widget,
+}: {
+  widget: MetricTrendChartWidgetModel;
+}) {
+  const isRunway = widget.data.metricKey === 'runway_months';
+  const color = METRIC_COLORS[widget.data.metricKey];
+  const formatValue = (value: number) =>
+    isRunway
+      ? `${value.toFixed(1)} mo`
+      : widget.data.currency
+        ? new Intl.NumberFormat('en-NZ', {
+            style: 'currency',
+            currency: widget.data.currency,
+            maximumFractionDigits: 0,
+          }).format(value)
+        : value.toFixed(2);
+
+  return (
+    <WidgetFrame title={widget.title} reason={widget.reason}>
+      <Box sx={{ height: 220 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={widget.data.points} margin={{ top: 5, right: 16, left: 0, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke={dashboardTokens.border} />
+            <XAxis dataKey="date" stroke={dashboardTokens.textMuted} style={{ fontSize: "0.72rem" }} />
+            <YAxis
+              stroke={dashboardTokens.textMuted}
+              style={{ fontSize: "0.72rem" }}
+              tickFormatter={(value) => formatValue(Number(value))}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: dashboardTokens.surface,
+                border: `1px solid ${dashboardTokens.border}`,
+                borderRadius: 4,
+                color: "white",
+              }}
+              formatter={(value, _name, item) => {
+                const point = item.payload as MetricTrendChartWidgetModel['data']['points'][number];
+                return [`${formatValue(Number(value))} — ${point.sourceLabel}`, widget.data.label];
+              }}
+            />
+            <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={{ fill: color, r: 4 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </Box>
+      <Typography variant="body2" fontWeight={700} sx={{ color: dashboardTokens.textMuted }}>
+        Trend: {widget.data.direction}
+      </Typography>
+      <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
+        {widget.data.note}
+      </Typography>
+      {widget.data.hasRecordedDateFallback ? (
+        <Typography variant="caption" sx={{ color: "#fde68a" }}>
+          Some points use upload dates because reporting dates were unavailable.
+        </Typography>
+      ) : null}
+    </WidgetFrame>
+  );
+}
+
 function MissingDataPanelWidgetView({
   widget,
 }: {
@@ -628,6 +690,8 @@ export function GenUiWidgetRenderer({
       return <DataConnectionsWidgetView widget={widget} />;
     case "runway_trend_chart":
       return <RunwayTrendWidgetView widget={widget} />;
+    case "metric_trend_chart":
+      return <MetricTrendChartWidgetView widget={widget} />;
     case "scenario_comparison":
       return <ScenarioComparisonWidgetView widget={widget} />;
     case "planning_checklist":

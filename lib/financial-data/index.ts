@@ -29,3 +29,15 @@ export type {
   FinancialMetricValue,
   UnavailableFinancialMetricValue,
 } from '@/lib/financial-data/types'
+export {
+  HISTORICAL_METRIC_KEYS,
+  readFinancialMetricHistory,
+  summarizeMetricHistory,
+} from '@/lib/financial-data/metric-history'
+export type {
+  HistoricalMetricKey,
+  MetricHistoryDirection,
+  MetricHistoryPoint,
+  MetricHistoryRange,
+  MetricHistorySummary,
+} from '@/lib/financial-data/metric-history'

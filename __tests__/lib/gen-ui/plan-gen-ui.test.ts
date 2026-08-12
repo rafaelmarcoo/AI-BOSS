@@ -2,6 +2,7 @@ import { ChatOpenAI } from '@langchain/openai'
 import { fillUnavailableMetrics } from '@/lib/financial-data/read-model'
 import { readSourceAwareMetrics } from '@/lib/financial-data/read-service'
 import { readRunwayObservationHistory } from '@/lib/financial-data/runway-history'
+import { readFinancialMetricHistory } from '@/lib/financial-data/metric-history'
 import { planGenUi } from '@/lib/gen-ui/plan-gen-ui'
 
 const mockPlannerInvoke = jest.fn()
@@ -24,11 +25,16 @@ jest.mock('@/lib/financial-data/runway-history', () => ({
   getMetricObservationDate: jest.fn((metric) => metric.updatedAt),
 }))
 
+jest.mock('@/lib/financial-data/metric-history', () => ({
+  readFinancialMetricHistory: jest.fn(),
+}))
+
 const mockChatOpenAI = jest.mocked(ChatOpenAI)
 const mockReadSourceAwareMetrics = jest.mocked(readSourceAwareMetrics)
 const mockReadRunwayObservationHistory = jest.mocked(
   readRunwayObservationHistory
 )
+const mockReadFinancialMetricHistory = jest.mocked(readFinancialMetricHistory)
 const originalApiKey = process.env.OPENAI_API_KEY
 
 describe('planGenUi', () => {
@@ -48,6 +54,24 @@ describe('planGenUi', () => {
       direction: 'insufficient_data',
       change: null,
       averageChange: null,
+    })
+    mockReadFinancialMetricHistory.mockResolvedValue({
+      metricKey: 'cash',
+      label: 'Cash',
+      range: 'all',
+      points: [],
+      movement: null,
+      direction: 'insufficient_data',
+      firstValue: null,
+      latestValue: null,
+      totalChange: null,
+      percentageChange: null,
+      averageChange: null,
+      currency: 'NZD',
+      sourceLabels: [],
+      hasMixedSources: false,
+      hasRecordedDateFallback: false,
+      hasIncompatibleCurrencies: false,
     })
   })
 
@@ -125,5 +149,46 @@ describe('planGenUi', () => {
     )
 
     consoleError.mockRestore()
+  })
+
+  it('always includes a deterministic trend widget for a metric-specific historical question', async () => {
+    mockPlannerInvoke.mockResolvedValue({ widgets: [] })
+    mockReadFinancialMetricHistory.mockResolvedValue({
+      metricKey: 'cash',
+      label: 'Cash',
+      range: 'all',
+      points: [
+        { date: '2026-05-01', dateSource: 'as_of_date', value: 100, currency: 'NZD', sourceLabel: 'May CSV', sourceType: 'document', confidence: 0.9, updatedAt: '2026-05-01T00:00:00.000Z' },
+        { date: '2026-06-01', dateSource: 'as_of_date', value: 120, currency: 'NZD', sourceLabel: 'June CSV', sourceType: 'document', confidence: 0.9, updatedAt: '2026-06-01T00:00:00.000Z' },
+      ],
+      movement: 'increased',
+      direction: 'improving',
+      firstValue: 100,
+      latestValue: 120,
+      totalChange: 20,
+      percentageChange: 20,
+      averageChange: 20,
+      currency: 'NZD',
+      sourceLabels: ['May CSV', 'June CSV'],
+      hasMixedSources: true,
+      hasRecordedDateFallback: false,
+      hasIncompatibleCurrencies: false,
+    } as never)
+
+    const plan = await planGenUi({
+      userId: 'user-123',
+      userMessage: 'How has our cash changed over time?',
+      assistantMessage: 'Cash has increased.',
+      toolsUsed: [],
+    })
+
+    expect(mockReadFinancialMetricHistory).toHaveBeenCalledWith({
+      userId: 'user-123',
+      metricKey: 'cash',
+      range: 'all',
+    })
+    expect(plan?.widgets).toContainEqual(
+      expect.objectContaining({ type: 'metric_trend_chart' })
+    )
   })
 })

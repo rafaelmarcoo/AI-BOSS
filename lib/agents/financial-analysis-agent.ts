@@ -1,6 +1,7 @@
 import { runAgent } from '@/lib/ai/agent'
 import { createGetLatestSnapshotTool } from '@/lib/tools/financial/get-latest-snapshot'
 import { calculateRunwayTool } from '@/lib/tools/financial/calculate-runway'
+import type { BaseMessage } from '@langchain/core/messages'
 import type { AgentRunResult } from '@/lib/ai/agent'
 
 const FINANCIAL_ANALYSIS_SYSTEM_PROMPT = `You are a specialist financial data retrieval agent within AI-BOSS.
@@ -18,12 +19,20 @@ Do not explain, interpret, or add advice — just return the tool results accura
 
 export async function runFinancialAnalysisAgent(
   userId: string,
-  query: string
+  query: string,
+  chatHistory: BaseMessage[] = [],
+  contextMessages: BaseMessage[] = []
 ): Promise<AgentRunResult> {
   const tools = [
     createGetLatestSnapshotTool(userId),
     calculateRunwayTool,
   ]
 
-  return runAgent(query, [], tools, [], FINANCIAL_ANALYSIS_SYSTEM_PROMPT)
+  return runAgent(
+    query,
+    chatHistory,
+    tools,
+    contextMessages,
+    FINANCIAL_ANALYSIS_SYSTEM_PROMPT
+  )
 }

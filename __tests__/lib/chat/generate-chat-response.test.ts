@@ -2,6 +2,7 @@ import { SystemMessage } from '@langchain/core/messages'
 import { generateChatResponse } from '@/lib/chat/generate-chat-response'
 import { buildChatContext } from '@/lib/chat/build-chat-context'
 import { runAgent } from '@/lib/ai/agent'
+import { runCoordinatorAgent } from '@/lib/agents/coordinator-agent'
 import { getAgentTools } from '@/lib/ai/tool-registry'
 import {
   getOrCreateConversation,
@@ -49,6 +50,7 @@ jest.mock('@/lib/gen-ui/plan-gen-ui', () => ({
 
 const mockBuildChatContext = jest.mocked(buildChatContext)
 const mockRunAgent = jest.mocked(runAgent)
+const mockRunCoordinatorAgent = jest.mocked(runCoordinatorAgent)
 const mockGetAgentTools = jest.mocked(getAgentTools)
 const mockGetOrCreateConversation = jest.mocked(getOrCreateConversation)
 const mockInsertConversationMessage = jest.mocked(insertConversationMessage)
@@ -159,5 +161,91 @@ describe('generateChatResponse', () => {
       contextMessages
     )
     expect(mockLogChatDecision).toHaveBeenCalled()
+  })
+
+  it('passes conversation history and document context into the coordinator', async () => {
+    // The multi-agent path previously called the coordinator with only the
+    // user's message, silently dropping chat history and RAG context.
+    const previousMultiAgent = process.env.NEXT_PUBLIC_MULTI_AGENT
+    process.env.NEXT_PUBLIC_MULTI_AGENT = 'true'
+
+    const contextMessages = [new SystemMessage('metrics and RAG context')]
+    const message = (
+      id: string,
+      role: 'user' | 'assistant',
+      content: string
+    ) => ({
+      id,
+      conversation_id: 'conversation-1',
+      user_id: 'user-123',
+      role,
+      content,
+      citations: null,
+      ui_payload: null,
+      created_at: '2026-05-12T00:00:00.000Z',
+    })
+
+    // A prior exchange, so chat history is genuinely non-empty. Without this
+    // the assertion below would pass against an empty array and prove nothing.
+    const priorTurns = [
+      message('m1', 'user', 'What is my runway?'),
+      message('m2', 'assistant', 'Your runway is 9.09 months.'),
+    ]
+    const followUp = message('m3', 'user', 'What if I cut it by 20%?')
+
+    try {
+      mockGetOrCreateConversation.mockResolvedValue({
+        id: 'conversation-1',
+        user_id: 'user-123',
+        company_id: 'company-1',
+        visibility: 'company',
+        title: 'What is my runway?',
+        created_at: '2026-05-12T00:00:00.000Z',
+        updated_at: '2026-05-12T00:00:00.000Z',
+      })
+      mockInsertConversationMessage
+        .mockResolvedValueOnce(followUp)
+        .mockResolvedValueOnce(message('m4', 'assistant', 'That buys you time.'))
+      mockListConversationMessages
+        .mockResolvedValueOnce([...priorTurns, followUp])
+        .mockResolvedValueOnce([
+          ...priorTurns,
+          followUp,
+          message('m4', 'assistant', 'That buys you time.'),
+        ])
+      mockBuildChatContext.mockResolvedValue({
+        messages: contextMessages,
+        metricKeys: ['cash'],
+        retrievedChunks: [],
+      })
+      mockRunCoordinatorAgent.mockResolvedValue({
+        content: 'That buys you time.',
+        tokensUsed: 456,
+        toolsUsed: [],
+      })
+      mockPlanGenUi.mockResolvedValue(null)
+
+      await generateChatResponse(
+        'user-123',
+        [{ role: 'user', content: 'What if I cut it by 20%?' }],
+        'conversation-1'
+      )
+
+      expect(mockRunCoordinatorAgent).toHaveBeenCalledTimes(1)
+      expect(mockRunAgent).not.toHaveBeenCalled()
+
+      const [userId, query, history, context] =
+        mockRunCoordinatorAgent.mock.calls[0]
+
+      expect(userId).toBe('user-123')
+      expect(query).toBe('What if I cut it by 20%?')
+      // "cut it by 20%" is meaningless without the preceding turns.
+      expect(history).toHaveLength(2)
+      expect(history?.[0].content).toBe('What is my runway?')
+      expect(history?.[1].content).toBe('Your runway is 9.09 months.')
+      expect(context).toBe(contextMessages)
+    } finally {
+      process.env.NEXT_PUBLIC_MULTI_AGENT = previousMultiAgent
+    }
   })
 })

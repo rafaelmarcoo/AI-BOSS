@@ -4,9 +4,18 @@ import { runFinancialAnalysisAgent } from '@/lib/agents/financial-analysis-agent
 import { runForecastingAgent } from '@/lib/agents/forecasting-agent'
 import { ApiError } from '@/lib/api/errors'
 import { CHAT_MODEL } from '@/lib/chat/system-prompt'
+import type { BaseMessage } from '@langchain/core/messages'
 import type { AgentRunResult } from '@/lib/ai/agent'
 
 type AgentIntent = 'financial_analysis' | 'forecasting_scenario'
+
+/**
+ * How many recent messages the intent classifier sees.
+ * It needs enough to resolve references like "cut it by 20%", but feeding it
+ * the whole conversation makes it latch onto earlier topics instead of the
+ * question actually being asked.
+ */
+const CLASSIFIER_HISTORY_LIMIT = 4
 
 const COORDINATOR_SYSTEM_PROMPT = `You are the coordinator of AI-BOSS, an intelligent financial companion.
 
@@ -63,10 +72,14 @@ function createLLM() {
   return new ChatOpenAI({ model: CHAT_MODEL, temperature: 0, apiKey })
 }
 
-async function classifyIntent(query: string): Promise<AgentIntent> {
+async function classifyIntent(
+  query: string,
+  chatHistory: BaseMessage[] = []
+): Promise<AgentIntent> {
   const llm = createLLM()
   const response = await llm.invoke([
     new SystemMessage(COORDINATOR_SYSTEM_PROMPT),
+    ...chatHistory.slice(-CLASSIFIER_HISTORY_LIMIT),
     new HumanMessage(query),
   ])
 
@@ -79,13 +92,16 @@ async function classifyIntent(query: string): Promise<AgentIntent> {
 }
 
 async function narrateResponse(
-  userId: string,
   query: string,
-  specialistOutput: string
+  specialistOutput: string,
+  chatHistory: BaseMessage[] = []
 ): Promise<string> {
   const llm = createLLM()
   const response = await llm.invoke([
     new SystemMessage(COORDINATOR_RESPONSE_PROMPT),
+    // Prior turns let the narrator build on what it already told the user
+    // instead of re-explaining the same context every message.
+    ...chatHistory,
     new HumanMessage(
       `User asked: "${query}"\n\nSpecialist analysis:\n${specialistOutput}\n\nNow present this to the user as their financial advisor.`
     ),
@@ -98,15 +114,21 @@ async function narrateResponse(
 
 export async function runCoordinatorAgent(
   userId: string,
-  query: string
+  query: string,
+  chatHistory: BaseMessage[] = [],
+  contextMessages: BaseMessage[] = []
 ): Promise<AgentRunResult> {
-  const intent = await classifyIntent(query)
+  const intent = await classifyIntent(query, chatHistory)
 
   const specialistResult = intent === 'forecasting_scenario'
-    ? await runForecastingAgent(userId, query)
-    : await runFinancialAnalysisAgent(userId, query)
+    ? await runForecastingAgent(userId, query, chatHistory, contextMessages)
+    : await runFinancialAnalysisAgent(userId, query, chatHistory, contextMessages)
 
-  const narratedResponse = await narrateResponse(userId, query, specialistResult.content)
+  const narratedResponse = await narrateResponse(
+    query,
+    specialistResult.content,
+    chatHistory
+  )
 
   return {
     content: narratedResponse,

@@ -3,6 +3,7 @@ import { createGetLatestSnapshotTool } from '@/lib/tools/financial/get-latest-sn
 import { createModelScenarioTool } from '@/lib/tools/financial/model-scenario'
 import { createGetRunwayHistoryTool } from '@/lib/tools/financial/get-runway-history'
 import { createForecastRunwayTrendTool } from '@/lib/tools/financial/forecast-runway-trend'
+import type { BaseMessage } from '@langchain/core/messages'
 import type { AgentRunResult } from '@/lib/ai/agent'
 
 const FORECASTING_SYSTEM_PROMPT = `You are a specialist forecasting and scenario data agent within AI-BOSS.
@@ -25,7 +26,9 @@ Rules:
 
 export async function runForecastingAgent(
   userId: string,
-  query: string
+  query: string,
+  chatHistory: BaseMessage[] = [],
+  contextMessages: BaseMessage[] = []
 ): Promise<AgentRunResult> {
   const tools = [
     createGetLatestSnapshotTool(userId),
@@ -34,5 +37,11 @@ export async function runForecastingAgent(
     createModelScenarioTool(userId),
   ]
 
-  return runAgent(query, [], tools, [], FORECASTING_SYSTEM_PROMPT)
+  return runAgent(
+    query,
+    chatHistory,
+    tools,
+    contextMessages,
+    FORECASTING_SYSTEM_PROMPT
+  )
 }

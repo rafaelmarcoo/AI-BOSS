@@ -62,7 +62,12 @@ export async function generateChatResponse(
   const useMultiAgent = process.env.NEXT_PUBLIC_MULTI_AGENT === 'true'
 
   const agentResponse = useMultiAgent
-    ? await runCoordinatorAgent(userId, latestUserMessage.content)
+    ? await runCoordinatorAgent(
+        userId,
+        latestUserMessage.content,
+        chatHistory,
+        chatContext.messages
+      )
     : await runAgent(
         latestUserMessage.content,
         chatHistory,

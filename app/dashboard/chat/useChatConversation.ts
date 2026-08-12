@@ -180,6 +180,8 @@ export function useChatConversation({
 
       setConversationId(payload.data.conversationId);
       setVisibility(payload.data.visibility);
+      const shouldGenerateAiTitle = !conversationId && !existingMessages.length;
+
       setConversations((prev) => {
         const existingConversation = prev.find(
           (conversation) => conversation.id === payload.data!.conversationId
@@ -201,6 +203,28 @@ export function useChatConversation({
 
         return [nextSummary, ...existingWithoutCurrent];
       });
+
+      if (shouldGenerateAiTitle) {
+        void fetch(`/api/chat/conversations/${payload.data.conversationId}/title`, {
+          method: "POST",
+        })
+          .then(async (titleResponse) => {
+            const titlePayload = (await titleResponse.json()) as ConversationMutationApiResponse;
+
+            if (!titleResponse.ok || !titlePayload.success || !titlePayload.data?.conversation) {
+              return;
+            }
+
+            setConversations((prev) =>
+              prev.map((conversation) =>
+                conversation.id === payload.data!.conversationId
+                  ? titlePayload.data!.conversation!
+                  : conversation,
+              ),
+            );
+          })
+          .catch(() => undefined);
+      }
 
       setConversationMessages(
         mapApiConversationToRecords(payload.data.conversation)

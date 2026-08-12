@@ -15,6 +15,11 @@ import {
   type RunwayTrendSummary,
 } from '@/lib/financial-data/runway-history'
 import {
+  readFinancialMetricHistory,
+  type HistoricalMetricKey,
+  type MetricHistorySummary,
+} from '@/lib/financial-data/metric-history'
+import {
   GEN_UI_PLAN_VERSION,
   GEN_UI_WIDGET_TYPES,
   type GenUiPlan,
@@ -77,6 +82,21 @@ interface GenUiDataContext {
   source: GenUiSource
   selectedText: string | null
   userMessage: string
+  metricHistory: MetricHistorySummary | null
+}
+
+function historicalMetricKeyForMessage(userMessage: string): HistoricalMetricKey | null {
+  const normalized = userMessage.toLowerCase()
+  const isHistorical = /\b(history|historical|changed?|increase|decrease|improv|worsen|declin|past|over time|trend)\b/.test(normalized)
+
+  if (!isHistorical) return null
+  if (/\brunway\b/.test(normalized)) return 'runway_months'
+  if (/\bcash\b/.test(normalized)) return 'cash'
+  if (/\bburn\b/.test(normalized)) return 'burn_rate'
+  if (/\brevenue|income\b/.test(normalized)) return 'monthly_revenue'
+  if (/\bexpense|cost\b/.test(normalized)) return 'monthly_expenses'
+
+  return null
 }
 
 function formatCurrency(value: number | null | undefined) {
@@ -146,6 +166,15 @@ function defaultWidgetSpecs(
   }
 
   const metricKeys = selectMetricKeysForMessage(userMessage)
+  const historicalMetricKey = historicalMetricKeyForMessage(userMessage)
+
+  if (historicalMetricKey) {
+    widgets.push({
+      type: 'metric_trend_chart',
+      title: `Historical ${FINANCIAL_METRIC_LABELS[historicalMetricKey]} trend`,
+      reason: 'The question asks how one financial metric has changed over time.',
+    })
+  }
 
   if (metricKeys.length > 0) {
     widgets.push({
@@ -164,7 +193,7 @@ function defaultWidgetSpecs(
     })
   }
 
-  if (/\b(future|forecast|plan|planning|trend|next|months?)\b/.test(normalized)) {
+  if (/\b(future|forecast|plan|planning|next|months?)\b/.test(normalized)) {
     widgets.push(
       {
         type: 'runway_trend_chart',
@@ -473,6 +502,43 @@ function buildRunwayTrendWidget(
   }
 }
 
+function buildMetricTrendWidget(
+  spec: PlannerWidget,
+  index: number,
+  context: GenUiDataContext
+): GenUiWidget | null {
+  const history = context.metricHistory
+
+  if (!history || history.points.length < 2 || history.hasIncompatibleCurrencies) {
+    return null
+  }
+
+  return {
+    id: widgetId(spec.type, index),
+    type: 'metric_trend_chart',
+    title: spec.title ?? `Historical ${history.label} trend`,
+    reason: spec.reason ?? 'AI-BOSS selected a deterministic historical trend for this question.',
+    data: {
+      metricKey: history.metricKey,
+      label: history.label,
+      currency: history.currency,
+      points: history.points.map((point) => ({
+        date: point.date,
+        value: point.value,
+        sourceLabel: point.sourceLabel,
+        confidence: point.confidence,
+      })),
+      direction: history.direction,
+      totalChange: history.totalChange,
+      hasMixedSources: history.hasMixedSources,
+      hasRecordedDateFallback: history.hasRecordedDateFallback,
+      note: history.hasMixedSources
+        ? `This trend combines sources: ${history.sourceLabels.join(', ')}.`
+        : 'Values are based on stored financial observations.',
+    },
+  }
+}
+
 function buildScenarioComparisonWidget(
   spec: PlannerWidget,
   index: number,
@@ -751,6 +817,8 @@ function hydrateWidget(
       return buildDataConnectionsWidget(spec, index)
     case 'runway_trend_chart':
       return buildRunwayTrendWidget(spec, index, context)
+    case 'metric_trend_chart':
+      return buildMetricTrendWidget(spec, index, context)
     case 'scenario_comparison':
       return buildScenarioComparisonWidget(spec, index, context)
     case 'planning_checklist':
@@ -773,8 +841,9 @@ export async function planGenUi({
   toolsUsed,
 }: PlanGenUiParams): Promise<GenUiPlan | null> {
   const source = detectSource(userMessage)
+  const historicalMetricKey = historicalMetricKeyForMessage(userMessage)
 
-  const [snapshot, runwayTrend] = await Promise.all([
+  const [snapshot, runwayTrend, metricHistory] = await Promise.all([
     readSourceAwareMetrics(userId),
     readRunwayObservationHistory(userId).catch(() => ({
       observations: [],
@@ -782,6 +851,9 @@ export async function planGenUi({
       change: null,
       averageChange: null,
     })),
+    historicalMetricKey
+      ? readFinancialMetricHistory({ userId, metricKey: historicalMetricKey, range: 'all' }).catch(() => null)
+      : Promise.resolve(null),
   ])
   const fallbackSpecs = defaultWidgetSpecs(userMessage, snapshot, source)
   const selectedText = extractSelectedText(userMessage)
@@ -804,7 +876,11 @@ export async function planGenUi({
   }
 
   // A valid empty model response is intentional; fall back only when planning failed.
-  const specs = dedupeWidgetSpecs(modelSpecs ?? fallbackSpecs)
+  const historySpec = fallbackSpecs.find((spec) => spec.type === 'metric_trend_chart')
+  const specs = dedupeWidgetSpecs([
+    ...(historySpec ? [historySpec] : []),
+    ...(modelSpecs ?? fallbackSpecs),
+  ])
 
   if (specs.length === 0) {
     return null
@@ -816,6 +892,7 @@ export async function planGenUi({
     source,
     selectedText,
     userMessage,
+    metricHistory,
   }
   const widgets = specs
     .map((spec, index) => hydrateWidget(spec, index, context))

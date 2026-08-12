@@ -30,6 +30,13 @@ export const GEN_UI_WIDGET_CATALOG = {
     selectionGuidance: 'Select for future planning, forecasts, or trend questions.',
     defaultColumnSpan: 2,
   },
+  metric_trend_chart: {
+    type: 'metric_trend_chart',
+    label: 'Historical metric trend',
+    description: 'Shows deterministic historical movement for one financial metric.',
+    selectionGuidance: 'Select only for a historical question that names one metric such as cash, revenue, expenses, burn rate, or runway.',
+    defaultColumnSpan: 2,
+  },
   scenario_comparison: {
     type: 'scenario_comparison',
     label: 'Scenario comparison',

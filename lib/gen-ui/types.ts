@@ -6,6 +6,7 @@ export const GEN_UI_WIDGET_TYPES = [
   'metric_snapshot',
   'data_connections',
   'runway_trend_chart',
+  'metric_trend_chart',
   'scenario_comparison',
   'planning_checklist',
   'risk_threshold_timeline',
@@ -62,6 +63,26 @@ export interface RunwayTrendChartWidget extends GenUiWidgetBase {
     averageMonthlyChange: number | null
     cautionThreshold: number
     urgentThreshold: number
+    note: string
+  }
+}
+
+export interface MetricTrendChartWidget extends GenUiWidgetBase {
+  type: 'metric_trend_chart'
+  data: {
+    metricKey: FinancialMetricKey
+    label: string
+    currency: string | null
+    points: Array<{
+      date: string
+      value: number
+      sourceLabel: string
+      confidence: number
+    }>
+    direction: 'improving' | 'worsening' | 'stable' | 'insufficient_data'
+    totalChange: number | null
+    hasMixedSources: boolean
+    hasRecordedDateFallback: boolean
     note: string
   }
 }
@@ -140,6 +161,7 @@ export type GenUiWidget =
   | MetricSnapshotWidget
   | DataConnectionsWidget
   | RunwayTrendChartWidget
+  | MetricTrendChartWidget
   | ScenarioComparisonWidget
   | PlanningChecklistWidget
   | RiskThresholdTimelineWidget

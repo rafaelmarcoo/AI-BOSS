@@ -28,7 +28,7 @@ type AskChatbotMode = "selection" | "prompt";
 
 const MIN_CHAT_WIDTH = 280;
 const MAX_CHAT_WIDTH = 720;
-const DEFAULT_CHAT_WIDTH = 360;
+const DEFAULT_CHAT_WIDTH = 440;
 const RESIZER_WIDTH = 12;
 
 export function ResizablePanels({

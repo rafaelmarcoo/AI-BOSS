@@ -23,18 +23,18 @@ export const GEN_UI_WIDGET_CATALOG = {
     selectionGuidance: 'Select for connection, integration, Xero, QuickBooks, or upload questions.',
     defaultColumnSpan: 2,
   },
-  runway_trend_chart: {
-    type: 'runway_trend_chart',
-    label: 'Runway trend chart',
-    description: 'Historical and forecast runway movement over time.',
-    selectionGuidance: 'Select for future planning, forecasts, or trend questions.',
-    defaultColumnSpan: 2,
-  },
   metric_trend_chart: {
     type: 'metric_trend_chart',
     label: 'Historical metric trend',
     description: 'Shows deterministic historical movement for one financial metric.',
     selectionGuidance: 'Select only for a historical question that names one metric such as cash, revenue, expenses, burn rate, or runway.',
+    defaultColumnSpan: 2,
+  },
+  metric_forecast_chart: {
+    type: 'metric_forecast_chart',
+    label: 'Metric forecast',
+    description: 'Shows deterministic actual and projected movement for one financial metric.',
+    selectionGuidance: 'Select only for a future-focused question that names cash, revenue, expenses, burn rate, or runway.',
     defaultColumnSpan: 2,
   },
   scenario_comparison: {

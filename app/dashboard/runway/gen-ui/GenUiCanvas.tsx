@@ -32,11 +32,11 @@ import type {
   HighlightExplainerWidget as HighlightExplainerWidgetModel,
   MetricSnapshotWidget as MetricSnapshotWidgetModel,
   MetricSourceEvidenceWidget as MetricSourceEvidenceWidgetModel,
+  MetricForecastChartWidget as MetricForecastChartWidgetModel,
   MetricTrendChartWidget as MetricTrendChartWidgetModel,
   MissingDataPanelWidget as MissingDataPanelWidgetModel,
   PlanningChecklistWidget as PlanningChecklistWidgetModel,
   RiskThresholdTimelineWidget as RiskThresholdTimelineWidgetModel,
-  RunwayTrendChartWidget as RunwayTrendChartWidgetModel,
   ScenarioComparisonWidget as ScenarioComparisonWidgetModel,
 } from "@/lib/gen-ui/types";
 
@@ -207,86 +207,6 @@ function DataConnectionsWidgetView({
         {widget.data.message}
       </Typography>
       <DataSourcesPanel />
-    </WidgetFrame>
-  );
-}
-
-function RunwayTrendWidgetView({
-  widget,
-}: {
-  widget: RunwayTrendChartWidgetModel;
-}) {
-  const data = widget.data.points.map((point) => ({
-    ...point,
-    runway: point.runwayMonths,
-  }));
-
-  return (
-    <WidgetFrame title={widget.title} reason={widget.reason}>
-      <Box sx={{ height: 260, minWidth: 0 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 10, right: 18, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke={dashboardTokens.border} />
-            <XAxis
-              dataKey="label"
-              stroke={dashboardTokens.textMuted}
-              style={{ fontSize: "0.75rem" }}
-            />
-            <YAxis
-              stroke={dashboardTokens.textMuted}
-              style={{ fontSize: "0.75rem" }}
-              width={34}
-              tickFormatter={(value) => `${value}m`}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: dashboardTokens.surface,
-                border: `1px solid ${dashboardTokens.border}`,
-                borderRadius: 4,
-                color: "white",
-              }}
-              labelStyle={{ color: "white" }}
-              formatter={(value, _name, item) => [
-                `${formatNumber(value as number)} months`,
-                item.payload.kind === "actual" ? "Actual" : "Forecast",
-              ]}
-            />
-            <Line
-              type="monotone"
-              dataKey="runway"
-              stroke="#38bdf8"
-              strokeWidth={2.5}
-              dot={{ fill: "#020617", stroke: "#67e8f9", strokeWidth: 2, r: 4 }}
-              activeDot={{ r: 6 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </Box>
-      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-        <Chip
-          label={`Current ${formatNumber(widget.data.currentRunway)} mo`}
-          size="small"
-          sx={{ color: "#bbf7d0", bgcolor: "rgba(34, 197, 94, 0.12)" }}
-        />
-        <Chip
-          label={`Trend ${widget.data.direction.replace("_", " ")}`}
-          size="small"
-          sx={{ color: "#bae6fd", bgcolor: "rgba(14, 165, 233, 0.12)" }}
-        />
-        <Chip
-          label={`Caution < ${widget.data.cautionThreshold} mo`}
-          size="small"
-          sx={{ color: "#fde68a", bgcolor: "rgba(251, 191, 36, 0.12)" }}
-        />
-        <Chip
-          label={`Urgent < ${widget.data.urgentThreshold} mo`}
-          size="small"
-          sx={{ color: "#fecdd3", bgcolor: "rgba(251, 113, 133, 0.12)" }}
-        />
-      </Stack>
-      <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
-        {widget.data.note}
-      </Typography>
     </WidgetFrame>
   );
 }
@@ -602,6 +522,61 @@ function MetricTrendChartWidgetView({
   );
 }
 
+function MetricForecastChartWidgetView({
+  widget,
+}: {
+  widget: MetricForecastChartWidgetModel;
+}) {
+  const isRunway = widget.data.metricKey === "runway_months";
+  const color = METRIC_COLORS[widget.data.metricKey];
+  const formatValue = (value: number) =>
+    isRunway
+      ? `${value.toFixed(1)} mo`
+      : widget.data.currency
+        ? new Intl.NumberFormat("en-NZ", {
+            style: "currency",
+            currency: widget.data.currency,
+            maximumFractionDigits: 0,
+          }).format(value)
+        : value.toFixed(2);
+  const latestActual = widget.data.actualPoints.at(-1);
+  const data = [
+    ...widget.data.actualPoints.map((point, index) => ({
+      ...point,
+      actual: point.value,
+      forecast: index === widget.data.actualPoints.length - 1 ? point.value : undefined,
+    })),
+    ...widget.data.forecastPoints.map((point) => ({ ...point, forecast: point.value })),
+  ];
+
+  return (
+    <WidgetFrame title={widget.title} reason={widget.reason}>
+      <Box sx={{ height: 220 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 5, right: 16, left: 0, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke={dashboardTokens.border} />
+            <XAxis dataKey="date" stroke={dashboardTokens.textMuted} style={{ fontSize: "0.72rem" }} />
+            <YAxis stroke={dashboardTokens.textMuted} style={{ fontSize: "0.72rem" }} tickFormatter={(value) => formatValue(Number(value))} />
+            <Tooltip
+              contentStyle={{ backgroundColor: dashboardTokens.surface, border: `1px solid ${dashboardTokens.border}`, borderRadius: 4, color: "white" }}
+              formatter={(value, name) => [formatValue(Number(value)), name === "actual" ? "Actual" : "Forecast"]}
+            />
+            <Line type="monotone" dataKey="actual" stroke={color} strokeWidth={2} dot={{ fill: color, r: 4 }} connectNulls={false} />
+            <Line type="monotone" dataKey="forecast" stroke="#fbbf24" strokeWidth={2} strokeDasharray="6 4" dot={{ fill: "#fbbf24", r: 4 }} connectNulls={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </Box>
+      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+        <Chip label={`Latest ${formatValue(latestActual?.value ?? 0)}`} size="small" sx={{ color: "#bae6fd", bgcolor: "rgba(14, 165, 233, 0.12)" }} />
+        <Chip label={`${widget.data.monthlySlope >= 0 ? "+" : ""}${formatValue(widget.data.monthlySlope)} / month`} size="small" sx={{ color: "#fde68a", bgcolor: "rgba(251, 191, 36, 0.12)" }} />
+        <Chip label={`${widget.data.horizon}-month estimate`} size="small" sx={{ color: "#bbf7d0", bgcolor: "rgba(34, 197, 94, 0.12)" }} />
+      </Stack>
+      <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>{widget.data.note}</Typography>
+      {widget.data.hasRecordedDateFallback ? <Typography variant="caption" sx={{ color: "#fde68a" }}>Some points use upload dates because reporting dates were unavailable.</Typography> : null}
+    </WidgetFrame>
+  );
+}
+
 function MissingDataPanelWidgetView({
   widget,
 }: {
@@ -688,10 +663,10 @@ export function GenUiWidgetRenderer({
       return <MetricSnapshotWidgetView widget={widget} />;
     case "data_connections":
       return <DataConnectionsWidgetView widget={widget} />;
-    case "runway_trend_chart":
-      return <RunwayTrendWidgetView widget={widget} />;
     case "metric_trend_chart":
       return <MetricTrendChartWidgetView widget={widget} />;
+    case "metric_forecast_chart":
+      return <MetricForecastChartWidgetView widget={widget} />;
     case "scenario_comparison":
       return <ScenarioComparisonWidgetView widget={widget} />;
     case "planning_checklist":

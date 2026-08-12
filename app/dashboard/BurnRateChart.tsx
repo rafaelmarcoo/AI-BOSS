@@ -29,6 +29,10 @@ import {
   type MetricHistoryRange,
   type MetricHistorySummary,
 } from "@/lib/financial-data/metric-history";
+import type {
+  ForecastHorizon,
+  MetricForecastSummary,
+} from "@/lib/financial-data/metric-forecast";
 import { FINANCIAL_METRIC_LABELS } from "@/lib/financial-data/metric-keys";
 
 const RANGE_OPTIONS: MetricHistoryRange[] = ["3m", "6m", "all"];
@@ -51,6 +55,15 @@ interface HistoryResponse {
   data?: MetricHistorySummary;
   error?: { message?: string };
 }
+
+interface ForecastResponse {
+  success: boolean;
+  data?: MetricForecastSummary;
+  error?: { message?: string };
+}
+
+type ChartMode = "history" | "forecast";
+const FORECAST_HORIZONS: ForecastHorizon[] = [3, 6];
 
 function formatValue(
   value: number,
@@ -88,29 +101,40 @@ function directionColor(direction: MetricHistorySummary["direction"]) {
 export function HistoricalMetricsChart({ refreshKey }: { refreshKey: string }) {
   const [metricKey, setMetricKey] = useState<HistoricalMetricKey>("cash");
   const [range, setRange] = useState<MetricHistoryRange>("3m");
+  const [mode, setMode] = useState<ChartMode>("history");
+  const [horizon, setHorizon] = useState<ForecastHorizon>(3);
   const [history, setHistory] = useState<MetricHistorySummary | null>(null);
+  const [forecast, setForecast] = useState<MetricForecastSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const controller = new AbortController();
 
-    async function loadHistory() {
+    async function loadChartData() {
       setLoading(true);
       setError(null);
 
       try {
         const response = await fetch(
-          `/api/financial-data/history?metricKey=${metricKey}&range=${range}`,
+          mode === "history"
+            ? `/api/financial-data/history?metricKey=${metricKey}&range=${range}`
+            : `/api/financial-data/forecast?metricKey=${metricKey}&range=${range}&horizon=${horizon}`,
           { signal: controller.signal },
         );
-        const payload = (await response.json()) as HistoryResponse;
+        const payload = (await response.json()) as HistoryResponse | ForecastResponse;
 
         if (!response.ok || !payload.success || !payload.data) {
           throw new Error(payload.error?.message ?? "Could not load historical data.");
         }
 
-        setHistory(payload.data);
+        if (mode === "history") {
+          setHistory(payload.data as MetricHistorySummary);
+          setForecast(null);
+        } else {
+          setForecast(payload.data as MetricForecastSummary);
+          setHistory(null);
+        }
       } catch (requestError) {
         if (requestError instanceof DOMException && requestError.name === "AbortError") {
           return;
@@ -122,21 +146,42 @@ export function HistoricalMetricsChart({ refreshKey }: { refreshKey: string }) {
             : "Could not load historical data.",
         );
         setHistory(null);
+        setForecast(null);
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
     }
 
-    void loadHistory();
+    void loadChartData();
 
     return () => controller.abort();
-  }, [metricKey, range, refreshKey]);
+  }, [horizon, metricKey, mode, range, refreshKey]);
 
+  const displayHistory = mode === "forecast" ? forecast?.history ?? null : history;
   const chartHistory =
-    history && history.points.length >= 2 && !history.hasIncompatibleCurrencies
-      ? history
+    displayHistory && displayHistory.points.length >= 2 && !displayHistory.hasIncompatibleCurrencies
+      ? displayHistory
       : null;
-  const trendColor = history ? directionColor(history.direction) : dashboardTokens.textMuted;
+  const trendColor = displayHistory ? directionColor(displayHistory.direction) : dashboardTokens.textMuted;
+  const chartData = chartHistory
+    ? [
+        ...chartHistory.points.map((point, index) => ({
+          ...point,
+          actual: point.value,
+          forecast:
+            mode === "forecast" && index === chartHistory.points.length - 1
+              ? point.value
+              : undefined,
+        })),
+        ...(mode === "forecast"
+          ? (forecast?.forecastPoints ?? []).map((point) => ({
+              date: point.date,
+              value: point.value,
+              forecast: point.value,
+            }))
+          : []),
+      ]
+    : [];
 
   return (
     <Paper
@@ -159,10 +204,10 @@ export function HistoricalMetricsChart({ refreshKey }: { refreshKey: string }) {
         >
           <Box>
             <Typography variant="h6" fontWeight={700}>
-              Historical financial trend
+              Financial trend and forecast
             </Typography>
             <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
-              Uses dated financial observations, not mock dashboard data.
+              Uses dated financial observations and deterministic projections, not mock data.
             </Typography>
           </Box>
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
@@ -196,6 +241,40 @@ export function HistoricalMetricsChart({ refreshKey }: { refreshKey: string }) {
                 </Button>
               ))}
             </ButtonGroup>
+            <ButtonGroup size="small" aria-label="Chart mode">
+              {(["history", "forecast"] as const).map((option) => (
+                <Button
+                  key={option}
+                  onClick={() => setMode(option)}
+                  variant={mode === option ? "contained" : "outlined"}
+                  sx={{
+                    color: mode === option ? "common.white" : dashboardTokens.textMuted,
+                    borderColor: dashboardTokens.borderMuted,
+                    textTransform: "none",
+                  }}
+                >
+                  {option === "history" ? "History" : "Forecast"}
+                </Button>
+              ))}
+            </ButtonGroup>
+            {mode === "forecast" ? (
+              <ButtonGroup size="small" aria-label="Forecast horizon">
+                {FORECAST_HORIZONS.map((option) => (
+                  <Button
+                    key={option}
+                    onClick={() => setHorizon(option)}
+                    variant={horizon === option ? "contained" : "outlined"}
+                    sx={{
+                      color: horizon === option ? "common.white" : dashboardTokens.textMuted,
+                      borderColor: dashboardTokens.borderMuted,
+                      minWidth: 48,
+                    }}
+                  >
+                    {option}M
+                  </Button>
+                ))}
+              </ButtonGroup>
+            ) : null}
           </Stack>
         </Stack>
 
@@ -203,24 +282,24 @@ export function HistoricalMetricsChart({ refreshKey }: { refreshKey: string }) {
           <Stack alignItems="center" justifyContent="center" sx={{ minHeight: 280 }} spacing={1}>
             <CircularProgress size={28} />
             <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
-              Loading historical observations...
+              Loading {mode === "forecast" ? "forecast" : "historical observations"}...
             </Typography>
           </Stack>
         ) : error ? (
           <Alert severity="error">{error}</Alert>
-        ) : history?.hasIncompatibleCurrencies ? (
+        ) : displayHistory?.hasIncompatibleCurrencies ? (
           <Alert severity="warning">
             This history contains multiple currencies. AI-BOSS does not convert currencies, so it cannot chart or compare these values.
           </Alert>
         ) : !chartHistory ? (
           <Alert severity="info">
-            Upload at least two dated records for {history?.label.toLowerCase() ?? "this metric"} to view a historical trend.
+            Upload at least two dated records for {displayHistory?.label.toLowerCase() ?? "this metric"} to view a {mode === "forecast" ? "forecast" : "historical trend"}.
           </Alert>
         ) : (
           <>
             <Box sx={{ width: "100%", height: 280 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartHistory.points} margin={{ top: 5, right: 20, left: 4, bottom: 5 }}>
+                <LineChart data={chartData} margin={{ top: 5, right: 20, left: 4, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={dashboardTokens.border} />
                   <XAxis
                     dataKey="date"
@@ -242,21 +321,35 @@ export function HistoricalMetricsChart({ refreshKey }: { refreshKey: string }) {
                     }}
                     labelFormatter={(value) => formatDate(String(value))}
                     formatter={(value, _name, item) => {
-                      const point = item.payload as MetricHistorySummary["points"][number];
+                      const point = item.payload as MetricHistorySummary["points"][number] & { forecast?: number };
                       return [
-                        `${formatValue(Number(value), chartHistory.metricKey, chartHistory.currency)} — ${point.sourceLabel} (${Math.round(point.confidence * 100)}%)`,
-                        chartHistory.label,
+                        point.sourceLabel
+                          ? `${formatValue(Number(value), chartHistory.metricKey, chartHistory.currency)} — ${point.sourceLabel} (${Math.round(point.confidence * 100)}%)`
+                          : formatValue(Number(value), chartHistory.metricKey, chartHistory.currency),
+                        item.dataKey === "forecast" ? "Forecast" : chartHistory.label,
                       ];
                     }}
                   />
                   <Line
                     type="monotone"
-                    dataKey="value"
+                    dataKey="actual"
                     stroke={METRIC_COLORS[chartHistory.metricKey]}
                     dot={{ fill: METRIC_COLORS[chartHistory.metricKey], r: 4 }}
                     activeDot={{ r: 6 }}
                     strokeWidth={2}
                   />
+                  {mode === "forecast" ? (
+                    <Line
+                      type="monotone"
+                      dataKey="forecast"
+                      stroke="#fbbf24"
+                      strokeDasharray="6 4"
+                      dot={{ fill: "#fbbf24", r: 4 }}
+                      activeDot={{ r: 6 }}
+                      strokeWidth={2}
+                      connectNulls={false}
+                    />
+                  ) : null}
                 </LineChart>
               </ResponsiveContainer>
             </Box>
@@ -270,6 +363,11 @@ export function HistoricalMetricsChart({ refreshKey }: { refreshKey: string }) {
               <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
                 Latest: {chartHistory.latestValue === null ? "-" : formatValue(chartHistory.latestValue, chartHistory.metricKey, chartHistory.currency)}
               </Typography>
+              {mode === "forecast" && forecast && forecast.monthlySlope !== null ? (
+                <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
+                  Monthly projection: {forecast.monthlySlope >= 0 ? "+" : ""}{formatValue(forecast.monthlySlope, chartHistory.metricKey, chartHistory.currency)}
+                </Typography>
+              ) : null}
             </Stack>
             {chartHistory.hasMixedSources ? (
               <Alert severity="warning">
@@ -279,6 +377,11 @@ export function HistoricalMetricsChart({ refreshKey }: { refreshKey: string }) {
             {chartHistory.hasRecordedDateFallback ? (
               <Alert severity="info">
                 At least one point uses its upload/recorded date because a financial reporting date was unavailable.
+              </Alert>
+            ) : null}
+            {mode === "forecast" ? (
+              <Alert severity="info">
+                {forecast?.assumptions[0] ?? "Forecasts continue the observed historical trend."} This is not a guaranteed prediction.
               </Alert>
             ) : null}
           </>

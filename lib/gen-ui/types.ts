@@ -5,8 +5,8 @@ export const GEN_UI_PLAN_VERSION = 1
 export const GEN_UI_WIDGET_TYPES = [
   'metric_snapshot',
   'data_connections',
-  'runway_trend_chart',
   'metric_trend_chart',
+  'metric_forecast_chart',
   'scenario_comparison',
   'planning_checklist',
   'risk_threshold_timeline',
@@ -47,26 +47,6 @@ export interface DataConnectionsWidget extends GenUiWidgetBase {
   }
 }
 
-export interface GenUiRunwayPoint {
-  label: string
-  date: string | null
-  runwayMonths: number
-  kind: 'actual' | 'forecast'
-}
-
-export interface RunwayTrendChartWidget extends GenUiWidgetBase {
-  type: 'runway_trend_chart'
-  data: {
-    points: GenUiRunwayPoint[]
-    direction: 'improving' | 'declining' | 'stable' | 'insufficient_data'
-    currentRunway: number | null
-    averageMonthlyChange: number | null
-    cautionThreshold: number
-    urgentThreshold: number
-    note: string
-  }
-}
-
 export interface MetricTrendChartWidget extends GenUiWidgetBase {
   type: 'metric_trend_chart'
   data: {
@@ -81,6 +61,30 @@ export interface MetricTrendChartWidget extends GenUiWidgetBase {
     }>
     direction: 'improving' | 'worsening' | 'stable' | 'insufficient_data'
     totalChange: number | null
+    hasMixedSources: boolean
+    hasRecordedDateFallback: boolean
+    note: string
+  }
+}
+
+export interface MetricForecastChartWidget extends GenUiWidgetBase {
+  type: 'metric_forecast_chart'
+  data: {
+    metricKey: FinancialMetricKey
+    label: string
+    currency: string | null
+    actualPoints: Array<{
+      date: string
+      value: number
+      sourceLabel: string
+      confidence: number
+    }>
+    forecastPoints: Array<{
+      date: string
+      value: number
+    }>
+    horizon: 3 | 6
+    monthlySlope: number
     hasMixedSources: boolean
     hasRecordedDateFallback: boolean
     note: string
@@ -160,8 +164,8 @@ export interface HighlightExplainerWidget extends GenUiWidgetBase {
 export type GenUiWidget =
   | MetricSnapshotWidget
   | DataConnectionsWidget
-  | RunwayTrendChartWidget
   | MetricTrendChartWidget
+  | MetricForecastChartWidget
   | ScenarioComparisonWidget
   | PlanningChecklistWidget
   | RiskThresholdTimelineWidget

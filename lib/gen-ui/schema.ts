@@ -33,31 +33,6 @@ const DataConnectionsWidgetSchema = WidgetBaseSchema.extend({
   }),
 })
 
-const RunwayPointSchema = z.object({
-  label: z.string(),
-  date: z.string().nullable(),
-  runwayMonths: z.number(),
-  kind: z.enum(['actual', 'forecast']),
-})
-
-const RunwayTrendChartWidgetSchema = WidgetBaseSchema.extend({
-  type: z.literal('runway_trend_chart'),
-  data: z.object({
-    points: z.array(RunwayPointSchema),
-    direction: z.enum([
-      'improving',
-      'declining',
-      'stable',
-      'insufficient_data',
-    ]),
-    currentRunway: z.number().nullable(),
-    averageMonthlyChange: z.number().nullable(),
-    cautionThreshold: z.number(),
-    urgentThreshold: z.number(),
-    note: z.string(),
-  }),
-})
-
 const MetricTrendChartWidgetSchema = WidgetBaseSchema.extend({
   type: z.literal('metric_trend_chart'),
   data: z.object({
@@ -74,6 +49,29 @@ const MetricTrendChartWidgetSchema = WidgetBaseSchema.extend({
     ),
     direction: z.enum(['improving', 'worsening', 'stable', 'insufficient_data']),
     totalChange: z.number().nullable(),
+    hasMixedSources: z.boolean(),
+    hasRecordedDateFallback: z.boolean(),
+    note: z.string(),
+  }),
+})
+
+const MetricForecastChartWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('metric_forecast_chart'),
+  data: z.object({
+    metricKey: z.enum(FINANCIAL_METRIC_KEYS),
+    label: z.string(),
+    currency: z.string().nullable(),
+    actualPoints: z.array(
+      z.object({
+        date: z.string(),
+        value: z.number(),
+        sourceLabel: z.string(),
+        confidence: z.number(),
+      })
+    ),
+    forecastPoints: z.array(z.object({ date: z.string(), value: z.number() })),
+    horizon: z.union([z.literal(3), z.literal(6)]),
+    monthlySlope: z.number(),
     hasMixedSources: z.boolean(),
     hasRecordedDateFallback: z.boolean(),
     note: z.string(),
@@ -159,8 +157,8 @@ const HighlightExplainerWidgetSchema = WidgetBaseSchema.extend({
 export const GenUiWidgetSchema = z.discriminatedUnion('type', [
   MetricSnapshotWidgetSchema,
   DataConnectionsWidgetSchema,
-  RunwayTrendChartWidgetSchema,
   MetricTrendChartWidgetSchema,
+  MetricForecastChartWidgetSchema,
   ScenarioComparisonWidgetSchema,
   PlanningChecklistWidgetSchema,
   RiskThresholdTimelineWidgetSchema,

@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto'
 import { ApiError } from '@/lib/api/errors'
 import { createAdminSupabaseClient } from '@/lib/supabase'
 import { DOCUMENTS_STORAGE_BUCKET } from '@/lib/documents/constants'
-import type { Document, DocumentChunk } from '@/types/database'
+import type { Document, DocumentChunk, DocumentDeletionResult } from '@/types/database'
 import type { DocumentChunkInsert, DocumentSummary } from '@/lib/documents/types'
 import type { SupportedDocumentType } from '@/lib/documents/constants'
 
@@ -156,6 +156,36 @@ export async function deleteDocumentFile(storagePath: string) {
       error.message
     )
   }
+}
+
+/**
+ * Removes the Storage file first, then uses a database transaction to remove
+ * the document, its RAG chunks, and any deterministic metrics extracted from it.
+ */
+export async function deleteUserDocument(documentId: string, userId: string) {
+  const document = await getDocumentById(documentId, userId)
+
+  await deleteDocumentFile(document.storage_path)
+
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase.rpc(
+    'delete_owned_document_and_derived_metrics',
+    {
+      p_document_id: documentId,
+      p_user_id: userId,
+    }
+  )
+
+  if (error || data !== true) {
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to remove the document data.',
+      error?.message
+    )
+  }
+
+  return { deleted: true } satisfies DocumentDeletionResult
 }
 
 export async function createDocumentRecord(params: {

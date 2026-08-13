@@ -42,6 +42,7 @@ export interface DocumentChunkInsert {
 export interface ParsedPdfPage {
   pageNumber: number
   text: string
+  lines?: string[]
 }
 
 export interface ParsedCsvRow {
@@ -60,4 +61,5 @@ export interface ParsedDocumentResult {
   metadata: unknown
   chunks: DocumentChunkInsert[]
   csvData?: ParsedCsvData
+  pdfPages?: ParsedPdfPage[]
 }

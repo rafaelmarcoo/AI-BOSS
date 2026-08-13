@@ -3,7 +3,7 @@
  * Run with: npm run test:agent
  *
  * Tests the agent end-to-end against the real OpenAI API.
- * Requires OPENAI_API_KEY to be set in .env.local
+ * Requires OPENAI_API_KEY and TEST_USER_ID in .env.local or the environment.
  */
 
 import { readFileSync } from 'fs'
@@ -26,6 +26,7 @@ import { runAgent } from '../lib/ai/agent'
 import { getAgentTools } from '../lib/ai/tool-registry'
 
 const DIVIDER = '─'.repeat(60)
+const TEST_USER_ID = process.env.TEST_USER_ID ?? ''
 
 async function runTest(label: string, input: string) {
   console.log(`\n${DIVIDER}`)
@@ -33,7 +34,7 @@ async function runTest(label: string, input: string) {
   console.log(`USER: ${input}`)
   console.log(DIVIDER)
 
-  const response = await runAgent(input, [], getAgentTools('local-test-user'))
+  const response = await runAgent(input, [], getAgentTools(TEST_USER_ID))
   console.log(`AGENT: ${response.content}`)
   console.log(`TOKENS: ${response.tokensUsed ?? 'unknown'}`)
   console.log(
@@ -53,6 +54,11 @@ async function main() {
 
   if (!process.env.OPENAI_API_KEY) {
     console.error('\nError: OPENAI_API_KEY is missing. Add it to your .env.local file.')
+    process.exit(1)
+  }
+
+  if (!TEST_USER_ID) {
+    console.error('\nError: TEST_USER_ID is missing. Add it to your .env.local file.')
     process.exit(1)
   }
 

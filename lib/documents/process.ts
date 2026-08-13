@@ -6,7 +6,11 @@ import {
 import { logDocumentIngestion } from '@/lib/documents/log-document-ingestion'
 import { parseDocumentContent } from '@/lib/documents/parsing'
 import { extractCsvFinancialMetrics } from '@/lib/financial-data/extraction/csv'
-import { saveFinancialMetricObservation } from '@/lib/financial-data/persistence'
+import { extractPdfFinancialMetrics } from '@/lib/financial-data/extraction/pdf'
+import {
+  deleteFinancialMetricObservationsForDocument,
+  saveFinancialMetricObservations,
+} from '@/lib/financial-data/persistence'
 import {
   deleteDocumentFile,
   downloadDocumentFile,
@@ -35,12 +39,12 @@ function addMetricObservationCount(
   }
 }
 
-async function saveCsvMetricObservations(params: {
+function getCsvMetrics(params: {
   document: Awaited<ReturnType<typeof getDocumentById>>
   parsedDocument: ParsedDocumentResult
 }) {
   if (params.document.file_type !== 'csv' || !params.parsedDocument.csvData) {
-    return 0
+    return []
   }
 
   const extractedAt = new Date().toISOString()
@@ -51,21 +55,23 @@ async function saveCsvMetricObservations(params: {
     extractedAt,
   })
 
-  await Promise.all(
-    metrics.map((metric) =>
-      saveFinancialMetricObservation({
-        userId: params.document.user_id,
-        documentId: params.document.id,
-        metric,
-        rawData: {
-          extractor: 'deterministic_csv_v1',
-          fileName: params.document.file_name,
-        },
-      })
-    )
-  )
+  return metrics
+}
 
-  return metrics.length
+function getPdfMetrics(params: {
+  document: Awaited<ReturnType<typeof getDocumentById>>
+  parsedDocument: ParsedDocumentResult
+}) {
+  if (params.document.file_type !== 'pdf' || !params.parsedDocument.pdfPages) {
+    return []
+  }
+
+  return extractPdfFinancialMetrics({
+    pages: params.parsedDocument.pdfPages,
+    documentId: params.document.id,
+    sourceLabel: params.document.file_name,
+    extractedAt: new Date().toISOString(),
+  })
 }
 
 export async function processDocument(documentId: string, userId: string) {
@@ -87,10 +93,33 @@ export async function processDocument(documentId: string, userId: string) {
     const embeddedChunks = await embedDocumentChunks(parsedDocument.chunks)
 
     await replaceDocumentChunks(document.id, document.user_id, embeddedChunks)
-    const metricObservationCount = await saveCsvMetricObservations({
+    const csvMetrics = getCsvMetrics({
       document,
       parsedDocument,
     })
+    const pdfMetrics = getPdfMetrics({ document, parsedDocument })
+
+    // Reprocessing must replace the document's derived metrics, not append stale values.
+    await deleteFinancialMetricObservationsForDocument(document.id, document.user_id)
+    await saveFinancialMetricObservations({
+      userId: document.user_id,
+      documentId: document.id,
+      metrics: csvMetrics,
+      rawData: {
+        extractor: 'deterministic_csv_v1',
+        fileName: document.file_name,
+      },
+    })
+    await saveFinancialMetricObservations({
+      userId: document.user_id,
+      documentId: document.id,
+      metrics: pdfMetrics,
+      rawData: {
+        extractor: 'deterministic_pdf_v1',
+        fileName: document.file_name,
+      },
+    })
+    const metricObservationCount = csvMetrics.length + pdfMetrics.length
     const metadata = addMetricObservationCount(
       parsedDocument.metadata,
       metricObservationCount,
@@ -117,6 +146,15 @@ export async function processDocument(documentId: string, userId: string) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Document processing failed.'
+
+    try {
+      await deleteFinancialMetricObservationsForDocument(document.id, document.user_id)
+    } catch (cleanupError) {
+      console.error(
+        `Failed to clean up financial metrics for ${document.file_name}.`,
+        cleanupError
+      )
+    }
 
     try {
       await deleteDocumentFile(document.storage_path)

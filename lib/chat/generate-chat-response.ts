@@ -2,7 +2,9 @@ import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import { getAgentTools } from '@/lib/ai/tool-registry'
 import { ChatMessagePayload } from '@/lib/api/validation'
 import { ApiError } from '@/lib/api/errors'
-import { runAgent } from '@/lib/ai/agent'
+import { runAgent, type AgentRunResult } from '@/lib/ai/agent'
+import type { FinancialSpecialist } from '@/lib/agents/router'
+import { runMultiAgent } from '@/lib/agents/specialists'
 import { CHAT_MODEL } from '@/lib/chat/system-prompt'
 import { logChatDecision } from '@/lib/chat/log-chat-decision'
 import { buildChatContext } from '@/lib/chat/build-chat-context'
@@ -58,12 +60,27 @@ export async function generateChatResponse(
     query: latestUserMessage.content,
   })
 
-  const agentResponse = await runAgent(
-    latestUserMessage.content,
-    chatHistory,
-    getAgentTools(userId),
-    chatContext.messages
-  )
+  const multiAgentEnabled = process.env.MULTI_AGENT_MODE === 'true'
+  let agentResponse: AgentRunResult
+  let specialist: FinancialSpecialist | undefined
+
+  if (multiAgentEnabled) {
+    const multiAgentResponse = await runMultiAgent(
+      userId,
+      latestUserMessage.content,
+      chatHistory,
+      chatContext.messages
+    )
+    agentResponse = multiAgentResponse
+    specialist = multiAgentResponse.specialist
+  } else {
+    agentResponse = await runAgent(
+        latestUserMessage.content,
+        chatHistory,
+        getAgentTools(userId),
+        chatContext.messages
+      )
+  }
   const uiPlan = await planGenUi({
     userId,
     userMessage: latestUserMessage.content,
@@ -94,6 +111,7 @@ export async function generateChatResponse(
     tokensUsed: agentResponse.tokensUsed,
     toolsUsed: agentResponse.toolsUsed,
     responseTimeMs: Date.now() - startedAt,
+    specialist,
   })
 
   return {

@@ -9,6 +9,7 @@ Use this folder as the single source of truth for the live demo flow and QA pass
 - `ai-boss-demo-full-metrics.csv` - baseline structured metrics.
 - `ai-boss-demo-updated-month.csv` - partial newer month that proves source mixing.
 - `ai-boss-demo-risky-month.csv` - urgent low-runway month that proves warnings, trends, and forecast behavior.
+- `ai-boss-demo-consistent.csv` - three dated, same-currency months for multi-agent history, forecast, and scenario testing.
 - `ai-boss-demo-board-report.pdf` - PDF-only board report for RAG evidence.
 
 ## Upload Order
@@ -90,9 +91,9 @@ Which metrics are unavailable?
 ## Product Rules To Say Out Loud
 
 - CSV files feed structured financial metrics.
-- PDF files feed RAG/evidence context only.
+- PDF files always feed RAG/evidence context. Clearly dated PDFs with recognised financial labels can also create low-confidence structured observations; undated PDFs remain document-only.
 - Dashboard calculations never come directly from raw chunks.
 - Chat should prefer structured metrics for calculations and use document chunks as supporting context.
 - Scenario modelling is read-only and should not save results.
-- Forecast trend is a rough continuation estimate, not a real prediction.
+- Forecast trend is a deterministic continuation estimate, not a guaranteed prediction.
 - Accounting OAuth credentials now use provider-neutral `oauth_tokens`; `oauth_connection_states` is still only temporary callback state.

@@ -190,4 +190,26 @@ describe('financial agent tools', () => {
       })
     ).resolves.toContain('one confirmed currency')
   })
+
+  it('calculates an explicit burn percentage in trusted code', async () => {
+    mockReadSourceAwareMetrics.mockResolvedValue(availableMetrics())
+
+    const result = await createModelScenarioTool('user-123').handler({
+      label: 'reduce burn',
+      burn_percentage_change: -20,
+    })
+
+    expect(result).toContain('-5,600 NZD/month')
+    expect(result).toContain('-20% of current burn')
+    expect(result).toContain('5.14 months runway')
+    expect(result).toContain('6.43 months runway')
+  })
+
+  it('rejects an ambiguous or unsupported scenario input shape', async () => {
+    mockReadSourceAwareMetrics.mockResolvedValue(availableMetrics())
+
+    await expect(
+      createModelScenarioTool('user-123').handler({ label: 'ambiguous' })
+    ).resolves.toContain('exactly one scenario change')
+  })
 })

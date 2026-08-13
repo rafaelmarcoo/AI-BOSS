@@ -7,8 +7,15 @@ import type { StructuredTool } from '@/lib/tools/contracts'
 const ModelScenarioInputSchema = z.object({
   monthly_cost_change: z
     .number()
+    .optional()
     .describe(
-      'Recurring monthly burn change. Positive means a new cost; negative means a recurring saving.'
+      'Optional recurring monthly burn change. Positive means a new cost; negative means a recurring saving.'
+    ),
+  burn_percentage_change: z
+    .number()
+    .optional()
+    .describe(
+      'Optional percentage change to verified monthly burn. Positive means an increase; negative means a reduction. The tool calculates the dollar change.'
     ),
   label: z.string().describe('Short scenario label, such as "new hire" or "reduce marketing".'),
 })
@@ -44,7 +51,14 @@ export function createModelScenarioTool(
     description:
       'Model a read-only what-if scenario by applying a recurring monthly cost change to verified current financial metrics and comparing before/after runway. Use for a new hire, recurring subscription, office cost, cost reduction, or another recurring change. Positive monthly_cost_change is a new expense; negative is a saving. This never changes stored data.',
     inputSchema: ModelScenarioInputSchema,
-    async handler({ monthly_cost_change, label }) {
+    async handler({ monthly_cost_change, burn_percentage_change, label }) {
+      if (
+        (monthly_cost_change === undefined && burn_percentage_change === undefined) ||
+        (monthly_cost_change !== undefined && burn_percentage_change !== undefined)
+      ) {
+        return 'Provide exactly one scenario change: a monthly dollar change or a percentage change to monthly burn.'
+      }
+
       const snapshot = await readSourceAwareMetrics(userId)
 
       if (!snapshot.runwayInput) {
@@ -60,7 +74,14 @@ export function createModelScenarioTool(
       }
 
       const { cash, ar, ap, burn } = snapshot.runwayInput
-      const scenarioBurn = burn + monthly_cost_change
+      const percentageChange = burn_percentage_change ?? null
+      if (percentageChange !== null && (percentageChange <= -100 || percentageChange > 1000)) {
+        return 'The burn percentage change must be greater than -100% and no more than 1000%.'
+      }
+
+      const resolvedMonthlyCostChange =
+        monthly_cost_change ?? Number(((burn * percentageChange!) / 100).toFixed(2))
+      const scenarioBurn = burn + resolvedMonthlyCostChange
 
       if (scenarioBurn <= 0) {
         return (
@@ -75,12 +96,16 @@ export function createModelScenarioTool(
         (after.runway_months - before.runway_months).toFixed(2)
       )
       const costLabel =
-        monthly_cost_change >= 0
-          ? `+${monthly_cost_change.toLocaleString()} ${currency}/month`
-          : `-${Math.abs(monthly_cost_change).toLocaleString()} ${currency}/month`
+        resolvedMonthlyCostChange >= 0
+          ? `+${resolvedMonthlyCostChange.toLocaleString()} ${currency}/month`
+          : `-${Math.abs(resolvedMonthlyCostChange).toLocaleString()} ${currency}/month`
+      const percentageLabel =
+        percentageChange === null
+          ? ''
+          : `; ${percentageChange >= 0 ? '+' : ''}${percentageChange}% of current burn`
 
       return [
-        `Scenario: ${label} (${costLabel})`,
+        `Scenario: ${label} (${costLabel}${percentageLabel})`,
         `Before: ${before.runway_months} months runway at ${burn.toLocaleString()} ${currency}/month burn.`,
         `After: ${after.runway_months} months runway at ${scenarioBurn.toLocaleString()} ${currency}/month burn.`,
         `Impact: ${runwayDiff >= 0 ? '+' : ''}${runwayDiff} months.`,

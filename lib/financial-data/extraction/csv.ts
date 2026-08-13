@@ -104,6 +104,12 @@ function matchMetricLabel(value: string): MetricLabelMatch | null {
     return null
   }
 
+  // Check the specific burn labels before the broader "cash" label so that
+  // "cash burn" is never stored as a cash-balance observation.
+  if (/\b(burn rate|monthly burn|cash burn)\b/.test(label)) {
+    return { key: 'burn_rate', confidence: 0.9 }
+  }
+
   if (/\b(cash|bank balance|cash at bank|cash balance)\b/.test(label)) {
     return { key: 'cash', confidence: 0.95 }
   }
@@ -130,10 +136,6 @@ function matchMetricLabel(value: string): MetricLabelMatch | null {
     /\b(monthly expenses|expenses|operating expenses|opex|costs)\b/.test(label)
   ) {
     return { key: 'monthly_expenses', confidence: 0.85 }
-  }
-
-  if (/\b(burn rate|monthly burn|cash burn)\b/.test(label)) {
-    return { key: 'burn_rate', confidence: 0.9 }
   }
 
   if (/\b(runway|runway months)\b/.test(label)) {

@@ -2,6 +2,7 @@ import { ApiError } from '@/lib/api/errors'
 import { ChatMessagePayload } from '@/lib/api/validation'
 import { createAdminSupabaseClient } from '@/lib/supabase'
 import type { AgentToolUsage } from '@/lib/ai/agent'
+import type { FinancialSpecialist } from '@/lib/agents/router'
 
 interface LogChatDecisionParams {
   userId: string
@@ -13,6 +14,7 @@ interface LogChatDecisionParams {
   tokensUsed: number | null
   toolsUsed: AgentToolUsage[]
   responseTimeMs: number
+  specialist?: FinancialSpecialist
 }
 
 export async function logChatDecision({
@@ -25,6 +27,7 @@ export async function logChatDecision({
   tokensUsed,
   toolsUsed,
   responseTimeMs,
+  specialist,
 }: LogChatDecisionParams) {
   const lastUserMessage = [...messages]
     .reverse()
@@ -51,7 +54,9 @@ export async function logChatDecision({
     user_query: lastUserMessage.content,
     ai_response: aiResponse,
     conversation_history: messages,
-    tools_used: toolsUsed,
+    tools_used: specialist
+      ? [...toolsUsed, { tool: 'specialist_router', args: { specialist } }]
+      : toolsUsed,
     data_accessed: null,
     calculations: null,
     model_used: modelUsed,

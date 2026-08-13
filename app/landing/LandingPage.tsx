@@ -18,7 +18,7 @@ import {
 import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
 import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
-import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
+import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import MicRoundedIcon from "@mui/icons-material/MicRounded";
 import RouteRoundedIcon from "@mui/icons-material/RouteRounded";
@@ -34,12 +34,8 @@ type ChatConversationSummary = Pick<
 
 interface ConversationsApiResponse {
   success: boolean;
-  data?: {
-    conversations: ChatConversationSummary[];
-  };
-  error?: {
-    message?: string;
-  };
+  data?: { conversations: ChatConversationSummary[] };
+  error?: { message?: string };
 }
 
 interface LandingPageProps {
@@ -47,21 +43,23 @@ interface LandingPageProps {
   email: string;
 }
 
-const OPTION_CARDS = [
+const QUICK_ACTIONS = [
   {
-    title: "Upload",
-    description: "Upload CSV, PDF, PNG, JPEG, etc.",
-    icon: CloudUploadRoundedIcon,
+    title: "Upload files",
+    description: "Add statements, reports or financial documents.",
+    meta: "CSV, PDF and images",
+    icon: CloudUploadOutlinedIcon,
   },
   {
     title: "Accounts",
-    description: "View and manage your accounts.",
+    description: "View and manage connected accounts.",
+    meta: "Connections and balances",
     icon: AccountBalanceWalletRoundedIcon,
   },
   {
-    title: "Scenario",
-    description:
-      "Run or explore financial scenarios, forecasts, or what-if planning.",
+    title: "Scenarios",
+    description: "Test forecasts and financial decisions.",
+    meta: "Planning and what-if analysis",
     icon: RouteRoundedIcon,
   },
 ];
@@ -69,10 +67,7 @@ const OPTION_CARDS = [
 function getFirstName(fullName: string | null, email: string) {
   const trimmedName = fullName?.trim();
 
-  if (trimmedName) {
-    return trimmedName.split(/\s+/)[0];
-  }
-
+  if (trimmedName) return trimmedName.split(/\s+/)[0];
   return email.split("@")[0] || "there";
 }
 
@@ -124,14 +119,11 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
           );
         }
       } finally {
-        if (isMounted) {
-          setHistoryLoading(false);
-        }
+        if (isMounted) setHistoryLoading(false);
       }
     }
 
     void loadConversations();
-
     return () => {
       isMounted = false;
     };
@@ -143,14 +135,11 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
 
   const submitMessage = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
     const trimmed = message.trim();
 
-    if (!trimmed) {
-      return;
+    if (trimmed) {
+      router.push(`/dashboard?initialMessage=${encodeURIComponent(trimmed)}`);
     }
-
-    router.push(`/dashboard?initialMessage=${encodeURIComponent(trimmed)}`);
   };
 
   const handleAttachmentClick = () => {
@@ -161,15 +150,15 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
     // TODO: Connect this to voice input when speech capture is supported.
   };
 
+  const recentConversations = conversations.slice(0, 3);
+
   return (
     <Box
       component="main"
       sx={{
         minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        bgcolor: dashboardTokens.sidebarV2,
-        color: "common.white",
+        bgcolor: dashboardTokens.shell,
+        color: dashboardTokens.text,
       }}
     >
       <Stack
@@ -178,231 +167,268 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
         alignItems="center"
         justifyContent="space-between"
         sx={{
-          px: { xs: 2, sm: 4, lg: 6 },
-          py: { xs: 1.5, sm: 2 },
+          height: 56,
+          px: { xs: 1.5, sm: 3, lg: 5 },
+          bgcolor: dashboardTokens.sidebar,
           borderBottom: "1px solid",
-          borderBottomColor: dashboardTokens.border,
+          borderColor: dashboardTokens.border,
         }}
       >
-        <Stack direction="row" alignItems="center" spacing={1.5}>
+        <Stack direction="row" alignItems="center" spacing={1}>
           <IconButton
             aria-label="Open past chats"
+            size="small"
             onClick={() => setHistoryOpen(true)}
             sx={{
-              width: 44,
-              height: 44,
-              color: "common.white",
+              width: 34,
+              height: 34,
+              borderRadius: `${dashboardTokens.radiusSm}px`,
+              color: dashboardTokens.textMuted,
               "&:hover": {
-                bgcolor: "transparent",
+                color: dashboardTokens.text,
+                bgcolor: dashboardTokens.surfaceAlt,
               },
             }}
           >
-            <MenuRoundedIcon />
+            <MenuRoundedIcon fontSize="small" />
           </IconButton>
           <Typography
-            variant="h6"
-            component="p"
+            component="span"
             sx={{
-              display: { xs: "none", sm: "block" },
-              fontWeight: 700,
-              letterSpacing: 0,
+              fontSize: 20,
+              fontWeight: 650,
+              letterSpacing: "-0.02em",
             }}
           >
             AI-BOSS
           </Typography>
         </Stack>
-
         <SignOutButton />
       </Stack>
 
       <Stack
         sx={{
           width: "100%",
-          maxWidth: 1280,
+          maxWidth: dashboardTokens.contentMaxWidth,
           mx: "auto",
-          flex: "1 1 auto",
           px: { xs: 2, sm: 4, lg: 6 },
-          py: { xs: 4, sm: 6, lg: 8 },
-          gap: { xs: 4, lg: 6 },
+          py: { xs: 4, sm: 5, lg: 6 },
         }}
       >
-        <Stack spacing={1.25}>
+        <Box>
           <Typography
-            variant="h2"
             component="h1"
             sx={{
-              fontSize: { xs: "2.25rem", sm: "3rem", lg: "3.75rem" },
-              lineHeight: 1,
-              fontWeight: 750,
-              letterSpacing: 0,
+              fontSize: { xs: 28, sm: 34 },
+              lineHeight: 1.2,
+              fontWeight: 600,
+              letterSpacing: "-0.025em",
             }}
           >
             Hello, {firstName}
           </Typography>
           <Typography
-            variant="h3"
             component="p"
             sx={{
-              maxWidth: 900,
-              color: "rgba(255,255,255,0.92)",
-              fontSize: { xs: "1.6rem", sm: "2.25rem", lg: "2.75rem" },
-              lineHeight: 1.14,
-              fontWeight: 650,
-              letterSpacing: 0,
+              mt: 0.75,
+              color: dashboardTokens.textMuted,
+              fontSize: { xs: 18, sm: 20 },
+              lineHeight: 1.4,
+              fontWeight: 400,
             }}
           >
-            How can I help with your finances today?
+            What would you like to work on?
           </Typography>
-        </Stack>
+        </Box>
 
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: {
-              xs: "1fr",
-              md: "repeat(3, minmax(0, 1fr))",
-            },
-            gap: { xs: 1.5, md: 2 },
-          }}
-        >
-          {/* TODO: Add card action handlers when Upload, Accounts, and Scenario flows are ready. */}
-          {OPTION_CARDS.map((card) => {
-            const Icon = card.icon;
+        <Box sx={{ mt: 3 }}>
+          <Box
+            component="form"
+            onSubmit={submitMessage}
+            sx={{
+              minHeight: 60,
+              display: "flex",
+              alignItems: "center",
+              gap: 0.5,
+              px: { xs: 1.25, sm: 1.5 },
+              borderRadius: `${dashboardTokens.radiusMd}px`,
+              border: "1px solid",
+              borderColor: dashboardTokens.borderInput,
+              bgcolor: dashboardTokens.surface,
+              transition: "border-color 140ms ease, box-shadow 140ms ease",
+              "&:focus-within": {
+                borderColor: dashboardTokens.accent,
+                boxShadow: "0 0 0 3px rgba(79, 125, 243, 0.12)",
+              },
+            }}
+          >
+            <InputBase
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              placeholder="Ask AI-BOSS about your business finances..."
+              inputProps={{ "aria-label": "Ask AI-BOSS about your business finances" }}
+              sx={{
+                flex: "1 1 auto",
+                minWidth: 0,
+                color: dashboardTokens.text,
+                fontSize: 14,
+                "& input::placeholder": {
+                  color: dashboardTokens.textSubtle,
+                  opacity: 1,
+                },
+              }}
+            />
+            <IconButton
+              type="button"
+              aria-label="Attach a file"
+              onClick={handleAttachmentClick}
+              sx={composerControlSx}
+            >
+              <AttachFileRoundedIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              type="button"
+              aria-label="Start voice input"
+              onClick={handleMicrophoneClick}
+              sx={composerControlSx}
+            >
+              <MicRoundedIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              type="submit"
+              aria-label="Send message"
+              disabled={!message.trim()}
+              sx={{
+                width: 36,
+                height: 36,
+                borderRadius: `${dashboardTokens.radiusSm}px`,
+                color: dashboardTokens.text,
+                bgcolor: message.trim()
+                  ? dashboardTokens.accent
+                  : dashboardTokens.surfaceAlt,
+                "&:hover": {
+                  bgcolor: message.trim()
+                    ? dashboardTokens.accentHover
+                    : dashboardTokens.surfaceAlt,
+                },
+                "&.Mui-disabled": { color: dashboardTokens.textSubtle },
+              }}
+            >
+              <SendRoundedIcon fontSize="small" />
+            </IconButton>
+          </Box>
+          <Typography
+            sx={{ mt: 1, color: dashboardTokens.textSubtle, fontSize: 12 }}
+          >
+            AI-BOSS provides financial insights. Review important decisions before acting.
+          </Typography>
+        </Box>
 
-            return (
-              <Box
-                key={card.title}
-                sx={{
-                  minHeight: { xs: 160, sm: 190 },
-                  display: "grid",
-                  gridTemplateColumns: { xs: "72px 1fr", sm: "96px 1fr" },
-                  alignItems: "center",
-                  gap: { xs: 2, sm: 2.5 },
-                  p: { xs: 2, sm: 3 },
-                  borderRadius: 2,
-                  border: "1px solid",
-                  borderColor: dashboardTokens.borderSoft,
-                  bgcolor: "rgba(255,255,255,0.035)",
-                  boxShadow: "0 20px 70px rgba(0,0,0,0.22)",
-                }}
-              >
+        <Box component="section" sx={{ mt: 4 }}>
+          <Typography component="h2" sx={{ fontSize: 15, fontWeight: 600 }}>
+            Quick actions
+          </Typography>
+          <Box
+            sx={{
+              mt: 1.5,
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                sm: "repeat(3, minmax(0, 1fr))",
+              },
+              gap: 2,
+            }}
+          >
+            {QUICK_ACTIONS.map((action) => {
+              const Icon = action.icon;
+
+              return (
                 <Box
+                  key={action.title}
                   sx={{
-                    width: { xs: 64, sm: 86 },
-                    height: { xs: 64, sm: 86 },
-                    borderRadius: 2,
-                    display: "grid",
-                    placeItems: "center",
-                    bgcolor: "rgba(255,255,255,0.06)",
-                    color: "#93c5fd",
+                    minHeight: 142,
+                    p: 2.5,
+                    borderRadius: `${dashboardTokens.radiusMd}px`,
+                    border: "1px solid",
+                    borderColor: dashboardTokens.border,
+                    bgcolor: dashboardTokens.surface,
+                    transition: "background-color 140ms ease, border-color 140ms ease, transform 140ms ease",
+                    "&:hover": {
+                      bgcolor: dashboardTokens.surfaceAlt,
+                      borderColor: dashboardTokens.borderMuted,
+                      transform: "translateY(-1px)",
+                    },
                   }}
                 >
-                  <Icon sx={{ fontSize: { xs: 34, sm: 44 } }} />
+                  <Icon sx={{ fontSize: 22, color: dashboardTokens.textMuted }} />
+                  <Typography sx={{ mt: 1.75, fontSize: 16, fontWeight: 600 }}>
+                    {action.title}
+                  </Typography>
+                  <Typography
+                    sx={{ mt: 0.5, color: dashboardTokens.textMuted, fontSize: 14, lineHeight: 1.45 }}
+                  >
+                    {action.description}
+                  </Typography>
+                  <Typography sx={{ mt: 1, color: dashboardTokens.textSubtle, fontSize: 12 }}>
+                    {action.meta}
+                  </Typography>
                 </Box>
-                <Stack spacing={1}>
-                  <Typography
-                    variant="h5"
-                    component="h2"
-                    sx={{
-                      fontSize: { xs: "1.25rem", sm: "1.5rem" },
-                      lineHeight: 1.1,
-                      fontWeight: 700,
-                    }}
-                  >
-                    {card.title}
-                  </Typography>
-                  <Typography
-                    variant="body1"
-                    sx={{
-                      color: dashboardTokens.textSoft,
-                      fontSize: { xs: "1rem", sm: "1.1rem" },
-                      lineHeight: 1.45,
-                    }}
-                  >
-                    {card.description}
-                  </Typography>
-                </Stack>
-              </Box>
-            );
-          })}
+              );
+            })}
+          </Box>
         </Box>
 
-        <Box
-          component="form"
-          onSubmit={submitMessage}
-          sx={{
-            mt: "auto",
-            display: "flex",
-            alignItems: "center",
-            gap: 1,
-            minHeight: { xs: 68, sm: 78 },
-            px: { xs: 2, sm: 3 },
-            borderRadius: 999,
-            border: "1px solid",
-            borderColor: "rgba(147,197,253,0.65)",
-            bgcolor: "rgba(2,2,5,0.62)",
-          }}
-        >
-          <InputBase
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
-            placeholder="Send a message..."
-            inputProps={{ "aria-label": "Send a message to AI-BOSS" }}
-            sx={{
-              flex: "1 1 auto",
-              minWidth: 0,
-              color: "common.white",
-              fontSize: { xs: "1rem", sm: "1.2rem" },
-              "& input::placeholder": {
-                color: dashboardTokens.textMuted,
-                opacity: 1,
-              },
-            }}
-          />
-          <IconButton
-            type="button"
-            aria-label="Attach a file"
-            onClick={handleAttachmentClick}
-            sx={{ color: dashboardTokens.textMuted }}
-          >
-            <AttachFileRoundedIcon />
-          </IconButton>
-          <IconButton
-            type="button"
-            aria-label="Start voice input"
-            onClick={handleMicrophoneClick}
-            sx={{ color: dashboardTokens.textMuted }}
-          >
-            <MicRoundedIcon />
-          </IconButton>
-          <IconButton
-            type="submit"
-            aria-label="Send message"
-            disabled={!message.trim()}
-            sx={{
-              color: "common.white",
-              bgcolor: message.trim() ? "#2563eb" : "rgba(255,255,255,0.05)",
-              "&:hover": {
-                bgcolor: message.trim() ? "#1d4ed8" : "rgba(255,255,255,0.05)",
-              },
-              "&.Mui-disabled": {
-                color: dashboardTokens.textMuted,
-              },
-            }}
-          >
-            <SendRoundedIcon />
-          </IconButton>
-        </Box>
-
-        <Typography
-          variant="body2"
-          sx={{
-            textAlign: "center",
-            color: dashboardTokens.textMuted,
-          }}
-        >
-          AI helps with insights. Check important financial details.
-        </Typography>
+        {!historyLoading && recentConversations.length > 0 ? (
+          <Box component="section" sx={{ mt: 4 }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+              <Typography component="h2" sx={{ fontSize: 15, fontWeight: 600 }}>
+                Recent conversations
+              </Typography>
+              <Button
+                size="small"
+                onClick={() => setHistoryOpen(true)}
+                sx={{ color: dashboardTokens.textMuted, textTransform: "none", fontSize: 13 }}
+              >
+                View all
+              </Button>
+            </Stack>
+            <List
+              disablePadding
+              sx={{ mt: 1, borderTop: "1px solid", borderColor: dashboardTokens.border }}
+            >
+              {recentConversations.map((conversation) => (
+                <ListItem key={conversation.id} disablePadding>
+                  <ListItemButton
+                    onClick={() => openConversation(conversation.id)}
+                    sx={{
+                      px: 0,
+                      py: 1.25,
+                      borderBottom: "1px solid",
+                      borderColor: dashboardTokens.border,
+                      "&:hover": { bgcolor: "transparent" },
+                      "&:hover .conversation-title": { color: dashboardTokens.accentHover },
+                    }}
+                  >
+                    <ListItemText
+                      primary={conversation.title ?? "Untitled conversation"}
+                      secondary={formatConversationDate(conversation.updated_at)}
+                      primaryTypographyProps={{
+                        className: "conversation-title",
+                        color: dashboardTokens.textSoft,
+                        fontSize: 14,
+                        fontWeight: 500,
+                      }}
+                      secondaryTypographyProps={{
+                        color: dashboardTokens.textSubtle,
+                        fontSize: 12,
+                      }}
+                    />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          </Box>
+        ) : null}
       </Stack>
 
       <Drawer
@@ -413,8 +439,8 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
           sx: {
             width: { xs: "100vw", sm: 380 },
             maxWidth: "100vw",
-            bgcolor: "#080910",
-            color: "common.white",
+            bgcolor: dashboardTokens.sidebar,
+            color: dashboardTokens.text,
             borderRight: "1px solid",
             borderRightColor: dashboardTokens.border,
             p: { xs: 1.5, sm: 2 },
@@ -424,15 +450,15 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
       >
         <Stack spacing={2} sx={{ height: "100%" }}>
           <Stack direction="row" spacing={1.25} alignItems="center">
-            <ChatBubbleOutlineRoundedIcon />
+            <ChatBubbleOutlineRoundedIcon sx={{ color: dashboardTokens.textMuted }} />
             <Box sx={{ minWidth: 0 }}>
-              <Typography variant="h6" component="h2" fontWeight={700}>
+              <Typography component="h2" sx={{ fontSize: 16, fontWeight: 600 }}>
                 Past chats
               </Typography>
               <Typography
-                variant="body2"
                 sx={{
                   color: dashboardTokens.textMuted,
+                  fontSize: 13,
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
@@ -445,44 +471,39 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
 
           <Box sx={{ flex: "1 1 0", minHeight: 0, overflow: "auto" }}>
             {historyLoading ? (
-              <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
+              <Typography sx={{ color: dashboardTokens.textMuted, fontSize: 14 }}>
                 Loading conversations...
               </Typography>
             ) : historyError ? (
-              <Typography variant="body2" sx={{ color: "#fca5a5" }}>
+              <Typography sx={{ color: "#E56565", fontSize: 14 }}>
                 {historyError}
               </Typography>
             ) : conversations.length === 0 ? (
-              <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
+              <Typography sx={{ color: dashboardTokens.textMuted, fontSize: 14 }}>
                 No saved conversations yet.
               </Typography>
             ) : (
-              <List disablePadding sx={{ display: "grid", gap: 0.75 }}>
+              <List disablePadding sx={{ display: "grid", gap: 0.5 }}>
                 {conversations.map((conversation) => (
                   <ListItem key={conversation.id} disablePadding>
                     <ListItemButton
                       onClick={() => openConversation(conversation.id)}
                       sx={{
-                        borderRadius: 2,
-                        border: "1px solid",
-                        borderColor: dashboardTokens.border,
-                        bgcolor: "rgba(255,255,255,0.03)",
-                        "&:hover": {
-                          bgcolor: "rgba(255,255,255,0.08)",
-                        },
+                        borderRadius: `${dashboardTokens.radiusSm}px`,
+                        "&:hover": { bgcolor: dashboardTokens.surfaceAlt },
                       }}
                     >
                       <ListItemText
                         primary={conversation.title ?? "Untitled conversation"}
                         secondary={formatConversationDate(conversation.updated_at)}
                         primaryTypographyProps={{
-                          color: "common.white",
+                          color: dashboardTokens.text,
                           fontSize: 14,
-                          fontWeight: 650,
+                          fontWeight: 500,
                           noWrap: true,
                         }}
                         secondaryTypographyProps={{
-                          color: dashboardTokens.textMuted,
+                          color: dashboardTokens.textSubtle,
                           fontSize: 12,
                           noWrap: true,
                         }}
@@ -498,8 +519,9 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
             variant="outlined"
             onClick={() => router.push("/dashboard")}
             sx={{
-              borderRadius: 999,
-              color: "common.white",
+              minHeight: 36,
+              borderRadius: `${dashboardTokens.radiusSm}px`,
+              color: dashboardTokens.text,
               borderColor: dashboardTokens.borderMuted,
               textTransform: "none",
             }}
@@ -511,3 +533,14 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
     </Box>
   );
 }
+
+const composerControlSx = {
+  width: 36,
+  height: 36,
+  borderRadius: `${dashboardTokens.radiusSm}px`,
+  color: dashboardTokens.textMuted,
+  "&:hover": {
+    color: dashboardTokens.text,
+    bgcolor: dashboardTokens.surfaceAlt,
+  },
+};

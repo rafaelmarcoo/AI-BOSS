@@ -138,4 +138,34 @@ describe('extractCsvFinancialMetrics', () => {
       },
     ])
   })
+
+  it('prioritises cash burn over the broader cash label', () => {
+    const csvData: ParsedCsvData = {
+      headers: ['Metric', 'Amount'],
+      rows: [
+        {
+          rowNumber: 1,
+          values: ['Cash burn', '17000'],
+          cells: {
+            Metric: 'Cash burn',
+            Amount: '17000',
+          },
+        },
+      ],
+    }
+
+    const [metric] = extractCsvFinancialMetrics({
+      csvData,
+      documentId: 'document-123',
+      sourceLabel: 'monthly-metrics.csv',
+      defaultCurrency: 'NZD',
+      extractedAt: '2026-05-12T00:00:00.000Z',
+    })
+
+    expect(metric).toMatchObject({
+      key: 'burn_rate',
+      value: 17000,
+      currency: 'NZD',
+    })
+  })
 })

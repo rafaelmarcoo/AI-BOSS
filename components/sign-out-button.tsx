@@ -25,14 +25,16 @@ export function SignOutButton() {
       disabled={isSubmitting}
       variant="text"
       sx={{
-        borderRadius: '999px',
-        px: 2.5,
-        py: 1.25,
-        color: 'common.white',
+        minHeight: 32,
+        minWidth: 0,
+        borderRadius: '8px',
+        px: 1.25,
+        color: '#9DA7B5',
+        fontSize: 13,
         textTransform: 'none',
         '&:hover': {
-          color: 'common.white',
-          backgroundColor: 'transparent',
+          color: '#F4F6F8',
+          backgroundColor: '#151A24',
         },
       }}
     >

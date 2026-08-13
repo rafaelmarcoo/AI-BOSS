@@ -187,10 +187,10 @@ export function HistoricalMetricsChart({ refreshKey }: { refreshKey: string }) {
     <Paper
       elevation={0}
       sx={{
-        p: 3,
-        borderRadius: 1,
-        bgcolor: dashboardTokens.runwayV2,
-        color: "common.white",
+        p: { xs: 2, sm: 2.5 },
+        borderRadius: `${dashboardTokens.radiusMd}px`,
+        bgcolor: dashboardTokens.surface,
+        color: dashboardTokens.text,
         border: "1px solid",
         borderColor: dashboardTokens.border,
       }}
@@ -203,7 +203,7 @@ export function HistoricalMetricsChart({ refreshKey }: { refreshKey: string }) {
           spacing={1.5}
         >
           <Box>
-            <Typography variant="h6" fontWeight={700}>
+            <Typography sx={{ fontSize: 16, fontWeight: 600 }}>
               Financial trend and forecast
             </Typography>
             <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
@@ -314,7 +314,7 @@ export function HistoricalMetricsChart({ refreshKey }: { refreshKey: string }) {
                   />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: dashboardTokens.surface,
+                      backgroundColor: dashboardTokens.surfaceAlt,
                       border: `1px solid ${dashboardTokens.border}`,
                       borderRadius: 4,
                       color: "white",

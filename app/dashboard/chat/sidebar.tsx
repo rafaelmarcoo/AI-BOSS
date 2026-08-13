@@ -265,12 +265,12 @@ export function ChatSidebar({
         borderRightColor: { md: dashboardTokens.border },
         borderBottom: { xs: "1px solid", md: "none" },
         borderBottomColor: { xs: dashboardTokens.border, md: "transparent" },
-        bgcolor: dashboardTokens.sidebarV2,
+        bgcolor: dashboardTokens.sidebar,
       }}
     >
       <Box
         sx={{
-          p: { xs: 1, md: 1.5 },
+          p: 0,
           flex: "1 1 0",
           minHeight: 0,
           display: "flex",

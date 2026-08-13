@@ -26,10 +26,10 @@ interface SelectionChatPrompt {
 
 type AskChatbotMode = "selection" | "prompt";
 
-const MIN_CHAT_WIDTH = 280;
-const MAX_CHAT_WIDTH = 720;
-const DEFAULT_CHAT_WIDTH = 440;
-const RESIZER_WIDTH = 12;
+const MIN_CHAT_WIDTH = 300;
+const MAX_CHAT_WIDTH = 620;
+const DEFAULT_CHAT_WIDTH = 380;
+const RESIZER_WIDTH = 8;
 
 export function ResizablePanels({
   fullName,
@@ -147,23 +147,20 @@ export function ResizablePanels({
           cursor: "col-resize",
           userSelect: "none",
           touchAction: "none",
-          bgcolor: isDragging
-            ? "rgba(255,255,255,0.08)"
-            : "rgba(255,255,255,0.02)",
+          bgcolor: "transparent",
           transition: isDragging ? "none" : "background-color 120ms ease",
           "&:hover": {
-            bgcolor: "rgba(255,255,255,0.06)",
+            bgcolor: dashboardTokens.surfaceSoft,
           },
         }}
       >
         <Box
           sx={{
-            width: 2,
-            my: 1.5,
-            borderRadius: 999,
+            width: 1,
+            my: 0,
             bgcolor: isDragging
-              ? "rgba(255,255,255,0.55)"
-              : "rgba(255,255,255,0.18)",
+              ? dashboardTokens.accent
+              : dashboardTokens.border,
           }}
         />
       </Box>
@@ -173,7 +170,7 @@ export function ResizablePanels({
           minHeight: { xs: "80vh", md: 0 },
           flex: { xs: "0 0 auto", md: undefined },
           overflow: { xs: "visible", md: "auto" },
-          bgcolor: dashboardTokens.surfaceV2,
+          bgcolor: dashboardTokens.shell,
           minWidth: 0,
         }}
       >

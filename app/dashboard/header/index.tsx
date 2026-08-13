@@ -2,93 +2,98 @@
 
 import { Box, Button, Stack, Typography } from "@mui/material";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { SignOutButton } from "@/components/sign-out-button";
 import { dashboardTokens } from "@/app/theme";
 
+const navigation = [
+  { label: "Dashboard", href: "/dashboard", exact: true },
+  { label: "Documents", href: "/dashboard/documents" },
+  { label: "Settings", href: "/dashboard/settings" },
+];
+
 export function DashboardHeader() {
+  const pathname = usePathname();
+
   return (
     <Box
+      component="header"
       sx={{
-        px: { xs: 2, sm: 4 },
-        py: { xs: 1.5, sm: 3 },
-        bgcolor: dashboardTokens.sidebarV2,
+        px: { xs: 1.5, sm: 2.5 },
+        height: 56,
+        display: "flex",
+        alignItems: "center",
+        bgcolor: dashboardTokens.sidebar,
         borderBottom: "1px solid",
         borderBottomColor: dashboardTokens.border,
       }}
     >
       <Stack
         direction="row"
-        spacing={2}
         alignItems="center"
         justifyContent="space-between"
+        sx={{ width: "100%", minWidth: 0 }}
       >
-        {/* Left: Title + Nav */}
         <Stack
           direction="row"
-          spacing={1.5}
+          spacing={{ xs: 1, sm: 2.5 }}
           alignItems="center"
-          flexWrap="wrap"
-          useFlexGap
           sx={{ minWidth: 0 }}
         >
-          {/* Title — hide subtitle on small screens */}
-          <Stack spacing={0.25}>
-            <Typography
-              variant="h4"
-              component="h1"
-              fontWeight={700}
-              color="common.white"
-              sx={{ fontSize: { xs: "1rem", sm: "2.125rem" } }}
-            >
-              AI-BOSS
-            </Typography>
-            <Typography
-              variant="body2"
-              sx={{
-                color: dashboardTokens.textMuted,
-                display: { xs: "none", sm: "block" },
-              }}
-            >
-              Barebones workspace for NZ/AU SME finance teams.
-            </Typography>
+          <Typography
+            component="span"
+            sx={{
+              color: dashboardTokens.text,
+              fontSize: 17,
+              fontWeight: 650,
+              letterSpacing: "-0.02em",
+              whiteSpace: "nowrap",
+            }}
+          >
+            AI-BOSS
+          </Typography>
+
+          <Box sx={{ width: "1px", height: 20, bgcolor: dashboardTokens.border }} />
+
+          <Stack direction="row" spacing={0.25}>
+            {navigation.map((item) => {
+              const active = item.exact
+                ? pathname === item.href
+                : pathname.startsWith(item.href);
+
+              return (
+                <Button
+                  key={item.href}
+                  component={Link}
+                  href={item.href}
+                  size="small"
+                  sx={{
+                    minHeight: 32,
+                    minWidth: 0,
+                    px: 1.25,
+                    borderRadius: `${dashboardTokens.radiusSm}px`,
+                    color: active ? dashboardTokens.text : dashboardTokens.textMuted,
+                    bgcolor: active ? dashboardTokens.surfaceAlt : "transparent",
+                    display: {
+                      xs: item.exact ? "inline-flex" : "none",
+                      sm: "inline-flex",
+                    },
+                    textTransform: "none",
+                    fontSize: 13,
+                    fontWeight: active ? 600 : 500,
+                    "&:hover": {
+                      bgcolor: dashboardTokens.surfaceAlt,
+                      color: dashboardTokens.text,
+                    },
+                  }}
+                >
+                  {item.label}
+                </Button>
+              );
+            })}
           </Stack>
-
-          <Button
-            component={Link}
-            href="/dashboard"
-            variant="contained"
-            size="small"
-            sx={{ borderRadius: 0.5, color: "common.white" }}
-          >
-            Dashboard
-          </Button>
-
-          <Button
-            component={Link}
-            href="/dashboard/documents"
-            size="small"
-            sx={{
-              color: dashboardTokens.textMuted,
-              display: { xs: "none", sm: "inline-flex" },
-            }}
-          >
-            Documents
-          </Button>
-
-          <Button
-            component={Link}
-            href="/dashboard/settings"
-            size="small"
-            sx={{
-              color: dashboardTokens.textMuted,
-              display: { xs: "none", sm: "inline-flex" },
-            }}
-          >
-            Settings
-          </Button>
         </Stack>
 
-        {/* Right: Sign out */}
         <SignOutButton />
       </Stack>
     </Box>

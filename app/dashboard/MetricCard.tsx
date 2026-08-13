@@ -31,19 +31,19 @@ export function MetricCard({
     <Paper
       elevation={0}
       sx={{
-        p: 2.5,
-        borderRadius: 1,
-        bgcolor: dashboardTokens.runwayV2,
-        color: "common.white",
+        p: 2,
+        borderRadius: `${dashboardTokens.radiusMd}px`,
+        bgcolor: dashboardTokens.surface,
+        color: dashboardTokens.text,
         border: "1px solid",
         borderColor: dashboardTokens.border,
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
-        minHeight: 156,
+        minHeight: 124,
       }}
     >
-      <Stack spacing={2} sx={{ minWidth: 0 }}>
+      <Stack spacing={1.5} sx={{ minWidth: 0 }}>
         {/* Header with label and color accent */}
         <Stack
           direction="row"
@@ -51,12 +51,12 @@ export function MetricCard({
           justifyContent="space-between"
           spacing={1.5}
         >
-          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 0 }}>
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
             <Box
               sx={{
-                width: 12,
-                height: 12,
-                borderRadius: "50%",
+                width: 6,
+                height: 6,
+                borderRadius: 1,
                 bgcolor: color,
                 flexShrink: 0,
               }}
@@ -66,9 +66,8 @@ export function MetricCard({
               sx={{
                 fontSize: "0.75rem",
                 fontWeight: 600,
-                letterSpacing: "0.05em",
+                letterSpacing: "0.02em",
                 color: dashboardTokens.textMuted,
-                textTransform: "uppercase",
                 overflowWrap: "anywhere",
               }}
             >
@@ -82,7 +81,8 @@ export function MetricCard({
               variant="outlined"
               sx={{
                 maxWidth: 140,
-                height: 22,
+                height: 24,
+                borderRadius: `${dashboardTokens.radiusSm}px`,
                 color: sourceColor,
                 borderColor:
                   sourceTone === "unavailable"
@@ -113,7 +113,7 @@ export function MetricCard({
               variant="h4"
               sx={{
                 fontWeight: 700,
-                fontSize: { xs: "1.75rem", sm: "2rem" },
+                fontSize: { xs: "1.5rem", sm: "1.65rem" },
                 lineHeight: 1,
                 overflowWrap: "anywhere",
               }}

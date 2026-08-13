@@ -9,15 +9,19 @@ import {
   FormControl,
   FormHelperText,
   FormLabel,
+  IconButton,
+  InputAdornment,
   Link as MuiLink,
   MenuItem,
   Paper,
   Stack,
+  SvgIcon,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
 } from '@mui/material'
+import { dashboardTokens } from '@/app/theme'
 import type { UserType } from '@/types/database'
 import { authCardStyles, authFieldStyles } from '@/components/auth-ui'
 
@@ -40,6 +44,38 @@ interface CompaniesPayload {
   data: { companies: string[] }
 }
 
+function PasswordVisibilityIcon({ crossed }: { crossed: boolean }) {
+  return (
+    <SvgIcon fontSize="small" viewBox="0 0 24 24">
+      <path
+        d="M2.5 12s3.5-5.5 9.5-5.5 9.5 5.5 9.5 5.5-3.5 5.5-9.5 5.5S2.5 12 2.5 12Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle
+        cx="12"
+        cy="12"
+        r="2.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+      />
+      {crossed ? (
+        <path
+          d="m4 4 16 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.7"
+          strokeLinecap="round"
+        />
+      ) : null}
+    </SvgIcon>
+  )
+}
+
 export function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -49,6 +85,8 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [companies, setCompanies] = useState<string[]>([])
   const [isLoadingCompanies, setIsLoadingCompanies] = useState(false)
   const [companiesError, setCompaniesError] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   useEffect(() => {
     if (mode !== 'sign-up' || userType !== 'employee') return
@@ -92,18 +130,29 @@ export function AuthForm({ mode }: AuthFormProps) {
     setFieldErrors({})
 
     const formData = new FormData(event.currentTarget)
+    const password = String(formData.get('password') ?? '')
+
+    if (
+      mode === 'sign-up' &&
+      password !== String(formData.get('confirmPassword') ?? '')
+    ) {
+      setFieldErrors({ confirmPassword: 'Passwords do not match.' })
+      setIsSubmitting(false)
+      return
+    }
+
     const payload =
       mode === 'sign-up'
         ? {
             email: String(formData.get('email') ?? ''),
-            password: String(formData.get('password') ?? ''),
+            password,
             fullName: String(formData.get('fullName') ?? ''),
             companyName: String(formData.get('companyName') ?? ''),
             userType: userType ?? '',
           }
         : {
             email: String(formData.get('email') ?? ''),
-            password: String(formData.get('password') ?? ''),
+            password,
           }
 
     const response = await fetch(`/api/auth/${mode === 'sign-up' ? 'signup' : 'signin'}`, {
@@ -138,25 +187,52 @@ export function AuthForm({ mode }: AuthFormProps) {
       elevation={0}
       sx={authCardStyles}
     >
-      <Stack spacing={3}>
-        <Stack spacing={0.5}>
-          <Typography variant="overline" sx={{ color: "#93c5fd" }} fontWeight={700}>
-            AI-BOSS financial intelligence
+      <Stack spacing={0}>
+        <Stack spacing={0.25}>
+          <Typography
+            component="p"
+            sx={{
+              color: dashboardTokens.text,
+              fontSize: 22,
+              fontWeight: 650,
+              letterSpacing: '-0.025em',
+            }}
+          >
+            AI-BOSS
           </Typography>
-          <Typography variant="h4" component="h1" fontWeight={600} color="common.white">
-          {isSignUp ? 'Create your workspace account' : 'Welcome back'}
-          </Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.68)" }}>
-          {isSignUp
-            ? 'Set up a secure account for clear, source-aware financial decisions.'
-            : 'Sign in to your AI-BOSS financial intelligence workspace.'}
+          <Typography sx={{ color: dashboardTokens.textSubtle, fontSize: 13 }}>
+            Financial intelligence for SME teams
           </Typography>
         </Stack>
 
-        {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
+        <Stack spacing={0.75} sx={{ mt: 3 }}>
+          <Typography
+            component="h1"
+            sx={{
+              color: dashboardTokens.text,
+              fontSize: { xs: 32, sm: 38 },
+              lineHeight: 1.2,
+              fontWeight: 600,
+              letterSpacing: '-0.03em',
+            }}
+          >
+            {isSignUp ? 'Create your account' : 'Welcome back'}
+          </Typography>
+          <Typography sx={{ color: dashboardTokens.textMuted, fontSize: 16 }}>
+            {isSignUp
+              ? 'Get started with your AI-BOSS workspace.'
+              : 'Sign in to your workspace.'}
+          </Typography>
+        </Stack>
+
+        {errorMessage ? (
+          <Alert severity="error" sx={{ mt: 2.5 }}>
+            {errorMessage}
+          </Alert>
+        ) : null}
 
         {isSignUp ? (
-          <Stack spacing={2}>
+          <Stack spacing={2} sx={{ mt: 3 }}>
             <TextField
               name="fullName"
               label="Full name"
@@ -165,12 +241,17 @@ export function AuthForm({ mode }: AuthFormProps) {
               autoComplete="name"
               fullWidth
               error={Boolean(fieldErrors.fullName)}
-              helperText={fieldErrors.fullName ?? ' '}
+              helperText={fieldErrors.fullName}
               sx={authFieldStyles}
             />
 
             <FormControl error={Boolean(fieldErrors.userType)}>
-              <FormLabel id="user-type-label" sx={{ color: "rgba(255,255,255,0.76)" }}>How will you use AI-BOSS?</FormLabel>
+              <FormLabel
+                id="user-type-label"
+                sx={{ color: dashboardTokens.textMuted, fontSize: 13, fontWeight: 500 }}
+              >
+                How will you use AI-BOSS?
+              </FormLabel>
               <ToggleButtonGroup
                 aria-labelledby="user-type-label"
                 value={userType}
@@ -179,12 +260,34 @@ export function AuthForm({ mode }: AuthFormProps) {
                 onChange={(_, nextUserType: UserType | null) => {
                   if (nextUserType) setUserType(nextUserType)
                 }}
-                sx={{ mt: 1, "& .MuiToggleButton-root": { color: "rgba(255,255,255,0.72)", borderColor: "rgba(255,255,255,0.16)" }, "& .Mui-selected": { color: "common.white !important", bgcolor: "rgba(59,130,246,0.26) !important" } }}
+                sx={{
+                  mt: 1,
+                  "& .MuiToggleButton-root": {
+                    minHeight: 42,
+                    color: dashboardTokens.textMuted,
+                    borderColor: dashboardTokens.borderInput,
+                    bgcolor: dashboardTokens.surfaceAlt,
+                    fontSize: 13,
+                    textTransform: 'none',
+                  },
+                  "& .MuiToggleButton-root:first-of-type": {
+                    borderRadius: `${dashboardTokens.radiusSm}px 0 0 ${dashboardTokens.radiusSm}px`,
+                  },
+                  "& .MuiToggleButton-root:last-of-type": {
+                    borderRadius: `0 ${dashboardTokens.radiusSm}px ${dashboardTokens.radiusSm}px 0`,
+                  },
+                  "& .Mui-selected": {
+                    color: `${dashboardTokens.text} !important`,
+                    bgcolor: 'rgba(79, 125, 243, 0.16) !important',
+                  },
+                }}
               >
                 <ToggleButton value="admin">Create a company</ToggleButton>
                 <ToggleButton value="employee">Join a company</ToggleButton>
               </ToggleButtonGroup>
-              <FormHelperText>{fieldErrors.userType ?? ' '}</FormHelperText>
+              {fieldErrors.userType ? (
+                <FormHelperText>{fieldErrors.userType}</FormHelperText>
+              ) : null}
             </FormControl>
 
             {userType === 'admin' ? (
@@ -240,32 +343,97 @@ export function AuthForm({ mode }: AuthFormProps) {
 
         <TextField
           name="email"
-          label="Email"
+          label={isSignUp ? 'Work email' : 'Email'}
           type="email"
           placeholder="founder@example.com"
           autoComplete="email"
           fullWidth
           required
           error={Boolean(fieldErrors.email)}
-          helperText={fieldErrors.email ?? ' '}
-          sx={authFieldStyles}
+          helperText={fieldErrors.email}
+          sx={{ ...authFieldStyles, mt: isSignUp ? 2 : 3 }}
         />
 
         <TextField
           name="password"
           label="Password"
-          type="password"
+          type={showPassword ? 'text' : 'password'}
           placeholder="At least 8 characters"
           autoComplete={isSignUp ? 'new-password' : 'current-password'}
           fullWidth
           required
           error={Boolean(fieldErrors.password)}
-          helperText={fieldErrors.password ?? ' '}
-          sx={authFieldStyles}
+          helperText={
+            fieldErrors.password ?? (isSignUp ? 'Use at least 8 characters.' : undefined)
+          }
+          slotProps={{
+            input: {
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    onClick={() => setShowPassword((visible) => !visible)}
+                    edge="end"
+                    sx={{ color: dashboardTokens.textSubtle }}
+                  >
+                    <PasswordVisibilityIcon crossed={showPassword} />
+                  </IconButton>
+                </InputAdornment>
+              ),
+            },
+          }}
+          sx={{ ...authFieldStyles, mt: 2 }}
         />
 
+        {isSignUp ? (
+          <TextField
+            name="confirmPassword"
+            label="Confirm password"
+            type={showConfirmPassword ? 'text' : 'password'}
+            placeholder="Repeat your password"
+            autoComplete="new-password"
+            fullWidth
+            required
+            error={Boolean(fieldErrors.confirmPassword)}
+            helperText={fieldErrors.confirmPassword}
+            slotProps={{
+              input: {
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label={
+                        showConfirmPassword
+                          ? 'Hide confirmed password'
+                          : 'Show confirmed password'
+                      }
+                      onClick={() =>
+                        setShowConfirmPassword((visible) => !visible)
+                      }
+                      edge="end"
+                      sx={{ color: dashboardTokens.textSubtle }}
+                    >
+                      <PasswordVisibilityIcon crossed={showConfirmPassword} />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              },
+            }}
+            sx={{ ...authFieldStyles, mt: 2 }}
+          />
+        ) : null}
+
         {!isSignUp ? (
-          <MuiLink component={NextLink} href="/forgot-password" underline="hover" sx={{ alignSelf: "flex-end", fontSize: 14, color: "#bfdbfe" }}>
+          <MuiLink
+            component={NextLink}
+            href="/forgot-password"
+            underline="hover"
+            sx={{
+              mt: 1,
+              alignSelf: 'flex-end',
+              fontSize: 14,
+              color: dashboardTokens.accentHover,
+            }}
+          >
             Forgot password?
           </MuiLink>
         ) : null}
@@ -278,7 +446,21 @@ export function AuthForm({ mode }: AuthFormProps) {
             (isSignUp && (!userType || isLoadingCompanies || Boolean(companiesError)))
           }
           fullWidth
-          sx={{ py: 1.5, borderRadius: '999px', bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' } }}
+          sx={{
+            mt: 2.5,
+            minHeight: 50,
+            borderRadius: `${dashboardTokens.radiusMd}px`,
+            bgcolor: dashboardTokens.accent,
+            color: dashboardTokens.text,
+            fontSize: 15,
+            fontWeight: 600,
+            textTransform: 'none',
+            boxShadow: 'none',
+            '&:hover': {
+              bgcolor: dashboardTokens.accentHover,
+              boxShadow: 'none',
+            },
+          }}
         >
           {isSubmitting
             ? 'Working...'
@@ -287,13 +469,15 @@ export function AuthForm({ mode }: AuthFormProps) {
               : 'Sign in'}
         </Button>
 
-        <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.68)" }}>
-          {isSignUp ? 'Already have an account?' : 'Need an account?'}{' '}
+        <Typography
+          sx={{ mt: 2.5, color: dashboardTokens.textMuted, fontSize: 14 }}
+        >
+          {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
           <MuiLink
             component={NextLink}
             href={isSignUp ? '/sign-in' : '/sign-up'}
             underline="hover"
-            sx={{ fontWeight: 600, color: '#bfdbfe' }}
+            sx={{ fontWeight: 600, color: dashboardTokens.accentHover }}
           >
             {isSignUp ? 'Sign in' : 'Sign up'}
           </MuiLink>

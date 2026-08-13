@@ -22,8 +22,9 @@ describe('AuthForm signup roles', () => {
     render(<AuthForm mode="sign-up" />)
     await user.click(screen.getByRole('button', { name: 'Create a company' }))
     await user.type(screen.getByRole('textbox', { name: /Company name/ }), 'Acme Ltd')
-    await user.type(screen.getByLabelText(/Email/), 'admin@example.com')
+    await user.type(screen.getByLabelText(/Work email/), 'admin@example.com')
     await user.type(screen.getByLabelText(/Password/), 'password123')
+    await user.type(screen.getByLabelText(/Confirm password/), 'password123')
     await user.click(screen.getByRole('button', { name: 'Create account' }))
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1))
@@ -51,8 +52,9 @@ describe('AuthForm signup roles', () => {
     await user.click(screen.getByRole('button', { name: 'Join a company' }))
     await user.click(await screen.findByRole('combobox', { name: /Company/ }))
     await user.click(await screen.findByRole('option', { name: 'Acme Ltd' }))
-    await user.type(screen.getByLabelText(/Email/), 'employee@example.com')
+    await user.type(screen.getByLabelText(/Work email/), 'employee@example.com')
     await user.type(screen.getByLabelText(/Password/), 'password123')
+    await user.type(screen.getByLabelText(/Confirm password/), 'password123')
     await user.click(screen.getByRole('button', { name: 'Create account' }))
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2))

@@ -10,8 +10,6 @@ import {
   Typography,
 } from "@mui/material";
 import ChatBubbleRoundedIcon from "@mui/icons-material/ChatBubbleRounded";
-import HighlightAltRoundedIcon from "@mui/icons-material/HighlightAltRounded";
-import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import {
   CartesianGrid,
   Line,
@@ -45,6 +43,7 @@ type AskChatbotMode = "selection" | "prompt";
 interface GenUiCanvasProps {
   plan: GenUiPlan | null;
   baselineSummary: string;
+  missingMetricLabels: string[];
   onAskChatbot: (text: string, mode?: AskChatbotMode) => void;
 }
 
@@ -107,8 +106,8 @@ function WidgetFrame({
       elevation={0}
       sx={{
         p: 2,
-        borderRadius: 1,
-        bgcolor: "rgba(255, 255, 255, 0.028)",
+        borderRadius: `${dashboardTokens.radiusMd}px`,
+        bgcolor: dashboardTokens.surface,
         border: "1px solid",
         borderColor: dashboardTokens.border,
         color: "common.white",
@@ -116,26 +115,7 @@ function WidgetFrame({
       }}
     >
       <Stack spacing={1.75}>
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={1}
-          justifyContent="space-between"
-        >
-          <Typography variant="subtitle1" fontWeight={700}>
-            {title}
-          </Typography>
-          <Chip
-            label="AI-selected"
-            size="small"
-            sx={{
-              color: "#bae6fd",
-              bgcolor: "rgba(14, 165, 233, 0.10)",
-              borderColor: "rgba(125, 211, 252, 0.22)",
-              alignSelf: { xs: "flex-start", sm: "center" },
-            }}
-            variant="outlined"
-          />
-        </Stack>
+        <Typography sx={{ fontSize: 16, fontWeight: 600 }}>{title}</Typography>
         {children}
         <Box
           sx={{
@@ -690,6 +670,7 @@ export function GenUiWidgetRenderer({
 export function GenUiCanvas({
   plan,
   baselineSummary,
+  missingMetricLabels,
   onAskChatbot,
 }: GenUiCanvasProps) {
   const hasPlan = Boolean(plan && plan.widgets.length > 0);
@@ -698,44 +679,25 @@ export function GenUiCanvas({
     <Paper
       elevation={0}
       sx={{
-        p: { xs: 2.25, sm: 2.75 },
-        borderRadius: 1,
-        bgcolor: "rgba(15, 23, 42, 0.62)",
-        color: "common.white",
-        border: "1px solid",
-        borderColor: "rgba(125, 211, 252, 0.16)",
+        p: 0,
+        borderRadius: 0,
+        bgcolor: "transparent",
+        color: dashboardTokens.text,
+        border: 0,
         overflow: "hidden",
       }}
     >
-      <Stack spacing={2.5}>
+      <Stack spacing={0}>
         <Stack
           direction={{ xs: "column", sm: "row" }}
           alignItems={{ xs: "flex-start", sm: "center" }}
           justifyContent="space-between"
-          spacing={1.5}
+          spacing={1}
+          sx={{ pb: 3 }}
         >
           <Stack direction="row" spacing={1.5} alignItems="center">
-            <Box
-              sx={{
-                width: 38,
-                height: 38,
-                borderRadius: 1,
-                bgcolor: "rgba(20, 184, 166, 0.14)",
-                color: "#5eead4",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flex: "0 0 auto",
-              }}
-            >
-              {plan?.source === "selection" ? (
-                <HighlightAltRoundedIcon fontSize="small" />
-              ) : (
-                <TrendingUpIcon fontSize="small" />
-              )}
-            </Box>
             <Box sx={{ minWidth: 0 }}>
-              <Typography variant="subtitle1" fontWeight={700}>
+              <Typography component="h1" sx={{ fontSize: { xs: 20, sm: 22 }, fontWeight: 600, letterSpacing: "-0.02em" }}>
                 Generated workspace
               </Typography>
               <Typography
@@ -744,19 +706,20 @@ export function GenUiCanvas({
               >
                 {hasPlan
                   ? plan?.summary
-                  : "Ready to build a workspace from your next AI-BOSS question."}
+                  : "Financial context generated from your current AI-BOSS conversation."}
               </Typography>
             </Box>
           </Stack>
           <Chip
-            label={hasPlan ? "Live plan" : "Ready"}
+            label="Live"
             size="small"
             sx={{
-              color: hasPlan ? "#bbf7d0" : "#bae6fd",
-              bgcolor: hasPlan
-                ? "rgba(34, 197, 94, 0.12)"
-                : "rgba(14, 165, 233, 0.12)",
-              borderColor: "rgba(125, 211, 252, 0.24)",
+              height: 24,
+              color: dashboardTokens.positive,
+              bgcolor: "rgba(62, 180, 137, 0.10)",
+              borderColor: "rgba(62, 180, 137, 0.22)",
+              borderRadius: `${dashboardTokens.radiusSm}px`,
+              fontSize: 12,
               alignSelf: { xs: "flex-start", sm: "center" },
             }}
             variant="outlined"
@@ -766,32 +729,71 @@ export function GenUiCanvas({
         <Paper
           elevation={0}
           sx={{
-            p: 2.25,
-            borderRadius: 1,
-            bgcolor: "rgba(37, 99, 235, 0.08)",
-            border: "1px solid",
-            borderColor: "rgba(96, 165, 250, 0.25)",
+            py: 3,
+            borderRadius: 0,
+            bgcolor: "transparent",
+            borderTop: "1px solid",
+            borderColor: dashboardTokens.border,
           }}
         >
+          <Typography component="h2" sx={{ fontSize: 16, fontWeight: 600 }}>
+            Runway summary
+          </Typography>
           <Stack spacing={1}>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <HighlightAltRoundedIcon sx={{ color: "#93c5fd", fontSize: 18 }} />
-              <Typography variant="caption" sx={{ color: "#bfdbfe" }}>
-                Runway summary · highlight any workspace text to ask AI-BOSS
-              </Typography>
-            </Stack>
             <Typography
               variant="body2"
-              sx={{ color: "common.white", lineHeight: 1.8, userSelect: "text" }}
+              sx={{ mt: 1, color: dashboardTokens.textMuted, lineHeight: 1.65, userSelect: "text" }}
             >
               {baselineSummary}
             </Typography>
           </Stack>
         </Paper>
 
+        <Box sx={{ py: 3, borderTop: "1px solid", borderColor: dashboardTokens.border }}>
+          <Typography component="h2" sx={{ fontSize: 16, fontWeight: 600 }}>
+            {missingMetricLabels.length > 0 ? "Missing financial metrics" : "Financial metrics"}
+          </Typography>
+          <Typography sx={{ mt: 0.75, color: dashboardTokens.textMuted, fontSize: 14, lineHeight: 1.55 }}>
+            {missingMetricLabels.length > 0
+              ? "Connect an accounting source or upload current records to complete the runway view."
+              : "The core metrics required for runway analysis are available."}
+          </Typography>
+          {missingMetricLabels.length > 0 ? (
+            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 2 }}>
+              {missingMetricLabels.map((label) => (
+                <Chip
+                  key={label}
+                  label={label}
+                  size="small"
+                  sx={{
+                    height: 26,
+                    borderRadius: `${dashboardTokens.radiusSm}px`,
+                    color: "#D9AAA3",
+                    bgcolor: "rgba(201, 129, 116, 0.09)",
+                    border: "1px solid rgba(201, 129, 116, 0.18)",
+                    fontSize: 12,
+                  }}
+                />
+              ))}
+            </Stack>
+          ) : null}
+        </Box>
+
+        <Box sx={{ py: 3, borderTop: "1px solid", borderColor: dashboardTokens.border }}>
+          <Typography component="h2" sx={{ fontSize: 16, fontWeight: 600 }}>
+            Why this matters
+          </Typography>
+          <Typography sx={{ mt: 0.75, maxWidth: 760, color: dashboardTokens.textMuted, fontSize: 14, lineHeight: 1.6 }}>
+            Reliable cash, burn, revenue, and liability data helps AI-BOSS explain how long the business can operate and where finance teams should focus next.
+          </Typography>
+        </Box>
+
         {hasPlan ? (
           <Box
             sx={{
+              py: 3,
+              borderTop: "1px solid",
+              borderColor: dashboardTokens.border,
               display: "grid",
               gridTemplateColumns: { xs: "1fr", xl: "repeat(2, minmax(0, 1fr))" },
               gap: 2,
@@ -819,28 +821,27 @@ export function GenUiCanvas({
           <Paper
             elevation={0}
             sx={{
-              p: 2,
-              borderRadius: 1,
-              bgcolor: "rgba(255, 255, 255, 0.028)",
-              border: "1px solid",
+              py: 3,
+              borderRadius: 0,
+              bgcolor: "transparent",
+              borderTop: "1px solid",
               borderColor: dashboardTokens.border,
             }}
           >
-            <Stack spacing={1.5}>
-              <Typography variant="subtitle2" fontWeight={700}>
-                No generated widgets selected yet
+            <Stack spacing={0.75}>
+              <Typography sx={{ fontSize: 16, fontWeight: 600 }}>
+                Feature testing context
               </Typography>
-              <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
-                Ask AI-BOSS a runway, metric, source, scenario, or planning question.
-                Only the widgets relevant to that request will appear here.
+              <Typography sx={{ color: dashboardTokens.textMuted, fontSize: 14, lineHeight: 1.55 }}>
+                Highlight dashboard text to ask AI-BOSS for an explanation, or use a follow-up below.
               </Typography>
             </Stack>
           </Paper>
         )}
 
-        <Stack spacing={1}>
-          <Typography variant="subtitle2" fontWeight={700}>
-            Example prompts for testing
+        <Stack spacing={1.25}>
+          <Typography sx={{ fontSize: 16, fontWeight: 600 }}>
+            Ask a follow-up
           </Typography>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             {EXAMPLE_PROMPTS.map((prompt) => (
@@ -850,16 +851,20 @@ export function GenUiCanvas({
                 variant="outlined"
                 onClick={() => onAskChatbot(prompt, "prompt")}
                 sx={{
-                  borderRadius: 999,
-                  color: "common.white",
-                  borderColor: dashboardTokens.borderMuted,
+                  minHeight: 34,
+                  borderRadius: `${dashboardTokens.radiusSm}px`,
+                  color: dashboardTokens.textSoft,
+                  borderColor: dashboardTokens.border,
+                  bgcolor: dashboardTokens.surface,
                   textTransform: "none",
+                  fontSize: 13,
                   maxWidth: { xs: "100%", sm: "none" },
                   whiteSpace: "normal",
                   textAlign: "left",
                   "&:hover": {
-                    borderColor: "rgba(125, 211, 252, 0.42)",
-                    bgcolor: "rgba(14, 165, 233, 0.10)",
+                    borderColor: dashboardTokens.borderMuted,
+                    bgcolor: dashboardTokens.surfaceAlt,
+                    color: dashboardTokens.text,
                   },
                 }}
               >

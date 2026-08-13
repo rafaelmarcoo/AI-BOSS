@@ -29,6 +29,37 @@ function normalizeWhitespace(value: string) {
     .trim()
 }
 
+function createPdfTextLines(items: Array<{ str?: string; transform?: number[] }>) {
+  const lines: string[] = []
+  let currentLine: string[] = []
+  let currentY: number | null = null
+
+  for (const item of items) {
+    const text = item.str?.trim()
+    if (!text) continue
+
+    const y = item.transform?.[5]
+    if (
+      currentLine.length > 0 &&
+      typeof y === 'number' &&
+      currentY !== null &&
+      Math.abs(y - currentY) > 2
+    ) {
+      lines.push(currentLine.join(' '))
+      currentLine = []
+    }
+
+    currentLine.push(text)
+    if (typeof y === 'number') currentY = y
+  }
+
+  if (currentLine.length > 0) {
+    lines.push(currentLine.join(' '))
+  }
+
+  return lines
+}
+
 function parseCsvLine(line: string) {
   const cells: string[] = []
   let current = ''
@@ -211,17 +242,25 @@ async function parsePdfDocument(
     for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
       const page = await pdf.getPage(pageNumber)
       const textContent = await page.getTextContent()
+      const lines = createPdfTextLines(
+        textContent.items.map((item) =>
+          'str' in item
+            ? {
+                str: item.str,
+                transform: 'transform' in item ? item.transform : undefined,
+              }
+            : {}
+        )
+      )
       const text = normalizeWhitespace(
-        textContent.items
-          .map((item) => ('str' in item ? item.str : ''))
-          .filter(Boolean)
-          .join(' ')
+        lines.join('\n')
       )
 
       if (text) {
         pages.push({
           pageNumber,
           text,
+          lines,
         })
       }
 
@@ -246,6 +285,7 @@ async function parsePdfDocument(
         userId: document.user_id,
         pages,
       }),
+      pdfPages: pages,
     }
   } catch (error) {
     if (error instanceof ApiError) {

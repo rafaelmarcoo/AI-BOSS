@@ -102,9 +102,10 @@ describe('financial agent tools', () => {
 
     const result = await createGetLatestSnapshotTool('user-123').handler({})
 
-    expect(result).toContain('Latest financial metrics')
+    expect(result).toContain('Financial snapshot')
     expect(result).toContain('cash: 120000 NZD')
     expect(result).toContain('source: demo.csv')
+    expect(result).toContain('cash=120000, ar=45000, ap=21000, burn=28000')
     expect(mockReadSourceAwareMetrics).toHaveBeenCalledWith('user-123')
   })
 
@@ -133,7 +134,7 @@ describe('financial agent tools', () => {
     expect(result).toContain('Scenario: new hire')
     expect(result).toContain('Before: 5.14 months')
     expect(result).toContain('After: 3.89 months')
-    expect(result).toContain('Stored financial data was not changed')
+    expect(result).toContain('Stored financial data has not been changed')
   })
 
   it('model_scenario handles incomplete runway inputs', async () => {

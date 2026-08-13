@@ -7,9 +7,9 @@ const ModelScenarioInputSchema = z.object({
   monthly_cost_change: z
     .number()
     .describe(
-      'Recurring monthly burn change. Positive means a new cost; negative means a saving or revenue improvement.'
+      'Recurring monthly burn change. Positive means a new cost; negative means a recurring saving.'
     ),
-  label: z.string().describe('Short scenario label.'),
+  label: z.string().describe('Short scenario label, such as "new hire" or "reduce marketing".'),
 })
 
 type ModelScenarioInput = z.infer<typeof ModelScenarioInputSchema>
@@ -20,7 +20,7 @@ export function createModelScenarioTool(
   return {
     name: 'model_scenario',
     description:
-      'Model a simple what-if scenario by applying a recurring monthly burn change to the current financial metrics and comparing before/after runway. This is read-only and does not change stored data.',
+      'Model a read-only what-if scenario by applying a recurring monthly cost change to verified current financial metrics and comparing before/after runway. Use for a new hire, recurring subscription, office cost, cost reduction, or another recurring change. Positive monthly_cost_change is a new expense; negative is a saving. This never changes stored data.',
     inputSchema: ModelScenarioInputSchema,
     async handler({ monthly_cost_change, label }) {
       const snapshot = await readSourceAwareMetrics(userId)
@@ -46,16 +46,16 @@ export function createModelScenarioTool(
       )
       const costLabel =
         monthly_cost_change >= 0
-          ? `+${monthly_cost_change.toLocaleString()}/month`
-          : `-${Math.abs(monthly_cost_change).toLocaleString()}/month`
+          ? `+$${monthly_cost_change.toLocaleString()}/month`
+          : `-$${Math.abs(monthly_cost_change).toLocaleString()}/month`
 
       return [
         `Scenario: ${label} (${costLabel})`,
-        `Before: ${before.runway_months} months runway at ${burn.toLocaleString()}/month burn.`,
-        `After: ${after.runway_months} months runway at ${scenarioBurn.toLocaleString()}/month burn.`,
+        `Before: ${before.runway_months} months runway at $${burn.toLocaleString()}/month burn.`,
+        `After: ${after.runway_months} months runway at $${scenarioBurn.toLocaleString()}/month burn.`,
         `Impact: ${runwayDiff >= 0 ? '+' : ''}${runwayDiff} months.`,
         `Assessment: ${after.policy.message}`,
-        'This is a modelled scenario only. Stored financial data was not changed.',
+        'This is a modelled scenario only. Stored financial data has not been changed.',
       ].join('\n')
     },
   }

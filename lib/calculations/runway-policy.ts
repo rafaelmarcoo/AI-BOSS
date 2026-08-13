@@ -10,6 +10,16 @@ const URGENT_THRESHOLD = 3
 const CAUTION_THRESHOLD = 6
 
 export function assessRunwayPolicy(runwayMonths: number): RunwayPolicy {
+  if (!Number.isFinite(runwayMonths)) {
+    return {
+      status: 'urgent',
+      message:
+        'Runway could not be assessed because the runway value is unavailable or invalid. ' +
+        'Confirm cash, receivables, payables, and monthly burn rate.',
+      thresholdMonths: URGENT_THRESHOLD,
+    }
+  }
+
   if (runwayMonths < URGENT_THRESHOLD) {
     return {
       status: 'urgent',

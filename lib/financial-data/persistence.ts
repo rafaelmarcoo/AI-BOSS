@@ -36,6 +36,82 @@ export interface SaveFinancialMetricObservationParams {
   rawData?: unknown
 }
 
+export interface SaveFinancialMetricObservationsParams {
+  userId: string
+  connectionId?: string | null
+  documentId?: string | null
+  metrics: AvailableFinancialMetricValue[]
+  rawData?: unknown
+}
+
+export async function deleteFinancialMetricObservationsForDocument(
+  documentId: string,
+  userId: string
+) {
+  const supabase = createAdminSupabaseClient()
+  const { error } = await supabase
+    .from('financial_metric_observations')
+    .delete()
+    .eq('document_id', documentId)
+    .eq('user_id', userId)
+
+  if (error) {
+    console.error('Failed to remove document-derived financial metrics.', error)
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to remove document-derived financial metrics.',
+      error.message
+    )
+  }
+}
+
+export async function saveFinancialMetricObservations({
+  userId,
+  connectionId = null,
+  documentId = null,
+  metrics,
+  rawData = {},
+}: SaveFinancialMetricObservationsParams) {
+  if (metrics.length === 0) return []
+
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase
+    .from('financial_metric_observations')
+    .insert(
+      metrics.map((metric) => ({
+        user_id: userId,
+        connection_id: connectionId,
+        document_id: documentId,
+        metric_key: metric.key,
+        value: metric.value,
+        currency: metric.currency,
+        period_start: metric.periodStart,
+        period_end: metric.periodEnd,
+        as_of_date: metric.asOfDate,
+        source_type: metric.provenance.sourceType,
+        source_label: metric.provenance.sourceLabel,
+        confidence: metric.confidence,
+        evidence: metric.provenance.evidence ?? {},
+        raw_data: rawData,
+        updated_at: metric.updatedAt,
+      }))
+    )
+    .select(FINANCIAL_METRIC_OBSERVATION_SELECT)
+
+  if (error || !data) {
+    console.error('Failed to save financial metric observations.', error)
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to save financial metric observations.',
+      error?.message
+    )
+  }
+
+  return data as FinancialMetricObservation[]
+}
+
 export async function saveFinancialMetricObservation({
   userId,
   connectionId = null,
@@ -43,40 +119,15 @@ export async function saveFinancialMetricObservation({
   metric,
   rawData = {},
 }: SaveFinancialMetricObservationParams) {
-  const supabase = createAdminSupabaseClient()
-  const { data, error } = await supabase
-    .from('financial_metric_observations')
-    .insert({
-      user_id: userId,
-      connection_id: connectionId,
-      document_id: documentId,
-      metric_key: metric.key,
-      value: metric.value,
-      currency: metric.currency,
-      period_start: metric.periodStart,
-      period_end: metric.periodEnd,
-      as_of_date: metric.asOfDate,
-      source_type: metric.provenance.sourceType,
-      source_label: metric.provenance.sourceLabel,
-      confidence: metric.confidence,
-      evidence: metric.provenance.evidence ?? {},
-      raw_data: rawData,
-      updated_at: metric.updatedAt,
-    })
-    .select(FINANCIAL_METRIC_OBSERVATION_SELECT)
-    .single()
+  const rows = await saveFinancialMetricObservations({
+    userId,
+    connectionId,
+    documentId,
+    metrics: [metric],
+    rawData,
+  })
 
-  if (error || !data) {
-    console.error('Failed to save financial metric observation.', error)
-    throw new ApiError(
-      500,
-      'INTERNAL_ERROR',
-      'Failed to save financial metric observation.',
-      error?.message
-    )
-  }
-
-  return data as FinancialMetricObservation
+  return rows[0] as FinancialMetricObservation
 }
 
 export async function listLatestFinancialMetricValues(userId: string) {

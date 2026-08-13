@@ -6,7 +6,10 @@ import {
   updateDocumentRecord,
 } from '@/lib/documents/persistence'
 import { logDocumentIngestion } from '@/lib/documents/log-document-ingestion'
-import { saveFinancialMetricObservation } from '@/lib/financial-data/persistence'
+import {
+  deleteFinancialMetricObservationsForDocument,
+  saveFinancialMetricObservations,
+} from '@/lib/financial-data/persistence'
 import { embedDocumentChunks } from '@/lib/documents/embeddings'
 
 jest.mock('@/lib/documents/persistence', () => ({
@@ -22,7 +25,8 @@ jest.mock('@/lib/documents/log-document-ingestion', () => ({
 }))
 
 jest.mock('@/lib/financial-data/persistence', () => ({
-  saveFinancialMetricObservation: jest.fn(),
+  deleteFinancialMetricObservationsForDocument: jest.fn(),
+  saveFinancialMetricObservations: jest.fn(),
 }))
 
 jest.mock('@/lib/documents/embeddings', () => ({
@@ -35,8 +39,11 @@ const mockDownloadDocumentFile = jest.mocked(downloadDocumentFile)
 const mockReplaceDocumentChunks = jest.mocked(replaceDocumentChunks)
 const mockUpdateDocumentRecord = jest.mocked(updateDocumentRecord)
 const mockLogDocumentIngestion = jest.mocked(logDocumentIngestion)
-const mockSaveFinancialMetricObservation = jest.mocked(
-  saveFinancialMetricObservation
+const mockDeleteFinancialMetricObservationsForDocument = jest.mocked(
+  deleteFinancialMetricObservationsForDocument
+)
+const mockSaveFinancialMetricObservations = jest.mocked(
+  saveFinancialMetricObservations
 )
 const mockEmbedDocumentChunks = jest.mocked(embedDocumentChunks)
 
@@ -65,25 +72,8 @@ describe('processDocument', () => {
         embedding: [1, 0, 0],
       }))
     )
-    mockSaveFinancialMetricObservation.mockResolvedValue({
-      id: 'observation-123',
-      user_id: 'user-123',
-      connection_id: null,
-      document_id: 'document-123',
-      metric_key: 'cash',
-      value: 120000,
-      currency: 'NZD',
-      period_start: null,
-      period_end: null,
-      as_of_date: '2026-05-12',
-      source_type: 'document',
-      source_label: 'summary.csv',
-      confidence: 0.95,
-      evidence: {},
-      raw_data: {},
-      created_at: '2026-05-12T00:00:00.000Z',
-      updated_at: '2026-05-12T00:00:00.000Z',
-    })
+    mockDeleteFinancialMetricObservationsForDocument.mockResolvedValue(undefined)
+    mockSaveFinancialMetricObservations.mockResolvedValue([])
   })
 
   it('saves extracted CSV financial metric observations', async () => {
@@ -109,12 +99,15 @@ describe('processDocument', () => {
 
     await processDocument('document-123', 'user-123')
 
-    expect(mockSaveFinancialMetricObservation).toHaveBeenCalledTimes(1)
-    expect(mockSaveFinancialMetricObservation).toHaveBeenCalledWith(
+    expect(mockDeleteFinancialMetricObservationsForDocument).toHaveBeenCalledWith(
+      'document-123',
+      'user-123'
+    )
+    expect(mockSaveFinancialMetricObservations).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: 'user-123',
         documentId: 'document-123',
-        metric: expect.objectContaining({
+        metrics: expect.arrayContaining([expect.objectContaining({
           key: 'cash',
           value: 120000,
           currency: 'NZD',
@@ -122,7 +115,7 @@ describe('processDocument', () => {
             sourceType: 'document',
             sourceLabel: 'summary.csv',
           }),
-        }),
+        })]),
       })
     )
     expect(mockUpdateDocumentRecord).toHaveBeenCalledWith(
@@ -146,6 +139,29 @@ describe('processDocument', () => {
           embedding: [1, 0, 0],
         }),
       ])
+    )
+  })
+
+  it('cleans derived metrics when persistence fails', async () => {
+    mockGetDocumentById.mockResolvedValue({
+      id: 'document-123', user_id: 'user-123', conversation_id: null,
+      file_name: 'summary.csv', file_type: 'csv', mime_type: 'text/csv',
+      storage_path: 'user-123/summary.csv', status: 'processing', document_type: null,
+      raw_text: null, metadata: null, error_message: null,
+      created_at: '2026-05-12T00:00:00.000Z', updated_at: '2026-05-12T00:00:00.000Z',
+    })
+    mockDownloadDocumentFile.mockResolvedValue(
+      Buffer.from('Account,Amount,Currency,Date\nCash at bank,120000,NZD,2026-05-12')
+    )
+    mockSaveFinancialMetricObservations.mockRejectedValueOnce(new Error('insert failed'))
+
+    await processDocument('document-123', 'user-123')
+
+    expect(mockDeleteFinancialMetricObservationsForDocument).toHaveBeenCalledTimes(2)
+    expect(mockUpdateDocumentRecord).toHaveBeenCalledWith(
+      'document-123',
+      'user-123',
+      expect.objectContaining({ status: 'failed' })
     )
   })
 })

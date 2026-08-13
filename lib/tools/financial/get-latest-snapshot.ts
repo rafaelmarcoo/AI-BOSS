@@ -8,7 +8,7 @@ export function createGetLatestSnapshotTool(
   return {
     name: 'get_latest_snapshot',
     description:
-      'Fetch the latest source-aware financial metrics for the current user. Use this before answering questions about current cash, burn, revenue, expenses, or available runway inputs.',
+      'Fetch the current verified financial metrics for the signed-in user, including source and confidence. Use this before answering questions about current cash, revenue, expenses, burn, or runway inputs. Use its confirmed cash, receivables, payables, and burn values before calling calculate_runway; never invent inputs.',
     inputSchema: z.object({}),
     async handler() {
       const result = await readSourceAwareMetrics(userId)
@@ -18,7 +18,7 @@ export function createGetLatestSnapshotTool(
       }
 
       const lines = [
-        `Latest financial metrics: ${result.availableMetricCount} available, ${result.unavailableMetricCount} unavailable.`,
+        `Financial snapshot: ${result.availableMetricCount} metric(s) available, ${result.unavailableMetricCount} unavailable.`,
       ]
 
       for (const metric of Object.values(result.metrics)) {
@@ -34,11 +34,11 @@ export function createGetLatestSnapshotTool(
 
       if (result.runwayInput) {
         lines.push(
-          `Runway inputs available: cash=${result.runwayInput.cash}, ar=${result.runwayInput.ar}, ap=${result.runwayInput.ap}, burn=${result.runwayInput.burn}.`
+          `Confirmed runway inputs: cash=${result.runwayInput.cash}, ar=${result.runwayInput.ar}, ap=${result.runwayInput.ap}, burn=${result.runwayInput.burn}.`
         )
       } else {
         lines.push(
-          'Runway inputs are incomplete. Cash, accounts receivable, accounts payable, and burn rate are required.'
+          'Runway inputs are incomplete. Cash, accounts receivable, accounts payable, and burn rate are all required.'
         )
       }
 

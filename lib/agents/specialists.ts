@@ -1,0 +1,89 @@
+import type { BaseMessage } from '@langchain/core/messages'
+import { runAgent, type AgentRunResult } from '@/lib/ai/agent'
+import { AGENT_SYSTEM_PROMPT } from '@/lib/chat/system-prompt'
+import { routeFinancialQuestion, type FinancialSpecialist } from '@/lib/agents/router'
+import { calculateRunwayTool } from '@/lib/tools/financial/calculate-runway'
+import { createGetFinancialForecastTool } from '@/lib/tools/financial/get-financial-forecast'
+import { createGetFinancialHistoryTool } from '@/lib/tools/financial/get-financial-history'
+import { createGetLatestSnapshotTool } from '@/lib/tools/financial/get-latest-snapshot'
+import { createModelScenarioTool } from '@/lib/tools/financial/model-scenario'
+import type { AppTool } from '@/lib/tools/contracts'
+
+const SPECIALIST_PROMPTS: Record<FinancialSpecialist, string> = {
+  financial_position: `${AGENT_SYSTEM_PROMPT}
+
+## Assigned specialist
+You are handling current financial position and runway only. Use get_latest_snapshot for current values. Use calculate_runway only from confirmed snapshot values. If the request is about history, forecasting, or a scenario, explain that this request needs the appropriate analysis instead of inventing an answer.`,
+  historical_forecast: `${AGENT_SYSTEM_PROMPT}
+
+## Assigned specialist
+You are handling historical review and deterministic forecasts only. Use get_financial_history for past movement and get_financial_forecast for future trend continuation. Do not calculate present runway or model scenarios.`,
+  scenario: `${AGENT_SYSTEM_PROMPT}
+
+## Assigned specialist
+You are handling recurring burn scenarios only. Use model_scenario for direct monthly amounts or explicit burn percentages. For a percentage, pass burn_percentage_change exactly as stated: a reduction is negative and an increase is positive. Never calculate the dollar amount yourself. Do not model revenue percentages; explain that only monthly-burn changes are supported.`,
+}
+
+function specialistTools(userId: string, specialist: FinancialSpecialist): AppTool[] {
+  if (specialist === 'financial_position') {
+    return [createGetLatestSnapshotTool(userId), calculateRunwayTool]
+  }
+
+  if (specialist === 'historical_forecast') {
+    return [
+      createGetFinancialHistoryTool(userId),
+      createGetFinancialForecastTool(userId),
+    ]
+  }
+
+  return [createModelScenarioTool(userId)]
+}
+
+function validatePercentageScenarioRequest(input: string) {
+  const value = input.toLowerCase()
+  if (!value.includes('%')) return null
+
+  if (/\b(revenue|sales|income)\b/.test(value)) {
+    return 'AI-BOSS currently supports percentage scenarios for monthly burn only. Revenue percentage scenarios are not supported yet.'
+  }
+
+  if (!/\bburn\b/.test(value)) {
+    return 'Please specify monthly burn for a percentage scenario, for example: "cut monthly burn by 20%". AI-BOSS does not assume which metric a percentage applies to.'
+  }
+
+  return null
+}
+
+export interface MultiAgentRunResult extends AgentRunResult {
+  specialist: FinancialSpecialist
+}
+
+export async function runMultiAgent(
+  userId: string,
+  input: string,
+  chatHistory: BaseMessage[] = [],
+  contextMessages: BaseMessage[] = []
+): Promise<MultiAgentRunResult> {
+  const specialist = routeFinancialQuestion(input)
+  const percentageValidation =
+    specialist === 'scenario' ? validatePercentageScenarioRequest(input) : null
+
+  if (percentageValidation) {
+    return {
+      content: percentageValidation,
+      tokensUsed: null,
+      toolsUsed: [],
+      specialist,
+    }
+  }
+
+  const result = await runAgent(
+    input,
+    chatHistory,
+    specialistTools(userId, specialist),
+    contextMessages,
+    SPECIALIST_PROMPTS[specialist]
+  )
+
+  return { ...result, specialist }
+}

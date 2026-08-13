@@ -76,6 +76,10 @@ It answers directly when the metric, source, and period are clear. AI-BOSS does 
 
 `npm run test:agent` requires `OPENAI_API_KEY` and `TEST_USER_ID`. The script reads `.env.local` when present and otherwise uses existing environment variables.
 
+## Optional multi-agent routing
+
+Set `MULTI_AGENT_MODE=true` only in a chosen server environment to use deterministic specialist routing. It is disabled by default. The router assigns each request to one specialist: current financial position/runway, historical review/forecasting, or recurring-burn scenarios. Each specialist has only the tools needed for its role, while calculations remain deterministic and the final answer still follows the shared AI-BOSS safety guidance.
+
 ## PDF metric extraction
 
 PDF documents remain available for retrieved document context. A PDF contributes structured financial metrics only when AI-BOSS finds a clear labelled reporting date and a supported labelled value. Extracted values retain the document filename, page excerpt, confidence, and detected currency. Undated PDFs do not affect dashboard metrics, history, or forecasts.

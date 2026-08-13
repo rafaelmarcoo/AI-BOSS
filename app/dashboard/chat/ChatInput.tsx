@@ -12,7 +12,7 @@ import {
   Tooltip,
 } from "@mui/material";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
-import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
+import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
 import PublicRoundedIcon from "@mui/icons-material/PublicRounded";
 import LockRoundedIcon from "@mui/icons-material/LockRounded";
 import AdminPanelSettingsRoundedIcon from "@mui/icons-material/AdminPanelSettingsRounded";
@@ -86,7 +86,7 @@ export function ChatInput({
   };
 
   return (
-    <Stack direction="row" spacing={1.25} alignItems="center">
+    <Stack direction="row" spacing={0.75} alignItems="center">
       <input
         ref={fileInputRef}
         type="file"
@@ -100,22 +100,21 @@ export function ChatInput({
         onClick={handleChooseFile}
         disabled={uploadDisabled}
         sx={{
-          borderRadius: 999,
-          width: 36,
-          height: 36,
-          border: "1px solid",
-          borderColor: dashboardTokens.borderInput,
-          bgcolor: dashboardTokens.surfaceAlt,
-          color: "common.white",
+          borderRadius: `${dashboardTokens.radiusSm}px`,
+          width: 32,
+          height: 32,
+          bgcolor: "transparent",
+          color: dashboardTokens.textMuted,
           "&:hover": {
-            bgcolor: "rgba(255,255,255,0.08)",
+            bgcolor: dashboardTokens.surfaceAlt,
+            color: dashboardTokens.text,
           },
           "&.Mui-disabled": {
             color: dashboardTokens.textMuted,
           },
         }}
       >
-        <UploadFileRoundedIcon fontSize="small" />
+        <AttachFileRoundedIcon fontSize="small" />
       </IconButton>
 
       <TextField
@@ -138,9 +137,11 @@ export function ChatInput({
         }}
         sx={{
           "& .MuiOutlinedInput-root": {
-            borderRadius: 999,
-            bgcolor: dashboardTokens.surfaceAlt,
-            color: "common.white",
+            minHeight: 38,
+            borderRadius: `${dashboardTokens.radiusSm}px`,
+            bgcolor: dashboardTokens.surface,
+            color: dashboardTokens.text,
+            fontSize: 14,
           },
           "& .MuiOutlinedInput-notchedOutline": {
             borderColor: dashboardTokens.borderInput,
@@ -162,13 +163,12 @@ export function ChatInput({
             onClick={(event) => setVisibilityAnchor(event.currentTarget)}
             disabled={disabled || visibilityDisabled}
             sx={{
-              borderRadius: 999,
-              width: 36,
-              height: 36,
-              border: "1px solid",
-              borderColor: dashboardTokens.borderInput,
-              bgcolor: dashboardTokens.surfaceAlt,
-              color: "common.white",
+              borderRadius: `${dashboardTokens.radiusSm}px`,
+              width: 32,
+              height: 32,
+              bgcolor: "transparent",
+              color: dashboardTokens.textMuted,
+              "&:hover": { bgcolor: dashboardTokens.surfaceAlt, color: dashboardTokens.text },
               "&.Mui-disabled": { color: dashboardTokens.textMuted },
             }}
           >
@@ -221,17 +221,17 @@ export function ChatInput({
         onClick={submit}
         disabled={disabled || !value.trim()}
         sx={{
-          borderRadius: 999,
-          width: 36,
-          height: 36,
+          borderRadius: `${dashboardTokens.radiusSm}px`,
+          width: 32,
+          height: 32,
           bgcolor:
-            disabled || !value.trim() ? dashboardTokens.surfaceAlt : "#2563eb",
-          color: "common.white",
+            disabled || !value.trim() ? dashboardTokens.surfaceAlt : dashboardTokens.accent,
+          color: dashboardTokens.text,
           "&:hover": {
             bgcolor:
               disabled || !value.trim()
                 ? dashboardTokens.surfaceAlt
-                : "#1d4ed8",
+                : dashboardTokens.accentHover,
           },
           "&.Mui-disabled": {
             color: dashboardTokens.textMuted,

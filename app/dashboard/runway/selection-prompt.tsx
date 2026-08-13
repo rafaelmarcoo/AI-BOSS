@@ -94,7 +94,7 @@ export function SelectableRunwayWorkspace({
           sx: {
             width: { xs: 300, sm: 360 },
             mt: 0.5,
-            borderRadius: 2,
+            borderRadius: `${dashboardTokens.radiusMd}px`,
             overflow: "hidden",
           },
         }}
@@ -102,9 +102,9 @@ export function SelectableRunwayWorkspace({
         <Paper
           elevation={0}
           sx={{
-            p: 2,
-            bgcolor: dashboardTokens.sidebarV2,
-            color: "common.white",
+            p: 1.5,
+            bgcolor: dashboardTokens.surface,
+            color: dashboardTokens.text,
             border: "1px solid",
             borderColor: dashboardTokens.border,
           }}
@@ -116,7 +116,7 @@ export function SelectableRunwayWorkspace({
               </Typography>
               <Typography
                 variant="body2"
-                sx={{ color: "common.white", lineHeight: 1.6 }}
+                sx={{ color: dashboardTokens.text, lineHeight: 1.6 }}
               >
                 {selectionText}
               </Typography>
@@ -135,7 +135,7 @@ export function SelectableRunwayWorkspace({
                 variant="contained"
                 startIcon={<ChatBubbleRoundedIcon fontSize="small" />}
                 onClick={handleAskChatbot}
-                sx={{ color: "common.white" }}
+                sx={{ color: dashboardTokens.text, borderRadius: `${dashboardTokens.radiusSm}px` }}
               >
                 Ask chatbot
               </Button>

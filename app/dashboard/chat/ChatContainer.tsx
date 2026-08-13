@@ -89,7 +89,7 @@ export function ChatContainer({
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
-        bgcolor: dashboardTokens.sidebarV2,
+        bgcolor: dashboardTokens.sidebar,
       }}
     >
       <Box
@@ -103,34 +103,30 @@ export function ChatContainer({
       >
         <Box
           sx={{
-            px: 1.25,
-            py: 1,
+            px: 1.5,
+            py: 1.1,
             borderBottom: "1px solid",
             borderBottomColor: dashboardTokens.border,
-            bgcolor: dashboardTokens.sidebarV2,
+            bgcolor: dashboardTokens.sidebar,
           }}
         >
           <Stack direction="row" alignItems="center" justifyContent="space-between">
             <IconButton
               onClick={onOpenHistory}
-              sx={{
-                color: "common.white",
-                "&:hover": {
-                  bgcolor: "transparent",
-                },
-              }}
+              size="small"
+              sx={{ color: dashboardTokens.textMuted, "&:hover": { bgcolor: dashboardTokens.surfaceAlt, color: dashboardTokens.text } }}
             >
               <MenuRoundedIcon />
             </IconButton>
             <Stack
               spacing={0.15}
-              sx={{ flex: 1, minWidth: 0, alignItems: "flex-end", pr: 1 }}
+              sx={{ flex: 1, minWidth: 0, alignItems: "flex-end", pr: 0.5 }}
             >
               <Tooltip title={activeConversationTitle ?? "New conversation"}>
                 <Typography
                   variant="body2"
                   sx={{
-                    color: "common.white",
+                    color: dashboardTokens.text,
                     fontWeight: 600,
                     maxWidth: "100%",
                     textOverflow: "ellipsis",
@@ -153,8 +149,8 @@ export function ChatContainer({
             flex: "1 1 0",
             minHeight: 0,
             overflow: "auto",
-            px: 1.25,
-            py: 1.25,
+            px: 1.5,
+            py: 1.5,
           }}
         >
           {historyLoading ? (
@@ -175,7 +171,7 @@ export function ChatContainer({
               </Stack>
             </Stack>
           ) : (
-            <Stack spacing={1.25} sx={{ pb: 1.25 }}>
+            <Stack spacing={1} sx={{ pb: 1 }}>
               {error ? (
                 <Alert
                   severity="error"
@@ -208,11 +204,11 @@ export function ChatContainer({
         <Box
           sx={{
             flex: "0 0 auto",
-            px: 1.25,
-            py: 1,
+            px: 1.5,
+            py: 1.25,
             borderTop: "1px solid",
             borderTopColor: dashboardTokens.border,
-            bgcolor: dashboardTokens.sidebarV2,
+            bgcolor: dashboardTokens.sidebar,
           }}
         >
           {readOnly ? (

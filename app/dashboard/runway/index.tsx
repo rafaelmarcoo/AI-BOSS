@@ -1,9 +1,11 @@
 import { Box } from "@mui/material";
+import { dashboardTokens } from "@/app/theme";
 import { HistoricalMetricsChart } from "../BurnRateChart";
 import type { GenUiPlan } from "@/lib/gen-ui/types";
 import {
   getMetricNumber,
   type CompleteFinancialMetricSet,
+  type FinancialMetricKey,
 } from "@/lib/financial-data";
 import { GenUiCanvas } from "./gen-ui/GenUiCanvas";
 import { SelectableRunwayWorkspace } from "./selection-prompt";
@@ -38,18 +40,38 @@ export function RunwaySection({
   const runway = getMetricNumber(metrics, "runway_months");
   const cash = getMetricNumber(metrics, "cash");
   const burn = getMetricNumber(metrics, "burn_rate");
+  const missingMetricLabels = ([
+    ["cash", "Cash"],
+    ["accounts_receivable", "Accounts receivable"],
+    ["accounts_payable", "Accounts payable"],
+    ["monthly_revenue", "Monthly revenue"],
+    ["monthly_expenses", "Monthly expenses"],
+    ["burn_rate", "Burn rate"],
+    ["runway_months", "Runway months"],
+  ] satisfies Array<[FinancialMetricKey, string]>)
+    .filter(([key]) => getMetricNumber(metrics, key) === null)
+    .map(([, label]) => label);
   const baselineSummary = `Current runway is ${formatRunway(runway)}, with ${formatCurrency(cash)} cash and ${formatCurrency(burn)} monthly burn.`;
   const historyRefreshKey = Object.values(metrics)
     .map((metric) => metric.updatedAt ?? "")
     .join("|");
 
   return (
-    <Box sx={{ p: { xs: 3, sm: 4 }, minHeight: "100%" }}>
-      <Box sx={{ display: "grid", gap: 2.5 }}>
+    <Box sx={{ p: { xs: 2, sm: 3 }, minHeight: "100%" }}>
+      <Box
+        sx={{
+          display: "grid",
+          gap: 3,
+          width: "100%",
+          maxWidth: dashboardTokens.contentMaxWidth,
+          mx: "auto",
+        }}
+      >
         <SelectableRunwayWorkspace onAskChatbot={onAskChatbot}>
           <GenUiCanvas
             plan={genUiPlan}
             baselineSummary={baselineSummary}
+            missingMetricLabels={missingMetricLabels}
             onAskChatbot={onAskChatbot}
           />
         </SelectableRunwayWorkspace>

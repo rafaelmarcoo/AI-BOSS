@@ -5,7 +5,7 @@ import { dashboardTokens } from "@/app/theme";
 
 const assistantMarkdownSx = {
   "& *": { boxSizing: "border-box" },
-  "& p": { m: 0, lineHeight: 1.45 },
+  "& p": { m: 0, lineHeight: 1.5 },
   "& p + p": { mt: 0.75 },
   "& ul, & ol": { pl: 2.25, my: 0.5 },
   "& li": { my: 0.25, lineHeight: 1.45 },
@@ -62,14 +62,15 @@ export function ChatMessage({
       <Paper
         elevation={0}
         sx={{
-          px: 2,
-          py: 1.5,
-          maxWidth: "85%",
-          borderRadius: 2,
+          px: 1.5,
+          py: 1.1,
+          maxWidth: "88%",
+          borderRadius: `${dashboardTokens.radiusSm}px`,
           border: "1px solid",
-          borderColor: dashboardTokens.border,
-          bgcolor: isUser ? "#2563eb" : "#4b5563",
-          color: "common.white",
+          borderColor: isUser ? "rgba(79, 125, 243, 0.24)" : dashboardTokens.border,
+          bgcolor: isUser ? "rgba(79, 125, 243, 0.14)" : dashboardTokens.surface,
+          color: dashboardTokens.text,
+          fontSize: 14,
           wordBreak: "break-word",
           lineHeight: 1.45,
           whiteSpace: isUser ? "pre-wrap" : "normal",

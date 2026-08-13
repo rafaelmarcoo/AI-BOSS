@@ -29,6 +29,17 @@ describe('extractPdfFinancialMetrics', () => {
     ]))
   })
 
+  it('extracts runway values expressed in months', () => {
+    const metrics = extract([
+      'Statement date: 31/05/2026',
+      'Runway: 7 months',
+    ])
+
+    expect(metrics).toEqual([
+      expect.objectContaining({ key: 'runway_months', value: 7, currency: null }),
+    ])
+  })
+
   it('prioritises cash burn over the broad cash label and supports negative values', () => {
     const metrics = extract(CASH_BURN_STATEMENT_LINES)
 

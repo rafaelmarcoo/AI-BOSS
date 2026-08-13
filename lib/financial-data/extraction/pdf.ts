@@ -116,7 +116,7 @@ export function extractPdfFinancialMetrics(params: {
 
   const results: AvailableFinancialMetricValue[] = []
   const seenKeys = new Set<FinancialMetricKey>()
-  const linePattern = /^(.+?)(?:\s*:\s*|\s+)(\(?\s*[-−]?\s*[$£€¥]?\s*[\d,]+(?:\.\d{1,2})?\s*\)?)(?:\s+([A-Z]{3}))?\s*$/
+  const linePattern = /^(.+?)(?:\s*:\s*|\s+)(\(?\s*[-−]?\s*[$£€¥]?\s*[\d,]+(?:\.\d{1,2})?\s*\)?)(?:\s+(months?))?(?:\s+([A-Z]{3}))?\s*$/i
 
   for (const page of params.pages) {
     for (const rawLine of getPageLines(page)) {
@@ -124,10 +124,11 @@ export function extractPdfFinancialMetrics(params: {
       const match = line.match(linePattern)
       if (!match) continue
 
-      const [, label, rawValue, inlineCurrency] = match
+      const [, label, rawValue, unit, inlineCurrency] = match
       const metric = matchMetricLabel(label)
       const value = parseNumber(rawValue)
       if (!metric || value === null || seenKeys.has(metric.key)) continue
+      if (unit && metric.key !== 'runway_months') continue
 
       seenKeys.add(metric.key)
       const currency = inlineCurrency?.toUpperCase() ?? line.match(CURRENCY_PATTERN)?.[1]?.toUpperCase() ?? null

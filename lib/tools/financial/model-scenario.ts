@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { calculateRunway } from '@/lib/calculations/runway'
 import { readSourceAwareMetrics } from '@/lib/financial-data/read-service'
+import { isAvailableMetric } from '@/lib/financial-data/metrics'
 import type { StructuredTool } from '@/lib/tools/contracts'
 
 const ModelScenarioInputSchema = z.object({
@@ -13,6 +14,27 @@ const ModelScenarioInputSchema = z.object({
 })
 
 type ModelScenarioInput = z.infer<typeof ModelScenarioInputSchema>
+
+function getRunwayCurrency(
+  snapshot: Awaited<ReturnType<typeof readSourceAwareMetrics>>
+) {
+  const runwayMetricKeys = [
+    'cash',
+    'accounts_receivable',
+    'accounts_payable',
+    'burn_rate',
+  ] as const
+  const currencies = runwayMetricKeys.map((key) => {
+    const metric = snapshot.metrics[key]
+    return isAvailableMetric(metric) ? metric.currency : null
+  })
+
+  if (currencies.some((currency) => currency === null)) {
+    return null
+  }
+
+  return new Set(currencies).size === 1 ? currencies[0] : null
+}
 
 export function createModelScenarioTool(
   userId: string
@@ -27,6 +49,14 @@ export function createModelScenarioTool(
 
       if (!snapshot.runwayInput) {
         return 'Cannot model this scenario because current runway inputs are incomplete. Cash, accounts receivable, accounts payable, and burn rate are required.'
+      }
+
+      const currency = getRunwayCurrency(snapshot)
+      if (!currency) {
+        return (
+          'Cannot model this scenario because the runway inputs do not have one confirmed currency. ' +
+          'Use complete metrics in the same currency; AI-BOSS does not convert currencies.'
+        )
       }
 
       const { cash, ar, ap, burn } = snapshot.runwayInput
@@ -46,13 +76,13 @@ export function createModelScenarioTool(
       )
       const costLabel =
         monthly_cost_change >= 0
-          ? `+$${monthly_cost_change.toLocaleString()}/month`
-          : `-$${Math.abs(monthly_cost_change).toLocaleString()}/month`
+          ? `+${monthly_cost_change.toLocaleString()} ${currency}/month`
+          : `-${Math.abs(monthly_cost_change).toLocaleString()} ${currency}/month`
 
       return [
         `Scenario: ${label} (${costLabel})`,
-        `Before: ${before.runway_months} months runway at $${burn.toLocaleString()}/month burn.`,
-        `After: ${after.runway_months} months runway at $${scenarioBurn.toLocaleString()}/month burn.`,
+        `Before: ${before.runway_months} months runway at ${burn.toLocaleString()} ${currency}/month burn.`,
+        `After: ${after.runway_months} months runway at ${scenarioBurn.toLocaleString()} ${currency}/month burn.`,
         `Impact: ${runwayDiff >= 0 ? '+' : ''}${runwayDiff} months.`,
         `Assessment: ${after.policy.message}`,
         'This is a modelled scenario only. Stored financial data has not been changed.',

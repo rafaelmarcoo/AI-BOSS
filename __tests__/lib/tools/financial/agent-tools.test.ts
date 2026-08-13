@@ -164,4 +164,30 @@ describe('financial agent tools', () => {
       })
     ).resolves.toContain('resulting monthly burn would be 0')
   })
+
+  it('does not model a scenario from missing or mixed-currency runway inputs', async () => {
+    mockReadSourceAwareMetrics.mockResolvedValue(
+      availableMetrics({
+        burn_rate: {
+          status: 'available',
+          key: 'burn_rate',
+          value: 28000,
+          currency: 'AUD',
+          periodStart: null,
+          periodEnd: '2026-04-30',
+          asOfDate: null,
+          provenance: { sourceType: 'document', sourceLabel: 'aud-demo.csv' },
+          confidence: 0.95,
+          updatedAt: '2026-05-12T00:00:00.000Z',
+        },
+      })
+    )
+
+    await expect(
+      createModelScenarioTool('user-123').handler({
+        label: 'new hire',
+        monthly_cost_change: 9000,
+      })
+    ).resolves.toContain('one confirmed currency')
+  })
 })

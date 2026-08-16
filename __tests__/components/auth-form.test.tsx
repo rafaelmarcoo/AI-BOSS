@@ -9,8 +9,34 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ replace, refresh }),
 }))
 
-describe('AuthForm signup roles', () => {
-  beforeEach(() => jest.clearAllMocks())
+describe('AuthForm', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    window.sessionStorage.clear()
+  })
+
+  it('verifies the password before requesting a sign-in link', async () => {
+    const user = userEvent.setup()
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
+    }) as jest.Mock
+
+    render(<AuthForm mode="sign-in" />)
+    await user.type(screen.getByLabelText(/^Email/), 'person@example.com')
+    await user.type(screen.getByLabelText(/Password/), 'password123')
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/check-email'))
+    const [, request] = (global.fetch as jest.Mock).mock.calls[0]
+    expect(JSON.parse(request.body)).toEqual({
+      email: 'person@example.com',
+      password: 'password123',
+    })
+    expect(window.sessionStorage.getItem('pending-signin-email')).toBe(
+      'person@example.com'
+    )
+  })
 
   it('submits an admin with a newly entered company', async () => {
     const user = userEvent.setup()
@@ -33,7 +59,7 @@ describe('AuthForm signup roles', () => {
       companyName: 'Acme Ltd',
       userType: 'admin',
     })
-    expect(replace).toHaveBeenCalledWith('/landing')
+    expect(replace).toHaveBeenCalledWith('/verify-email')
   })
 
   it('loads companies and submits the selected employee company', async () => {

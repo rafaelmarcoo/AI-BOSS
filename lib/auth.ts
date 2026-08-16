@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ApiError } from '@/lib/api/errors'
 import {
   COOKIE_ACCESS_TOKEN,
+  COOKIE_MAGIC_LINK_STATE,
   COOKIE_REFRESH_TOKEN,
   createAdminSupabaseClient,
   createServerSupabaseClient,
@@ -108,4 +109,30 @@ export async function applySessionCookies(
 export function clearSessionCookies(response: NextResponse) {
   response.cookies.delete(COOKIE_ACCESS_TOKEN)
   response.cookies.delete(COOKIE_REFRESH_TOKEN)
+}
+
+export function applyPendingSignInCookie(response: NextResponse, email: string) {
+  response.cookies.set(
+    COOKIE_MAGIC_LINK_STATE,
+    Buffer.from(email.toLowerCase(), 'utf8').toString('base64url'),
+    {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 10 * 60,
+    }
+  )
+}
+
+export function getPendingSignInEmail(request: NextRequest) {
+  const value = request.cookies.get(COOKIE_MAGIC_LINK_STATE)?.value
+  if (!value) return null
+
+  try {
+    const email = Buffer.from(value, 'base64url').toString('utf8').trim().toLowerCase()
+    return email || null
+  } catch {
+    return null
+  }
 }

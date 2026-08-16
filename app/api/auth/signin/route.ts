@@ -5,40 +5,54 @@ import {
   readJsonBody,
   validateSignInPayload,
 } from '@/lib/api/validation'
-import { applySessionCookies } from '@/lib/auth'
+import { applyPendingSignInCookie } from '@/lib/auth'
 import { createServerSupabaseClient } from '@/lib/supabase'
 
 export async function POST(request: Request) {
   try {
     const payload = assertValid(validateSignInPayload(await readJsonBody(request)))
     const supabase = createServerSupabaseClient()
-    const { data, error } = await supabase.auth.signInWithPassword(payload)
+    const { data: passwordData, error: passwordError } =
+      await supabase.auth.signInWithPassword({
+        email: payload.email,
+        password: payload.password,
+      })
 
-    if (error || !data.session || !data.user?.email) {
+    if (passwordError || !passwordData.session || !passwordData.user?.email) {
+      throw new ApiError(401, 'AUTH_INVALID', 'Invalid email or password.')
+    }
+
+    // The password session proves the first step only. Revoke its refresh token;
+    // the application session is issued later, after the email link is confirmed.
+    const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' })
+    if (signOutError) {
+      throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to prepare email confirmation.')
+    }
+
+    const callbackUrl = new URL('/auth/callback', request.url)
+    const { error } = await supabase.auth.signInWithOtp({
+      email: payload.email,
+      options: {
+        shouldCreateUser: false,
+        emailRedirectTo: callbackUrl.toString(),
+      },
+    })
+
+    if (error) {
       throw new ApiError(
-        401,
-        'AUTH_INVALID',
-        error?.message ?? 'Invalid email or password.'
+        400,
+        'BAD_REQUEST',
+        error.message ?? 'Unable to send the sign-in link.'
       )
     }
 
     const response = successResponse(
-      {
-        user: {
-          id: data.user.id,
-          email: data.user.email,
-        },
-        session: {
-          accessToken: data.session.access_token,
-          refreshToken: data.session.refresh_token,
-          expiresIn: data.session.expires_in,
-        },
-      },
+      { email: payload.email, nextStep: 'check-email' as const },
       undefined,
-      'Signed in successfully.'
+      'Check your email for the sign-in link.'
     )
 
-    await applySessionCookies(response, data.session)
+    applyPendingSignInCookie(response, payload.email)
 
     return response
   } catch (error) {

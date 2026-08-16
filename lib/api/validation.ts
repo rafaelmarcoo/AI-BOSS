@@ -59,6 +59,15 @@ export interface SignInPayload {
   password: string
 }
 
+export interface EmailPayload {
+  email: string
+}
+
+export interface MagicLinkSessionPayload {
+  accessToken: string
+  refreshToken: string
+}
+
 // Keep the accepted chat roles narrow so the API contract stays predictable.
 export type ChatMessageRole = 'user' | 'assistant'
 
@@ -170,6 +179,47 @@ export function validateSignInPayload(payload: unknown): ValidationResult<SignIn
       email: email.toLowerCase(),
       password,
     },
+  }
+}
+
+export function validateEmailPayload(payload: unknown): ValidationResult<EmailPayload> {
+  const details: Record<string, string> = {}
+  const input = typeof payload === 'object' && payload !== null ? payload : {}
+  const email = readTrimmedString(Reflect.get(input, 'email'), 'email', details)
+
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    details.email = 'email must be a valid email address.'
+  }
+
+  if (Object.keys(details).length > 0 || !email) {
+    return { success: false, details }
+  }
+
+  return { success: true, data: { email: email.toLowerCase() } }
+}
+
+export function validateMagicLinkSessionPayload(
+  payload: unknown
+): ValidationResult<MagicLinkSessionPayload> {
+  const details: Record<string, string> = {}
+  const input = typeof payload === 'object' && payload !== null ? payload : {}
+  const accessToken = readTrimmedString(
+    Reflect.get(input, 'accessToken'),
+    'accessToken',
+    details
+  )
+  const refreshToken = readTrimmedString(
+    Reflect.get(input, 'refreshToken'),
+    'refreshToken',
+    details
+  )
+  if (Object.keys(details).length > 0 || !accessToken || !refreshToken) {
+    return { success: false, details }
+  }
+
+  return {
+    success: true,
+    data: { accessToken, refreshToken },
   }
 }
 

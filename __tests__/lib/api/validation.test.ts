@@ -1,4 +1,9 @@
-import { validateChatPayload, validateSignUpPayload } from '@/lib/api/validation'
+import {
+  validateChatPayload,
+  validateEmailPayload,
+  validateSignInPayload,
+  validateSignUpPayload,
+} from '@/lib/api/validation'
 
 describe('validateSignUpPayload', () => {
   const basePayload = {
@@ -52,6 +57,36 @@ describe('validateChatPayload visibility', () => {
     expect(validateChatPayload({ messages, visibility: 'public' })).toEqual({
       success: false,
       details: { visibility: 'visibility must be private, company, or admins.' },
+    })
+  })
+})
+
+describe('validateSignInPayload', () => {
+  it('requires an email and password before the email confirmation step', () => {
+    expect(
+      validateSignInPayload({
+        email: 'Person@Example.com',
+        password: 'password123',
+      })
+    ).toEqual({
+      success: true,
+      data: { email: 'person@example.com', password: 'password123' },
+    })
+  })
+})
+
+describe('validateEmailPayload', () => {
+  it('normalizes a valid email address', () => {
+    expect(validateEmailPayload({ email: 'Person@Example.com' })).toEqual({
+      success: true,
+      data: { email: 'person@example.com' },
+    })
+  })
+
+  it('rejects an invalid email address', () => {
+    expect(validateEmailPayload({ email: 'not-an-email' })).toEqual({
+      success: false,
+      details: { email: 'email must be a valid email address.' },
     })
   })
 })

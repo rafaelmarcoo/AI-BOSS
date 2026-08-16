@@ -131,6 +131,7 @@ export function AuthForm({ mode }: AuthFormProps) {
 
     const formData = new FormData(event.currentTarget)
     const password = String(formData.get('password') ?? '')
+    const email = String(formData.get('email') ?? '')
 
     if (
       mode === 'sign-up' &&
@@ -144,14 +145,14 @@ export function AuthForm({ mode }: AuthFormProps) {
     const payload =
       mode === 'sign-up'
         ? {
-            email: String(formData.get('email') ?? ''),
+            email,
             password,
             fullName: String(formData.get('fullName') ?? ''),
             companyName: String(formData.get('companyName') ?? ''),
             userType: userType ?? '',
           }
         : {
-            email: String(formData.get('email') ?? ''),
+            email,
             password,
           }
 
@@ -164,8 +165,13 @@ export function AuthForm({ mode }: AuthFormProps) {
       body: JSON.stringify(payload),
     })
 
-    if (!response.ok) {
-      const errorPayload = (await response.json().catch(() => null)) as ApiErrorPayload | null
+    const responsePayload = (await response.json().catch(() => null)) as
+      | ApiErrorPayload
+      | { success: true }
+      | null
+
+    if (!response.ok || !responsePayload?.success) {
+      const errorPayload = responsePayload as ApiErrorPayload | null
       setErrorMessage(
         errorPayload?.error?.message ?? 'We could not complete that request.'
       )
@@ -174,7 +180,13 @@ export function AuthForm({ mode }: AuthFormProps) {
       return
     }
 
-    router.replace('/landing')
+    if (mode === 'sign-up') {
+      window.sessionStorage.setItem('pending-signup-email', email.trim().toLowerCase())
+      router.replace('/verify-email')
+    } else {
+      window.sessionStorage.setItem('pending-signin-email', email.trim().toLowerCase())
+      router.replace('/check-email')
+    }
     router.refresh()
   }
 
@@ -466,7 +478,7 @@ export function AuthForm({ mode }: AuthFormProps) {
             ? 'Working...'
             : isSignUp
               ? 'Create account'
-              : 'Sign in'}
+              : 'Continue'}
         </Button>
 
         <Typography

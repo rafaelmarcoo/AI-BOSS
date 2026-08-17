@@ -38,6 +38,27 @@ describe('AuthForm', () => {
     )
   })
 
+  it('shows and uses the development-only email bypass when enabled', async () => {
+    const user = userEvent.setup()
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
+    }) as jest.Mock
+
+    render(<AuthForm mode="sign-in" showTestBypass />)
+
+    expect(screen.getByText('Development testing only')).toBeInTheDocument()
+    await user.type(screen.getByLabelText(/^Email/), 'person@example.com')
+    await user.type(screen.getByLabelText(/Password/), 'password123')
+    await user.click(screen.getByRole('button', { name: 'Bypass email check' }))
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/landing'))
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/auth/test-bypass',
+      expect.objectContaining({ method: 'POST' })
+    )
+  })
+
   it('submits an admin with a newly entered company', async () => {
     const user = userEvent.setup()
     global.fetch = jest.fn().mockResolvedValue({

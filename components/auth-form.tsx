@@ -29,6 +29,7 @@ type Mode = 'sign-in' | 'sign-up'
 
 interface AuthFormProps {
   mode: Mode
+  showTestBypass?: boolean
 }
 
 interface ApiErrorPayload {
@@ -76,7 +77,7 @@ function PasswordVisibilityIcon({ crossed }: { crossed: boolean }) {
   )
 }
 
-export function AuthForm({ mode }: AuthFormProps) {
+export function AuthForm({ mode, showTestBypass = false }: AuthFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -125,6 +126,12 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as
+      | HTMLButtonElement
+      | null
+    const isTestBypass =
+      mode === 'sign-in' && submitter?.value === 'test-bypass'
+
     setIsSubmitting(true)
     setErrorMessage(null)
     setFieldErrors({})
@@ -156,7 +163,10 @@ export function AuthForm({ mode }: AuthFormProps) {
             password,
           }
 
-    const response = await fetch(`/api/auth/${mode === 'sign-up' ? 'signup' : 'signin'}`, {
+    const endpoint = isTestBypass
+      ? '/api/auth/test-bypass'
+      : `/api/auth/${mode === 'sign-up' ? 'signup' : 'signin'}`
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -180,7 +190,10 @@ export function AuthForm({ mode }: AuthFormProps) {
       return
     }
 
-    if (mode === 'sign-up') {
+    if (isTestBypass) {
+      window.sessionStorage.removeItem('pending-signin-email')
+      router.replace('/landing')
+    } else if (mode === 'sign-up') {
       window.sessionStorage.setItem('pending-signup-email', email.trim().toLowerCase())
       router.replace('/verify-email')
     } else {
@@ -199,6 +212,43 @@ export function AuthForm({ mode }: AuthFormProps) {
       elevation={0}
       sx={authCardStyles}
     >
+      {mode === 'sign-in' && showTestBypass ? (
+        <Paper
+          elevation={0}
+          sx={{
+            position: 'fixed',
+            top: 20,
+            right: 20,
+            zIndex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.25,
+            p: 1.25,
+            border: `1px solid ${dashboardTokens.border}`,
+            borderRadius: `${dashboardTokens.radiusMd}px`,
+            bgcolor: dashboardTokens.surface,
+          }}
+        >
+          <Typography sx={{ color: dashboardTokens.textMuted, fontSize: 12 }}>
+            Development testing only
+          </Typography>
+          <Button
+            type="submit"
+            name="intent"
+            value="test-bypass"
+            variant="outlined"
+            disabled={isSubmitting}
+            sx={{
+              borderColor: dashboardTokens.borderInput,
+              color: dashboardTokens.text,
+              textTransform: 'none',
+            }}
+          >
+            Bypass email check
+          </Button>
+        </Paper>
+      ) : null}
+
       <Stack spacing={0}>
         <Stack spacing={0.25}>
           <Typography

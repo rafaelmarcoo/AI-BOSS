@@ -8,7 +8,10 @@ export default function SignInPage() {
       component="main"
       sx={authPageStyles}
     >
-      <AuthForm mode="sign-in" />
+      <AuthForm
+        mode="sign-in"
+        showTestBypass={process.env.NODE_ENV !== 'production'}
+      />
     </Box>
   )
 }

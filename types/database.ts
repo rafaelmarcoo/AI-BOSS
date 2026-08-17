@@ -23,6 +23,15 @@ export interface Company {
   updated_at: string
 }
 
+/** Server-only company credential used to authorize employee signup. */
+export interface CompanyJoinCode {
+  company_id: string
+  join_code: string
+  expires_at: string
+  created_at: string
+  updated_at: string
+}
+
 export interface PolicyRule {
   id: string
   user_id: string

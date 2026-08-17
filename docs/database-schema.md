@@ -2,14 +2,15 @@
 
 **Database:** Supabase (PostgreSQL)  
 **Created:** March 22, 2025  
-**Last Updated:** May 18, 2026
+**Last Updated:** August 17, 2026
 
 ---
 
 ## Overview
 
-The database now consists of 12 main tables:
+The database now consists of 13 main tables:
 - **companies** - Company identities used as shared-data access boundaries
+- **company_join_codes** - Server-only daily credentials for employee signup
 - **users** - User profiles (extends Supabase Auth)
 - **conversations** - User-owned chat threads
 - **conversation_messages** - Individual chat messages inside a thread
@@ -48,6 +49,26 @@ Canonical company records used to scope shared conversation access.
 
 **Integrity rules:**
 - Company names are unique after trimming and case normalization, so a company cannot be duplicated with different casing.
+- Employee accounts can join a company only by submitting its current unexpired join code through the server-side signup route.
+
+### Company join codes
+
+Stores the current employee signup credential for each company. Codes rotate at
+midnight UTC through Supabase Cron and are never queried directly by browser clients.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| company_id | UUID (PK, FK) | References companies(id); one current code per company |
+| join_code | TEXT | Unique 16-character code displayed as four groups |
+| expires_at | TIMESTAMP | Time the current code expires and rotates |
+| created_at | TIMESTAMP | Code record creation time |
+| updated_at | TIMESTAMP | Last successful rotation time |
+
+**Security:**
+- RLS is enabled with no browser-facing policies.
+- `anon` and `authenticated` have no table privileges.
+- Application server routes use the service role and must separately authorize admins.
+- The `rotate-company-join-codes-daily` Cron job replaces every code at midnight UTC.
 
 ### 1. users
 
@@ -417,10 +438,11 @@ All schema changes are tracked in `db/migrations/`:
 - `007_drop_financial_snapshots.sql` - Drops the legacy financial snapshots table
 - `008_accounting_oauth_tokens.sql` - Adds provider-neutral OAuth tokens and drops the Xero-specific credential table
 - `009_conversation_message_ui_payload.sql` - Adds validated Gen UI payloads to assistant messages
-- `013_delete_document_and_derived_metrics.sql` - Adds atomic owner-only cleanup of a document and its document-derived financial observations
 - `010_add_user_type.sql` - Adds admin/employee roles used by company signup and joining; existing company accounts are backfilled as admins
 - `011_company_chat_visibility.sql` - Adds company-scoped conversation history and message read access
 - `012_conversation_visibility_modes.sql` - Adds private, company, and admins-only conversation visibility
+- `013_delete_document_and_derived_metrics.sql` - Adds atomic owner-only cleanup of a document and its document-derived financial observations
+- `014_daily_company_join_codes.sql` - Adds protected stored company join codes and a daily UTC rotation job
 
 ---
 
@@ -476,4 +498,4 @@ Planned for Sprint 2+:
 
 ---
 
-**Last Updated:** May 18, 2026 by Rafael Manubay
+**Last Updated:** August 17, 2026

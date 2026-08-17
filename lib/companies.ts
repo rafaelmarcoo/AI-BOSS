@@ -1,38 +1,77 @@
 import { ApiError } from '@/lib/api/errors'
 import { createAdminSupabaseClient } from '@/lib/supabase'
 
-export async function getJoinableCompanyNames() {
+export async function findCompanyByName(requestedCompanyName: string) {
   const admin = createAdminSupabaseClient()
   const { data, error } = await admin
     .from('companies')
-    .select('name')
-    .order('name')
+    .select('id, name')
 
   if (error) {
-    throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to load companies.')
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to check the company name.')
   }
 
-  const companies = new Map<string, string>()
-
-  for (const row of data ?? []) {
-    if (typeof row.name !== 'string') continue
-
-    const companyName = row.name.trim()
-    const normalizedName = companyName.toLocaleLowerCase()
-
-    if (companyName && !companies.has(normalizedName)) {
-      companies.set(normalizedName, companyName)
-    }
-  }
-
-  return [...companies.values()].sort((left, right) => left.localeCompare(right))
+  const normalizedName = requestedCompanyName.trim().toLocaleLowerCase()
+  return (
+    data?.find(
+      (company) =>
+        typeof company.name === 'string' &&
+        company.name.trim().toLocaleLowerCase() === normalizedName
+    ) ?? null
+  )
 }
 
-export function findCompanyName(companies: string[], requestedCompanyName: string) {
-  const normalizedName = requestedCompanyName.toLocaleLowerCase()
-  return companies.find(
-    (companyName) => companyName.toLocaleLowerCase() === normalizedName
-  )
+export async function findCompanyByJoinCode(joinCode: string) {
+  const admin = createAdminSupabaseClient()
+  const { data: codeRecord, error: codeError } = await admin
+    .from('company_join_codes')
+    .select('company_id')
+    .eq('join_code', joinCode)
+    .gt('expires_at', new Date().toISOString())
+    .maybeSingle()
+
+  if (codeError) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to validate the company code.')
+  }
+
+  if (!codeRecord) return null
+
+  const { data: company, error: companyError } = await admin
+    .from('companies')
+    .select('id, name')
+    .eq('id', codeRecord.company_id)
+    .maybeSingle()
+
+  if (companyError) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to load the company.')
+  }
+
+  return company
+}
+
+export async function getCompanyJoinCodeForAdmin(userId: string) {
+  const company = await getUserCompany(userId)
+
+  if (company.userType !== 'admin') {
+    throw new ApiError(403, 'FORBIDDEN', 'Only company admins can view the join code.')
+  }
+
+  const admin = createAdminSupabaseClient()
+  const { data, error } = await admin
+    .from('company_join_codes')
+    .select('join_code, expires_at')
+    .eq('company_id', company.id)
+    .gt('expires_at', new Date().toISOString())
+    .maybeSingle()
+
+  if (error || !data) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'The company join code is unavailable.')
+  }
+
+  return {
+    code: data.join_code as string,
+    expiresAt: data.expires_at as string,
+  }
 }
 
 export async function getUserCompany(userId: string) {

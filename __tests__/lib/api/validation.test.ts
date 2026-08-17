@@ -9,24 +9,46 @@ describe('validateSignUpPayload', () => {
   const basePayload = {
     email: 'person@example.com',
     password: 'password123',
-    companyName: 'Acme Ltd',
   }
 
-  it.each(['admin', 'employee'] as const)('accepts the %s signup role', (userType) => {
-    expect(validateSignUpPayload({ ...basePayload, userType })).toEqual({
+  it('accepts an admin signup with a company name', () => {
+    expect(validateSignUpPayload({
+      ...basePayload,
+      userType: 'admin',
+      companyName: 'Acme Ltd',
+    })).toEqual({
       success: true,
-      data: { ...basePayload, userType },
+      data: { ...basePayload, userType: 'admin', companyName: 'Acme Ltd' },
+    })
+  })
+
+  it('accepts and normalizes an employee company code', () => {
+    expect(validateSignUpPayload({
+      ...basePayload,
+      userType: 'employee',
+      companyCode: 'a3f97c21d84b6e10',
+    })).toEqual({
+      success: true,
+      data: {
+        ...basePayload,
+        userType: 'employee',
+        companyCode: 'A3F9-7C21-D84B-6E10',
+      },
     })
   })
 
   it('requires a supported user role', () => {
-    expect(validateSignUpPayload({ ...basePayload, userType: 'owner' })).toEqual({
+    expect(validateSignUpPayload({
+      ...basePayload,
+      userType: 'owner',
+      companyName: 'Acme Ltd',
+    })).toEqual({
       success: false,
       details: { userType: 'userType must be either "admin" or "employee".' },
     })
   })
 
-  it('requires a company for every new account', () => {
+  it('requires a company code for employees', () => {
     expect(
       validateSignUpPayload({
         email: basePayload.email,
@@ -35,7 +57,7 @@ describe('validateSignUpPayload', () => {
       })
     ).toEqual({
       success: false,
-      details: { companyName: 'companyName is required.' },
+      details: { companyCode: 'companyCode is required.' },
     })
   })
 })

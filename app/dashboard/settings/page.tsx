@@ -1,11 +1,13 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { Box, Chip, Stack, Typography } from "@mui/material";
+import { Alert, Box, Chip, Stack, Typography } from "@mui/material";
 import { COOKIE_ACCESS_TOKEN } from "@/lib/supabase";
 import { getCurrentUserProfile } from "@/lib/auth";
+import { getCompanyJoinCodeForAdmin } from "@/lib/companies";
 import { dashboardTokens } from "@/app/theme";
 import { DashboardHeader } from "../header";
 import { PasswordSettingsForm } from "./PasswordSettingsForm";
+import { CompanyJoinCodeCard } from "./CompanyJoinCodeCard";
 
 export default async function SettingsPage() {
   const cookieStore = await cookies();
@@ -16,6 +18,9 @@ export default async function SettingsPage() {
   if (!currentUser) redirect("/sign-in");
 
   const { profile } = currentUser;
+  const companyJoinCode = profile.user_type === "admin"
+    ? await getCompanyJoinCodeForAdmin(currentUser.user.id).catch(() => null)
+    : null;
   return (
     <Box component="main" sx={{ minHeight: "100vh", bgcolor: dashboardTokens.shell }}>
       <DashboardHeader />
@@ -36,6 +41,18 @@ export default async function SettingsPage() {
             </Stack>
           </Stack>
         </Box>
+        {profile.user_type === "admin" ? (
+          companyJoinCode ? (
+            <CompanyJoinCodeCard
+              code={companyJoinCode.code}
+              expiresAt={companyJoinCode.expiresAt}
+            />
+          ) : (
+            <Alert severity="error">
+              The employee join code is currently unavailable.
+            </Alert>
+          )
+        ) : null}
         <PasswordSettingsForm />
       </Stack>
     </Box>

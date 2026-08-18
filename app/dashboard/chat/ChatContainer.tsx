@@ -11,6 +11,7 @@ import {
   Typography,
 } from "@mui/material";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
+import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
 import { ChatInput } from "./ChatInput";
 import { ChatMessage } from "./ChatMessage";
 import type {
@@ -28,6 +29,7 @@ interface ChatContainerProps {
   email: string;
   userType: UserType | null;
   activeConversationTitle: string | null;
+  canManageConversation: boolean;
   readOnly: boolean;
   visibility: ConversationVisibility;
   visibilityLocked: boolean;
@@ -38,6 +40,7 @@ interface ChatContainerProps {
   uploading: boolean;
   error: ChatErrorState | null;
   onOpenHistory: () => void;
+  onOpenConversationActions: (event: React.MouseEvent<HTMLElement>) => void;
   onSendMessage: (input: string) => Promise<void>;
   onUploadDocument: (file: File) => Promise<void>;
   onRetryMessage: () => Promise<void>;
@@ -58,6 +61,7 @@ export function ChatContainer({
   email,
   userType,
   activeConversationTitle,
+  canManageConversation,
   readOnly,
   visibility,
   visibilityLocked,
@@ -68,6 +72,7 @@ export function ChatContainer({
   uploading,
   error,
   onOpenHistory,
+  onOpenConversationActions,
   onSendMessage,
   onUploadDocument,
   onRetryMessage,
@@ -112,6 +117,7 @@ export function ChatContainer({
         >
           <Stack direction="row" alignItems="center" justifyContent="space-between">
             <IconButton
+              aria-label="Open conversation history"
               onClick={onOpenHistory}
               size="small"
               sx={{ color: dashboardTokens.textMuted, "&:hover": { bgcolor: dashboardTokens.surfaceAlt, color: dashboardTokens.text } }}
@@ -120,7 +126,7 @@ export function ChatContainer({
             </IconButton>
             <Stack
               spacing={0.15}
-              sx={{ flex: 1, minWidth: 0, alignItems: "flex-end", pr: 0.5 }}
+              sx={{ flex: 1, minWidth: 0, alignItems: "flex-end", px: 0.5 }}
             >
               <Tooltip title={activeConversationTitle ?? "New conversation"}>
                 <Typography
@@ -141,6 +147,24 @@ export function ChatContainer({
                 {readOnly ? "Company chat · Read only" : "AI-BOSS chat"}
               </Typography>
             </Stack>
+            {canManageConversation ? (
+              <Tooltip title="Conversation actions">
+                <IconButton
+                  aria-label="Manage current conversation"
+                  onClick={onOpenConversationActions}
+                  size="small"
+                  sx={{
+                    color: dashboardTokens.textMuted,
+                    "&:hover": {
+                      bgcolor: dashboardTokens.surfaceAlt,
+                      color: dashboardTokens.text,
+                    },
+                  }}
+                >
+                  <MoreHorizRoundedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            ) : null}
           </Stack>
         </Box>
 

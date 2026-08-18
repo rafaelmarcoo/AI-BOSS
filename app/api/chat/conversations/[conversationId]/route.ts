@@ -82,6 +82,19 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (body.title !== undefined) {
       const normalizedTitle =
         typeof body.title === 'string' ? body.title.trim() || null : null
+
+      if (!normalizedTitle) {
+        throw new ApiError(400, 'BAD_REQUEST', 'Conversation title is required.')
+      }
+
+      if (normalizedTitle.length > 80) {
+        throw new ApiError(
+          400,
+          'BAD_REQUEST',
+          'Conversation title must be 80 characters or fewer.'
+        )
+      }
+
       conversation = await renameConversation(
         conversationId,
         user.id,

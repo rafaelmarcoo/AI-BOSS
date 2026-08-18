@@ -5,6 +5,7 @@ import {
   Alert,
   Box,
   Button,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -17,6 +18,7 @@ import {
   ListItemText,
   Menu,
   MenuItem,
+  Snackbar,
   Stack,
   TextField,
   Tooltip,
@@ -94,7 +96,13 @@ export function ChatSidebar({
   const [renamingConversationId, setRenamingConversationId] = useState<
     string | null
   >(null);
+  const [deletingConversationId, setDeletingConversationId] = useState<
+    string | null
+  >(null);
+  const [deletingConversationTitle, setDeletingConversationTitle] = useState("");
+  const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const lastHandledPromptId = useRef<string | null>(null);
   const lastHandledInitialMessage = useRef<string | null>(null);
   const {
@@ -200,6 +208,7 @@ export function ChatSidebar({
     setMenuAnchorEl(event.currentTarget);
     setMenuConversationId(conversationId);
     setRenameValue(title ?? "");
+    setActionError(null);
   };
 
   const closeConversationMenu = () => {
@@ -213,8 +222,10 @@ export function ChatSidebar({
   };
 
   const closeRenameDialog = () => {
+    if (actionLoading) return;
     setRenamingConversationId(null);
     setRenameValue("");
+    setActionError(null);
   };
 
   const submitRenameConversation = async () => {
@@ -222,9 +233,24 @@ export function ChatSidebar({
       return;
     }
 
+    const normalizedTitle = renameValue.trim();
+
+    if (!normalizedTitle) {
+      setActionError("Enter a conversation name.");
+      return;
+    }
+
+    if (normalizedTitle.length > 80) {
+      setActionError("Conversation names must be 80 characters or fewer.");
+      return;
+    }
+
     try {
+      setActionLoading(true);
       setActionError(null);
-      await renameConversation(renamingConversationId, renameValue);
+      await renameConversation(renamingConversationId, normalizedTitle);
+      setActionSuccess("Conversation renamed.");
+      setActionLoading(false);
       closeRenameDialog();
     } catch (error) {
       setActionError(
@@ -232,24 +258,49 @@ export function ChatSidebar({
           ? error.message
           : "Could not rename the conversation.",
       );
+      setActionLoading(false);
     }
   };
 
-  const handleDeleteConversation = async () => {
+  const startDeleteConversation = () => {
     if (!menuConversationId) {
       return;
     }
 
+    setDeletingConversationId(menuConversationId);
+    setDeletingConversationTitle(
+      conversations.find((conversation) => conversation.id === menuConversationId)
+        ?.title ?? "Untitled conversation",
+    );
+    closeConversationMenu();
+  };
+
+  const closeDeleteDialog = () => {
+    if (actionLoading) return;
+    setDeletingConversationId(null);
+    setDeletingConversationTitle("");
+    setActionError(null);
+  };
+
+  const handleDeleteConversation = async () => {
+    if (!deletingConversationId) {
+      return;
+    }
+
     try {
+      setActionLoading(true);
       setActionError(null);
-      await deleteConversation(menuConversationId);
-      closeConversationMenu();
+      await deleteConversation(deletingConversationId);
+      setActionSuccess("Conversation deleted.");
+      setActionLoading(false);
+      closeDeleteDialog();
     } catch (error) {
       setActionError(
         error instanceof Error
           ? error.message
           : "Could not delete the conversation.",
       );
+      setActionLoading(false);
     }
   };
 
@@ -283,6 +334,7 @@ export function ChatSidebar({
           email={email}
           userType={userType}
           activeConversationTitle={activeConversation?.title ?? null}
+          canManageConversation={Boolean(activeConversation?.isOwner)}
           readOnly={isReadOnly}
           visibility={visibility}
           visibilityLocked={isReadOnly}
@@ -295,6 +347,14 @@ export function ChatSidebar({
           uploading={uploading}
           error={error}
           onOpenHistory={() => setHistoryOpen(true)}
+          onOpenConversationActions={(event) => {
+            if (!activeConversation) return;
+            openConversationMenu(
+              event,
+              activeConversation.id,
+              activeConversation.title,
+            );
+          }}
           onSendMessage={sendMessage}
           onUploadDocument={uploadDocument}
           onRetryMessage={retryMessage}
@@ -518,6 +578,7 @@ export function ChatSidebar({
                             {conversation.isOwner ? (
                               <IconButton
                                 size="small"
+                                aria-label={`Manage ${conversation.title ?? "untitled conversation"}`}
                                 onClick={(event) =>
                                   openConversationMenu(
                                     event,
@@ -565,7 +626,7 @@ export function ChatSidebar({
       >
         <MenuItem onClick={startRenameConversation}>Rename</MenuItem>
         <MenuItem
-          onClick={() => void handleDeleteConversation()}
+          onClick={startDeleteConversation}
           sx={{ color: "#fca5a5" }}
         >
           Delete
@@ -599,6 +660,9 @@ export function ChatSidebar({
               }
             }}
             placeholder="Conversation name"
+            error={Boolean(actionError)}
+            helperText={actionError ?? `${renameValue.trim().length}/80 characters`}
+            inputProps={{ maxLength: 80 }}
             sx={{
               mt: 1,
               "& .MuiOutlinedInput-root": {
@@ -612,6 +676,7 @@ export function ChatSidebar({
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
           <Button
             onClick={closeRenameDialog}
+            disabled={actionLoading}
             sx={{ color: dashboardTokens.textMuted }}
           >
             Cancel
@@ -619,11 +684,58 @@ export function ChatSidebar({
           <Button
             onClick={() => void submitRenameConversation()}
             variant="contained"
+            disabled={actionLoading || !renameValue.trim()}
           >
-            Save
+            {actionLoading ? <CircularProgress size={20} /> : "Save"}
           </Button>
         </DialogActions>
       </Dialog>
+      <Dialog
+        open={Boolean(deletingConversationId)}
+        onClose={closeDeleteDialog}
+        fullWidth
+        maxWidth="xs"
+        PaperProps={{
+          sx: {
+            bgcolor: "#111218",
+            color: "common.white",
+            border: "1px solid",
+            borderColor: dashboardTokens.border,
+          },
+        }}
+      >
+        <DialogTitle>Delete conversation?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Delete “{deletingConversationTitle}”? This permanently removes the
+            conversation and all its messages. This cannot be undone.
+          </Typography>
+          {actionError ? <Alert severity="error" sx={{ mt: 2 }}>{actionError}</Alert> : null}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button
+            onClick={closeDeleteDialog}
+            disabled={actionLoading}
+            sx={{ color: dashboardTokens.textMuted }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => void handleDeleteConversation()}
+            color="error"
+            variant="contained"
+            disabled={actionLoading}
+          >
+            {actionLoading ? <CircularProgress size={20} /> : "Delete permanently"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Snackbar
+        open={Boolean(actionSuccess)}
+        autoHideDuration={3500}
+        onClose={() => setActionSuccess(null)}
+        message={actionSuccess}
+      />
     </Box>
   );
 }

@@ -366,11 +366,7 @@ export function useChatConversation({
     setConversations(nextConversations);
 
     if (conversationId === targetConversationId) {
-      if (nextConversations.length > 0) {
-        await loadConversation(nextConversations[0].id);
-      } else {
-        startNewConversation();
-      }
+      startNewConversation();
     }
   };
 

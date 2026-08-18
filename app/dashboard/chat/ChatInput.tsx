@@ -17,6 +17,7 @@ import PublicRoundedIcon from "@mui/icons-material/PublicRounded";
 import LockRoundedIcon from "@mui/icons-material/LockRounded";
 import AdminPanelSettingsRoundedIcon from "@mui/icons-material/AdminPanelSettingsRounded";
 import { dashboardTokens } from "@/app/theme";
+import { VoiceInputButton } from "@/components/voice-input-button";
 import type { ConversationVisibility, UserType } from "@/types/database";
 
 interface ChatInputProps {
@@ -116,6 +117,15 @@ export function ChatInput({
       >
         <AttachFileRoundedIcon fontSize="small" />
       </IconButton>
+
+      <VoiceInputButton
+        disabled={disabled}
+        onTranscript={(transcript) =>
+          setValue((current) =>
+            [current.trimEnd(), transcript.trim()].filter(Boolean).join(" "),
+          )
+        }
+      />
 
       <TextField
         fullWidth

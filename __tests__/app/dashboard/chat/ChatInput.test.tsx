@@ -2,6 +2,16 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ChatInput } from '@/app/dashboard/chat/ChatInput'
 
+jest.mock('@/components/voice-input-button', () => ({
+  VoiceInputButton({ onTranscript }: { onTranscript: (value: string) => void }) {
+    return (
+      <button type="button" onClick={() => onTranscript('forecast my cash')}>
+        Mock voice input
+      </button>
+    )
+  },
+}))
+
 describe('ChatInput', () => {
   it('uploads the selected document file', async () => {
     const onUploadDocument = jest.fn().mockResolvedValue(undefined)
@@ -80,5 +90,19 @@ describe('ChatInput', () => {
     await user.click(screen.getByText('Admins only'))
 
     expect(onVisibilityChange).toHaveBeenCalledWith('admins')
+  })
+
+  it('appends a voice transcript for review without sending it', async () => {
+    const user = userEvent.setup()
+    const onSend = jest.fn()
+    render(
+      <ChatInput onSend={onSend} onUploadDocument={jest.fn()} />
+    )
+
+    await user.type(screen.getByPlaceholderText('Ask AI-BOSS something...'), 'Please')
+    await user.click(screen.getByRole('button', { name: 'Mock voice input' }))
+
+    expect(screen.getByDisplayValue('Please forecast my cash')).toBeInTheDocument()
+    expect(onSend).not.toHaveBeenCalled()
   })
 })

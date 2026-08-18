@@ -26,12 +26,12 @@ import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
-import MicRoundedIcon from "@mui/icons-material/MicRounded";
 import FolderRoundedIcon from "@mui/icons-material/FolderRounded";
 import RouteRoundedIcon from "@mui/icons-material/RouteRounded";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import { dashboardTokens } from "@/app/theme";
 import { SignOutButton } from "@/components/sign-out-button";
+import { VoiceInputButton } from "@/components/voice-input-button";
 import type { Conversation } from "@/types/database";
 
 type ChatConversationSummary = Pick<
@@ -159,10 +159,6 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
 
   const handleAttachmentClick = () => {
     if (!uploading) fileInputRef.current?.click();
-  };
-
-  const handleMicrophoneClick = () => {
-    // TODO: Connect this to voice input when speech capture is supported.
   };
 
   const handleFileChange = async (
@@ -362,14 +358,13 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
             >
               <AttachFileRoundedIcon fontSize="small" />
             </IconButton>
-            <IconButton
-              type="button"
-              aria-label="Start voice input"
-              onClick={handleMicrophoneClick}
-              sx={composerControlSx}
-            >
-              <MicRoundedIcon fontSize="small" />
-            </IconButton>
+            <VoiceInputButton
+              onTranscript={(transcript) =>
+                setMessage((current) =>
+                  [current.trimEnd(), transcript.trim()].filter(Boolean).join(" "),
+                )
+              }
+            />
             <IconButton
               type="submit"
               aria-label="Send message"

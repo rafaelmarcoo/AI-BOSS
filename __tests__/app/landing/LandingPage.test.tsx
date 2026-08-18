@@ -7,6 +7,15 @@ const mockPush = jest.fn()
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
 }))
+jest.mock('@/components/voice-input-button', () => ({
+  VoiceInputButton({ onTranscript }: { onTranscript: (value: string) => void }) {
+    return (
+      <button type="button" onClick={() => onTranscript('show my runway')}>
+        Mock voice input
+      </button>
+    )
+  },
+}))
 
 describe('LandingPage quick actions', () => {
   const originalFetch = global.fetch
@@ -131,6 +140,20 @@ describe('LandingPage quick actions', () => {
     expect(
       await screen.findByText('Only PDF and CSV uploads are supported right now.'),
     ).toBeInTheDocument()
+    expect(mockPush).not.toHaveBeenCalled()
+  })
+
+  it('adds a voice transcript to the prompt for review without sending it', async () => {
+    const user = userEvent.setup()
+    renderLandingPage()
+
+    await user.type(
+      screen.getByLabelText('Ask AI-BOSS about your business finances'),
+      'Please',
+    )
+    await user.click(screen.getByRole('button', { name: 'Mock voice input' }))
+
+    expect(screen.getByDisplayValue('Please show my runway')).toBeInTheDocument()
     expect(mockPush).not.toHaveBeenCalled()
   })
 })

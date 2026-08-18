@@ -39,4 +39,47 @@ describe('Gen UI plan schema', () => {
 
     expect(result.success).toBe(true)
   })
+
+  it('requires an explicit supported currency for scenario comparisons', () => {
+    const scenario = {
+      version: GEN_UI_PLAN_VERSION,
+      source: 'chat',
+      generatedAt: '2026-08-18T00:00:00.000Z',
+      summary: 'Deterministic scenario comparison.',
+      widgets: [
+        {
+          id: 'scenario-1',
+          type: 'scenario_comparison',
+          title: 'Scenario comparison',
+          reason: 'Compare changes to monthly burn.',
+          data: {
+            currency: 'AUD',
+            base: { label: 'Current', monthlyBurn: 20000, runwayMonths: 6 },
+            scenarios: [
+              {
+                label: 'Burn +15%',
+                monthlyBurn: 23000,
+                runwayMonths: 5.2,
+                deltaMonths: -0.8,
+              },
+            ],
+            note: 'Read-only calculation.',
+          },
+        },
+      ],
+    }
+
+    expect(GenUiPlanSchema.safeParse(scenario).success).toBe(true)
+    expect(
+      GenUiPlanSchema.safeParse({
+        ...scenario,
+        widgets: [
+          {
+            ...scenario.widgets[0],
+            data: { ...scenario.widgets[0].data, currency: 'USD' },
+          },
+        ],
+      }).success
+    ).toBe(false)
+  })
 })

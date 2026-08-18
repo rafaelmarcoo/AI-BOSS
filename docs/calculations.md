@@ -56,6 +56,19 @@ and runway observations. The analysis is deterministic: it prioritises financial
 reporting dates, preserves source labels, warns when sources are mixed, and does
 not compare values across different currencies.
 
+## Currency Safety
+
+The MVP supports NZD and AUD monetary observations. Values keep their recorded
+currency code and are never silently converted, added, or compared across
+currencies. Runway inputs are accepted only when cash, accounts receivable,
+accounts payable, and monthly burn all use the same supported currency.
+
+Historical and forecast calculations exclude monetary observations whose
+currency is missing or unsupported, while keeping the uploaded document
+available for document retrieval. The UI and financial tools disclose these
+exclusions. A history containing both NZD and AUD is not combined; separate
+currency charts are planned as the next chart phase.
+
 ## Financial Forecasting
 
 Forecasting uses the same historical observations and supports cash, monthly

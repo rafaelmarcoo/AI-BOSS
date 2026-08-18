@@ -119,6 +119,9 @@ export function summarizeMetricForecast(params: {
       ...(history.hasRecordedDateFallback
         ? ['At least one input uses its recorded/upload date because a reporting date was unavailable.']
         : []),
+      ...(history.excludedCurrencyObservationCount > 0
+        ? [`${history.excludedCurrencyObservationCount} observation(s) with missing or unsupported currency were excluded.`]
+        : []),
     ],
   }
 }

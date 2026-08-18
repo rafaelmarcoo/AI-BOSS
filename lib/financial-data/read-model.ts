@@ -12,6 +12,10 @@ import type {
   FinancialMetricValue,
 } from '@/lib/financial-data/types'
 import type { RunwayInput } from '@/lib/calculations/runway'
+import {
+  isSupportedFinancialCurrency,
+  type SupportedFinancialCurrency,
+} from '@/lib/financial-data/currency'
 
 export type CompleteFinancialMetricSet = Record<
   FinancialMetricKey,
@@ -50,7 +54,20 @@ export function buildRunwayInputFromMetrics(
   const ap = getMetricNumber(metrics, 'accounts_payable')
   const burn = getMetricNumber(metrics, 'burn_rate')
 
-  if (cash === null || ar === null || ap === null || burn === null) {
+  const currency = getSharedSupportedCurrency(metrics, [
+    'cash',
+    'accounts_receivable',
+    'accounts_payable',
+    'burn_rate',
+  ])
+
+  if (
+    cash === null ||
+    ar === null ||
+    ap === null ||
+    burn === null ||
+    currency === null
+  ) {
     return null
   }
 
@@ -60,6 +77,27 @@ export function buildRunwayInputFromMetrics(
     ap,
     burn,
   }
+}
+
+export function getSharedSupportedCurrency(
+  metrics: FinancialMetricSet,
+  keys: FinancialMetricKey[]
+): SupportedFinancialCurrency | null {
+  const currencies = keys.map((key) => {
+    const metric = metrics[key]
+
+    return isAvailableMetric(metric) ? metric.currency : null
+  })
+
+  if (currencies.some((currency) => !isSupportedFinancialCurrency(currency))) {
+    return null
+  }
+
+  const supportedCurrencies = currencies as SupportedFinancialCurrency[]
+
+  return new Set(supportedCurrencies).size === 1
+    ? supportedCurrencies[0]
+    : null
 }
 
 export function summarizeMetricAvailability(metrics: FinancialMetricSet) {

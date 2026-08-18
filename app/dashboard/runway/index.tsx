@@ -3,9 +3,13 @@ import { dashboardTokens } from "@/app/theme";
 import { HistoricalMetricsChart } from "../BurnRateChart";
 import type { GenUiPlan } from "@/lib/gen-ui/types";
 import {
+  formatFinancialCurrency,
   getMetricNumber,
+  isAvailableMetric,
+  isSupportedFinancialCurrency,
   type CompleteFinancialMetricSet,
   type FinancialMetricKey,
+  type FinancialMetricValue,
 } from "@/lib/financial-data";
 import { GenUiCanvas } from "./gen-ui/GenUiCanvas";
 import { SelectableRunwayWorkspace } from "./selection-prompt";
@@ -18,14 +22,16 @@ interface RunwaySectionProps {
   onAskChatbot: (text: string, mode?: AskChatbotMode) => void;
 }
 
-function formatCurrency(value: number | null) {
-  if (value === null) return "unavailable";
+function formatCurrencyMetric(metric: FinancialMetricValue) {
+  if (!isAvailableMetric(metric)) return "unavailable";
 
-  return new Intl.NumberFormat("en-NZ", {
-    style: "currency",
-    currency: "NZD",
-    maximumFractionDigits: 0,
-  }).format(value);
+  if (!isSupportedFinancialCurrency(metric.currency)) {
+    return metric.currency
+      ? `${metric.currency} is not supported for calculations`
+      : "currency not provided";
+  }
+
+  return formatFinancialCurrency(metric.value, metric.currency);
 }
 
 function formatRunway(value: number | null) {
@@ -38,8 +44,6 @@ export function RunwaySection({
   onAskChatbot,
 }: RunwaySectionProps) {
   const runway = getMetricNumber(metrics, "runway_months");
-  const cash = getMetricNumber(metrics, "cash");
-  const burn = getMetricNumber(metrics, "burn_rate");
   const missingMetricLabels = ([
     ["cash", "Cash"],
     ["accounts_receivable", "Accounts receivable"],
@@ -51,7 +55,7 @@ export function RunwaySection({
   ] satisfies Array<[FinancialMetricKey, string]>)
     .filter(([key]) => getMetricNumber(metrics, key) === null)
     .map(([, label]) => label);
-  const baselineSummary = `Current runway is ${formatRunway(runway)}, with ${formatCurrency(cash)} cash and ${formatCurrency(burn)} monthly burn.`;
+  const baselineSummary = `Current runway is ${formatRunway(runway)}, with cash of ${formatCurrencyMetric(metrics.cash)} and monthly burn of ${formatCurrencyMetric(metrics.burn_rate)}.`;
   const historyRefreshKey = Object.values(metrics)
     .map((metric) => metric.updatedAt ?? "")
     .join("|");

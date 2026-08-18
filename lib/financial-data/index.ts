@@ -12,8 +12,15 @@ export {
 export {
   buildRunwayInputFromMetrics,
   fillUnavailableMetrics,
+  getSharedSupportedCurrency,
   summarizeMetricAvailability,
 } from '@/lib/financial-data/read-model'
+export {
+  formatFinancialCurrency,
+  isSupportedFinancialCurrency,
+  SUPPORTED_FINANCIAL_CURRENCIES,
+} from '@/lib/financial-data/currency'
+export type { SupportedFinancialCurrency } from '@/lib/financial-data/currency'
 export type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
 export type {
   CompleteFinancialMetricSet,

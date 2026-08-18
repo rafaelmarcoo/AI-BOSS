@@ -8,6 +8,11 @@ import {
   FINANCIAL_METRIC_LABELS,
 } from '@/lib/financial-data/metric-keys'
 import { getMetricNumber, isAvailableMetric } from '@/lib/financial-data/metrics'
+import {
+  formatFinancialCurrency,
+  isSupportedFinancialCurrency,
+} from '@/lib/financial-data/currency'
+import { getSharedSupportedCurrency } from '@/lib/financial-data/read-model'
 import { readSourceAwareMetrics } from '@/lib/financial-data/read-service'
 import {
   readRunwayObservationHistory,
@@ -121,16 +126,19 @@ function forecastHorizonForMessage(userMessage: string): ForecastHorizon {
   return /\b6\s*(?:months?|m)\b/i.test(userMessage) ? 6 : 3
 }
 
-function formatCurrency(value: number | null | undefined) {
+function formatCurrency(
+  value: number | null | undefined,
+  currency: string | null | undefined
+) {
   if (value === null || value === undefined) {
     return '-'
   }
 
-  return new Intl.NumberFormat('en-NZ', {
-    style: 'currency',
-    currency: 'NZD',
-    maximumFractionDigits: 0,
-  }).format(value)
+  if (!isSupportedFinancialCurrency(currency)) {
+    return currency ? `${currency} not supported` : 'Currency not provided'
+  }
+
+  return formatFinancialCurrency(value, currency)
 }
 
 function formatNumber(value: number | null | undefined, decimals = 1) {
@@ -411,7 +419,7 @@ function buildMetricSnapshotWidget(
       value:
         key === 'runway_months'
           ? formatNumber(metric.value)
-          : formatCurrency(metric.value),
+          : formatCurrency(metric.value, metric.currency),
       unit: key === 'runway_months' ? 'months' : null,
       sourceLabel,
       sourceTone: 'available' as const,
@@ -472,9 +480,14 @@ function buildMetricTrendWidget(
       totalChange: history.totalChange,
       hasMixedSources: history.hasMixedSources,
       hasRecordedDateFallback: history.hasRecordedDateFallback,
-      note: history.hasMixedSources
-        ? `This trend combines sources: ${history.sourceLabels.join(', ')}.`
-        : 'Values are based on stored financial observations.',
+      note: [
+        history.hasMixedSources
+          ? `This trend combines sources: ${history.sourceLabels.join(', ')}.`
+          : 'Values are based on stored financial observations.',
+        history.excludedCurrencyObservationCount > 0
+          ? `${history.excludedCurrencyObservationCount} observation(s) with missing or unsupported currency were excluded.`
+          : null,
+      ].filter(Boolean).join(' '),
     },
   }
 }
@@ -521,8 +534,14 @@ function buildScenarioComparisonWidget(
   context: GenUiDataContext
 ): GenUiWidget | null {
   const runwayInput = context.snapshot.runwayInput
+  const runwayCurrency = getSharedSupportedCurrency(context.snapshot.metrics, [
+    'cash',
+    'accounts_receivable',
+    'accounts_payable',
+    'burn_rate',
+  ])
 
-  if (!runwayInput) {
+  if (!runwayInput || !runwayCurrency) {
     return null
   }
 
@@ -557,6 +576,7 @@ function buildScenarioComparisonWidget(
     title: spec.title ?? 'Scenario comparison',
     reason: spec.reason ?? 'AI-BOSS selected a scenario view for this question.',
     data: {
+      currency: runwayCurrency,
       base: {
         label: 'Current',
         monthlyBurn: runwayInput.burn,
@@ -578,6 +598,7 @@ function buildPlanningChecklistWidget(
     'runway_months'
   )
   const monthlyBurn = getMetricNumber(context.snapshot.metrics, 'burn_rate')
+  const burnMetric = context.snapshot.metrics.burn_rate
   const missingMetrics = listMissingMetrics(context.snapshot)
   const items = [
     {
@@ -598,7 +619,10 @@ function buildPlanningChecklistWidget(
       label: 'Pressure-test monthly burn',
       detail:
         monthlyBurn !== null
-          ? `Use ${formatCurrency(monthlyBurn)} monthly burn as the current baseline.`
+          ? `Use ${formatCurrency(
+              monthlyBurn,
+              isAvailableMetric(burnMetric) ? burnMetric.currency : null
+            )} monthly burn as the current baseline.`
           : 'Monthly burn is missing, so scenario outputs will be limited.',
       tone: 'watch' as const,
     },
@@ -703,9 +727,9 @@ function buildMetricSourceEvidenceWidget(
 
     if (isAvailableMetric(metric)) {
       const value =
-        metric.currency === 'NZD' || key !== 'runway_months'
-          ? formatCurrency(metric.value)
-          : formatNumber(metric.value)
+        key === 'runway_months'
+          ? formatNumber(metric.value)
+          : formatCurrency(metric.value, metric.currency)
 
       return {
         label: FINANCIAL_METRIC_LABELS[key],

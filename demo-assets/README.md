@@ -10,6 +10,10 @@ Use this folder as the single source of truth for the live demo flow and QA pass
 - `ai-boss-demo-updated-month.csv` - partial newer month that proves source mixing.
 - `ai-boss-demo-risky-month.csv` - urgent low-runway month that proves warnings, trends, and forecast behavior.
 - `ai-boss-demo-consistent.csv` - three dated, same-currency months for multi-agent history, forecast, and scenario testing.
+- `ai-boss-test-aud.csv` - three supported AUD months for currency display and calculation testing.
+- `ai-boss-demo-mixed-nzd-aud.csv` - mixed-currency cash history that must warn and block combined calculations.
+- `ai-boss-test-usd.csv` - unsupported-currency observations that must be excluded with a warning.
+- `ai-boss-test-missing-currency.csv` - unlabelled monetary observations that must be excluded with a warning.
 - `ai-boss-demo-board-report.pdf` - PDF-only board report for RAG evidence.
 
 ## Upload Order

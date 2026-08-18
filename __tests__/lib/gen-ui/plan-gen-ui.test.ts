@@ -77,6 +77,9 @@ describe('planGenUi', () => {
       hasMixedSources: false,
       hasRecordedDateFallback: false,
       hasIncompatibleCurrencies: false,
+      excludedCurrencyObservationCount: 0,
+      hasMissingCurrencyObservations: false,
+      unsupportedCurrencies: [],
     })
     mockReadFinancialMetricForecast.mockResolvedValue({
       metricKey: 'cash', label: 'Cash', range: 'all', horizon: 3,
@@ -85,7 +88,7 @@ describe('planGenUi', () => {
         points: [
           { date: '2026-05-01', dateSource: 'as_of_date', value: 100, currency: 'NZD', sourceLabel: 'May CSV', sourceType: 'document', confidence: 0.9, updatedAt: '2026-05-01T00:00:00.000Z' },
           { date: '2026-06-01', dateSource: 'as_of_date', value: 120, currency: 'NZD', sourceLabel: 'June CSV', sourceType: 'document', confidence: 0.9, updatedAt: '2026-06-01T00:00:00.000Z' },
-        ], movement: 'increased', direction: 'improving', firstValue: 100, latestValue: 120, totalChange: 20, percentageChange: 20, averageChange: 20, currency: 'NZD', sourceLabels: ['May CSV', 'June CSV'], hasMixedSources: true, hasRecordedDateFallback: false, hasIncompatibleCurrencies: false,
+        ], movement: 'increased', direction: 'improving', firstValue: 100, latestValue: 120, totalChange: 20, percentageChange: 20, averageChange: 20, currency: 'NZD', sourceLabels: ['May CSV', 'June CSV'], hasMixedSources: true, hasRecordedDateFallback: false, hasIncompatibleCurrencies: false, excludedCurrencyObservationCount: 0, hasMissingCurrencyObservations: false, unsupportedCurrencies: [],
       },
       forecastPoints: [{ date: '2026-07-01', value: 140, kind: 'forecast' }], latestActualValue: 120, monthlySlope: 20, method: 'date_aware_linear_trend', assumptions: [],
     } as never)
@@ -189,6 +192,9 @@ describe('planGenUi', () => {
       hasMixedSources: true,
       hasRecordedDateFallback: false,
       hasIncompatibleCurrencies: false,
+      excludedCurrencyObservationCount: 0,
+      hasMissingCurrencyObservations: false,
+      unsupportedCurrencies: [],
     } as never)
 
     const plan = await planGenUi({

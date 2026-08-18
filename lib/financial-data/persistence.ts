@@ -1,5 +1,6 @@
 import { ApiError } from '@/lib/api/errors'
 import { mapObservationRowToMetric } from '@/lib/financial-data/observation-mapping'
+import { selectLatestFinancialMetricObservations } from '@/lib/financial-data/latest-observation'
 import { createAdminSupabaseClient } from '@/lib/supabase'
 import type {
   AvailableFinancialMetricValue,
@@ -149,11 +150,9 @@ export async function listLatestFinancialMetricValues(userId: string) {
 
   const metrics: FinancialMetricSet = {}
 
-  for (const row of (data ?? []) as FinancialMetricObservation[]) {
-    if (metrics[row.metric_key]) {
-      continue
-    }
-
+  for (const row of selectLatestFinancialMetricObservations(
+    (data ?? []) as FinancialMetricObservation[]
+  )) {
     metrics[row.metric_key] = mapObservationRowToMetric(row)
   }
 

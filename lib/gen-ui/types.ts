@@ -94,6 +94,7 @@ export interface MetricForecastChartWidget extends GenUiWidgetBase {
 export interface ScenarioComparisonWidget extends GenUiWidgetBase {
   type: 'scenario_comparison'
   data: {
+    currency: 'NZD' | 'AUD'
     base: {
       label: string
       monthlyBurn: number | null

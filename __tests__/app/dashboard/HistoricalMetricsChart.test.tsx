@@ -3,6 +3,7 @@ import { HistoricalMetricsChart } from '@/app/dashboard/BurnRateChart'
 
 jest.mock('recharts', () => ({
   CartesianGrid: () => null,
+  Legend: () => null,
   Line: () => null,
   LineChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -31,6 +32,9 @@ const history = {
   hasMixedSources: true,
   hasRecordedDateFallback: false,
   hasIncompatibleCurrencies: false,
+  excludedCurrencyObservationCount: 0,
+  hasMissingCurrencyObservations: false,
+  unsupportedCurrencies: [],
 }
 
 describe('HistoricalMetricsChart', () => {
@@ -44,6 +48,10 @@ describe('HistoricalMetricsChart', () => {
 
     expect(screen.getByText('Financial trend and forecast')).toBeInTheDocument()
     await waitFor(() => expect(screen.getByText('Trend: improving')).toBeInTheDocument())
+    expect(screen.getByText('Currency: NZD')).toBeInTheDocument()
+    expect(screen.getByText(/Reporting period:/)).toBeInTheDocument()
+    expect(screen.getByText('Latest recorded value')).toBeInTheDocument()
+    expect(screen.getByText(/NZD 120 as at/)).toBeInTheDocument()
     expect(screen.getByText(/This trend combines sources: May CSV, June CSV/)).toBeInTheDocument()
     expect(global.fetch).toHaveBeenCalledWith(
       '/api/financial-data/history?metricKey=cash&range=3m',
@@ -75,14 +83,15 @@ describe('HistoricalMetricsChart', () => {
     render(<HistoricalMetricsChart refreshKey="forecast" />)
     await waitFor(() => expect(screen.getByText('Trend: improving')).toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: 'Forecast' }))
-    const horizonControls = await screen.findByRole('group', { name: 'Forecast horizon' })
-    fireEvent.click(within(horizonControls).getByRole('button', { name: '6M' }))
+    const horizonControls = await screen.findByRole('group', { name: 'Forecast period' })
+    fireEvent.click(within(horizonControls).getByRole('button', { name: 'Next 6 months' }))
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
       '/api/financial-data/forecast?metricKey=cash&range=3m&horizon=6',
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     ))
-    expect(screen.getByText(/Monthly projection:/)).toBeInTheDocument()
+    expect(screen.getByText('Projected monthly change')).toBeInTheDocument()
+    expect(screen.getByText('+NZD 20')).toBeInTheDocument()
   })
 
   it('shows a safe empty state when fewer than two observations exist', async () => {

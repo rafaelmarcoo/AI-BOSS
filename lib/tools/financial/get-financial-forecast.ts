@@ -10,6 +10,10 @@ import {
   type MetricHistoryRange,
 } from '@/lib/financial-data/metric-history'
 import type { StructuredTool } from '@/lib/tools/contracts'
+import {
+  formatFinancialCurrency,
+  isSupportedFinancialCurrency,
+} from '@/lib/financial-data/currency'
 
 const inputSchema = z.object({
   metricKey: z.enum(HISTORICAL_METRIC_KEYS).optional(),
@@ -20,12 +24,8 @@ const inputSchema = z.object({
 function formatValue(value: number, summary: MetricForecastSummary) {
   if (summary.metricKey === 'runway_months') return `${value.toFixed(1)} months`
 
-  if (summary.history.currency) {
-    return new Intl.NumberFormat('en-NZ', {
-      style: 'currency',
-      currency: summary.history.currency,
-      maximumFractionDigits: 0,
-    }).format(value)
+  if (isSupportedFinancialCurrency(summary.history.currency)) {
+    return formatFinancialCurrency(value, summary.history.currency)
   }
 
   return value.toFixed(2)
@@ -58,6 +58,11 @@ function formatForecast(summary: MetricForecastSummary) {
   }
   if (summary.history.hasRecordedDateFallback) {
     lines.push('Warning: at least one input uses its recorded/upload date because a reporting date was unavailable.')
+  }
+  if (summary.history.excludedCurrencyObservationCount > 0) {
+    lines.push(
+      `Warning: ${summary.history.excludedCurrencyObservationCount} observation(s) with missing or unsupported currency were excluded from the forecast.`
+    )
   }
 
   return lines.join('\n')

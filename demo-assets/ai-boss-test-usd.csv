@@ -1,0 +1,22 @@
+Metric,Amount,Currency,Date
+Cash at bank,100000,USD,2026-03-31
+Accounts receivable,20000,USD,2026-03-31
+Accounts payable,10000,USD,2026-03-31
+Monthly revenue,50000,USD,2026-03-31
+Monthly expenses,35000,USD,2026-03-31
+Cash burn,15000,USD,2026-03-31
+Runway,7,USD,2026-03-31
+Cash at bank,90000,USD,2026-04-30
+Accounts receivable,18000,USD,2026-04-30
+Accounts payable,12000,USD,2026-04-30
+Monthly revenue,48000,USD,2026-04-30
+Monthly expenses,36000,USD,2026-04-30
+Cash burn,16000,USD,2026-04-30
+Runway,6,USD,2026-04-30
+Cash at bank,80000,USD,2026-05-31
+Accounts receivable,16000,USD,2026-05-31
+Accounts payable,14000,USD,2026-05-31
+Monthly revenue,46000,USD,2026-05-31
+Monthly expenses,37000,USD,2026-05-31
+Cash burn,17000,USD,2026-05-31
+Runway,5,USD,2026-05-31

@@ -81,6 +81,7 @@ const MetricForecastChartWidgetSchema = WidgetBaseSchema.extend({
 const ScenarioComparisonWidgetSchema = WidgetBaseSchema.extend({
   type: z.literal('scenario_comparison'),
   data: z.object({
+    currency: z.enum(['NZD', 'AUD']),
     base: z.object({
       label: z.string(),
       monthlyBurn: z.number().nullable(),

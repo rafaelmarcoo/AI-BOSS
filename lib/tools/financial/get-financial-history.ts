@@ -7,6 +7,10 @@ import {
   type MetricHistorySummary,
 } from '@/lib/financial-data/metric-history'
 import type { StructuredTool } from '@/lib/tools/contracts'
+import {
+  formatFinancialCurrency,
+  isSupportedFinancialCurrency,
+} from '@/lib/financial-data/currency'
 
 const inputSchema = z.object({
   metricKey: z.enum(HISTORICAL_METRIC_KEYS).optional(),
@@ -18,12 +22,8 @@ function formatValue(value: number, summary: MetricHistorySummary) {
     return `${value.toFixed(1)} months`
   }
 
-  if (summary.currency) {
-    return new Intl.NumberFormat('en-NZ', {
-      style: 'currency',
-      currency: summary.currency,
-      maximumFractionDigits: 0,
-    }).format(value)
+  if (isSupportedFinancialCurrency(summary.currency)) {
+    return formatFinancialCurrency(value, summary.currency)
   }
 
   return value.toFixed(2)
@@ -61,6 +61,11 @@ function formatHistorySummary(summary: MetricHistorySummary) {
 
   if (summary.hasRecordedDateFallback) {
     lines.push('Warning: at least one point uses its recorded/upload date because a financial reporting date was unavailable.')
+  }
+  if (summary.excludedCurrencyObservationCount > 0) {
+    lines.push(
+      `Warning: ${summary.excludedCurrencyObservationCount} observation(s) with missing or unsupported currency were excluded from calculations.`
+    )
   }
 
   return lines.join('\n')

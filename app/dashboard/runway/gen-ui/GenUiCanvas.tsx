@@ -12,6 +12,7 @@ import {
 import ChatBubbleRoundedIcon from "@mui/icons-material/ChatBubbleRounded";
 import {
   CartesianGrid,
+  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -20,6 +21,10 @@ import {
   YAxis,
 } from "recharts";
 import { dashboardTokens } from "@/app/theme";
+import {
+  formatFinancialCurrency,
+  isSupportedFinancialCurrency,
+} from "@/lib/financial-data/currency";
 import { DataSourcesPanel } from "@/components/data-sources-panel";
 import { GEN_UI_WIDGET_CATALOG } from "@/lib/gen-ui/catalog";
 import { MetricCard } from "../../MetricCard";
@@ -55,16 +60,19 @@ const EXAMPLE_PROMPTS = [
   "Show me a future cash and runway trend.",
 ];
 
-function formatCurrency(value: number | null | undefined) {
+function formatCurrency(
+  value: number | null | undefined,
+  currency: string | null | undefined,
+) {
   if (value === null || value === undefined) {
     return "-";
   }
 
-  return new Intl.NumberFormat("en-NZ", {
-    style: "currency",
-    currency: "NZD",
-    maximumFractionDigits: 0,
-  }).format(value);
+  if (!isSupportedFinancialCurrency(currency)) {
+    return currency ? `${currency} not supported` : "Currency not provided";
+  }
+
+  return formatFinancialCurrency(value, currency);
 }
 
 function formatNumber(value: number | null | undefined, decimals = 1) {
@@ -73,6 +81,38 @@ function formatNumber(value: number | null | undefined, decimals = 1) {
   }
 
   return value.toFixed(decimals);
+}
+
+function formatDate(date: string) {
+  return new Intl.DateTimeFormat("en-NZ", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(`${date}T00:00:00.000Z`));
+}
+
+function formatAxisDate(date: string) {
+  return new Intl.DateTimeFormat("en-NZ", {
+    month: "short",
+    year: "numeric",
+  }).format(new Date(`${date}T00:00:00.000Z`));
+}
+
+function formatAxisNumber(value: number, isRunway: boolean) {
+  if (isRunway) return value.toFixed(1);
+
+  return new Intl.NumberFormat("en-NZ", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
+function formatPeriod(points: Array<{ date: string }>) {
+  const first = points[0]?.date;
+  const latest = points.at(-1)?.date;
+
+  if (!first || !latest) return "Unavailable";
+  return first === latest ? formatDate(first) : `${formatDate(first)}–${formatDate(latest)}`;
 }
 
 function statusColor(status: RiskThresholdTimelineWidgetModel["data"]["status"]) {
@@ -91,6 +131,20 @@ const METRIC_COLORS: Record<string, string> = {
   monthly_revenue: "#22c55e",
   monthly_expenses: "#f43f5e",
 };
+
+const chartContextChipSx = {
+  color: "#dbeafe",
+  bgcolor: "rgba(59, 130, 246, 0.14)",
+  border: "1px solid rgba(96, 165, 250, 0.3)",
+  fontWeight: 600,
+};
+
+function trendDirectionColor(direction: string) {
+  if (direction === "improving") return "#34d399";
+  if (direction === "worsening") return "#fb7185";
+  if (direction === "stable") return "#fbbf24";
+  return dashboardTokens.textSoft;
+}
 
 function WidgetFrame({
   title,
@@ -204,6 +258,11 @@ function ScenarioComparisonWidgetView({
 
   return (
     <WidgetFrame title={widget.title} reason={widget.reason}>
+      <Chip
+        label={`Currency: ${widget.data.currency}`}
+        size="small"
+        sx={{ alignSelf: "flex-start", color: "#bae6fd", bgcolor: "rgba(14, 165, 233, 0.12)" }}
+      />
       <Stack spacing={1.25}>
         {rows.map((row) => {
           const runwayPercent = ((row.runwayMonths ?? 0) / maxRunway) * 100;
@@ -220,7 +279,7 @@ function ScenarioComparisonWidgetView({
                   {row.label}
                 </Typography>
                 <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
-                  {formatCurrency(row.monthlyBurn)} burn
+                  {formatCurrency(row.monthlyBurn, widget.data.currency)} burn
                 </Typography>
               </Stack>
               <Stack direction="row" spacing={1.25} alignItems="center">
@@ -451,26 +510,38 @@ function MetricTrendChartWidgetView({
   const formatValue = (value: number) =>
     isRunway
       ? `${value.toFixed(1)} mo`
-      : widget.data.currency
-        ? new Intl.NumberFormat('en-NZ', {
-            style: 'currency',
-            currency: widget.data.currency,
-            maximumFractionDigits: 0,
-          }).format(value)
-        : value.toFixed(2);
+      : isSupportedFinancialCurrency(widget.data.currency)
+        ? formatFinancialCurrency(value, widget.data.currency)
+        : "Currency not provided";
 
   return (
     <WidgetFrame title={widget.title} reason={widget.reason}>
-      <Box sx={{ height: 220 }}>
+      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+        <Chip label={isRunway ? "Unit: months" : `Currency: ${widget.data.currency}`} size="small" sx={chartContextChipSx} />
+        <Chip label={`Reporting period: ${formatPeriod(widget.data.points)}`} size="small" sx={chartContextChipSx} />
+        <Chip label={`Observations: ${widget.data.points.length}`} size="small" sx={chartContextChipSx} />
+      </Stack>
+      <Typography variant="body2" fontWeight={700} sx={{ color: dashboardTokens.text }}>
+        Value axis: <Box component="span" sx={{ color: "#bae6fd" }}>{isRunway ? "Runway (months)" : `${widget.data.label} (${widget.data.currency})`}</Box>
+      </Typography>
+      <Box sx={{ height: 250 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={widget.data.points} margin={{ top: 5, right: 16, left: 0, bottom: 5 }}>
+          <LineChart data={widget.data.points} margin={{ top: 10, right: 16, left: 8, bottom: 30 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={dashboardTokens.border} />
-            <XAxis dataKey="date" stroke={dashboardTokens.textMuted} style={{ fontSize: "0.72rem" }} />
-            <YAxis
+            <XAxis
+              dataKey="date"
               stroke={dashboardTokens.textMuted}
               style={{ fontSize: "0.72rem" }}
-              tickFormatter={(value) => formatValue(Number(value))}
+              tickFormatter={(value) => formatAxisDate(String(value))}
+              label={{ value: "Reporting date", position: "insideBottom", offset: -16 }}
             />
+            <YAxis
+              width={58}
+              stroke={dashboardTokens.textMuted}
+              style={{ fontSize: "0.72rem" }}
+              tickFormatter={(value) => formatAxisNumber(Number(value), isRunway)}
+            />
+            <Legend formatter={() => "Actual"} verticalAlign="top" />
             <Tooltip
               contentStyle={{
                 backgroundColor: dashboardTokens.surface,
@@ -487,7 +558,7 @@ function MetricTrendChartWidgetView({
           </LineChart>
         </ResponsiveContainer>
       </Box>
-      <Typography variant="body2" fontWeight={700} sx={{ color: dashboardTokens.textMuted }}>
+      <Typography variant="body2" fontWeight={700} sx={{ color: trendDirectionColor(widget.data.direction), textTransform: "capitalize" }}>
         Trend: {widget.data.direction}
       </Typography>
       <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
@@ -512,13 +583,9 @@ function MetricForecastChartWidgetView({
   const formatValue = (value: number) =>
     isRunway
       ? `${value.toFixed(1)} mo`
-      : widget.data.currency
-        ? new Intl.NumberFormat("en-NZ", {
-            style: "currency",
-            currency: widget.data.currency,
-            maximumFractionDigits: 0,
-          }).format(value)
-        : value.toFixed(2);
+      : isSupportedFinancialCurrency(widget.data.currency)
+        ? formatFinancialCurrency(value, widget.data.currency)
+        : "Currency not provided";
   const latestActual = widget.data.actualPoints.at(-1);
   const data = [
     ...widget.data.actualPoints.map((point, index) => ({
@@ -531,12 +598,35 @@ function MetricForecastChartWidgetView({
 
   return (
     <WidgetFrame title={widget.title} reason={widget.reason}>
-      <Box sx={{ height: 220 }}>
+      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+        <Chip label={isRunway ? "Unit: months" : `Currency: ${widget.data.currency}`} size="small" sx={chartContextChipSx} />
+        <Chip label={`Historical period: ${formatPeriod(widget.data.actualPoints)}`} size="small" sx={chartContextChipSx} />
+        <Chip label={`Forecast period: Next ${widget.data.horizon} months`} size="small" sx={chartContextChipSx} />
+      </Stack>
+      <Typography variant="body2" fontWeight={700} sx={{ color: dashboardTokens.text }}>
+        Value axis: <Box component="span" sx={{ color: "#bae6fd" }}>{isRunway ? "Runway (months)" : `${widget.data.label} (${widget.data.currency})`}</Box>
+      </Typography>
+      <Box sx={{ height: 250 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 5, right: 16, left: 0, bottom: 5 }}>
+          <LineChart data={data} margin={{ top: 10, right: 16, left: 8, bottom: 30 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={dashboardTokens.border} />
-            <XAxis dataKey="date" stroke={dashboardTokens.textMuted} style={{ fontSize: "0.72rem" }} />
-            <YAxis stroke={dashboardTokens.textMuted} style={{ fontSize: "0.72rem" }} tickFormatter={(value) => formatValue(Number(value))} />
+            <XAxis
+              dataKey="date"
+              stroke={dashboardTokens.textMuted}
+              style={{ fontSize: "0.72rem" }}
+              tickFormatter={(value) => formatAxisDate(String(value))}
+              label={{ value: "Reporting date", position: "insideBottom", offset: -16 }}
+            />
+            <YAxis
+              width={58}
+              stroke={dashboardTokens.textMuted}
+              style={{ fontSize: "0.72rem" }}
+              tickFormatter={(value) => formatAxisNumber(Number(value), isRunway)}
+            />
+            <Legend
+              verticalAlign="top"
+              formatter={(value) => (value === "actual" ? "Actual" : "Forecast")}
+            />
             <Tooltip
               contentStyle={{ backgroundColor: dashboardTokens.surface, border: `1px solid ${dashboardTokens.border}`, borderRadius: 4, color: "white" }}
               formatter={(value, name) => [formatValue(Number(value)), name === "actual" ? "Actual" : "Forecast"]}

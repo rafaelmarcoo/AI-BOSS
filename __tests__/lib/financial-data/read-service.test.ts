@@ -7,13 +7,14 @@ import {
 
 function createMetric(
   key: 'cash' | 'accounts_receivable' | 'accounts_payable' | 'burn_rate',
-  value: number
+  value: number,
+  currency: string | null = 'NZD'
 ) {
   return {
     status: 'available' as const,
     key,
     value,
-    currency: 'NZD',
+    currency,
     periodStart: null,
     periodEnd: null,
     asOfDate: '2026-05-12',
@@ -87,6 +88,34 @@ describe('financial data read service helpers', () => {
     expect(
       buildRunwayInputFromMetrics({
         cash: createMetric('cash', 120000),
+      })
+    ).toBeNull()
+  })
+
+  it('does not combine missing, unsupported, or mixed currencies for runway', () => {
+    const completeMetrics = {
+      cash: createMetric('cash', 120000),
+      accounts_receivable: createMetric('accounts_receivable', 45000),
+      accounts_payable: createMetric('accounts_payable', 21000),
+      burn_rate: createMetric('burn_rate', 28000),
+    }
+
+    expect(
+      buildRunwayInputFromMetrics({
+        ...completeMetrics,
+        burn_rate: createMetric('burn_rate', 28000, 'AUD'),
+      })
+    ).toBeNull()
+    expect(
+      buildRunwayInputFromMetrics({
+        ...completeMetrics,
+        burn_rate: createMetric('burn_rate', 28000, 'USD'),
+      })
+    ).toBeNull()
+    expect(
+      buildRunwayInputFromMetrics({
+        ...completeMetrics,
+        burn_rate: createMetric('burn_rate', 28000, null),
       })
     ).toBeNull()
   })

@@ -17,7 +17,7 @@ function observation(params: {
     status: 'available',
     key: params.key,
     value: params.value,
-    currency: params.currency ?? 'NZD',
+    currency: params.currency === undefined ? 'NZD' : params.currency,
     periodStart: null,
     periodEnd: params.periodEnd ?? null,
     asOfDate: params.asOfDate ?? null,
@@ -95,6 +95,26 @@ describe('summarizeMetricHistory', () => {
     expect(summary.hasMixedSources).toBe(true)
     expect(summary.hasIncompatibleCurrencies).toBe(true)
     expect(summary.direction).toBe('insufficient_data')
+  })
+
+  it('excludes missing and unsupported currencies without discarding supported observations', () => {
+    const summary = summarizeMetricHistory({
+      metricKey: 'cash',
+      range: 'all',
+      observations: [
+        observation({ key: 'cash', value: 100, asOfDate: '2026-05-01', currency: 'NZD' }),
+        observation({ key: 'cash', value: 110, asOfDate: '2026-06-01', currency: 'NZD' }),
+        observation({ key: 'cash', value: 70, asOfDate: '2026-06-01', currency: 'USD' }),
+        observation({ key: 'cash', value: 80, asOfDate: '2026-07-01', currency: null }),
+      ],
+    })
+
+    expect(summary.points.map((point) => point.value)).toEqual([100, 110])
+    expect(summary.currency).toBe('NZD')
+    expect(summary.direction).toBe('improving')
+    expect(summary.excludedCurrencyObservationCount).toBe(2)
+    expect(summary.hasMissingCurrencyObservations).toBe(true)
+    expect(summary.unsupportedCurrencies).toEqual(['USD'])
   })
 
   it('filters three-month history from the latest observation date', () => {

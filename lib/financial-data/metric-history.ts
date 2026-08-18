@@ -3,6 +3,7 @@ import {
   type FinancialMetricKey,
 } from '@/lib/financial-data/metric-keys'
 import type { AvailableFinancialMetricValue } from '@/lib/financial-data/types'
+import { isSupportedFinancialCurrency } from '@/lib/financial-data/currency'
 
 export const HISTORICAL_METRIC_KEYS = [
   'cash',
@@ -50,6 +51,9 @@ export interface MetricHistorySummary {
   hasMixedSources: boolean
   hasRecordedDateFallback: boolean
   hasIncompatibleCurrencies: boolean
+  excludedCurrencyObservationCount: number
+  hasMissingCurrencyObservations: boolean
+  unsupportedCurrencies: string[]
 }
 
 function normaliseDate(value: string) {
@@ -84,10 +88,11 @@ function selectLatestObservationPerDate(
 
   for (const observation of observations) {
     const { date } = getEffectiveDate(observation)
-    const existing = byDate.get(date)
+    const dateCurrencyKey = `${date}:${observation.currency ?? 'missing'}`
+    const existing = byDate.get(dateCurrencyKey)
 
     if (!existing || observation.updatedAt > existing.updatedAt) {
-      byDate.set(date, observation)
+      byDate.set(dateCurrencyKey, observation)
     }
   }
 
@@ -150,10 +155,33 @@ export function summarizeMetricHistory(params: {
   range: MetricHistoryRange
   observations: AvailableFinancialMetricValue[]
 }): MetricHistorySummary {
-  const selected = filterObservationsByRange(
+  const selectedForRange = filterObservationsByRange(
     selectLatestObservationPerDate(params.observations),
     params.range
   )
+  const isMonetaryMetric = params.metricKey !== 'runway_months'
+  const hasMissingCurrencyObservations =
+    isMonetaryMetric &&
+    selectedForRange.some((observation) => observation.currency === null)
+  const unsupportedCurrencies = isMonetaryMetric
+    ? [
+        ...new Set(
+          selectedForRange.flatMap((observation) =>
+            observation.currency &&
+            !isSupportedFinancialCurrency(observation.currency)
+              ? [observation.currency]
+              : []
+          )
+        ),
+      ]
+    : []
+  const selected = isMonetaryMetric
+    ? selectedForRange.filter((observation) =>
+        isSupportedFinancialCurrency(observation.currency)
+      )
+    : selectedForRange
+  const excludedCurrencyObservationCount =
+    selectedForRange.length - selected.length
   const points = selected.map((observation) => {
     const effectiveDate = getEffectiveDate(observation)
 
@@ -191,6 +219,9 @@ export function summarizeMetricHistory(params: {
       hasMixedSources: sourceLabels.length > 1,
       hasRecordedDateFallback: points.some((point) => point.dateSource === 'updated_at'),
       hasIncompatibleCurrencies,
+      excludedCurrencyObservationCount,
+      hasMissingCurrencyObservations,
+      unsupportedCurrencies,
     }
   }
 
@@ -217,6 +248,9 @@ export function summarizeMetricHistory(params: {
     hasMixedSources: sourceLabels.length > 1,
     hasRecordedDateFallback: points.some((point) => point.dateSource === 'updated_at'),
     hasIncompatibleCurrencies: false,
+    excludedCurrencyObservationCount,
+    hasMissingCurrencyObservations,
+    unsupportedCurrencies,
   }
 }
 

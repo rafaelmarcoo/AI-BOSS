@@ -32,6 +32,9 @@ function summary(
     hasMixedSources: true,
     hasRecordedDateFallback: false,
     hasIncompatibleCurrencies: false,
+    excludedCurrencyObservationCount: 0,
+    hasMissingCurrencyObservations: false,
+    unsupportedCurrencies: [],
   }
 }
 

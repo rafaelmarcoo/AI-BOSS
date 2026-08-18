@@ -4,6 +4,7 @@ import {
 } from '@/lib/financial-data/metric-keys'
 import type { AvailableFinancialMetricValue } from '@/lib/financial-data/types'
 import { isSupportedFinancialCurrency } from '@/lib/financial-data/currency'
+import type { SupportedFinancialCurrency } from '@/lib/financial-data/currency'
 
 export const HISTORICAL_METRIC_KEYS = [
   'cash',
@@ -15,6 +16,9 @@ export const HISTORICAL_METRIC_KEYS = [
 
 export type HistoricalMetricKey = (typeof HISTORICAL_METRIC_KEYS)[number]
 export type MetricHistoryRange = '3m' | '6m' | 'all'
+export const METRIC_HISTORY_RECORD_LIMITS = [12, 25, 50, 'all'] as const
+export type MetricHistoryRecordLimit =
+  (typeof METRIC_HISTORY_RECORD_LIMITS)[number]
 export type MetricHistoryMovement = 'increased' | 'decreased' | 'stable'
 export type MetricHistoryDirection =
   | 'improving'
@@ -51,6 +55,28 @@ export interface MetricHistorySummary {
   hasMixedSources: boolean
   hasRecordedDateFallback: boolean
   hasIncompatibleCurrencies: boolean
+  excludedCurrencyObservationCount: number
+  hasMissingCurrencyObservations: boolean
+  unsupportedCurrencies: string[]
+}
+
+export interface MetricHistorySourceOption {
+  key: string
+  label: string
+  sourceId: string | null
+  sourceType: AvailableFinancialMetricValue['provenance']['sourceType']
+}
+
+export interface MetricHistorySeriesCollection {
+  metricKey: HistoricalMetricKey
+  label: string
+  range: MetricHistoryRange
+  recordLimit: MetricHistoryRecordLimit
+  selectedCurrency: SupportedFinancialCurrency | null
+  selectedSourceKey: string | null
+  availableCurrencies: SupportedFinancialCurrency[]
+  availableSources: MetricHistorySourceOption[]
+  series: MetricHistorySummary[]
   excludedCurrencyObservationCount: number
   hasMissingCurrencyObservations: boolean
   unsupportedCurrencies: string[]
@@ -103,31 +129,71 @@ function selectLatestObservationPerDate(
   })
 }
 
+function getSourceKey(observation: AvailableFinancialMetricValue) {
+  const { sourceId, sourceLabel, sourceType } = observation.provenance
+
+  return sourceId
+    ? `${sourceType}:${sourceId}`
+    : `${sourceType}:label:${sourceLabel}`
+}
+
+function listSourceOptions(observations: AvailableFinancialMetricValue[]) {
+  const sources = new Map<string, MetricHistorySourceOption>()
+
+  for (const observation of observations) {
+    const key = getSourceKey(observation)
+
+    if (!sources.has(key)) {
+      sources.set(key, {
+        key,
+        label: observation.provenance.sourceLabel,
+        sourceId: observation.provenance.sourceId ?? null,
+        sourceType: observation.provenance.sourceType,
+      })
+    }
+  }
+
+  return [...sources.values()].sort((left, right) =>
+    left.label.localeCompare(right.label)
+  )
+}
+
+function applyRecordLimit(
+  observations: AvailableFinancialMetricValue[],
+  recordLimit: MetricHistoryRecordLimit
+) {
+  return recordLimit === 'all'
+    ? observations
+    : observations.slice(-recordLimit)
+}
+
 function filterObservationsByRange(
   observations: AvailableFinancialMetricValue[],
-  range: MetricHistoryRange
+  range: MetricHistoryRange,
+  recordLimit: MetricHistoryRecordLimit
 ) {
   if (observations.length === 0) return []
 
   if (range === 'all') {
-    return observations.slice(-12)
+    return applyRecordLimit(observations, recordLimit)
   }
 
   const latest = getEffectiveDate(observations[observations.length - 1])
   const latestDate = parseDate(latest.date)
 
-  if (!latestDate) return observations.slice(-12)
+  if (!latestDate) return applyRecordLimit(observations, recordLimit)
 
   const months = range === '3m' ? 3 : 6
   const cutoff = new Date(latestDate)
   cutoff.setUTCMonth(cutoff.getUTCMonth() - months)
 
-  return observations
-    .filter((observation) => {
+  return applyRecordLimit(
+    observations.filter((observation) => {
       const date = parseDate(getEffectiveDate(observation).date)
       return date && date >= cutoff
-    })
-    .slice(-12)
+    }),
+    recordLimit
+  )
 }
 
 function getDirection(
@@ -154,10 +220,12 @@ export function summarizeMetricHistory(params: {
   metricKey: HistoricalMetricKey
   range: MetricHistoryRange
   observations: AvailableFinancialMetricValue[]
+  recordLimit?: MetricHistoryRecordLimit
 }): MetricHistorySummary {
   const selectedForRange = filterObservationsByRange(
     selectLatestObservationPerDate(params.observations),
-    params.range
+    params.range,
+    params.recordLimit ?? 12
   )
   const isMonetaryMetric = params.metricKey !== 'runway_months'
   const hasMissingCurrencyObservations =
@@ -254,6 +322,83 @@ export function summarizeMetricHistory(params: {
   }
 }
 
+export function summarizeMetricHistorySeries(params: {
+  metricKey: HistoricalMetricKey
+  range: MetricHistoryRange
+  observations: AvailableFinancialMetricValue[]
+  recordLimit?: MetricHistoryRecordLimit
+  currency?: SupportedFinancialCurrency | null
+  sourceKey?: string | null
+}): MetricHistorySeriesCollection {
+  const recordLimit = params.recordLimit ?? 12
+  const isMonetaryMetric = params.metricKey !== 'runway_months'
+  const availableSources = listSourceOptions(params.observations)
+  const sourceFiltered = params.sourceKey
+    ? params.observations.filter(
+        (observation) => getSourceKey(observation) === params.sourceKey
+      )
+    : params.observations
+  const availableCurrencies = [
+    ...new Set(
+      sourceFiltered.flatMap((observation) =>
+        isSupportedFinancialCurrency(observation.currency)
+          ? [observation.currency]
+          : []
+      )
+    ),
+  ].sort() as SupportedFinancialCurrency[]
+  const selected = params.currency
+    ? sourceFiltered.filter(
+        (observation) => observation.currency === params.currency
+      )
+    : sourceFiltered
+  const currencyAudit = summarizeMetricHistory({
+    metricKey: params.metricKey,
+    range: params.range,
+    observations: sourceFiltered,
+    recordLimit,
+  })
+  const series = isMonetaryMetric
+    ? availableCurrencies
+        .filter((currency) => !params.currency || currency === params.currency)
+        .map((currency) =>
+          summarizeMetricHistory({
+            metricKey: params.metricKey,
+            range: params.range,
+            observations: selected.filter(
+              (observation) => observation.currency === currency
+            ),
+            recordLimit,
+          })
+        )
+        .filter((summary) => summary.points.length > 0)
+    : [
+        summarizeMetricHistory({
+          metricKey: params.metricKey,
+          range: params.range,
+          observations: selected,
+          recordLimit,
+        }),
+      ].filter((summary) => summary.points.length > 0)
+
+  return {
+    metricKey: params.metricKey,
+    label: FINANCIAL_METRIC_LABELS[params.metricKey],
+    range: params.range,
+    recordLimit,
+    selectedCurrency: params.currency ?? null,
+    selectedSourceKey: params.sourceKey ?? null,
+    availableCurrencies,
+    availableSources,
+    series,
+    excludedCurrencyObservationCount:
+      currencyAudit.excludedCurrencyObservationCount,
+    hasMissingCurrencyObservations:
+      currencyAudit.hasMissingCurrencyObservations,
+    unsupportedCurrencies: currencyAudit.unsupportedCurrencies,
+  }
+}
+
 export async function readFinancialMetricHistory(params: {
   userId: string
   metricKey: HistoricalMetricKey
@@ -273,5 +418,33 @@ export async function readFinancialMetricHistory(params: {
     metricKey: params.metricKey,
     range,
     observations,
+  })
+}
+
+export async function readFinancialMetricHistorySeries(params: {
+  userId: string
+  metricKey: HistoricalMetricKey
+  range?: MetricHistoryRange
+  recordLimit?: MetricHistoryRecordLimit
+  currency?: SupportedFinancialCurrency | null
+  sourceKey?: string | null
+}) {
+  const range = params.range ?? 'all'
+  const { listFinancialMetricObservationHistory } = await import(
+    '@/lib/financial-data/persistence'
+  )
+  const observations = await listFinancialMetricObservationHistory({
+    userId: params.userId,
+    metricKey: params.metricKey,
+    limit: 'all',
+  })
+
+  return summarizeMetricHistorySeries({
+    metricKey: params.metricKey,
+    range,
+    observations,
+    recordLimit: params.recordLimit,
+    currency: params.currency,
+    sourceKey: params.sourceKey,
   })
 }

@@ -2,8 +2,8 @@ import { ChatOpenAI } from '@langchain/openai'
 import { fillUnavailableMetrics } from '@/lib/financial-data/read-model'
 import { readSourceAwareMetrics } from '@/lib/financial-data/read-service'
 import { readRunwayObservationHistory } from '@/lib/financial-data/runway-history'
-import { readFinancialMetricHistory } from '@/lib/financial-data/metric-history'
-import { readFinancialMetricForecast } from '@/lib/financial-data/metric-forecast'
+import { readFinancialMetricHistorySeries } from '@/lib/financial-data/metric-history'
+import { readFinancialMetricForecastSeries } from '@/lib/financial-data/metric-forecast'
 import { planGenUi } from '@/lib/gen-ui/plan-gen-ui'
 
 const mockPlannerInvoke = jest.fn()
@@ -27,10 +27,10 @@ jest.mock('@/lib/financial-data/runway-history', () => ({
 }))
 
 jest.mock('@/lib/financial-data/metric-history', () => ({
-  readFinancialMetricHistory: jest.fn(),
+  readFinancialMetricHistorySeries: jest.fn(),
 }))
 jest.mock('@/lib/financial-data/metric-forecast', () => ({
-  readFinancialMetricForecast: jest.fn(),
+  readFinancialMetricForecastSeries: jest.fn(),
 }))
 
 const mockChatOpenAI = jest.mocked(ChatOpenAI)
@@ -38,8 +38,8 @@ const mockReadSourceAwareMetrics = jest.mocked(readSourceAwareMetrics)
 const mockReadRunwayObservationHistory = jest.mocked(
   readRunwayObservationHistory
 )
-const mockReadFinancialMetricHistory = jest.mocked(readFinancialMetricHistory)
-const mockReadFinancialMetricForecast = jest.mocked(readFinancialMetricForecast)
+const mockReadFinancialMetricHistorySeries = jest.mocked(readFinancialMetricHistorySeries)
+const mockReadFinancialMetricForecastSeries = jest.mocked(readFinancialMetricForecastSeries)
 const originalApiKey = process.env.OPENAI_API_KEY
 
 describe('planGenUi', () => {
@@ -60,30 +60,23 @@ describe('planGenUi', () => {
       change: null,
       averageChange: null,
     })
-    mockReadFinancialMetricHistory.mockResolvedValue({
+    mockReadFinancialMetricHistorySeries.mockResolvedValue({
       metricKey: 'cash',
       label: 'Cash',
       range: 'all',
-      points: [],
-      movement: null,
-      direction: 'insufficient_data',
-      firstValue: null,
-      latestValue: null,
-      totalChange: null,
-      percentageChange: null,
-      averageChange: null,
-      currency: 'NZD',
-      sourceLabels: [],
-      hasMixedSources: false,
-      hasRecordedDateFallback: false,
-      hasIncompatibleCurrencies: false,
+      recordLimit: 'all',
+      selectedCurrency: null,
+      selectedSourceKey: null,
+      availableCurrencies: [],
+      availableSources: [],
+      series: [],
       excludedCurrencyObservationCount: 0,
       hasMissingCurrencyObservations: false,
       unsupportedCurrencies: [],
-    })
-    mockReadFinancialMetricForecast.mockResolvedValue({
-      metricKey: 'cash', label: 'Cash', range: 'all', horizon: 3,
-      history: {
+    } as never)
+    mockReadFinancialMetricForecastSeries.mockResolvedValue({
+      metricKey: 'cash', label: 'Cash', range: 'all', recordLimit: 'all', selectedCurrency: null, selectedSourceKey: null, availableCurrencies: ['NZD'], availableSources: [], excludedCurrencyObservationCount: 0, hasMissingCurrencyObservations: false, unsupportedCurrencies: [], horizon: 3,
+      series: [{ history: {
         metricKey: 'cash', label: 'Cash', range: 'all',
         points: [
           { date: '2026-05-01', dateSource: 'as_of_date', value: 100, currency: 'NZD', sourceLabel: 'May CSV', sourceType: 'document', confidence: 0.9, updatedAt: '2026-05-01T00:00:00.000Z' },
@@ -91,6 +84,8 @@ describe('planGenUi', () => {
         ], movement: 'increased', direction: 'improving', firstValue: 100, latestValue: 120, totalChange: 20, percentageChange: 20, averageChange: 20, currency: 'NZD', sourceLabels: ['May CSV', 'June CSV'], hasMixedSources: true, hasRecordedDateFallback: false, hasIncompatibleCurrencies: false, excludedCurrencyObservationCount: 0, hasMissingCurrencyObservations: false, unsupportedCurrencies: [],
       },
       forecastPoints: [{ date: '2026-07-01', value: 140, kind: 'forecast' }], latestActualValue: 120, monthlySlope: 20, method: 'date_aware_linear_trend', assumptions: [],
+      metricKey: 'cash', label: 'Cash', range: 'all', horizon: 3,
+      }],
     } as never)
   })
 
@@ -172,7 +167,8 @@ describe('planGenUi', () => {
 
   it('always includes a deterministic trend widget for a metric-specific historical question', async () => {
     mockPlannerInvoke.mockResolvedValue({ widgets: [] })
-    mockReadFinancialMetricHistory.mockResolvedValue({
+    mockReadFinancialMetricHistorySeries.mockResolvedValue({
+      metricKey: 'cash', label: 'Cash', range: 'all', recordLimit: 'all', selectedCurrency: null, selectedSourceKey: null, availableCurrencies: ['NZD'], availableSources: [], excludedCurrencyObservationCount: 0, hasMissingCurrencyObservations: false, unsupportedCurrencies: [], series: [{
       metricKey: 'cash',
       label: 'Cash',
       range: 'all',
@@ -195,7 +191,7 @@ describe('planGenUi', () => {
       excludedCurrencyObservationCount: 0,
       hasMissingCurrencyObservations: false,
       unsupportedCurrencies: [],
-    } as never)
+    }] } as never)
 
     const plan = await planGenUi({
       userId: 'user-123',
@@ -204,10 +200,11 @@ describe('planGenUi', () => {
       toolsUsed: [],
     })
 
-    expect(mockReadFinancialMetricHistory).toHaveBeenCalledWith({
+    expect(mockReadFinancialMetricHistorySeries).toHaveBeenCalledWith({
       userId: 'user-123',
       metricKey: 'cash',
       range: 'all',
+      recordLimit: 'all',
     })
     expect(plan?.widgets).toContainEqual(
       expect.objectContaining({ type: 'metric_trend_chart' })
@@ -224,8 +221,8 @@ describe('planGenUi', () => {
       toolsUsed: [],
     })
 
-    expect(mockReadFinancialMetricForecast).toHaveBeenCalledWith({
-      userId: 'user-123', metricKey: 'cash', range: 'all', horizon: 6,
+    expect(mockReadFinancialMetricForecastSeries).toHaveBeenCalledWith({
+      userId: 'user-123', metricKey: 'cash', range: 'all', horizon: 6, recordLimit: 'all',
     })
     expect(plan?.widgets).toContainEqual(
       expect.objectContaining({ type: 'metric_forecast_chart' })

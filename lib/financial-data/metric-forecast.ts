@@ -1,11 +1,15 @@
 import {
   HISTORICAL_METRIC_KEYS,
   summarizeMetricHistory,
+  summarizeMetricHistorySeries,
   type HistoricalMetricKey,
+  type MetricHistoryRecordLimit,
   type MetricHistoryRange,
+  type MetricHistorySeriesCollection,
   type MetricHistorySummary,
 } from '@/lib/financial-data/metric-history'
 import type { AvailableFinancialMetricValue } from '@/lib/financial-data/types'
+import type { SupportedFinancialCurrency } from '@/lib/financial-data/currency'
 
 export const FORECAST_HORIZONS = [3, 6] as const
 export type ForecastHorizon = (typeof FORECAST_HORIZONS)[number]
@@ -27,6 +31,12 @@ export interface MetricForecastSummary {
   monthlySlope: number | null
   method: 'date_aware_linear_trend'
   assumptions: string[]
+}
+
+export interface MetricForecastSeriesCollection
+  extends Omit<MetricHistorySeriesCollection, 'series'> {
+  horizon: ForecastHorizon
+  series: MetricForecastSummary[]
 }
 
 const DAYS_PER_MONTH = 30.4375
@@ -71,17 +81,10 @@ function calculateMonthlySlope(history: MetricHistorySummary) {
   return round(numerator / denominator)
 }
 
-export function summarizeMetricForecast(params: {
-  metricKey: HistoricalMetricKey
-  range: MetricHistoryRange
+function buildMetricForecastFromHistory(
+  history: MetricHistorySummary,
   horizon: ForecastHorizon
-  observations: AvailableFinancialMetricValue[]
-}): MetricForecastSummary {
-  const history = summarizeMetricHistory({
-    metricKey: params.metricKey,
-    range: params.range,
-    observations: params.observations,
-  })
+): MetricForecastSummary {
   const latestPoint = history.points[history.points.length - 1]
   const monthlySlope =
     history.direction === 'insufficient_data' || history.hasIncompatibleCurrencies
@@ -89,22 +92,22 @@ export function summarizeMetricForecast(params: {
       : calculateMonthlySlope(history)
   const forecastPoints =
     latestPoint && monthlySlope !== null
-      ? Array.from({ length: params.horizon }, (_, index) => {
+      ? Array.from({ length: horizon }, (_, index) => {
           const value = latestPoint.value + monthlySlope * (index + 1)
 
           return {
             date: addCalendarMonths(latestPoint.date, index + 1),
-            value: round(params.metricKey === 'runway_months' ? Math.max(0, value) : value),
+            value: round(history.metricKey === 'runway_months' ? Math.max(0, value) : value),
             kind: 'forecast' as const,
           }
         })
       : []
 
   return {
-    metricKey: params.metricKey,
+    metricKey: history.metricKey,
     label: history.label,
-    range: params.range,
-    horizon: params.horizon,
+    range: history.range,
+    horizon,
     history,
     forecastPoints,
     latestActualValue: latestPoint?.value ?? null,
@@ -123,6 +126,43 @@ export function summarizeMetricForecast(params: {
         ? [`${history.excludedCurrencyObservationCount} observation(s) with missing or unsupported currency were excluded.`]
         : []),
     ],
+  }
+}
+
+export function summarizeMetricForecast(params: {
+  metricKey: HistoricalMetricKey
+  range: MetricHistoryRange
+  horizon: ForecastHorizon
+  observations: AvailableFinancialMetricValue[]
+  recordLimit?: MetricHistoryRecordLimit
+}): MetricForecastSummary {
+  const history = summarizeMetricHistory({
+    metricKey: params.metricKey,
+    range: params.range,
+    observations: params.observations,
+    recordLimit: params.recordLimit,
+  })
+
+  return buildMetricForecastFromHistory(history, params.horizon)
+}
+
+export function summarizeMetricForecastSeries(params: {
+  metricKey: HistoricalMetricKey
+  range: MetricHistoryRange
+  horizon: ForecastHorizon
+  observations: AvailableFinancialMetricValue[]
+  recordLimit?: MetricHistoryRecordLimit
+  currency?: SupportedFinancialCurrency | null
+  sourceKey?: string | null
+}): MetricForecastSeriesCollection {
+  const histories = summarizeMetricHistorySeries(params)
+
+  return {
+    ...histories,
+    horizon: params.horizon,
+    series: histories.series.map((history) =>
+      buildMetricForecastFromHistory(history, params.horizon)
+    ),
   }
 }
 
@@ -148,6 +188,37 @@ export async function readFinancialMetricForecast(params: {
     range,
     horizon,
     observations,
+  })
+}
+
+export async function readFinancialMetricForecastSeries(params: {
+  userId: string
+  metricKey: HistoricalMetricKey
+  range?: MetricHistoryRange
+  horizon?: ForecastHorizon
+  recordLimit?: MetricHistoryRecordLimit
+  currency?: SupportedFinancialCurrency | null
+  sourceKey?: string | null
+}) {
+  const range = params.range ?? 'all'
+  const horizon = params.horizon ?? 3
+  const { listFinancialMetricObservationHistory } = await import(
+    '@/lib/financial-data/persistence'
+  )
+  const observations = await listFinancialMetricObservationHistory({
+    userId: params.userId,
+    metricKey: params.metricKey,
+    limit: 'all',
+  })
+
+  return summarizeMetricForecastSeries({
+    metricKey: params.metricKey,
+    range,
+    horizon,
+    observations,
+    recordLimit: params.recordLimit,
+    currency: params.currency,
+    sourceKey: params.sourceKey,
   })
 }
 

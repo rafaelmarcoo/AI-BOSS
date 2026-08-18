@@ -19,12 +19,12 @@ import {
   type RunwayTrendSummary,
 } from '@/lib/financial-data/runway-history'
 import {
-  readFinancialMetricHistory,
+  readFinancialMetricHistorySeries,
   type HistoricalMetricKey,
   type MetricHistorySummary,
 } from '@/lib/financial-data/metric-history'
 import {
-  readFinancialMetricForecast,
+  readFinancialMetricForecastSeries,
   type ForecastHorizon,
   type MetricForecastSummary,
 } from '@/lib/financial-data/metric-forecast'
@@ -90,8 +90,8 @@ interface GenUiDataContext {
   source: GenUiSource
   selectedText: string | null
   userMessage: string
-  metricHistory: MetricHistorySummary | null
-  metricForecast: MetricForecastSummary | null
+  metricHistories: MetricHistorySummary[]
+  metricForecasts: MetricForecastSummary[]
 }
 
 function historicalMetricKeyForMessage(userMessage: string): HistoricalMetricKey | null {
@@ -453,9 +453,10 @@ function buildDataConnectionsWidget(
 function buildMetricTrendWidget(
   spec: PlannerWidget,
   index: number,
-  context: GenUiDataContext
+  context: GenUiDataContext,
+  selectedHistory?: MetricHistorySummary
 ): GenUiWidget | null {
-  const history = context.metricHistory
+  const history = selectedHistory ?? context.metricHistories[0]
 
   if (!history || history.points.length < 2 || history.hasIncompatibleCurrencies) {
     return null
@@ -464,7 +465,9 @@ function buildMetricTrendWidget(
   return {
     id: widgetId(spec.type, index),
     type: 'metric_trend_chart',
-    title: spec.title ?? `Historical ${history.label} trend`,
+    title: spec.title
+      ? `${spec.title}${history.metricKey === 'runway_months' ? '' : ` (${history.currency})`}`
+      : `Historical ${history.label} trend${history.metricKey === 'runway_months' ? '' : ` (${history.currency})`}`,
     reason: spec.reason ?? 'AI-BOSS selected a deterministic historical trend for this question.',
     data: {
       metricKey: history.metricKey,
@@ -495,9 +498,10 @@ function buildMetricTrendWidget(
 function buildMetricForecastWidget(
   spec: PlannerWidget,
   index: number,
-  context: GenUiDataContext
+  context: GenUiDataContext,
+  selectedForecast?: MetricForecastSummary
 ): GenUiWidget | null {
-  const forecast = context.metricForecast
+  const forecast = selectedForecast ?? context.metricForecasts[0]
 
   if (!forecast || forecast.forecastPoints.length === 0 || forecast.monthlySlope === null) {
     return null
@@ -506,7 +510,9 @@ function buildMetricForecastWidget(
   return {
     id: widgetId(spec.type, index),
     type: 'metric_forecast_chart',
-    title: spec.title ?? `${forecast.label} forecast`,
+    title: spec.title
+      ? `${spec.title}${forecast.metricKey === 'runway_months' ? '' : ` (${forecast.history.currency})`}`
+      : `${forecast.label} forecast${forecast.metricKey === 'runway_months' ? '' : ` (${forecast.history.currency})`}`,
     reason: spec.reason ?? 'AI-BOSS selected a deterministic forecast for this question.',
     data: {
       metricKey: forecast.metricKey,
@@ -845,7 +851,7 @@ export async function planGenUi({
   const forecastMetricKey = forecastMetricKeyForMessage(userMessage)
   const forecastHorizon = forecastHorizonForMessage(userMessage)
 
-  const [snapshot, runwayTrend, metricHistory, metricForecast] = await Promise.all([
+  const [snapshot, runwayTrend, metricHistoryCollection, metricForecastCollection] = await Promise.all([
     readSourceAwareMetrics(userId),
     readRunwayObservationHistory(userId).catch(() => ({
       observations: [],
@@ -854,10 +860,10 @@ export async function planGenUi({
       averageChange: null,
     })),
     historicalMetricKey
-      ? readFinancialMetricHistory({ userId, metricKey: historicalMetricKey, range: 'all' }).catch(() => null)
+      ? readFinancialMetricHistorySeries({ userId, metricKey: historicalMetricKey, range: 'all', recordLimit: 'all' }).catch(() => null)
       : Promise.resolve(null),
     forecastMetricKey
-      ? readFinancialMetricForecast({ userId, metricKey: forecastMetricKey, range: 'all', horizon: forecastHorizon }).catch(() => null)
+      ? readFinancialMetricForecastSeries({ userId, metricKey: forecastMetricKey, range: 'all', horizon: forecastHorizon, recordLimit: 'all' }).catch(() => null)
       : Promise.resolve(null),
   ])
   const fallbackSpecs = defaultWidgetSpecs(userMessage, snapshot, source)
@@ -899,12 +905,29 @@ export async function planGenUi({
     source,
     selectedText,
     userMessage,
-    metricHistory,
-    metricForecast,
+    metricHistories: metricHistoryCollection?.series ?? [],
+    metricForecasts: metricForecastCollection?.series ?? [],
   }
-  const widgets = specs
-    .map((spec, index) => hydrateWidget(spec, index, context))
-    .filter((widget): widget is GenUiWidget => widget !== null)
+  const widgets = specs.flatMap((spec, index) => {
+    if (spec.type === 'metric_trend_chart') {
+      return context.metricHistories
+        .map((history, seriesIndex) =>
+          buildMetricTrendWidget(spec, index * 10 + seriesIndex, context, history)
+        )
+        .filter((widget): widget is GenUiWidget => widget !== null)
+    }
+
+    if (spec.type === 'metric_forecast_chart') {
+      return context.metricForecasts
+        .map((forecast, seriesIndex) =>
+          buildMetricForecastWidget(spec, index * 10 + seriesIndex, context, forecast)
+        )
+        .filter((widget): widget is GenUiWidget => widget !== null)
+    }
+
+    const widget = hydrateWidget(spec, index, context)
+    return widget ? [widget] : []
+  })
 
   if (widgets.length === 0) {
     return null

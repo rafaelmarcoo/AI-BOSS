@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import {
-  readFinancialMetricForecast,
+  readFinancialMetricForecastSeries,
   type ForecastHorizon,
   type MetricForecastSummary,
 } from '@/lib/financial-data/metric-forecast'
@@ -19,6 +19,9 @@ const inputSchema = z.object({
   metricKey: z.enum(HISTORICAL_METRIC_KEYS).optional(),
   range: z.enum(['3m', '6m', 'all']).default('all'),
   horizon: z.union([z.literal(3), z.literal(6)]).default(3),
+  currency: z.enum(['NZD', 'AUD']).optional(),
+  sourceLabel: z.string().trim().min(1).max(200).optional(),
+  recordLimit: z.union([z.literal(12), z.literal(25), z.literal(50), z.literal('all')]).default(12),
 })
 
 function formatValue(value: number, summary: MetricForecastSummary) {
@@ -36,17 +39,13 @@ function formatForecast(summary: MetricForecastSummary) {
     return `No ${summary.label.toLowerCase()} history is available yet, so AI-BOSS cannot forecast it.`
   }
 
-  if (summary.history.hasIncompatibleCurrencies) {
-    return `${summary.label} cannot be forecast because its history contains multiple currencies. AI-BOSS does not convert currencies.`
-  }
-
   if (summary.forecastPoints.length === 0 || summary.monthlySlope === null) {
     return `${summary.label} needs at least 2 dated observations before AI-BOSS can create a forecast.`
   }
 
   const latestForecast = summary.forecastPoints.at(-1)
   const lines = [
-    `${summary.label} ${summary.horizon}-month forecast (${summary.range} history).`,
+    `${summary.label}${summary.metricKey === 'runway_months' ? '' : ` — ${summary.history.currency}`} ${summary.horizon}-month forecast (${summary.range} history).`,
     `Latest actual: ${formatValue(summary.latestActualValue ?? 0, summary)}.`,
     `Observed trend: ${summary.monthlySlope >= 0 ? '+' : ''}${formatValue(summary.monthlySlope, summary)} per month.`,
     `Projected ${latestForecast?.date}: ${formatValue(latestForecast?.value ?? 0, summary)}.`,
@@ -71,24 +70,49 @@ function formatForecast(summary: MetricForecastSummary) {
 export function createGetFinancialForecastTool(
   userId: string
 ): StructuredTool<
-  { metricKey?: HistoricalMetricKey; range: MetricHistoryRange; horizon: ForecastHorizon },
+  { metricKey?: HistoricalMetricKey; range: MetricHistoryRange; horizon: ForecastHorizon; currency?: 'NZD' | 'AUD'; sourceLabel?: string; recordLimit?: 12 | 25 | 50 | 'all' },
   string
 > {
   return {
     name: 'get_financial_forecast',
     description:
-      'Create a deterministic 3- or 6-month trend-continuation forecast for cash, monthly revenue, monthly expenses, burn rate, or runway. Use this for future-focused questions. Leave metricKey empty only for a broad forecast summary. Forecasts are estimates, not guarantees.',
+      'Create a deterministic 3- or 6-month trend-continuation forecast for cash, monthly revenue, monthly expenses, burn rate, or runway. NZD and AUD are forecast independently and never converted. Set currency or sourceLabel only when the user explicitly supplies that context. Leave metricKey empty only for a broad forecast summary. Forecasts are estimates, not guarantees.',
     inputSchema,
-    async handler({ metricKey, range, horizon }) {
+    async handler({ metricKey, range, horizon, currency, sourceLabel, recordLimit = 12 }) {
       const metricKeys = metricKey ? [metricKey] : HISTORICAL_METRIC_KEYS
-      const summaries = await Promise.all(
-        metricKeys.map((key) =>
-          readFinancialMetricForecast({ userId, metricKey: key, range, horizon })
+      const collections = await Promise.all(metricKeys.map(async (key) => {
+        const initial = await readFinancialMetricForecastSeries({
+          userId,
+          metricKey: key,
+          range,
+          horizon,
+          recordLimit,
+          currency: currency ?? null,
+        })
+        if (!sourceLabel) return initial
+
+        const source = initial.availableSources.find(
+          (option) => option.label.toLowerCase() === sourceLabel.toLowerCase()
         )
-      )
-      const availableSummaries = summaries.filter((summary) => summary.history.points.length > 0)
+        if (!source) return { ...initial, series: [] }
+
+        return readFinancialMetricForecastSeries({
+          userId,
+          metricKey: key,
+          range,
+          horizon,
+          recordLimit,
+          currency: currency ?? null,
+          sourceKey: source.key,
+        })
+      }))
+      const availableSummaries = collections.flatMap((collection) => collection.series)
 
       if (availableSummaries.length === 0) {
+        if (sourceLabel) {
+          const availableSources = [...new Set(collections.flatMap((collection) => collection.availableSources.map((source) => source.label)))]
+          return `No forecast history matched source "${sourceLabel}".${availableSources.length > 0 ? ` Available sources: ${availableSources.join(', ')}.` : ''}`
+        }
         return 'No historical financial observations are available yet. Upload at least two dated CSV records before creating a forecast.'
       }
 

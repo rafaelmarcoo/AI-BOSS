@@ -1,13 +1,13 @@
-import { readFinancialMetricForecast } from '@/lib/financial-data/metric-forecast'
+import { readFinancialMetricForecastSeries } from '@/lib/financial-data/metric-forecast'
 import { createGetFinancialForecastTool } from '@/lib/tools/financial/get-financial-forecast'
 import { adaptToolToLangChain } from '@/lib/ai/tools'
 
 jest.mock('@/lib/financial-data/metric-forecast', () => ({
   FORECAST_HORIZONS: [3, 6],
-  readFinancialMetricForecast: jest.fn(),
+  readFinancialMetricForecastSeries: jest.fn(),
 }))
 
-const mockReadFinancialMetricForecast = jest.mocked(readFinancialMetricForecast)
+const mockReadFinancialMetricForecastSeries = jest.mocked(readFinancialMetricForecastSeries)
 
 const forecast = {
   metricKey: 'cash',
@@ -31,11 +31,19 @@ const forecast = {
   assumptions: [],
 }
 
+const forecastCollection = {
+  metricKey: 'cash', label: 'Cash', range: 'all', recordLimit: 12,
+  selectedCurrency: null, selectedSourceKey: null, availableCurrencies: ['NZD'],
+  availableSources: [], excludedCurrencyObservationCount: 0,
+  hasMissingCurrencyObservations: false, unsupportedCurrencies: [], horizon: 3,
+  series: [forecast],
+}
+
 describe('get_financial_forecast tool', () => {
   beforeEach(() => jest.clearAllMocks())
 
   it('returns a deterministic metric-specific forecast with uncertainty wording', async () => {
-    mockReadFinancialMetricForecast.mockResolvedValue(forecast as never)
+    mockReadFinancialMetricForecastSeries.mockResolvedValue(forecastCollection as never)
 
     const result = await createGetFinancialForecastTool('user-1').handler({
       metricKey: 'cash',
@@ -43,21 +51,22 @@ describe('get_financial_forecast tool', () => {
       horizon: 3,
     })
 
-    expect(mockReadFinancialMetricForecast).toHaveBeenCalledWith({
+    expect(mockReadFinancialMetricForecastSeries).toHaveBeenCalledWith({
       userId: 'user-1', metricKey: 'cash', range: 'all', horizon: 3,
+      recordLimit: 12, currency: null,
     })
-    expect(result).toContain('Cash 3-month forecast')
+    expect(result).toContain('Cash — NZD 3-month forecast')
     expect(result).toContain('not a guaranteed prediction')
     expect(result).toContain('combine multiple sources')
   })
 
   it('summarizes each available metric for a broad question', async () => {
-    mockReadFinancialMetricForecast.mockResolvedValue(forecast as never)
+    mockReadFinancialMetricForecastSeries.mockResolvedValue(forecastCollection as never)
 
     await createGetFinancialForecastTool('user-1').handler({ range: 'all', horizon: 6 })
 
-    expect(mockReadFinancialMetricForecast).toHaveBeenCalledTimes(5)
-    expect(mockReadFinancialMetricForecast).toHaveBeenCalledWith(
+    expect(mockReadFinancialMetricForecastSeries).toHaveBeenCalledTimes(5)
+    expect(mockReadFinancialMetricForecastSeries).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 'user-1', horizon: 6 })
     )
   })

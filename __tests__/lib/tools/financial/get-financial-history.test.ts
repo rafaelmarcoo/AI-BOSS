@@ -1,12 +1,12 @@
 import { createGetFinancialHistoryTool } from '@/lib/tools/financial/get-financial-history'
-import { readFinancialMetricHistory } from '@/lib/financial-data/metric-history'
+import { readFinancialMetricHistorySeries } from '@/lib/financial-data/metric-history'
 
 jest.mock('@/lib/financial-data/metric-history', () => {
   const actual = jest.requireActual('@/lib/financial-data/metric-history')
-  return { ...actual, readFinancialMetricHistory: jest.fn() }
+  return { ...actual, readFinancialMetricHistorySeries: jest.fn() }
 })
 
-const mockReadFinancialMetricHistory = jest.mocked(readFinancialMetricHistory)
+const mockReadFinancialMetricHistorySeries = jest.mocked(readFinancialMetricHistorySeries)
 
 function summary(
   metricKey: 'cash' | 'burn_rate',
@@ -38,11 +38,20 @@ function summary(
   }
 }
 
+function collection(series = [summary('cash')]) {
+  return {
+    metricKey: 'cash' as const, label: 'Cash', range: 'all' as const, recordLimit: 12 as const,
+    selectedCurrency: null, selectedSourceKey: null, availableCurrencies: ['NZD' as const],
+    availableSources: [], series, excludedCurrencyObservationCount: 0,
+    hasMissingCurrencyObservations: false, unsupportedCurrencies: [],
+  }
+}
+
 describe('get_financial_history tool', () => {
   beforeEach(() => jest.clearAllMocks())
 
   it('formats a metric-specific history with source warning', async () => {
-    mockReadFinancialMetricHistory.mockResolvedValue(summary('cash'))
+    mockReadFinancialMetricHistorySeries.mockResolvedValue(collection())
 
     const result = await createGetFinancialHistoryTool('user-1').handler({
       metricKey: 'cash',
@@ -55,15 +64,27 @@ describe('get_financial_history tool', () => {
   })
 
   it('summarizes each available metric for broad historical questions', async () => {
-    mockReadFinancialMetricHistory.mockImplementation(async ({ metricKey }) =>
+    mockReadFinancialMetricHistorySeries.mockImplementation(async ({ metricKey }) =>
       metricKey === 'cash'
-        ? summary('cash')
-        : { ...summary('burn_rate', 'worsening'), metricKey, label: metricKey, points: [] }
+        ? collection()
+        : { ...collection([]), metricKey, label: metricKey }
     )
 
     const result = await createGetFinancialHistoryTool('user-1').handler({ range: 'all' })
 
-    expect(mockReadFinancialMetricHistory).toHaveBeenCalledTimes(5)
+    expect(mockReadFinancialMetricHistorySeries).toHaveBeenCalledTimes(5)
     expect(result).toContain('Cash history')
+  })
+
+  it('reports NZD and AUD as separate histories', async () => {
+    mockReadFinancialMetricHistorySeries.mockResolvedValue(collection([
+      summary('cash'),
+      { ...summary('cash', 'worsening'), currency: 'AUD', points: summary('cash').points.map((point) => ({ ...point, currency: 'AUD' })) },
+    ]))
+
+    const result = await createGetFinancialHistoryTool('user-1').handler({ metricKey: 'cash', range: 'all' })
+
+    expect(result).toContain('NZD 120')
+    expect(result).toContain('AUD 120')
   })
 })

@@ -66,8 +66,12 @@ accounts payable, and monthly burn all use the same supported currency.
 Historical and forecast calculations exclude monetary observations whose
 currency is missing or unsupported, while keeping the uploaded document
 available for document retrieval. The UI and financial tools disclose these
-exclusions. A history containing both NZD and AUD is not combined; separate
-currency charts are planned as the next chart phase.
+exclusions. When history contains both NZD and AUD, AI-BOSS calculates and
+displays independent currency series and forecasts in separate chart panels.
+It never places both currencies into one calculation or converts between them.
+Users can filter chart data by supported currency and source/statement, and can
+show the latest 12, 25, 50, or all retrieved records. Each filtered series keeps
+its own reporting period, source labels, trend, and latest recorded value.
 
 ## Financial Forecasting
 
@@ -77,5 +81,6 @@ It calculates a date-aware least-squares linear monthly trend over the selected
 history range, then anchors future calendar-month projections to the latest
 actual observation. Runway projections are never below zero; other metrics are
 not clamped. Forecasts are trend-continuation estimates, not guarantees, and
-are unavailable with fewer than two comparable dated observations or multiple
-non-null currencies.
+are unavailable with fewer than two comparable dated observations. When
+multiple supported currencies are present, each currency is forecast
+independently.

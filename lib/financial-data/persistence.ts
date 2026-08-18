@@ -162,28 +162,43 @@ export async function listLatestFinancialMetricValues(userId: string) {
 export async function listFinancialMetricObservationHistory(params: {
   userId: string
   metricKey: FinancialMetricKey
-  limit?: number
+  limit?: number | 'all'
 }) {
   const supabase = createAdminSupabaseClient()
-  const { data, error } = await supabase
-    .from('financial_metric_observations')
-    .select(FINANCIAL_METRIC_OBSERVATION_SELECT)
-    .eq('user_id', params.userId)
-    .eq('metric_key', params.metricKey)
-    .order('as_of_date', { ascending: false, nullsFirst: false })
-    .order('period_end', { ascending: false, nullsFirst: false })
-    .order('updated_at', { ascending: false })
-    .limit(params.limit ?? 6)
+  const rows: FinancialMetricObservation[] = []
+  const requestedLimit = params.limit ?? 6
+  const pageSize = 1000
+  let offset = 0
 
-  if (error) {
-    throw new ApiError(
-      500,
-      'INTERNAL_ERROR',
-      'Failed to load financial metric observation history.'
-    )
+  while (true) {
+    const baseQuery = supabase
+      .from('financial_metric_observations')
+      .select(FINANCIAL_METRIC_OBSERVATION_SELECT)
+      .eq('user_id', params.userId)
+      .eq('metric_key', params.metricKey)
+      .order('as_of_date', { ascending: false, nullsFirst: false })
+      .order('period_end', { ascending: false, nullsFirst: false })
+      .order('updated_at', { ascending: false })
+    const { data, error } = requestedLimit === 'all'
+      ? await baseQuery.range(offset, offset + pageSize - 1)
+      : await baseQuery.limit(requestedLimit)
+
+    if (error) {
+      throw new ApiError(
+        500,
+        'INTERNAL_ERROR',
+        'Failed to load financial metric observation history.'
+      )
+    }
+
+    const page = (data ?? []) as FinancialMetricObservation[]
+    rows.push(...page)
+
+    if (requestedLimit !== 'all' || page.length < pageSize) break
+    offset += pageSize
   }
 
-  return ((data ?? []) as FinancialMetricObservation[])
+  return rows
     .map(mapObservationRowToMetric)
     .reverse()
 }

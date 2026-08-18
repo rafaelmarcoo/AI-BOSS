@@ -22,6 +22,39 @@ export interface AgentRunResult {
   toolsUsed: AgentToolUsage[]
 }
 
+interface FinancialToolResult {
+  name: string
+  content: string
+}
+
+export function preserveFinancialCurrencyCoverage(
+  response: string,
+  toolResults: FinancialToolResult[]
+) {
+  const relevantResults = toolResults.filter(({ name }) =>
+    name === 'get_financial_history' || name === 'get_financial_forecast'
+  )
+  const missingCurrencyBlocks = ['NZD', 'AUD'].flatMap((currency) => {
+    const toolContainsCurrency = relevantResults.some(({ content }) =>
+      new RegExp(`\\b${currency}\\b`).test(content)
+    )
+    const responseContainsCurrency = new RegExp(`\\b${currency}\\b`).test(response)
+
+    if (!toolContainsCurrency || responseContainsCurrency) return []
+
+    return relevantResults.flatMap(({ content }) =>
+      content
+        .split(/\n\s*\n/)
+        .filter((block) => new RegExp(`\\b${currency}\\b`).test(block))
+    )
+  })
+  const uniqueBlocks = [...new Set(missingCurrencyBlocks)]
+
+  if (uniqueBlocks.length === 0) return response
+
+  return `${response}\n\nAdditional currency series from the deterministic analysis:\n\n${uniqueBlocks.join('\n\n')}`
+}
+
 function createAgentModel() {
   const apiKey = process.env.OPENAI_API_KEY
 
@@ -73,6 +106,7 @@ export async function runAgent(
   const MAX_ITERATIONS = 10
   let totalTokensUsed = 0
   const toolsUsed: AgentToolUsage[] = []
+  const financialToolResults: FinancialToolResult[] = []
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     const response = await llm.invoke(messages)
@@ -80,11 +114,12 @@ export async function runAgent(
     messages.push(response)
 
     if (!response.tool_calls || response.tool_calls.length === 0) {
+      const content = typeof response.content === 'string'
+        ? response.content
+        : JSON.stringify(response.content)
+
       return {
-        content:
-          typeof response.content === 'string'
-            ? response.content
-            : JSON.stringify(response.content),
+        content: preserveFinancialCurrencyCoverage(content, financialToolResults),
         tokensUsed: totalTokensUsed > 0 ? totalTokensUsed : null,
         toolsUsed,
       }
@@ -100,7 +135,9 @@ export async function runAgent(
       })
 
       const result = await tool.invoke(toolCall.args)
-      messages.push(new ToolMessage({ content: String(result), tool_call_id: toolCall.id ?? '' }))
+      const resultContent = String(result)
+      financialToolResults.push({ name: toolCall.name, content: resultContent })
+      messages.push(new ToolMessage({ content: resultContent, tool_call_id: toolCall.id ?? '' }))
     }
   }
 

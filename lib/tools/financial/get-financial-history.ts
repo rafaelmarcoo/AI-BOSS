@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import {
   HISTORICAL_METRIC_KEYS,
-  readFinancialMetricHistory,
+  readFinancialMetricHistorySeries,
   type HistoricalMetricKey,
   type MetricHistoryRange,
   type MetricHistorySummary,
@@ -15,6 +15,9 @@ import {
 const inputSchema = z.object({
   metricKey: z.enum(HISTORICAL_METRIC_KEYS).optional(),
   range: z.enum(['3m', '6m', 'all']).default('all'),
+  currency: z.enum(['NZD', 'AUD']).optional(),
+  sourceLabel: z.string().trim().min(1).max(200).optional(),
+  recordLimit: z.union([z.literal(12), z.literal(25), z.literal(50), z.literal('all')]).default(12),
 })
 
 function formatValue(value: number, summary: MetricHistorySummary) {
@@ -34,14 +37,10 @@ function formatHistorySummary(summary: MetricHistorySummary) {
     return `No ${summary.label.toLowerCase()} history is available yet.`
   }
 
-  if (summary.hasIncompatibleCurrencies) {
-    return `${summary.label} history cannot be compared because it contains multiple currencies. AI-BOSS does not convert currencies in historical analysis.`
-  }
-
   const firstPoint = summary.points[0]
   const latestPoint = summary.points[summary.points.length - 1]
   const lines = [
-    `${summary.label} history (${summary.range}): ${summary.points.length} observation(s) from ${firstPoint.date} to ${latestPoint.date}.`,
+    `${summary.label} history${summary.metricKey === 'runway_months' ? '' : ` — ${summary.currency}`} (${summary.range}): ${summary.points.length} observation(s) from ${firstPoint.date} to ${latestPoint.date}.`,
     `Latest value: ${formatValue(latestPoint.value, summary)}.`,
   ]
 
@@ -74,24 +73,47 @@ function formatHistorySummary(summary: MetricHistorySummary) {
 export function createGetFinancialHistoryTool(
   userId: string
 ): StructuredTool<
-  { metricKey?: HistoricalMetricKey; range: MetricHistoryRange },
+  { metricKey?: HistoricalMetricKey; range: MetricHistoryRange; currency?: 'NZD' | 'AUD'; sourceLabel?: string; recordLimit?: 12 | 25 | 50 | 'all' },
   string
 > {
   return {
     name: 'get_financial_history',
     description:
-      'Describe historical movement in cash, monthly revenue, monthly expenses, burn rate, or runway. Use this for questions about changes over time, whether a metric is improving or worsening, or what changed historically. Leave metricKey empty only for a broad historical summary.',
+      'Describe historical movement in cash, monthly revenue, monthly expenses, burn rate, or runway. NZD and AUD are analysed independently and never converted. Set currency only when the user names it. Set sourceLabel only when the user names a statement/source; otherwise report each available currency series without guessing. Leave metricKey empty only for a broad historical summary.',
     inputSchema,
-    async handler({ metricKey, range }) {
+    async handler({ metricKey, range, currency, sourceLabel, recordLimit = 12 }) {
       const metricKeys = metricKey ? [metricKey] : HISTORICAL_METRIC_KEYS
-      const summaries = await Promise.all(
-        metricKeys.map((key) =>
-          readFinancialMetricHistory({ userId, metricKey: key, range })
+      const collections = await Promise.all(metricKeys.map(async (key) => {
+        const initial = await readFinancialMetricHistorySeries({
+          userId,
+          metricKey: key,
+          range,
+          recordLimit,
+          currency: currency ?? null,
+        })
+        if (!sourceLabel) return initial
+
+        const source = initial.availableSources.find(
+          (option) => option.label.toLowerCase() === sourceLabel.toLowerCase()
         )
-      )
-      const availableSummaries = summaries.filter((summary) => summary.points.length > 0)
+        if (!source) return { ...initial, series: [] }
+
+        return readFinancialMetricHistorySeries({
+          userId,
+          metricKey: key,
+          range,
+          recordLimit,
+          currency: currency ?? null,
+          sourceKey: source.key,
+        })
+      }))
+      const availableSummaries = collections.flatMap((collection) => collection.series)
 
       if (availableSummaries.length === 0) {
+        if (sourceLabel) {
+          const availableSources = [...new Set(collections.flatMap((collection) => collection.availableSources.map((source) => source.label)))]
+          return `No history matched source "${sourceLabel}".${availableSources.length > 0 ? ` Available sources: ${availableSources.join(', ')}.` : ''}`
+        }
         return 'No historical financial observations are available yet. Upload at least two dated CSV records to identify a trend.'
       }
 

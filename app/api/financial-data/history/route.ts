@@ -4,10 +4,13 @@ import { handleRouteError, successResponse } from '@/lib/api/responses'
 import { requireAuthenticatedUser } from '@/lib/auth'
 import {
   HISTORICAL_METRIC_KEYS,
-  readFinancialMetricHistory,
+  METRIC_HISTORY_RECORD_LIMITS,
+  readFinancialMetricHistorySeries,
   type HistoricalMetricKey,
+  type MetricHistoryRecordLimit,
   type MetricHistoryRange,
 } from '@/lib/financial-data/metric-history'
+import { isSupportedFinancialCurrency } from '@/lib/financial-data/currency'
 
 function isHistoryRange(value: string | null): value is MetricHistoryRange {
   return value === '3m' || value === '6m' || value === 'all'
@@ -17,11 +20,31 @@ function isHistoricalMetricKey(value: string | null): value is HistoricalMetricK
   return Boolean(value && HISTORICAL_METRIC_KEYS.includes(value as HistoricalMetricKey))
 }
 
+function parseRecordLimit(value: string | null): MetricHistoryRecordLimit | null {
+  if (!value) return 12
+  if (value === 'all') return 'all'
+
+  const parsed = Number(value)
+  return METRIC_HISTORY_RECORD_LIMITS.includes(
+    parsed as MetricHistoryRecordLimit
+  )
+    ? (parsed as MetricHistoryRecordLimit)
+    : null
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { user } = await requireAuthenticatedUser(request)
     const metricKey = request.nextUrl.searchParams.get('metricKey')
     const range = request.nextUrl.searchParams.get('range') ?? 'all'
+    const currencyValue = request.nextUrl.searchParams.get('currency')
+    const currency = currencyValue === 'all' || currencyValue === null
+      ? null
+      : currencyValue
+    const sourceKey = request.nextUrl.searchParams.get('sourceKey')
+    const recordLimit = parseRecordLimit(
+      request.nextUrl.searchParams.get('recordLimit')
+    )
 
     if (!isHistoricalMetricKey(metricKey)) {
       throw new ApiError(
@@ -35,10 +58,25 @@ export async function GET(request: NextRequest) {
       throw new ApiError(400, 'VALIDATION_ERROR', 'range must be 3m, 6m, or all.')
     }
 
-    const history = await readFinancialMetricHistory({
+    if (currency !== null && !isSupportedFinancialCurrency(currency)) {
+      throw new ApiError(400, 'VALIDATION_ERROR', 'currency must be NZD, AUD, or all.')
+    }
+
+    if (recordLimit === null) {
+      throw new ApiError(400, 'VALIDATION_ERROR', 'recordLimit must be 12, 25, 50, or all.')
+    }
+
+    if (sourceKey && sourceKey.length > 300) {
+      throw new ApiError(400, 'VALIDATION_ERROR', 'sourceKey is too long.')
+    }
+
+    const history = await readFinancialMetricHistorySeries({
       userId: user.id,
       metricKey,
       range,
+      currency,
+      sourceKey,
+      recordLimit,
     })
 
     return successResponse(history)

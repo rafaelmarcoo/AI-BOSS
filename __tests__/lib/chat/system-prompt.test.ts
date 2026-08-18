@@ -15,4 +15,9 @@ describe('AGENT_SYSTEM_PROMPT', () => {
     expect(AGENT_SYSTEM_PROMPT).not.toContain('financial_snapshots')
     expect(AGENT_SYSTEM_PROMPT).not.toContain('forecast_runway_trend')
   })
+
+  it('requires every returned currency series to remain in the written answer', () => {
+    expect(AGENT_SYSTEM_PROMPT).toContain('include every returned currency')
+    expect(AGENT_SYSTEM_PROMPT).toContain('Never choose only one series')
+  })
 })

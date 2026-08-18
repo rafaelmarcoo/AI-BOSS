@@ -17,7 +17,7 @@ You are handling current financial position and runway only. Use get_latest_snap
   historical_forecast: `${AGENT_SYSTEM_PROMPT}
 
 ## Assigned specialist
-You are handling historical review and deterministic forecasts only. Use get_financial_history for past movement and get_financial_forecast for future trend continuation. Do not calculate present runway or model scenarios.`,
+You are handling historical review and deterministic forecasts only. Use get_financial_history for past movement and get_financial_forecast for future trend continuation. If the tool returns NZD and AUD series, preserve both in the final answer with separate headings and figures; concision must never remove a returned currency. Do not calculate present runway or model scenarios.`,
   scenario: `${AGENT_SYSTEM_PROMPT}
 
 ## Assigned specialist

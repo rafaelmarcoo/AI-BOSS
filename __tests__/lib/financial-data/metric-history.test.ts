@@ -1,5 +1,6 @@
 import {
   summarizeMetricHistory,
+  summarizeMetricHistorySeries,
   type HistoricalMetricKey,
 } from '@/lib/financial-data/metric-history'
 import type { AvailableFinancialMetricValue } from '@/lib/financial-data/types'
@@ -12,6 +13,7 @@ function observation(params: {
   updatedAt?: string
   currency?: string | null
   sourceLabel?: string
+  sourceId?: string
 }): AvailableFinancialMetricValue {
   return {
     status: 'available',
@@ -21,7 +23,11 @@ function observation(params: {
     periodStart: null,
     periodEnd: params.periodEnd ?? null,
     asOfDate: params.asOfDate ?? null,
-    provenance: { sourceType: 'document', sourceLabel: params.sourceLabel ?? 'history.csv' },
+    provenance: {
+      sourceType: 'document',
+      sourceLabel: params.sourceLabel ?? 'history.csv',
+      sourceId: params.sourceId,
+    },
     confidence: 0.9,
     updatedAt: params.updatedAt ?? '2026-06-01T00:00:00.000Z',
   }
@@ -145,5 +151,73 @@ describe('summarizeMetricHistory', () => {
 
     expect(summary.direction).toBe('insufficient_data')
     expect(summary.totalChange).toBeNull()
+  })
+})
+
+describe('summarizeMetricHistorySeries', () => {
+  it('calculates NZD and AUD trends as independent series', () => {
+    const collection = summarizeMetricHistorySeries({
+      metricKey: 'cash',
+      range: 'all',
+      recordLimit: 'all',
+      observations: [
+        observation({ key: 'cash', value: 100, asOfDate: '2026-05-01', currency: 'NZD' }),
+        observation({ key: 'cash', value: 120, asOfDate: '2026-06-01', currency: 'NZD' }),
+        observation({ key: 'cash', value: 80, asOfDate: '2026-05-01', currency: 'AUD' }),
+        observation({ key: 'cash', value: 70, asOfDate: '2026-06-01', currency: 'AUD' }),
+      ],
+    })
+
+    expect(collection.availableCurrencies).toEqual(['AUD', 'NZD'])
+    expect(collection.series).toEqual([
+      expect.objectContaining({ currency: 'AUD', direction: 'worsening' }),
+      expect.objectContaining({ currency: 'NZD', direction: 'improving' }),
+    ])
+    expect(collection.series.every((series) => !series.hasIncompatibleCurrencies)).toBe(true)
+  })
+
+  it('filters by a stable source key without combining statements', () => {
+    const collection = summarizeMetricHistorySeries({
+      metricKey: 'monthly_revenue',
+      range: 'all',
+      sourceKey: 'document:statement-b',
+      observations: [
+        observation({ key: 'monthly_revenue', value: 100, asOfDate: '2026-05-01', sourceId: 'statement-a', sourceLabel: 'A.csv' }),
+        observation({ key: 'monthly_revenue', value: 200, asOfDate: '2026-05-01', sourceId: 'statement-b', sourceLabel: 'B.csv' }),
+        observation({ key: 'monthly_revenue', value: 220, asOfDate: '2026-06-01', sourceId: 'statement-b', sourceLabel: 'B.csv' }),
+      ],
+    })
+
+    expect(collection.availableSources).toEqual([
+      expect.objectContaining({ key: 'document:statement-a', label: 'A.csv' }),
+      expect.objectContaining({ key: 'document:statement-b', label: 'B.csv' }),
+    ])
+    expect(collection.series[0].points.map((point) => point.value)).toEqual([200, 220])
+  })
+
+  it('supports a configurable record limit and a true all-records view', () => {
+    const observations = Array.from({ length: 15 }, (_, index) =>
+      observation({
+        key: 'cash',
+        value: index,
+        asOfDate: new Date(Date.UTC(2025, index, 1)).toISOString().slice(0, 10),
+      })
+    )
+
+    const latestTwelve = summarizeMetricHistorySeries({
+      metricKey: 'cash',
+      range: 'all',
+      recordLimit: 12,
+      observations,
+    })
+    const allRecords = summarizeMetricHistorySeries({
+      metricKey: 'cash',
+      range: 'all',
+      recordLimit: 'all',
+      observations,
+    })
+
+    expect(latestTwelve.series[0].points).toHaveLength(12)
+    expect(allRecords.series[0].points).toHaveLength(15)
   })
 })

@@ -37,11 +37,29 @@ const history = {
   unsupportedCurrencies: [],
 }
 
+const historyCollection = {
+  metricKey: 'cash',
+  label: 'Cash',
+  range: '3m',
+  recordLimit: 12,
+  selectedCurrency: null,
+  selectedSourceKey: null,
+  availableCurrencies: ['NZD'],
+  availableSources: [
+    { key: 'document:may', label: 'May CSV', sourceId: 'may', sourceType: 'document' },
+    { key: 'document:june', label: 'June CSV', sourceId: 'june', sourceType: 'document' },
+  ],
+  series: [history],
+  excludedCurrencyObservationCount: 0,
+  hasMissingCurrencyObservations: false,
+  unsupportedCurrencies: [],
+}
+
 describe('HistoricalMetricsChart', () => {
   it('renders deterministic history and a mixed-source warning', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ success: true, data: history }),
+      json: async () => ({ success: true, data: historyCollection }),
     })
 
     render(<HistoricalMetricsChart refreshKey="initial" />)
@@ -54,7 +72,7 @@ describe('HistoricalMetricsChart', () => {
     expect(screen.getByText(/NZD 120 as at/)).toBeInTheDocument()
     expect(screen.getByText(/This trend combines sources: May CSV, June CSV/)).toBeInTheDocument()
     expect(global.fetch).toHaveBeenCalledWith(
-      '/api/financial-data/history?metricKey=cash&range=3m',
+      '/api/financial-data/history?metricKey=cash&range=3m&currency=all&recordLimit=12',
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     )
   })
@@ -66,7 +84,7 @@ describe('HistoricalMetricsChart', () => {
         json: async () => ({
           success: true,
           data: url.includes('/forecast')
-            ? {
+            ? { ...historyCollection, horizon: 6, series: [{
                 metricKey: 'cash', label: 'Cash', range: '3m', horizon: 6,
                 history,
                 forecastPoints: [{ date: '2026-07-01', value: 140, kind: 'forecast' }],
@@ -74,8 +92,8 @@ describe('HistoricalMetricsChart', () => {
                 monthlySlope: 20,
                 method: 'date_aware_linear_trend',
                 assumptions: ['Projects the observed date-aware linear trend from the latest actual value.'],
-              }
-            : history,
+              }] }
+            : historyCollection,
         }),
       })
     )
@@ -87,7 +105,7 @@ describe('HistoricalMetricsChart', () => {
     fireEvent.click(within(horizonControls).getByRole('button', { name: 'Next 6 months' }))
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
-      '/api/financial-data/forecast?metricKey=cash&range=3m&horizon=6',
+      '/api/financial-data/forecast?metricKey=cash&range=3m&currency=all&recordLimit=12&horizon=6',
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     ))
     expect(screen.getByText('Projected monthly change')).toBeInTheDocument()
@@ -99,12 +117,15 @@ describe('HistoricalMetricsChart', () => {
       ok: true,
       json: async () => ({
         success: true,
-        data: { ...history, points: [history.points[0]], direction: 'insufficient_data' },
+        data: {
+          ...historyCollection,
+          series: [{ ...history, points: [history.points[0]], direction: 'insufficient_data' }],
+        },
       }),
     })
 
     render(<HistoricalMetricsChart refreshKey="empty" />)
 
-    await waitFor(() => expect(screen.getByText(/Upload at least two dated records/)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(/needs at least two dated records/)).toBeInTheDocument())
   })
 })

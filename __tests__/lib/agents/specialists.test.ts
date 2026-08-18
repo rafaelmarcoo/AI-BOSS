@@ -47,6 +47,7 @@ describe('runMultiAgent', () => {
     const tools = mockRunAgent.mock.calls[0][2]!
     expect(tools.map((tool) => tool.name)).not.toContain('model_scenario')
     expect(tools.map((tool) => tool.name)).not.toContain('calculate_runway')
+    expect(mockRunAgent.mock.calls[0][4]).toContain('preserve both in the final answer')
   })
 
   it('uses only the scenario tool for a percentage burn scenario', async () => {

@@ -3,20 +3,21 @@
 import { NextRequest } from 'next/server'
 import { GET } from '@/app/api/financial-data/forecast/route'
 import { requireAuthenticatedUser } from '@/lib/auth'
-import { readFinancialMetricForecast } from '@/lib/financial-data/metric-forecast'
+import { readFinancialMetricForecastSeries } from '@/lib/financial-data/metric-forecast'
 
 jest.mock('@/lib/auth', () => ({ requireAuthenticatedUser: jest.fn() }))
 jest.mock('@/lib/financial-data/metric-forecast', () => ({
   FORECAST_HORIZONS: [3, 6],
   isForecastHorizon: (value: number) => value === 3 || value === 6,
-  readFinancialMetricForecast: jest.fn(),
+  readFinancialMetricForecastSeries: jest.fn(),
 }))
 jest.mock('@/lib/financial-data/metric-history', () => ({
   HISTORICAL_METRIC_KEYS: ['cash', 'monthly_revenue', 'monthly_expenses', 'burn_rate', 'runway_months'],
+  METRIC_HISTORY_RECORD_LIMITS: [12, 25, 50, 'all'],
 }))
 
 const mockRequireAuthenticatedUser = jest.mocked(requireAuthenticatedUser)
-const mockReadFinancialMetricForecast = jest.mocked(readFinancialMetricForecast)
+const mockReadFinancialMetricForecastSeries = jest.mocked(readFinancialMetricForecastSeries)
 
 describe('/api/financial-data/forecast', () => {
   beforeEach(() => {
@@ -28,16 +29,19 @@ describe('/api/financial-data/forecast', () => {
   })
 
   it('returns the authenticated user forecast for a valid query', async () => {
-    mockReadFinancialMetricForecast.mockResolvedValue({ metricKey: 'cash' } as never)
+    mockReadFinancialMetricForecastSeries.mockResolvedValue({ metricKey: 'cash' } as never)
 
-    const response = await GET(new NextRequest('http://localhost/api/financial-data/forecast?metricKey=cash&range=6m&horizon=6'))
+    const response = await GET(new NextRequest('http://localhost/api/financial-data/forecast?metricKey=cash&range=6m&horizon=6&currency=NZD&sourceKey=document%3Astatement-1&recordLimit=all'))
 
     expect(response.status).toBe(200)
-    expect(mockReadFinancialMetricForecast).toHaveBeenCalledWith({
+    expect(mockReadFinancialMetricForecastSeries).toHaveBeenCalledWith({
       userId: 'user-1',
       metricKey: 'cash',
       range: '6m',
       horizon: 6,
+      currency: 'NZD',
+      sourceKey: 'document:statement-1',
+      recordLimit: 'all',
     })
   })
 
@@ -49,6 +53,6 @@ describe('/api/financial-data/forecast', () => {
     expect(invalidMetric.status).toBe(400)
     expect(invalidRange.status).toBe(400)
     expect(invalidHorizon.status).toBe(400)
-    expect(mockReadFinancialMetricForecast).not.toHaveBeenCalled()
+    expect(mockReadFinancialMetricForecastSeries).not.toHaveBeenCalled()
   })
 })

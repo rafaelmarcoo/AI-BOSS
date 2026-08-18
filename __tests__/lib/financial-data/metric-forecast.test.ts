@@ -1,5 +1,6 @@
 import {
   summarizeMetricForecast,
+  summarizeMetricForecastSeries,
   type ForecastHorizon,
 } from '@/lib/financial-data/metric-forecast'
 import type { HistoricalMetricKey, MetricHistoryRange } from '@/lib/financial-data/metric-history'
@@ -97,5 +98,26 @@ describe('summarizeMetricForecast', () => {
     expect(insufficient.monthlySlope).toBeNull()
     expect(incompatible.forecastPoints).toEqual([])
     expect(incompatible.monthlySlope).toBeNull()
+  })
+
+  it('forecasts NZD and AUD independently without conversion', () => {
+    const collection = summarizeMetricForecastSeries({
+      metricKey: 'cash',
+      range: 'all',
+      horizon: 3,
+      recordLimit: 'all',
+      observations: [
+        observation({ key: 'cash', value: 100, asOfDate: '2026-01-01', currency: 'NZD' }),
+        observation({ key: 'cash', value: 110, asOfDate: '2026-02-01', currency: 'NZD' }),
+        observation({ key: 'cash', value: 80, asOfDate: '2026-01-01', currency: 'AUD' }),
+        observation({ key: 'cash', value: 70, asOfDate: '2026-02-01', currency: 'AUD' }),
+      ],
+    })
+
+    expect(collection.series).toHaveLength(2)
+    expect(collection.series.map((series) => series.history.currency)).toEqual(['AUD', 'NZD'])
+    expect(collection.series.every((series) => series.forecastPoints.length === 3)).toBe(true)
+    expect(collection.series[0].monthlySlope).toBeLessThan(0)
+    expect(collection.series[1].monthlySlope).toBeGreaterThan(0)
   })
 })

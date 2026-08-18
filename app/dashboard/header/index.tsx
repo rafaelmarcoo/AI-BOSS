@@ -41,13 +41,17 @@ export function DashboardHeader() {
           sx={{ minWidth: 0 }}
         >
           <Typography
-            component="span"
+            component={Link}
+            href="/landing"
+            aria-label="AI-BOSS home"
+            title="Home"
             sx={{
               color: dashboardTokens.text,
               fontSize: 17,
               fontWeight: 650,
               letterSpacing: "-0.02em",
               whiteSpace: "nowrap",
+              textDecoration: "none",
             }}
           >
             AI-BOSS

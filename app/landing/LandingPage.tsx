@@ -1,10 +1,17 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Alert,
   Box,
   Button,
+  ButtonBase,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Drawer,
   IconButton,
   InputBase,
@@ -15,12 +22,12 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
 import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import MicRoundedIcon from "@mui/icons-material/MicRounded";
+import FolderRoundedIcon from "@mui/icons-material/FolderRounded";
 import RouteRoundedIcon from "@mui/icons-material/RouteRounded";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import { dashboardTokens } from "@/app/theme";
@@ -45,18 +52,21 @@ interface LandingPageProps {
 
 const QUICK_ACTIONS = [
   {
+    id: "upload" as const,
     title: "Upload files",
     description: "Add statements, reports or financial documents.",
-    meta: "CSV, PDF and images",
+    meta: "PDF and CSV",
     icon: CloudUploadOutlinedIcon,
   },
   {
-    title: "Accounts",
-    description: "View and manage connected accounts.",
-    meta: "Connections and balances",
-    icon: AccountBalanceWalletRoundedIcon,
+    id: "documents" as const,
+    title: "Manage documents",
+    description: "Review, search or remove uploaded financial sources.",
+    meta: "Sources and processing status",
+    icon: FolderRoundedIcon,
   },
   {
+    id: "scenarios" as const,
     title: "Scenarios",
     description: "Test forecasts and financial decisions.",
     meta: "Planning and what-if analysis",
@@ -82,8 +92,13 @@ function formatConversationDate(value: string) {
 
 export function LandingPage({ fullName, email }: LandingPageProps) {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [scenarioDialogOpen, setScenarioDialogOpen] = useState(false);
   const [message, setMessage] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ChatConversationSummary[]>(
     [],
   );
@@ -143,11 +158,64 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
   };
 
   const handleAttachmentClick = () => {
-    // TODO: Connect this to the document upload flow when landing attachments are supported.
+    if (!uploading) fileInputRef.current?.click();
   };
 
   const handleMicrophoneClick = () => {
     // TODO: Connect this to voice input when speech capture is supported.
+  };
+
+  const handleFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.set("file", file);
+    setUploading(true);
+    setUploadError(null);
+    setUploadedFileName(null);
+
+    try {
+      const response = await fetch("/api/documents", {
+        method: "POST",
+        body: formData,
+      });
+      const payload = (await response.json()) as {
+        success: boolean;
+        data?: { document?: { file_name: string } };
+        error?: { message?: string };
+      };
+
+      if (!response.ok || !payload.success || !payload.data?.document) {
+        throw new Error(payload.error?.message ?? "Could not upload the document.");
+      }
+
+      setUploadedFileName(payload.data.document.file_name);
+    } catch (error) {
+      setUploadError(
+        error instanceof Error ? error.message : "Could not upload the document.",
+      );
+    } finally {
+      setUploading(false);
+      event.target.value = "";
+    }
+  };
+
+  const handleQuickAction = (actionId: (typeof QUICK_ACTIONS)[number]["id"]) => {
+    if (actionId === "upload") {
+      handleAttachmentClick();
+      return;
+    }
+
+    if (actionId === "documents") {
+      router.push("/dashboard/documents");
+      return;
+    }
+
+    setScenarioDialogOpen(true);
   };
 
   const recentConversations = conversations.slice(0, 3);
@@ -242,6 +310,13 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
         </Box>
 
         <Box sx={{ mt: 3 }}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.csv,application/pdf,text/csv"
+            hidden
+            onChange={(event) => void handleFileChange(event)}
+          />
           <Box
             component="form"
             onSubmit={submitMessage}
@@ -282,6 +357,7 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
               type="button"
               aria-label="Attach a file"
               onClick={handleAttachmentClick}
+              disabled={uploading}
               sx={composerControlSx}
             >
               <AttachFileRoundedIcon fontSize="small" />
@@ -322,6 +398,47 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
           >
             AI-BOSS provides financial insights. Review important decisions before acting.
           </Typography>
+          {uploading ? (
+            <Alert
+              severity="info"
+              icon={<CircularProgress size={18} />}
+              sx={{ mt: 2 }}
+            >
+              Uploading your document…
+            </Alert>
+          ) : null}
+          {uploadError ? (
+            <Alert severity="error" onClose={() => setUploadError(null)} sx={{ mt: 2 }}>
+              {uploadError}
+            </Alert>
+          ) : null}
+          {uploadedFileName ? (
+            <Alert
+              severity="success"
+              onClose={() => setUploadedFileName(null)}
+              sx={{ mt: 2 }}
+              action={
+                <Stack direction="row" spacing={0.5}>
+                  <Button
+                    color="inherit"
+                    size="small"
+                    onClick={() => router.push("/dashboard/documents")}
+                  >
+                    View documents
+                  </Button>
+                  <Button
+                    color="inherit"
+                    size="small"
+                    onClick={() => router.push("/dashboard")}
+                  >
+                    Open workspace
+                  </Button>
+                </Stack>
+              }
+            >
+              {uploadedFileName} was uploaded and is being processed.
+            </Alert>
+          ) : null}
         </Box>
 
         <Box component="section" sx={{ mt: 4 }}>
@@ -343,11 +460,17 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
               const Icon = action.icon;
 
               return (
-                <Box
+                <ButtonBase
                   key={action.title}
+                  onClick={() => handleQuickAction(action.id)}
+                  disabled={action.id === "upload" && uploading}
+                  aria-label={action.title}
                   sx={{
+                    width: "100%",
                     minHeight: 142,
                     p: 2.5,
+                    display: "block",
+                    textAlign: "left",
                     borderRadius: `${dashboardTokens.radiusMd}px`,
                     border: "1px solid",
                     borderColor: dashboardTokens.border,
@@ -372,7 +495,7 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
                   <Typography sx={{ mt: 1, color: dashboardTokens.textSubtle, fontSize: 12 }}>
                     {action.meta}
                   </Typography>
-                </Box>
+                </ButtonBase>
               );
             })}
           </Box>
@@ -430,6 +553,28 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
           </Box>
         ) : null}
       </Stack>
+
+      <Dialog
+        open={scenarioDialogOpen}
+        onClose={() => setScenarioDialogOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>Scenario planning is coming next</DialogTitle>
+        <DialogContent>
+          <Typography>
+            We’re designing structured comparisons and what-if analysis so
+            AI-BOSS can clearly show assumptions, alternatives and financial
+            impact. You can still discuss a decision with AI-BOSS in the workspace.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setScenarioDialogOpen(false)}>Close</Button>
+          <Button variant="contained" onClick={() => router.push("/dashboard")}>
+            Open workspace
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Drawer
         anchor="left"

@@ -1,8 +1,9 @@
-import { ChatOpenAI } from '@langchain/openai'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { z } from 'zod'
 import { calculateRunway } from '@/lib/calculations/runway'
-import { CHAT_MODEL } from '@/lib/chat/system-prompt'
+import { tryCreateChatModel, DEFAULT_MODEL } from '@/lib/ai/models'
+
+const GEN_UI_MODEL = DEFAULT_MODEL
 import {
   FINANCIAL_METRIC_KEYS,
   FINANCIAL_METRIC_LABELS,
@@ -309,9 +310,9 @@ async function chooseWidgetsWithModel(params: {
   runwayTrend: RunwayTrendSummary
   source: GenUiSource
 }) {
-  const apiKey = process.env.OPENAI_API_KEY
+  const model = tryCreateChatModel(GEN_UI_MODEL, { temperature: 0 })
 
-  if (!apiKey) {
+  if (!model) {
     return null
   }
 
@@ -322,11 +323,6 @@ async function chooseWidgetsWithModel(params: {
     (key) => FINANCIAL_METRIC_LABELS[key]
   )
 
-  const model = new ChatOpenAI({
-    model: CHAT_MODEL,
-    temperature: 0,
-    apiKey,
-  })
   const planner = model.withStructuredOutput(PlannerOutputSchema, {
     name: 'plan_dashboard_widgets',
     method: 'jsonSchema',

@@ -1,4 +1,3 @@
-import { ChatOpenAI } from '@langchain/openai'
 import {
   AIMessage,
   BaseMessage,
@@ -6,8 +5,12 @@ import {
   SystemMessage,
   ToolMessage,
 } from '@langchain/core/messages'
-import { ApiError } from '@/lib/api/errors'
-import { CHAT_MODEL, AGENT_SYSTEM_PROMPT } from '@/lib/chat/system-prompt'
+import {
+  createChatModel,
+  DEFAULT_MODEL,
+  type ModelName,
+} from '@/lib/ai/models'
+import { AGENT_SYSTEM_PROMPT } from '@/lib/chat/system-prompt'
 import { adaptToolsToLangChain } from '@/lib/ai/tools'
 import type { AppTool } from '@/lib/tools/contracts'
 
@@ -55,22 +58,8 @@ export function preserveFinancialCurrencyCoverage(
   return `${response}\n\nAdditional currency series from the deterministic analysis:\n\n${uniqueBlocks.join('\n\n')}`
 }
 
-function createAgentModel() {
-  const apiKey = process.env.OPENAI_API_KEY
-
-  if (!apiKey) {
-    throw new ApiError(
-      500,
-      'INTERNAL_ERROR',
-      'Missing required environment variable: OPENAI_API_KEY.'
-    )
-  }
-
-  return new ChatOpenAI({
-    model: CHAT_MODEL,
-    temperature: 0,
-    apiKey,
-  })
+function createAgentModel(model: ModelName = DEFAULT_MODEL) {
+  return createChatModel(model, { temperature: 0 })
 }
 
 function readTotalTokens(message: BaseMessage) {

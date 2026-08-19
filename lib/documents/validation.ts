@@ -1,5 +1,6 @@
 import { ApiError } from '@/lib/api/errors'
 import {
+  IMAGE_MIME_TYPES,
   MAX_DOCUMENT_SIZE_BYTES,
   SUPPORTED_DOCUMENT_TYPES,
   SupportedDocumentType,
@@ -11,6 +12,7 @@ const CSV_MIME_TYPES = [
   'application/csv',
   'application/vnd.ms-excel',
 ]
+const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp']
 
 function getFileExtension(fileName: string) {
   const extension = fileName.split('.').pop()
@@ -33,6 +35,15 @@ function detectDocumentType(file: File): SupportedDocumentType | null {
     CSV_MIME_TYPES.includes(file.type.toLowerCase())
   ) {
     return 'csv'
+  }
+
+  if (
+    IMAGE_EXTENSIONS.includes(extension) ||
+    IMAGE_MIME_TYPES.includes(
+      file.type.toLowerCase() as (typeof IMAGE_MIME_TYPES)[number]
+    )
+  ) {
+    return 'image'
   }
 
   return null
@@ -82,7 +93,7 @@ export function validateDocumentUpload(
     throw new ApiError(
       400,
       'BAD_REQUEST',
-      'Only PDF and CSV uploads are supported right now.'
+      'Only PDF, CSV, and image (JPEG, PNG, WebP) uploads are supported right now.'
     )
   }
 

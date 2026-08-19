@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Alert,
   Box,
   Button,
   Drawer,
@@ -12,6 +13,7 @@ import {
   ListItem,
   ListItemButton,
   ListItemText,
+  Snackbar,
   Stack,
   Typography,
 } from "@mui/material";
@@ -26,6 +28,29 @@ import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import { dashboardTokens } from "@/app/theme";
 import { SignOutButton } from "@/components/sign-out-button";
 import type { Conversation } from "@/types/database";
+
+const DOCUMENT_UPLOAD_ACCEPT =
+  ".pdf,.csv,.jpg,.jpeg,.png,.webp,application/pdf,text/csv,image/jpeg,image/png,image/webp";
+
+interface UploadDocumentApiResponse {
+  success: boolean;
+  error?: { message?: string };
+}
+
+async function uploadDocumentToWorkspace(file: File) {
+  const formData = new FormData();
+  formData.set("file", file);
+
+  const response = await fetch("/api/documents", {
+    method: "POST",
+    body: formData,
+  });
+  const payload = (await response.json()) as UploadDocumentApiResponse;
+
+  if (!response.ok || !payload.success) {
+    throw new Error(payload.error?.message ?? "Could not upload document.");
+  }
+}
 
 type ChatConversationSummary = Pick<
   Conversation,
@@ -98,6 +123,11 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
   );
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [uploadToast, setUploadToast] = useState<{
+    message: string;
+    severity: "success" | "error";
+  } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const firstName = useMemo(() => getFirstName(fullName, email), [email, fullName]);
 
   useEffect(() => {
@@ -152,7 +182,29 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
   };
 
   const handleAttachmentClick = () => {
-    // TODO: Connect this to the document upload flow when landing attachments are supported.
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) return;
+
+    try {
+      await uploadDocumentToWorkspace(file);
+      router.push("/dashboard/documents");
+    } catch (error) {
+      setUploadToast({
+        message:
+          error instanceof Error
+            ? error.message
+            : `Could not upload ${file.name}.`,
+        severity: "error",
+      });
+    }
   };
 
   const handleMicrophoneClick = () => {
@@ -251,6 +303,13 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
         </Box>
 
         <Box sx={{ mt: 3 }}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={DOCUMENT_UPLOAD_ACCEPT}
+            hidden
+            onChange={(event) => void handleFileChange(event)}
+          />
           <Box
             component="form"
             onSubmit={submitMessage}
@@ -554,6 +613,21 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
           </Button>
         </Stack>
       </Drawer>
+
+      <Snackbar
+        open={uploadToast !== null}
+        autoHideDuration={5000}
+        onClose={() => setUploadToast(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity={uploadToast?.severity}
+          variant="filled"
+          onClose={() => setUploadToast(null)}
+        >
+          {uploadToast?.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

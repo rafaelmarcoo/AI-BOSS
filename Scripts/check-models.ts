@@ -8,6 +8,17 @@ import {
 
 const DIVIDER = '─'.repeat(72)
 
+const TIMEOUT_MS = 60_000
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`timed out after ${ms / 1000}s`)), ms)
+    ),
+  ])
+}
+
 async function checkModel(name: ModelName) {
   const { provider, apiKey } = resolveModel(name)
 
@@ -23,8 +34,11 @@ async function checkModel(name: ModelName) {
   const startedAt = Date.now()
 
   try {
-    const model = createChatModel(name, { temperature: 0 })
-    const response = await model.invoke('Reply with the single word: ok')
+    const model = createChatModel(name, { temperature: 0, maxRetries: 0 })
+    const response = await withTimeout(
+      model.invoke('Reply with the single word: ok'),
+      TIMEOUT_MS
+    )
     const content =
       typeof response.content === 'string'
         ? response.content.trim()

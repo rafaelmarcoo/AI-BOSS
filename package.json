@@ -10,7 +10,8 @@
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
     "test:agent": "tsx Scripts/test-agent.ts",
-    "check:models": "node --env-file=.env.local --import=tsx Scripts/check-models.ts"
+    "check:models": "node --env-file=.env.local --import=tsx Scripts/check-models.ts",
+    "list:models": "node --env-file=.env.local --import=tsx Scripts/list-provider-models.ts"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

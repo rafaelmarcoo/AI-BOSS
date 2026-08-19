@@ -1,4 +1,4 @@
-import { ChatOpenAI } from '@langchain/openai'
+﻿import { ChatOpenAI } from '@langchain/openai'
 import { ApiError } from '@/lib/api/errors'
 import { CHAT_MODEL } from '@/lib/chat/system-prompt'
 
@@ -76,37 +76,37 @@ export const MODEL_CATALOG = {
     provider: 'zhipu',
     model: 'glm-5.2',
     label: 'GLM-5.2',
-    verified: false,
+    verified: true,
   },
   'glm-5.3': {
     provider: 'zhipu',
     model: 'glm-5.3',
     label: 'GLM-5.3',
-    verified: false,
+    verified: true,
   },
   'glm-5-turbo': {
     provider: 'zhipu',
     model: 'glm-5-turbo',
     label: 'GLM-5 Turbo',
-    verified: false,
+    verified: true,
   },
-  'deepseek-chat': {
+  'deepseek-flash': {
     provider: 'deepseek',
-    model: 'deepseek-chat',
-    label: 'DeepSeek Chat',
-    verified: false,
+    model: 'deepseek-v4-flash',
+    label: 'DeepSeek V4 Flash',
+    verified: true,
   },
   'grok': {
     provider: 'xai',
-    model: 'grok-2-latest',
-    label: 'Grok 2',
-    verified: false,
+    model: 'grok-4',
+    label: 'Grok 4',
+    verified: true,
   },
   'gemini-flash': {
     provider: 'google',
-    model: 'gemini-2.0-flash',
-    label: 'Gemini 2.0 Flash',
-    verified: false,
+    model: 'gemini-3.6-flash',
+    label: 'Gemini 3.6 Flash',
+    verified: true,
   },
 } as const satisfies Record<string, ModelSpec>
 
@@ -131,12 +131,14 @@ function buildModel(
   spec: ModelSpec,
   provider: ModelProvider,
   apiKey: string,
-  temperature: number
+  temperature: number,
+  maxRetries?: number
 ) {
   return new ChatOpenAI({
     model: spec.model,
     temperature,
     apiKey,
+    ...(maxRetries === undefined ? {} : { maxRetries }),
     ...(provider.baseUrl ? { configuration: { baseURL: provider.baseUrl } } : {}),
   })
 }
@@ -144,7 +146,7 @@ function buildModel(
 
 export function createChatModel(
   name: ModelName = DEFAULT_MODEL,
-  options: { temperature?: number } = {}
+  options: { temperature?: number; maxRetries?: number } = {}
 ) {
   const { spec, provider, apiKey } = resolveModel(name)
 
@@ -156,7 +158,13 @@ export function createChatModel(
     )
   }
 
-  return buildModel(spec, provider, apiKey, options.temperature ?? 0)
+  return buildModel(
+    spec,
+    provider,
+    apiKey,
+    options.temperature ?? 0,
+    options.maxRetries
+  )
 }
 
 

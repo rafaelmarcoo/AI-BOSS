@@ -26,7 +26,7 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import type { DocumentSummary } from "@/lib/documents/types";
 import { dashboardTokens } from "@/app/theme";
 
-type FileFilter = "all" | "pdf" | "csv";
+type FileFilter = "all" | "pdf" | "csv" | "image";
 type StatusFilter = "all" | DocumentSummary["status"];
 type SortOption = "newest" | "oldest" | "name";
 
@@ -142,7 +142,7 @@ export function DocumentsWorkspace() {
         <Stack spacing={0.5}>
           <Typography variant="h5" fontWeight={700} color="common.white">Documents</Typography>
           <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
-            Manage your uploaded PDFs and CSVs. Removing a CSV also removes its derived dashboard, history, and forecast data.
+            Manage your uploaded PDFs, CSVs, and images. Removing a CSV also removes its derived dashboard, history, and forecast data.
           </Typography>
         </Stack>
       </Stack>
@@ -174,7 +174,7 @@ export function DocumentsWorkspace() {
             {documents.length === 0 ? "No documents uploaded yet" : "No documents match these filters"}
           </Typography>
           <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
-            Upload a PDF or CSV from chat to add it to your workspace.
+            Upload a PDF, CSV, or image from chat to add it to your workspace.
           </Typography>
         </Box>
       ) : (

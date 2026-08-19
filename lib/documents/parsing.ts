@@ -1,7 +1,12 @@
 import { join } from 'node:path'
 
 import { ApiError } from '@/lib/api/errors'
-import { createCsvChunks, createPdfChunks } from '@/lib/documents/chunking'
+import {
+  createCsvChunks,
+  createImageChunks,
+  createPdfChunks,
+} from '@/lib/documents/chunking'
+import { extractImageText } from '@/lib/documents/image-extraction'
 import type {
   ParsedCsvRow,
   ParsedDocumentResult,
@@ -209,7 +214,10 @@ function createStructuredCsvRows(
 }
 
 export async function parseDocumentContent(
-  document: Pick<Document, 'id' | 'user_id' | 'file_type' | 'file_name'>,
+  document: Pick<
+    Document,
+    'id' | 'user_id' | 'file_type' | 'file_name' | 'mime_type'
+  >,
   fileBytes: Uint8Array
 ): Promise<ParsedDocumentResult> {
   if (document.file_type === 'csv') {
@@ -220,7 +228,52 @@ export async function parseDocumentContent(
     return parsePdfDocument(document, fileBytes)
   }
 
+  if (document.file_type === 'image') {
+    return parseImageDocument(document, fileBytes)
+  }
+
   throw new ApiError(400, 'BAD_REQUEST', 'Unsupported document type.')
+}
+
+async function parseImageDocument(
+  document: Pick<Document, 'id' | 'user_id' | 'file_name' | 'mime_type'>,
+  fileBytes: Uint8Array
+) {
+  try {
+    const text = normalizeWhitespace(
+      await extractImageText(fileBytes, document.mime_type)
+    )
+
+    if (!text) {
+      throw new ApiError(
+        400,
+        'BAD_REQUEST',
+        `No readable content was found in ${document.file_name}.`
+      )
+    }
+
+    return {
+      rawText: text,
+      metadata: {},
+      chunks: createImageChunks({
+        documentId: document.id,
+        userId: document.user_id,
+        text,
+      }),
+    }
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error
+    }
+
+    console.error(`Failed to parse image ${document.file_name}.`, error)
+
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      `Failed to parse image ${document.file_name}.`
+    )
+  }
 }
 
 async function parsePdfDocument(

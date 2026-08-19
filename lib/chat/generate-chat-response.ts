@@ -9,7 +9,7 @@ import {
   type FinancialSpecialist,
 } from '@/lib/agents/router'
 import { runMultiAgent } from '@/lib/agents/specialists'
-import { CHAT_MODEL } from '@/lib/chat/system-prompt'
+import { CHAT_MODEL } from '@/lib/ai/model-config'
 import { logChatDecision } from '@/lib/chat/log-chat-decision'
 import { buildChatContext } from '@/lib/chat/build-chat-context'
 import { planGenUi } from '@/lib/gen-ui/plan-gen-ui'

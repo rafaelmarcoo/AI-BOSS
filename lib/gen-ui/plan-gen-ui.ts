@@ -1,7 +1,7 @@
 import { ChatOpenAI } from '@langchain/openai'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { z } from 'zod'
-import { CHAT_MODEL } from '@/lib/chat/system-prompt'
+import { CHAT_MODEL, mainModelOptions } from '@/lib/ai/model-config'
 import {
   FINANCIAL_METRIC_KEYS,
   FINANCIAL_METRIC_LABELS,
@@ -321,7 +321,7 @@ async function chooseWidgetsWithModel(params: {
 
   const model = new ChatOpenAI({
     model: CHAT_MODEL,
-    temperature: 0,
+    ...mainModelOptions(),
     apiKey,
   })
   const planner = model.withStructuredOutput(PlannerOutputSchema, {

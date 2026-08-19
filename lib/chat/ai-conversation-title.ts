@@ -1,6 +1,6 @@
 import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { ChatOpenAI } from '@langchain/openai'
-import { CHAT_MODEL } from '@/lib/chat/system-prompt'
+import { UTILITY_MODEL } from '@/lib/ai/model-config'
 
 export const MAX_AI_CONVERSATION_TITLE_LENGTH = 48
 
@@ -39,7 +39,7 @@ export async function generateAiConversationTitle(params: {
   }
 
   const model = new ChatOpenAI({
-    model: CHAT_MODEL,
+    model: UTILITY_MODEL,
     temperature: 0,
     apiKey,
   })

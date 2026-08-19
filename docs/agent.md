@@ -9,13 +9,16 @@ AI-BOSS uses a LangChain-powered agent to handle user queries. The agent support
 
 ---
 
-## Model
+## Models
 
-| Setting | Value |
-|---------|-------|
-| Model | `gpt-4o-mini-2024-07-18` |
-| Temperature | `0` (deterministic responses) |
-| Provider | OpenAI via `@langchain/openai` |
+| Workload | Default model | Server override |
+|---|---|---|
+| Main chat, tool calling, scenario interpretation, and generated UI planning | `gpt-5.6-luna` with reasoning effort `low` | `OPENAI_CHAT_MODEL` |
+| Cosmetic conversation titles | `gpt-4o-mini-2024-07-18` with temperature `0` | `OPENAI_UTILITY_MODEL` |
+
+Both models use OpenAI through `@langchain/openai`. The environment variables are optional: the defaults above apply when they are unset or blank. They are server-only and must not use the `NEXT_PUBLIC_` prefix.
+
+Financial arithmetic is still deterministic TypeScript. The language model interprets requests, selects tools, and explains validated results; changing the model does not change the calculation formulas.
 
 ---
 
@@ -70,7 +73,8 @@ It answers directly when the metric, source, and period are clear. AI-BOSS does 
 |------|---------|
 | `lib/ai/agent.ts` | Agent logic and tool-calling loop |
 | `lib/ai/tool-registry.ts` | App-owned tool registry for the agent |
-| `lib/chat/system-prompt.ts` | Model name and system prompts |
+| `lib/ai/model-config.ts` | Server-side model defaults and environment overrides |
+| `lib/chat/system-prompt.ts` | System prompts |
 | `lib/ai/tools.ts` | Adapter from app tools into LangChain tools |
 | `Scripts/test-agent.ts` | Local test script — run with `npm run test:agent` |
 

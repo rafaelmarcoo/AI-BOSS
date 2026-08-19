@@ -8,7 +8,8 @@ import {
 } from '@langchain/core/messages'
 import { ToolInputParsingException } from '@langchain/core/tools'
 import { ApiError } from '@/lib/api/errors'
-import { CHAT_MODEL, AGENT_SYSTEM_PROMPT } from '@/lib/chat/system-prompt'
+import { AGENT_SYSTEM_PROMPT } from '@/lib/chat/system-prompt'
+import { CHAT_MODEL, mainModelOptions } from '@/lib/ai/model-config'
 import { adaptToolsToLangChain } from '@/lib/ai/tools'
 import type { AppTool } from '@/lib/tools/contracts'
 
@@ -85,7 +86,7 @@ function createAgentModel() {
 
   return new ChatOpenAI({
     model: CHAT_MODEL,
-    temperature: 0,
+    ...mainModelOptions(),
     apiKey,
   })
 }

@@ -1,5 +1,6 @@
 import type { BaseMessage } from '@langchain/core/messages'
 import { runAgent, type AgentRunResult } from '@/lib/ai/agent'
+import { DEFAULT_MODEL, isModelName, type ModelName } from '@/lib/ai/models'
 import { AGENT_SYSTEM_PROMPT } from '@/lib/chat/system-prompt'
 import { routeFinancialQuestion, type FinancialSpecialist } from '@/lib/agents/router'
 import { calculateRunwayTool } from '@/lib/tools/financial/calculate-runway'
@@ -22,6 +23,30 @@ You are handling historical review and deterministic forecasts only. Use get_fin
 
 ## Assigned specialist
 You are handling recurring burn scenarios only. Use model_scenario for direct monthly amounts or explicit burn percentages. For a percentage, pass burn_percentage_change exactly as stated: a reduction is negative and an increase is positive. Never calculate the dollar amount yourself. Do not model revenue percentages; explain that only monthly-burn changes are supported.`,
+}
+
+const SPECIALIST_MODELS: Record<FinancialSpecialist, ModelName> = {
+  financial_position: DEFAULT_MODEL,
+  historical_forecast: DEFAULT_MODEL,
+  scenario: DEFAULT_MODEL,
+}
+
+export function modelForSpecialist(specialist: FinancialSpecialist): ModelName {
+  const override = process.env[`AI_MODEL_${specialist.toUpperCase()}`]
+
+  if (!override) {
+    return SPECIALIST_MODELS[specialist]
+  }
+
+  if (!isModelName(override)) {
+    console.warn(
+      `Unknown model "${override}" in AI_MODEL_${specialist.toUpperCase()}; ` +
+        `using ${SPECIALIST_MODELS[specialist]} instead.`
+    )
+    return SPECIALIST_MODELS[specialist]
+  }
+
+  return override
 }
 
 function specialistTools(userId: string, specialist: FinancialSpecialist): AppTool[] {
@@ -56,6 +81,7 @@ function validatePercentageScenarioRequest(input: string) {
 
 export interface MultiAgentRunResult extends AgentRunResult {
   specialist: FinancialSpecialist
+  modelName: ModelName
 }
 
 export async function runMultiAgent(
@@ -74,16 +100,19 @@ export async function runMultiAgent(
       tokensUsed: null,
       toolsUsed: [],
       specialist,
+      modelName: modelForSpecialist(specialist),
     }
   }
 
+  const modelName = modelForSpecialist(specialist)
   const result = await runAgent(
     input,
     chatHistory,
     specialistTools(userId, specialist),
     contextMessages,
-    SPECIALIST_PROMPTS[specialist]
+    SPECIALIST_PROMPTS[specialist],
+    modelName
   )
 
-  return { ...result, specialist }
+  return { ...result, specialist, modelName }
 }

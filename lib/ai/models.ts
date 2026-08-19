@@ -2,6 +2,11 @@ import { ChatOpenAI } from '@langchain/openai'
 import { ApiError } from '@/lib/api/errors'
 import { CHAT_MODEL } from '@/lib/chat/system-prompt'
 
+/**
+ * Every provider here implements OpenAI's API format, so they all run through
+ * ChatOpenAI with a different baseUrl and by adding a model is a config entry, not
+ * new code.
+ */
 
 export interface ModelProvider {
   label: string
@@ -48,6 +53,7 @@ export interface ModelSpec {
   provider: ProviderId
   model: string
   label: string
+  /** Confirmed by a live API call. `npm run check:models` reports mismatches. */
   verified: boolean
 }
 
@@ -64,6 +70,8 @@ export const MODEL_CATALOG = {
     label: 'GPT-4o',
     verified: true,
   },
+  // Run `npm run check:models`
+  // once a key exists and correct any that fail.
   'glm-5.2': {
     provider: 'zhipu',
     model: 'glm-5.2',

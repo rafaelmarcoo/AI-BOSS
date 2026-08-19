@@ -79,9 +79,10 @@ export async function runAgent(
   chatHistory: BaseMessage[] = [],
   tools: AppTool[] = [],
   contextMessages: BaseMessage[] = [],
-  systemPrompt: string = AGENT_SYSTEM_PROMPT
+  systemPrompt: string = AGENT_SYSTEM_PROMPT,
+  modelName: ModelName = DEFAULT_MODEL
 ): Promise<AgentRunResult> {
-  const model = createAgentModel()
+  const model = createAgentModel(modelName)
   const langChainTools = adaptToolsToLangChain(tools)
   const llm = langChainTools.length > 0 ? model.bindTools(langChainTools) : model
 

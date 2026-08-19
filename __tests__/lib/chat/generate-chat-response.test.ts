@@ -183,7 +183,8 @@ describe('generateChatResponse', () => {
       .mockResolvedValueOnce([{ id: 'message-user', conversation_id: 'conversation-1', user_id: 'user-123', role: 'user', content: 'Forecast cash', citations: null, ui_payload: null, created_at: '2026-05-12T00:00:00.000Z' }])
       .mockResolvedValueOnce([])
     mockBuildChatContext.mockResolvedValue({ messages: contextMessages, metricKeys: ['cash'], retrievedChunks: [] })
-    mockRunMultiAgent.mockResolvedValue({ content: 'Forecast result', tokensUsed: 88, toolsUsed: [], specialist: 'historical_forecast' })
+    // Deliberately not the default model, so a hardcoded modelUsed would fail.
+    mockRunMultiAgent.mockResolvedValue({ content: 'Forecast result', tokensUsed: 88, toolsUsed: [], specialist: 'historical_forecast', modelName: 'gpt-4o' })
     mockPlanGenUi.mockResolvedValue(null)
 
     await generateChatResponse('user-123', [{ role: 'user', content: 'Forecast cash' }], 'conversation-1')
@@ -191,5 +192,6 @@ describe('generateChatResponse', () => {
     expect(mockRunMultiAgent).toHaveBeenCalledWith('user-123', 'Forecast cash', [], contextMessages)
     expect(mockRunAgent).not.toHaveBeenCalled()
     expect(mockLogChatDecision).toHaveBeenCalledWith(expect.objectContaining({ specialist: 'historical_forecast' }))
+    expect(mockLogChatDecision).toHaveBeenCalledWith(expect.objectContaining({ modelUsed: 'gpt-4o' }))
   })
 })

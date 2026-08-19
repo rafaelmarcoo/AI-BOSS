@@ -5,7 +5,7 @@ import { ApiError } from '@/lib/api/errors'
 import { runAgent, type AgentRunResult } from '@/lib/ai/agent'
 import type { FinancialSpecialist } from '@/lib/agents/router'
 import { runMultiAgent } from '@/lib/agents/specialists'
-import { CHAT_MODEL } from '@/lib/chat/system-prompt'
+import { DEFAULT_MODEL, MODEL_CATALOG } from '@/lib/ai/models'
 import { logChatDecision } from '@/lib/chat/log-chat-decision'
 import { buildChatContext } from '@/lib/chat/build-chat-context'
 import { planGenUi } from '@/lib/gen-ui/plan-gen-ui'
@@ -63,6 +63,7 @@ export async function generateChatResponse(
   const multiAgentEnabled = process.env.MULTI_AGENT_MODE === 'true'
   let agentResponse: AgentRunResult
   let specialist: FinancialSpecialist | undefined
+  let modelUsed: string = MODEL_CATALOG[DEFAULT_MODEL].model
 
   if (multiAgentEnabled) {
     const multiAgentResponse = await runMultiAgent(
@@ -73,6 +74,7 @@ export async function generateChatResponse(
     )
     agentResponse = multiAgentResponse
     specialist = multiAgentResponse.specialist
+    modelUsed = MODEL_CATALOG[multiAgentResponse.modelName].model
   } else {
     agentResponse = await runAgent(
         latestUserMessage.content,
@@ -107,7 +109,7 @@ export async function generateChatResponse(
     assistantMessageId: savedAssistantMessage.id,
     messages: mapConversationMessagesToPayload(updatedConversationMessages),
     aiResponse: agentResponse.content,
-    modelUsed: CHAT_MODEL,
+    modelUsed,
     tokensUsed: agentResponse.tokensUsed,
     toolsUsed: agentResponse.toolsUsed,
     responseTimeMs: Date.now() - startedAt,

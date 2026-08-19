@@ -42,8 +42,10 @@ describe('runMultiAgent', () => {
         expect.objectContaining({ name: 'get_financial_forecast' }),
       ]),
       context,
-      expect.stringContaining('historical review and deterministic forecasts only')
+      expect.stringContaining('historical review and deterministic forecasts only'),
+      'gpt-4o-mini'
     )
+    expect(result.modelName).toBe('gpt-4o-mini')
     const tools = mockRunAgent.mock.calls[0][2]!
     expect(tools.map((tool) => tool.name)).not.toContain('model_scenario')
     expect(tools.map((tool) => tool.name)).not.toContain('calculate_runway')
@@ -68,5 +70,49 @@ describe('runMultiAgent', () => {
     expect(ambiguous.content).toContain('specify monthly burn')
     expect(revenue.content).toContain('Revenue percentage scenarios are not supported')
     expect(mockRunAgent).not.toHaveBeenCalled()
+  })
+
+  describe('per-specialist model selection', () => {
+    const originalEnv = process.env
+
+    beforeEach(() => {
+      process.env = { ...originalEnv }
+      mockRunAgent.mockResolvedValue({ content: 'ok', tokensUsed: 1, toolsUsed: [] })
+    })
+
+    afterEach(() => {
+      process.env = originalEnv
+    })
+
+    it('routes a specialist to the model named in its env override', async () => {
+      process.env.AI_MODEL_HISTORICAL_FORECAST = 'glm-5.2'
+
+      const result = await runMultiAgent('user-123', 'Forecast cash for 6 months')
+
+
+      expect(mockRunAgent.mock.calls[0][5]).toBe('glm-5.2')
+      expect(result.modelName).toBe('glm-5.2')
+    })
+
+    it('leaves other specialists on the default when one is overridden', async () => {
+      process.env.AI_MODEL_HISTORICAL_FORECAST = 'glm-5.2'
+
+      const result = await runMultiAgent('user-123', 'What is my runway?')
+
+      expect(result.specialist).toBe('financial_position')
+      expect(result.modelName).toBe('gpt-4o-mini')
+    })
+
+    it('falls back to the default and warns when the override is not a known model', async () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {})
+      process.env.AI_MODEL_HISTORICAL_FORECAST = 'not-a-real-model'
+
+      const result = await runMultiAgent('user-123', 'Forecast cash for 6 months')
+
+      expect(result.modelName).toBe('gpt-4o-mini')
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('not-a-real-model'))
+
+      warn.mockRestore()
+    })
   })
 })

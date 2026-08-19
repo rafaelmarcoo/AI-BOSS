@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto'
 import { ApiError } from '@/lib/api/errors'
 import { createAdminSupabaseClient } from '@/lib/supabase'
-import { DOCUMENTS_STORAGE_BUCKET } from '@/lib/documents/constants'
+import { DOCUMENTS_STORAGE_BUCKET, IMAGE_MIME_TYPES } from '@/lib/documents/constants'
 import type { Document, DocumentChunk, DocumentDeletionResult } from '@/types/database'
 import type { DocumentChunkInsert, DocumentSummary } from '@/lib/documents/types'
 import type { SupportedDocumentType } from '@/lib/documents/constants'
@@ -78,6 +78,7 @@ async function ensureDocumentsBucketExists() {
         'text/csv',
         'application/csv',
         'application/vnd.ms-excel',
+        ...IMAGE_MIME_TYPES,
       ],
     }
   )

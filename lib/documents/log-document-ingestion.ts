@@ -1,5 +1,4 @@
 import { createAdminSupabaseClient } from '@/lib/supabase'
-import { ApiError } from '@/lib/api/errors'
 
 interface LogDocumentIngestionParams {
   userId: string
@@ -49,11 +48,9 @@ export async function logDocumentIngestion({
     response_time_ms: responseTimeMs,
   })
 
+  // Best-effort audit log — a failure here should never undo an otherwise
+  // successful (or already-failed) document processing run.
   if (error) {
-    throw new ApiError(
-      500,
-      'INTERNAL_ERROR',
-      'Failed to log document ingestion.'
-    )
+    console.error('logDocumentIngestion failed:', error)
   }
 }

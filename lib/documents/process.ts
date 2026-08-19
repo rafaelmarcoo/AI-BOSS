@@ -144,6 +144,7 @@ export async function processDocument(documentId: string, userId: string) {
       responseTimeMs: Date.now() - startedAt,
     })
   } catch (error) {
+    console.error(`processDocument failed for ${document.file_name}:`, error)
     const message =
       error instanceof Error ? error.message : 'Document processing failed.'
 

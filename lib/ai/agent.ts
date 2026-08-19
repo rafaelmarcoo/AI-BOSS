@@ -6,6 +6,7 @@ import {
   SystemMessage,
   ToolMessage,
 } from '@langchain/core/messages'
+import { ToolInputParsingException } from '@langchain/core/tools'
 import { ApiError } from '@/lib/api/errors'
 import { CHAT_MODEL, AGENT_SYSTEM_PROMPT } from '@/lib/chat/system-prompt'
 import { adaptToolsToLangChain } from '@/lib/ai/tools'
@@ -16,15 +17,31 @@ export interface AgentToolUsage {
   args: unknown
 }
 
+export interface AgentToolExecution extends AgentToolUsage {
+  result: unknown
+}
+
 export interface AgentRunResult {
   content: string
   tokensUsed: number | null
   toolsUsed: AgentToolUsage[]
+  toolExecutions?: AgentToolExecution[]
 }
 
 interface FinancialToolResult {
   name: string
   content: string
+}
+
+export function toolInputRepairResult(toolName: string, error: unknown) {
+  if (!(error instanceof ToolInputParsingException)) return null
+
+  return {
+    status: 'invalid_tool_input',
+    tool: toolName,
+    message: 'The tool arguments did not match the required structure. Correct the arguments and call the same tool again. Do not calculate the answer yourself.',
+    details: error.message,
+  }
 }
 
 export function preserveFinancialCurrencyCoverage(
@@ -106,6 +123,7 @@ export async function runAgent(
   const MAX_ITERATIONS = 10
   let totalTokensUsed = 0
   const toolsUsed: AgentToolUsage[] = []
+  const toolExecutions: AgentToolExecution[] = []
   const financialToolResults: FinancialToolResult[] = []
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
@@ -122,6 +140,7 @@ export async function runAgent(
         content: preserveFinancialCurrencyCoverage(content, financialToolResults),
         tokensUsed: totalTokensUsed > 0 ? totalTokensUsed : null,
         toolsUsed,
+        toolExecutions,
       }
     }
 
@@ -134,9 +153,32 @@ export async function runAgent(
         args: toolCall.args,
       })
 
-      const result = await tool.invoke(toolCall.args)
-      const resultContent = String(result)
-      financialToolResults.push({ name: toolCall.name, content: resultContent })
+      let resultContent: string
+      let parsedResult: unknown
+      try {
+        const result = await tool.invoke(toolCall.args)
+        resultContent = String(result)
+        parsedResult = resultContent
+        try {
+          parsedResult = JSON.parse(resultContent)
+        } catch {
+          // Older tools return plain text. Preserve it without weakening the
+          // structured result path used by scenario analysis.
+        }
+      } catch (error) {
+        const repairResult = toolInputRepairResult(toolCall.name, error)
+        if (!repairResult) throw error
+        parsedResult = repairResult
+        resultContent = JSON.stringify(repairResult)
+      }
+      toolExecutions.push({
+        tool: toolCall.name,
+        args: toolCall.args,
+        result: parsedResult,
+      })
+      if (!(typeof parsedResult === 'object' && parsedResult && 'status' in parsedResult && parsedResult.status === 'invalid_tool_input')) {
+        financialToolResults.push({ name: toolCall.name, content: resultContent })
+      }
       messages.push(new ToolMessage({ content: resultContent, tool_call_id: toolCall.id ?? '' }))
     }
   }

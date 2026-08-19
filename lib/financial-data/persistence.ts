@@ -159,6 +159,37 @@ export async function listLatestFinancialMetricValues(userId: string) {
   return metrics
 }
 
+export async function listFinancialMetricObservations(userId: string) {
+  const supabase = createAdminSupabaseClient()
+  const rows: FinancialMetricObservation[] = []
+  const pageSize = 1000
+  let offset = 0
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('financial_metric_observations')
+      .select(FINANCIAL_METRIC_OBSERVATION_SELECT)
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false })
+      .range(offset, offset + pageSize - 1)
+
+    if (error) {
+      throw new ApiError(
+        500,
+        'INTERNAL_ERROR',
+        'Failed to load financial metric observations.'
+      )
+    }
+
+    const page = (data ?? []) as FinancialMetricObservation[]
+    rows.push(...page)
+    if (page.length < pageSize) break
+    offset += pageSize
+  }
+
+  return rows
+}
+
 export async function listFinancialMetricObservationHistory(params: {
   userId: string
   metricKey: FinancialMetricKey

@@ -3,12 +3,30 @@ import { fillUnavailableMetrics } from '@/lib/financial-data/read-model'
 import { createGetLatestSnapshotTool } from '@/lib/tools/financial/get-latest-snapshot'
 import { createModelScenarioTool } from '@/lib/tools/financial/model-scenario'
 import type { FinancialMetricSet } from '@/lib/financial-data/types'
+import { analyseScenario, listScenarioBaselineOptions } from '@/lib/scenarios/service'
 
 jest.mock('@/lib/financial-data/read-service', () => ({
   readSourceAwareMetrics: jest.fn(),
 }))
+jest.mock('@/lib/scenarios/service', () => ({
+  analyseScenario: jest.fn(),
+  listScenarioBaselineOptions: jest.fn(),
+}))
 
 const mockReadSourceAwareMetrics = jest.mocked(readSourceAwareMetrics)
+const mockAnalyseScenario = jest.mocked(analyseScenario)
+const mockListScenarioBaselineOptions = jest.mocked(listScenarioBaselineOptions)
+
+const scenarioInput = {
+  horizon: 3 as const,
+  trendRange: '6m' as const,
+  manualBaseline: {},
+  scenarios: [{ id: 'hire', label: 'New hire', adjustments: [{
+    id: 'cost', label: 'Employer cost', kind: 'fixed' as const,
+    flow: 'outflow' as const, frequency: 'recurring' as const,
+    amount: 9000, startMonth: '2026-06',
+  }] }],
+}
 
 function availableMetrics(overrides: FinancialMetricSet = {}) {
   const metrics = fillUnavailableMetrics({
@@ -123,93 +141,64 @@ describe('financial agent tools', () => {
     ).resolves.toContain('No financial metrics are available yet')
   })
 
-  it('model_scenario compares before and after runway', async () => {
-    mockReadSourceAwareMetrics.mockResolvedValue(availableMetrics())
+  it('model_scenario resolves one owned source and returns the deterministic result', async () => {
+    mockListScenarioBaselineOptions.mockResolvedValue([{
+      sourceKey: 'document:doc-1', sourceLabel: 'demo.csv', sourceType: 'document',
+      currency: 'NZD', availableMetrics: ['cash'], latestReportingDate: '2026-05-31', cashObservationCount: 3, metrics: {},
+    }])
+    mockAnalyseScenario.mockResolvedValue({ sourceLabel: 'demo.csv' } as never)
 
-    const result = await createModelScenarioTool('user-123').handler({
-      label: 'new hire',
-      monthly_cost_change: 9000,
+    const result = await createModelScenarioTool('user-123').handler(scenarioInput)
+
+    expect(result.status).toBe('ready')
+    expect(mockAnalyseScenario).toHaveBeenCalledWith('user-123', expect.objectContaining({
+      sourceKey: 'document:doc-1', currency: 'NZD',
+    }))
+  })
+
+  it('model_scenario requests a source/currency when choices are ambiguous', async () => {
+    mockListScenarioBaselineOptions.mockResolvedValue([
+      { sourceKey: 'document:nzd', sourceLabel: 'nzd.csv', sourceType: 'document', currency: 'NZD', availableMetrics: ['cash'], latestReportingDate: '2026-05-31', cashObservationCount: 3, metrics: {} },
+      { sourceKey: 'document:aud', sourceLabel: 'aud.csv', sourceType: 'document', currency: 'AUD', availableMetrics: ['cash'], latestReportingDate: '2026-05-31', cashObservationCount: 3, metrics: {} },
+    ])
+
+    const result = await createModelScenarioTool('user-123').handler(scenarioInput)
+    expect(result).toMatchObject({ status: 'needs_input', field: 'source_currency' })
+  })
+
+  it('models a removed recurring employee cost as a saving for a firing scenario', async () => {
+    mockListScenarioBaselineOptions.mockResolvedValue([{
+      sourceKey: 'document:doc-1', sourceLabel: 'demo.csv', sourceType: 'document',
+      currency: 'NZD', availableMetrics: ['cash'], latestReportingDate: '2026-05-31', cashObservationCount: 3, metrics: {},
+    }])
+    mockAnalyseScenario.mockResolvedValue({ sourceLabel: 'demo.csv' } as never)
+
+    await createModelScenarioTool('user-123').handler({
+      ...scenarioInput,
+      scenarios: [{
+        id: 'fire', label: 'Firing Employee', adjustments: [{
+          id: 'saving', label: 'Monthly employee cost', kind: 'fixed',
+          flow: 'outflow', frequency: 'recurring', amount: 6600, startMonth: '2026-06',
+        }],
+      }],
     })
 
-    expect(result).toContain('Scenario: new hire')
-    expect(result).toContain('Before: 5.14 months')
-    expect(result).toContain('After: 3.89 months')
-    expect(result).toContain('Stored financial data has not been changed')
+    expect(mockAnalyseScenario).toHaveBeenCalledWith('user-123', expect.objectContaining({
+      scenarios: [expect.objectContaining({
+        adjustments: [expect.objectContaining({ flow: 'inflow', amount: 6600 })],
+      })],
+    }))
   })
 
-  it('model_scenario handles incomplete runway inputs', async () => {
-    const metrics = fillUnavailableMetrics({})
-    mockReadSourceAwareMetrics.mockResolvedValue({
-      metrics,
-      availableMetricCount: 0,
-      unavailableMetricCount: 7,
-      runwayInput: null,
+  it('model_scenario returns deterministic validation failures as focused missing input', async () => {
+    mockListScenarioBaselineOptions.mockResolvedValue([{
+      sourceKey: 'document:doc-1', sourceLabel: 'demo.csv', sourceType: 'document',
+      currency: 'NZD', availableMetrics: ['cash'], latestReportingDate: '2026-05-31', cashObservationCount: 3, metrics: {},
+    }])
+    mockAnalyseScenario.mockRejectedValue(new Error('Accounts payable is required.'))
+
+    await expect(createModelScenarioTool('user-123').handler(scenarioInput)).resolves.toMatchObject({
+      status: 'needs_input', field: 'baseline', message: 'Accounts payable is required.',
     })
-
-    await expect(
-      createModelScenarioTool('user-123').handler({
-        label: 'new hire',
-        monthly_cost_change: 9000,
-      })
-    ).resolves.toContain('current runway inputs are incomplete')
-  })
-
-  it('model_scenario rejects scenarios with non-positive resulting burn', async () => {
-    mockReadSourceAwareMetrics.mockResolvedValue(availableMetrics())
-
-    await expect(
-      createModelScenarioTool('user-123').handler({
-        label: 'large saving',
-        monthly_cost_change: -28000,
-      })
-    ).resolves.toContain('resulting monthly burn would be 0')
-  })
-
-  it('does not model a scenario from missing or mixed-currency runway inputs', async () => {
-    mockReadSourceAwareMetrics.mockResolvedValue(
-      availableMetrics({
-        burn_rate: {
-          status: 'available',
-          key: 'burn_rate',
-          value: 28000,
-          currency: 'AUD',
-          periodStart: null,
-          periodEnd: '2026-04-30',
-          asOfDate: null,
-          provenance: { sourceType: 'document', sourceLabel: 'aud-demo.csv' },
-          confidence: 0.95,
-          updatedAt: '2026-05-12T00:00:00.000Z',
-        },
-      })
-    )
-
-    await expect(
-      createModelScenarioTool('user-123').handler({
-        label: 'new hire',
-        monthly_cost_change: 9000,
-      })
-    ).resolves.toContain('one confirmed currency')
-  })
-
-  it('calculates an explicit burn percentage in trusted code', async () => {
-    mockReadSourceAwareMetrics.mockResolvedValue(availableMetrics())
-
-    const result = await createModelScenarioTool('user-123').handler({
-      label: 'reduce burn',
-      burn_percentage_change: -20,
-    })
-
-    expect(result).toContain('-5,600 NZD/month')
-    expect(result).toContain('-20% of current burn')
-    expect(result).toContain('5.14 months runway')
-    expect(result).toContain('6.43 months runway')
-  })
-
-  it('rejects an ambiguous or unsupported scenario input shape', async () => {
-    mockReadSourceAwareMetrics.mockResolvedValue(availableMetrics())
-
-    await expect(
-      createModelScenarioTool('user-123').handler({ label: 'ambiguous' })
-    ).resolves.toContain('exactly one scenario change')
   })
 })

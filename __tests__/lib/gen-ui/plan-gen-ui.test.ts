@@ -228,4 +228,53 @@ describe('planGenUi', () => {
       expect.objectContaining({ type: 'metric_forecast_chart' })
     )
   })
+
+  it('hydrates scenario UI from the exact validated tool result and ignores legacy model comparisons', async () => {
+    mockPlannerInvoke.mockResolvedValue({
+      widgets: [{ type: 'scenario_comparison', title: 'Invented comparison', reason: 'Legacy selection' }],
+    })
+    const scenarioResult = {
+      input: {
+        sourceKey: 'document:doc-1', currency: 'NZD', horizon: 3, trendRange: '6m', manualBaseline: {},
+        scenarios: [{ id: 'hire', label: 'Hire', adjustments: [{
+          id: 'cost', label: 'Employer cost', kind: 'fixed', flow: 'outflow', frequency: 'recurring',
+          amount: 8000, startMonth: '2026-06',
+        }] }],
+      },
+      currency: 'NZD', sourceKey: 'document:doc-1', sourceLabel: 'statement.csv',
+      projectionStartMonth: '2026-06', openingLiquidity: 100000,
+      openingBridge: { cash: 100000, accountsReceivable: 0, accountsPayable: 0, formula: '100000 + 0 - 0 = 100000' },
+      panels: [{ method: 'current_run_rate', label: 'Current run rate', available: true, unavailableReason: null, baselineMonthlyMovement: -10000, series: [] }],
+      assumptions: [], warnings: [], metricInputs: {}, calculatedAt: '2026-06-01T00:00:00Z',
+    }
+
+    const plan = await planGenUi({
+      userId: 'user-123', userMessage: 'Compare hiring someone', assistantMessage: 'Calculated.',
+      toolsUsed: [{ tool: 'model_scenario', args: scenarioResult.input }],
+      toolExecutions: [{ tool: 'model_scenario', args: scenarioResult.input, result: { status: 'ready', result: scenarioResult } }],
+      scenarioMode: true,
+    })
+
+    expect(plan?.widgets).toHaveLength(1)
+    expect(plan?.widgets[0]).toMatchObject({
+      type: 'scenario_analysis',
+      data: { result: scenarioResult, editHref: '/dashboard/scenarios' },
+    })
+    expect(mockPlannerInvoke).not.toHaveBeenCalled()
+  })
+
+  it('does not create generic financial widgets for scenario prose without a trusted result', async () => {
+    const plan = await planGenUi({
+      userId: 'user-123',
+      userMessage: 'Compare hiring with buying equipment',
+      assistantMessage: 'An untrusted model-written calculation.',
+      toolsUsed: [],
+      toolExecutions: [],
+      scenarioMode: true,
+    })
+
+    expect(plan).toBeNull()
+    expect(mockPlannerInvoke).not.toHaveBeenCalled()
+    expect(mockReadSourceAwareMetrics).not.toHaveBeenCalled()
+  })
 })

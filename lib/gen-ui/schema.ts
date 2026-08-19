@@ -2,6 +2,8 @@ import { z } from 'zod'
 import { FINANCIAL_METRIC_KEYS } from '@/lib/financial-data/metric-keys'
 import { GEN_UI_PLAN_VERSION, GEN_UI_WIDGET_TYPES } from '@/lib/gen-ui/types'
 import type { GenUiPlan } from '@/lib/gen-ui/types'
+import { isScenarioAnalysisResult } from '@/lib/scenarios/calculation'
+import type { ScenarioAnalysisResult } from '@/lib/scenarios/calculation'
 
 const WidgetBaseSchema = z.object({
   id: z.string(),
@@ -99,6 +101,14 @@ const ScenarioComparisonWidgetSchema = WidgetBaseSchema.extend({
   }),
 })
 
+const ScenarioAnalysisWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('scenario_analysis'),
+  data: z.object({
+    result: z.custom<ScenarioAnalysisResult>(isScenarioAnalysisResult),
+    editHref: z.string(),
+  }),
+})
+
 const PlanningChecklistWidgetSchema = WidgetBaseSchema.extend({
   type: z.literal('planning_checklist'),
   data: z.object({
@@ -161,6 +171,7 @@ export const GenUiWidgetSchema = z.discriminatedUnion('type', [
   MetricTrendChartWidgetSchema,
   MetricForecastChartWidgetSchema,
   ScenarioComparisonWidgetSchema,
+  ScenarioAnalysisWidgetSchema,
   PlanningChecklistWidgetSchema,
   RiskThresholdTimelineWidgetSchema,
   MetricSourceEvidenceWidgetSchema,

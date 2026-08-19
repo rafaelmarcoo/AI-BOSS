@@ -192,4 +192,43 @@ describe('generateChatResponse', () => {
     expect(mockRunAgent).not.toHaveBeenCalled()
     expect(mockLogChatDecision).toHaveBeenCalledWith(expect.objectContaining({ specialist: 'historical_forecast' }))
   })
+
+  it('always applies the trusted scenario path even when multi-agent mode is disabled', async () => {
+    const prompt = 'Compare hiring for NZD 8,000 per month from October with buying NZD 50,000 of equipment in November.'
+    const contextMessages = [new SystemMessage('metrics and RAG context')]
+    const conversation = {
+      id: 'conversation-1', user_id: 'user-123', company_id: 'company-1', visibility: 'company' as const,
+      title: 'Scenario comparison', created_at: '2026-08-19T00:00:00.000Z', updated_at: '2026-08-19T00:00:00.000Z',
+    }
+    const userMessage = {
+      id: 'message-user', conversation_id: conversation.id, user_id: 'user-123', role: 'user' as const,
+      content: prompt, citations: null, ui_payload: null, created_at: '2026-08-19T00:00:00.000Z',
+    }
+    const assistantMessage = {
+      id: 'message-assistant', conversation_id: conversation.id, user_id: 'user-123', role: 'assistant' as const,
+      content: 'Trusted scenario result', citations: null, ui_payload: null, created_at: '2026-08-19T00:00:01.000Z',
+    }
+
+    mockGetOrCreateConversation.mockResolvedValue(conversation)
+    mockInsertConversationMessage
+      .mockResolvedValueOnce(userMessage)
+      .mockResolvedValueOnce(assistantMessage)
+    mockListConversationMessages
+      .mockResolvedValueOnce([userMessage])
+      .mockResolvedValueOnce([userMessage, assistantMessage])
+    mockBuildChatContext.mockResolvedValue({ messages: contextMessages, metricKeys: ['cash'], retrievedChunks: [] })
+    mockRunMultiAgent.mockResolvedValue({
+      content: 'Trusted scenario result', tokensUsed: 88, toolsUsed: [], toolExecutions: [], specialist: 'scenario',
+    })
+    mockPlanGenUi.mockResolvedValue(null)
+
+    await generateChatResponse('user-123', [{ role: 'user', content: prompt }], conversation.id)
+
+    expect(mockRunMultiAgent).toHaveBeenCalledWith('user-123', prompt, [], contextMessages)
+    expect(mockRunAgent).not.toHaveBeenCalled()
+    expect(mockPlanGenUi).toHaveBeenCalledWith(expect.objectContaining({
+      scenarioMode: true,
+      toolExecutions: [],
+    }))
+  })
 })

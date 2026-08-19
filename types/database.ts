@@ -1,9 +1,13 @@
 import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
 import type { FinancialMetricSourceType } from '@/lib/financial-data/types'
 import type { GenUiPlan } from '@/lib/gen-ui/types'
+import type { ScenarioAnalysisInput } from '@/lib/scenarios/schema'
+import type { ScenarioAnalysisResult } from '@/lib/scenarios/calculation'
 
 export type UserType = 'admin' | 'employee'
 export type ConversationVisibility = 'private' | 'company' | 'admins'
+export type ScenarioVisibility = 'private' | 'company'
+export type ScenarioStatus = 'draft' | 'calculated'
 
 export interface User {
   id: string
@@ -158,6 +162,22 @@ export interface FinancialMetricObservation {
   confidence: number
   evidence: unknown
   raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface SavedScenario {
+  id: string
+  user_id: string
+  company_id: string
+  name: string
+  description: string | null
+  status: ScenarioStatus
+  visibility: ScenarioVisibility
+  input_payload: ScenarioAnalysisInput | Record<string, unknown>
+  result_payload: ScenarioAnalysisResult | null
+  baseline_fingerprint: Array<{ id: string; updatedAt: string }>
+  calculated_at: string | null
   created_at: string
   updated_at: string
 }

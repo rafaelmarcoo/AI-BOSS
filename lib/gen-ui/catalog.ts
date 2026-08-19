@@ -44,6 +44,13 @@ export const GEN_UI_WIDGET_CATALOG = {
     selectionGuidance: 'Select for what-if, hiring, saving, or cost-change questions.',
     defaultColumnSpan: 1,
   },
+  scenario_analysis: {
+    type: 'scenario_analysis',
+    label: 'Scenario analysis',
+    description: 'Shows the exact deterministic current-run-rate and historical-trend scenario result.',
+    selectionGuidance: 'Use only when the model_scenario tool returned a ready structured result.',
+    defaultColumnSpan: 2,
+  },
   planning_checklist: {
     type: 'planning_checklist',
     label: 'Planning checklist',

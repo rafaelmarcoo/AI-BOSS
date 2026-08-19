@@ -1,4 +1,5 @@
 import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
+import type { ScenarioAnalysisResult } from '@/lib/scenarios/calculation'
 
 export const GEN_UI_PLAN_VERSION = 1
 
@@ -8,6 +9,7 @@ export const GEN_UI_WIDGET_TYPES = [
   'metric_trend_chart',
   'metric_forecast_chart',
   'scenario_comparison',
+  'scenario_analysis',
   'planning_checklist',
   'risk_threshold_timeline',
   'metric_source_evidence',
@@ -110,6 +112,14 @@ export interface ScenarioComparisonWidget extends GenUiWidgetBase {
   }
 }
 
+export interface ScenarioAnalysisWidget extends GenUiWidgetBase {
+  type: 'scenario_analysis'
+  data: {
+    result: ScenarioAnalysisResult
+    editHref: string
+  }
+}
+
 export interface PlanningChecklistWidget extends GenUiWidgetBase {
   type: 'planning_checklist'
   data: {
@@ -168,6 +178,7 @@ export type GenUiWidget =
   | MetricTrendChartWidget
   | MetricForecastChartWidget
   | ScenarioComparisonWidget
+  | ScenarioAnalysisWidget
   | PlanningChecklistWidget
   | RiskThresholdTimelineWidget
   | MetricSourceEvidenceWidget

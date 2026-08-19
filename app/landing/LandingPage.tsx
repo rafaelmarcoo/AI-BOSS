@@ -8,10 +8,6 @@ import {
   Button,
   ButtonBase,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   Drawer,
   IconButton,
   InputBase,
@@ -94,7 +90,6 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [scenarioDialogOpen, setScenarioDialogOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -211,7 +206,7 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
       return;
     }
 
-    setScenarioDialogOpen(true);
+    router.push("/dashboard/scenarios");
   };
 
   const recentConversations = conversations.slice(0, 3);
@@ -548,28 +543,6 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
           </Box>
         ) : null}
       </Stack>
-
-      <Dialog
-        open={scenarioDialogOpen}
-        onClose={() => setScenarioDialogOpen(false)}
-        fullWidth
-        maxWidth="xs"
-      >
-        <DialogTitle>Scenario planning is coming next</DialogTitle>
-        <DialogContent>
-          <Typography>
-            We’re designing structured comparisons and what-if analysis so
-            AI-BOSS can clearly show assumptions, alternatives and financial
-            impact. You can still discuss a decision with AI-BOSS in the workspace.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setScenarioDialogOpen(false)}>Close</Button>
-          <Button variant="contained" onClick={() => router.push("/dashboard")}>
-            Open workspace
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       <Drawer
         anchor="left"

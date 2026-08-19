@@ -1,7 +1,6 @@
 import { ChatOpenAI } from '@langchain/openai'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { z } from 'zod'
-import { calculateRunway } from '@/lib/calculations/runway'
 import { CHAT_MODEL } from '@/lib/chat/system-prompt'
 import {
   FINANCIAL_METRIC_KEYS,
@@ -12,7 +11,6 @@ import {
   formatFinancialCurrency,
   isSupportedFinancialCurrency,
 } from '@/lib/financial-data/currency'
-import { getSharedSupportedCurrency } from '@/lib/financial-data/read-model'
 import { readSourceAwareMetrics } from '@/lib/financial-data/read-service'
 import {
   readRunwayObservationHistory,
@@ -36,7 +34,7 @@ import {
   type GenUiWidget,
   type GenUiWidgetType,
 } from '@/lib/gen-ui/types'
-import type { AgentToolUsage } from '@/lib/ai/agent'
+import type { AgentToolExecution, AgentToolUsage } from '@/lib/ai/agent'
 import type { SourceAwareMetricReadResult } from '@/lib/financial-data/read-model'
 import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
 import { describeGenUiWidgetCatalog } from '@/lib/gen-ui/catalog'
@@ -44,6 +42,10 @@ import {
   isDataConnectionRequest,
   selectMetricKeysForMessage,
 } from '@/lib/gen-ui/selection'
+import {
+  isScenarioAnalysisResult,
+  type ScenarioAnalysisResult,
+} from '@/lib/scenarios/calculation'
 
 const CAUTION_THRESHOLD = 6
 const URGENT_THRESHOLD = 3
@@ -82,6 +84,8 @@ interface PlanGenUiParams {
   userMessage: string
   assistantMessage: string
   toolsUsed: AgentToolUsage[]
+  toolExecutions?: AgentToolExecution[]
+  scenarioMode?: boolean
 }
 
 interface GenUiDataContext {
@@ -92,6 +96,7 @@ interface GenUiDataContext {
   userMessage: string
   metricHistories: MetricHistorySummary[]
   metricForecasts: MetricForecastSummary[]
+  scenarioResult: ScenarioAnalysisResult | null
 }
 
 function historicalMetricKeyForMessage(userMessage: string): HistoricalMetricKey | null {
@@ -240,14 +245,6 @@ function defaultWidgetSpecs(
         reason: 'Runway planning needs caution and urgent threshold timing.',
       })
     }
-  }
-
-  if (/\b(scenario|what if|increase|decrease|hire|cut|saving|cost)\b/.test(normalized)) {
-    widgets.push({
-      type: 'scenario_comparison',
-      title: 'Scenario comparison',
-      reason: 'The user is exploring a possible change to monthly burn.',
-    })
   }
 
   if (/\b(source|evidence|data|where|uploaded|metric)\b/.test(normalized)) {
@@ -534,62 +531,21 @@ function buildMetricForecastWidget(
   }
 }
 
-function buildScenarioComparisonWidget(
+function buildScenarioAnalysisWidget(
   spec: PlannerWidget,
   index: number,
   context: GenUiDataContext
 ): GenUiWidget | null {
-  const runwayInput = context.snapshot.runwayInput
-  const runwayCurrency = getSharedSupportedCurrency(context.snapshot.metrics, [
-    'cash',
-    'accounts_receivable',
-    'accounts_payable',
-    'burn_rate',
-  ])
-
-  if (!runwayInput || !runwayCurrency) {
-    return null
-  }
-
-  const base = calculateRunway(runwayInput)
-  const scenarioInputs = [
-    {
-      label: 'Burn +15%',
-      burn: Number((runwayInput.burn * 1.15).toFixed(2)),
-    },
-    {
-      label: 'Burn -10%',
-      burn: Number((runwayInput.burn * 0.9).toFixed(2)),
-    },
-  ]
-  const scenarios = scenarioInputs.map((scenario) => {
-    const result = calculateRunway({
-      ...runwayInput,
-      burn: scenario.burn,
-    })
-
-    return {
-      label: scenario.label,
-      monthlyBurn: scenario.burn,
-      runwayMonths: result.runway_months,
-      deltaMonths: Number((result.runway_months - base.runway_months).toFixed(2)),
-    }
-  })
+  if (!context.scenarioResult) return null
 
   return {
     id: widgetId(spec.type, index),
-    type: 'scenario_comparison',
-    title: spec.title ?? 'Scenario comparison',
-    reason: spec.reason ?? 'AI-BOSS selected a scenario view for this question.',
+    type: 'scenario_analysis',
+    title: spec.title ?? 'Scenario analysis',
+    reason: spec.reason ?? 'This view uses the exact deterministic result returned to the chat assistant.',
     data: {
-      currency: runwayCurrency,
-      base: {
-        label: 'Current',
-        monthlyBurn: runwayInput.burn,
-        runwayMonths: base.runway_months,
-      },
-      scenarios,
-      note: 'These scenarios are calculated from current runway inputs and do not update stored financial data.',
+      result: context.scenarioResult,
+      editHref: '/dashboard/scenarios',
     },
   }
 }
@@ -826,7 +782,11 @@ function hydrateWidget(
     case 'metric_forecast_chart':
       return buildMetricForecastWidget(spec, index, context)
     case 'scenario_comparison':
-      return buildScenarioComparisonWidget(spec, index, context)
+      // Retained only so persisted legacy messages continue to render. New
+      // plans must use the exact structured tool result below.
+      return null
+    case 'scenario_analysis':
+      return buildScenarioAnalysisWidget(spec, index, context)
     case 'planning_checklist':
       return buildPlanningChecklistWidget(spec, index, context)
     case 'risk_threshold_timeline':
@@ -845,8 +805,38 @@ export async function planGenUi({
   userMessage,
   assistantMessage,
   toolsUsed,
+  toolExecutions = [],
+  scenarioMode = false,
 }: PlanGenUiParams): Promise<GenUiPlan | null> {
   const source = detectSource(userMessage)
+  const scenarioResult = toolExecutions.flatMap((execution) => {
+    if (execution.tool !== 'model_scenario' || !execution.result || typeof execution.result !== 'object') {
+      return []
+    }
+    const toolResult = execution.result as { status?: unknown; result?: unknown }
+    return toolResult.status === 'ready' && isScenarioAnalysisResult(toolResult.result)
+      ? [toolResult.result]
+      : []
+  }).at(-1) ?? null
+
+  // Scenario UI must never be inferred from prose. Without a validated tool
+  // result there is no trusted financial result to visualise.
+  if (scenarioMode) {
+    if (!scenarioResult) return null
+    return {
+      version: GEN_UI_PLAN_VERSION,
+      source,
+      generatedAt: new Date().toISOString(),
+      summary: 'Generated from the deterministic scenario calculation.',
+      widgets: [{
+        id: widgetId('scenario_analysis', 0),
+        type: 'scenario_analysis',
+        title: 'Scenario analysis',
+        reason: 'This comparison uses the exact deterministic scenario result returned to AI-BOSS.',
+        data: { result: scenarioResult, editHref: '/dashboard/scenarios' },
+      }],
+    }
+  }
   const historicalMetricKey = historicalMetricKeyForMessage(userMessage)
   const forecastMetricKey = forecastMetricKeyForMessage(userMessage)
   const forecastHorizon = forecastHorizonForMessage(userMessage)
@@ -889,10 +879,20 @@ export async function planGenUi({
   // A valid empty model response is intentional; fall back only when planning failed.
   const historySpec = fallbackSpecs.find((spec) => spec.type === 'metric_trend_chart')
   const forecastSpec = fallbackSpecs.find((spec) => spec.type === 'metric_forecast_chart')
+  const scenarioSpec: PlannerWidget | null = scenarioResult
+    ? {
+        type: 'scenario_analysis',
+        title: 'Scenario analysis',
+        reason: 'This comparison uses the exact deterministic scenario result returned to AI-BOSS.',
+      }
+    : null
   const specs = dedupeWidgetSpecs([
     ...(historySpec ? [historySpec] : []),
     ...(forecastSpec ? [forecastSpec] : []),
-    ...(modelSpecs ?? fallbackSpecs),
+    ...(scenarioSpec ? [scenarioSpec] : []),
+    ...(modelSpecs ?? fallbackSpecs).filter(
+      (spec) => spec.type !== 'scenario_comparison' && spec.type !== 'scenario_analysis'
+    ),
   ])
 
   if (specs.length === 0) {
@@ -907,6 +907,7 @@ export async function planGenUi({
     userMessage,
     metricHistories: metricHistoryCollection?.series ?? [],
     metricForecasts: metricForecastCollection?.series ?? [],
+    scenarioResult,
   }
   const widgets = specs.flatMap((spec, index) => {
     if (spec.type === 'metric_trend_chart') {

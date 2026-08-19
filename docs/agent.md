@@ -50,7 +50,7 @@ The current app registry lives in `lib/ai/tool-registry.ts` and registers five a
 |---|---|
 | `get_latest_snapshot` | Reads source-aware current metrics and confirms runway inputs. |
 | `calculate_runway` | Calculates runway from confirmed cash, receivables, payables, and burn. |
-| `model_scenario` | Models a read-only recurring cost or saving scenario. |
+| `model_scenario` | Validates and calculates one to three source-aware what-if alternatives using the shared deterministic scenario engine. |
 | `get_financial_history` | Summarises deterministic historical movement for a supported metric. |
 | `get_financial_forecast` | Creates a deterministic 3- or 6-month trend-continuation forecast. |
 
@@ -58,7 +58,7 @@ Supporting document context provides retrieved evidence, not calculated dashboar
 
 ## Clarifying questions
 
-When a request is materially ambiguous, AI-BOSS asks one focused follow-up instead of guessing. For example, it asks whether “money” means cash, revenue, or runway, and asks for a source or reporting period when multiple options are available.
+When a request is materially ambiguous, AI-BOSS asks one focused follow-up instead of guessing. Scenario clarifications follow a stable order: source/currency, missing baseline values, amount or percentage, fixed versus compounding, one-off versus recurring, and timing. Annual salary alone is not treated as employer cost; staffing scenarios require a confirmed total monthly employer cost or saving and keep recruitment, equipment, and redundancy costs separate.
 
 It answers directly when the metric, source, and period are clear. AI-BOSS does not claim unsupported ratio calculations, company comparisons, department analysis, or currency conversion.
 
@@ -78,7 +78,7 @@ It answers directly when the metric, source, and period are clear. AI-BOSS does 
 
 ## Optional multi-agent routing
 
-Set `MULTI_AGENT_MODE=true` only in a chosen server environment to use deterministic specialist routing. It is disabled by default. The router assigns each request to one specialist: current financial position/runway, historical review/forecasting, or recurring-burn scenarios. Each specialist has only the tools needed for its role, while calculations remain deterministic and the final answer still follows the shared AI-BOSS safety guidance.
+Set `MULTI_AGENT_MODE=true` only in a chosen server environment to use deterministic specialist routing. It is disabled by default. The router assigns each request to one specialist: current financial position/runway, historical review/forecasting, or general scenario comparisons. Each specialist has only the tools needed for its role, while calculations remain deterministic and the final answer still follows the shared AI-BOSS safety guidance.
 
 ## PDF metric extraction
 

@@ -1,117 +1,101 @@
 import { z } from 'zod'
-import { calculateRunway } from '@/lib/calculations/runway'
-import { readSourceAwareMetrics } from '@/lib/financial-data/read-service'
-import { isAvailableMetric } from '@/lib/financial-data/metrics'
 import type { StructuredTool } from '@/lib/tools/contracts'
+import { ScenarioAnalysisInputSchema } from '@/lib/scenarios/schema'
+import { analyseScenario, listScenarioBaselineOptions } from '@/lib/scenarios/service'
+import type { ScenarioAnalysisResult } from '@/lib/scenarios/calculation'
 
-const ModelScenarioInputSchema = z.object({
-  monthly_cost_change: z
-    .number()
-    .optional()
-    .describe(
-      'Optional recurring monthly burn change. Positive means a new cost; negative means a recurring saving.'
-    ),
-  burn_percentage_change: z
-    .number()
-    .optional()
-    .describe(
-      'Optional percentage change to verified monthly burn. Positive means an increase; negative means a reduction. The tool calculates the dollar change.'
-    ),
-  label: z.string().describe('Short scenario label, such as "new hire" or "reduce marketing".'),
+const ModelScenarioInputSchema = ScenarioAnalysisInputSchema.extend({
+  sourceKey: z.string().min(1).optional().describe(
+    'Exact source key when already confirmed. Omit it when the user has not selected a source; the tool will use a unique valid source or request clarification.'
+  ),
+  currency: z.enum(['NZD', 'AUD']).optional().describe(
+    'Confirmed scenario currency. Omit it when not confirmed; the tool will use a unique valid currency or request clarification.'
+  ),
 })
 
 type ModelScenarioInput = z.infer<typeof ModelScenarioInputSchema>
 
-function getRunwayCurrency(
-  snapshot: Awaited<ReturnType<typeof readSourceAwareMetrics>>
-) {
-  const runwayMetricKeys = [
-    'cash',
-    'accounts_receivable',
-    'accounts_payable',
-    'burn_rate',
-  ] as const
-  const currencies = runwayMetricKeys.map((key) => {
-    const metric = snapshot.metrics[key]
-    return isAvailableMetric(metric) ? metric.currency : null
-  })
+function normalizeScenarioSemantics(input: ModelScenarioInput): ModelScenarioInput {
+  return {
+    ...input,
+    scenarios: input.scenarios.map((scenario) => {
+      const isStaffReduction = /\b(?:fir(?:e|ed|ing)|dismiss(?:al|ed|ing)?|layoff|lay off|redundan(?:cy|t|cies))\b/i.test(scenario.label)
+      if (!isStaffReduction) return scenario
 
-  if (currencies.some((currency) => currency === null)) {
-    return null
+      return {
+        ...scenario,
+        adjustments: scenario.adjustments.map((adjustment) => {
+          const describesRemovedEmploymentCost = /\b(?:employee|employer|salary|wage|monthly cost|monthly saving)\b/i.test(adjustment.label)
+          if (
+            adjustment.kind === 'fixed' &&
+            adjustment.frequency === 'recurring' &&
+            adjustment.flow === 'outflow' &&
+            describesRemovedEmploymentCost
+          ) {
+            return { ...adjustment, flow: 'inflow' as const }
+          }
+          return adjustment
+        }),
+      }
+    }),
   }
-
-  return new Set(currencies).size === 1 ? currencies[0] : null
 }
+
+export type ModelScenarioToolResult =
+  | { status: 'ready'; result: ScenarioAnalysisResult }
+  | {
+      status: 'needs_input'
+      field: 'source_currency' | 'baseline' | 'assumptions'
+      message: string
+      options?: Array<{ sourceKey: string; sourceLabel: string; currency: 'NZD' | 'AUD' }>
+    }
 
 export function createModelScenarioTool(
   userId: string
-): StructuredTool<ModelScenarioInput, string> {
+): StructuredTool<ModelScenarioInput, ModelScenarioToolResult> {
   return {
     name: 'model_scenario',
     description:
-      'Model a read-only what-if scenario by applying a recurring monthly cost change to verified current financial metrics and comparing before/after runway. Use for a new hire, recurring subscription, office cost, cost reduction, or another recurring change. Positive monthly_cost_change is a new expense; negative is a saving. This never changes stored data.',
+      'Model one to three read-only financial scenarios over 3, 6, 12, or 24 months. Supports fixed one-off or recurring inflows/outflows and fixed or compounding percentage changes to verified revenue, expenses, or burn. Every scenario requires explicit monthly timing. The tool uses one owned source and one NZD or AUD currency, calculates current-run-rate and historical-trend comparisons in trusted code, and never changes stored financial data.',
     inputSchema: ModelScenarioInputSchema,
-    async handler({ monthly_cost_change, burn_percentage_change, label }) {
-      if (
-        (monthly_cost_change === undefined && burn_percentage_change === undefined) ||
-        (monthly_cost_change !== undefined && burn_percentage_change !== undefined)
-      ) {
-        return 'Provide exactly one scenario change: a monthly dollar change or a percentage change to monthly burn.'
-      }
-
-      const snapshot = await readSourceAwareMetrics(userId)
-
-      if (!snapshot.runwayInput) {
-        return 'Cannot model this scenario because current runway inputs are incomplete. Cash, accounts receivable, accounts payable, and burn rate are required.'
-      }
-
-      const currency = getRunwayCurrency(snapshot)
-      if (!currency) {
-        return (
-          'Cannot model this scenario because the runway inputs do not have one confirmed currency. ' +
-          'Use complete metrics in the same currency; AI-BOSS does not convert currencies.'
-        )
-      }
-
-      const { cash, ar, ap, burn } = snapshot.runwayInput
-      const percentageChange = burn_percentage_change ?? null
-      if (percentageChange !== null && (percentageChange <= -100 || percentageChange > 1000)) {
-        return 'The burn percentage change must be greater than -100% and no more than 1000%.'
-      }
-
-      const resolvedMonthlyCostChange =
-        monthly_cost_change ?? Number(((burn * percentageChange!) / 100).toFixed(2))
-      const scenarioBurn = burn + resolvedMonthlyCostChange
-
-      if (scenarioBurn <= 0) {
-        return (
-          `Cannot model "${label}" because the resulting monthly burn would be ${scenarioBurn}. ` +
-          'Runway requires a monthly burn greater than zero. Treat this as a break-even or cash-positive scenario instead.'
-        )
-      }
-
-      const before = calculateRunway({ cash, ar, ap, burn })
-      const after = calculateRunway({ cash, ar, ap, burn: scenarioBurn })
-      const runwayDiff = Number(
-        (after.runway_months - before.runway_months).toFixed(2)
+    async handler(input) {
+      const options = await listScenarioBaselineOptions(userId)
+      const candidates = options.filter((option) =>
+        (!input.sourceKey || option.sourceKey === input.sourceKey) &&
+        (!input.currency || option.currency === input.currency)
       )
-      const costLabel =
-        resolvedMonthlyCostChange >= 0
-          ? `+${resolvedMonthlyCostChange.toLocaleString()} ${currency}/month`
-          : `-${Math.abs(resolvedMonthlyCostChange).toLocaleString()} ${currency}/month`
-      const percentageLabel =
-        percentageChange === null
-          ? ''
-          : `; ${percentageChange >= 0 ? '+' : ''}${percentageChange}% of current burn`
 
-      return [
-        `Scenario: ${label} (${costLabel}${percentageLabel})`,
-        `Before: ${before.runway_months} months runway at ${burn.toLocaleString()} ${currency}/month burn.`,
-        `After: ${after.runway_months} months runway at ${scenarioBurn.toLocaleString()} ${currency}/month burn.`,
-        `Impact: ${runwayDiff >= 0 ? '+' : ''}${runwayDiff} months.`,
-        `Assessment: ${after.policy.message}`,
-        'This is a modelled scenario only. Stored financial data has not been changed.',
-      ].join('\n')
+      if (candidates.length !== 1) {
+        return {
+          status: 'needs_input',
+          field: 'source_currency',
+          message: candidates.length === 0
+            ? 'No matching source and supported currency are available. Ask the user to select an uploaded statement and NZD or AUD currency.'
+            : 'More than one source or currency is available. Ask the user to choose exactly one before calculating.',
+          options: candidates.map(({ sourceKey, sourceLabel, currency }) => ({
+            sourceKey,
+            sourceLabel,
+            currency,
+          })),
+        }
+      }
+
+      try {
+        const result = await analyseScenario(userId, {
+          ...normalizeScenarioSemantics(input),
+          sourceKey: candidates[0].sourceKey,
+          currency: candidates[0].currency,
+        })
+        return { status: 'ready', result }
+      } catch (error) {
+        return {
+          status: 'needs_input',
+          field: error instanceof z.ZodError ? 'assumptions' : 'baseline',
+          message: error instanceof Error
+            ? error.message
+            : 'The scenario could not be calculated from the confirmed inputs.',
+        }
+      }
     },
   }
 }

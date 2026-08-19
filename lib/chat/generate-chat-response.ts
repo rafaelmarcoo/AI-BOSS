@@ -3,7 +3,11 @@ import { getAgentTools } from '@/lib/ai/tool-registry'
 import { ChatMessagePayload } from '@/lib/api/validation'
 import { ApiError } from '@/lib/api/errors'
 import { runAgent, type AgentRunResult } from '@/lib/ai/agent'
-import type { FinancialSpecialist } from '@/lib/agents/router'
+import {
+  getScenarioPreflightClarification,
+  routeFinancialConversation,
+  type FinancialSpecialist,
+} from '@/lib/agents/router'
 import { runMultiAgent } from '@/lib/agents/specialists'
 import { CHAT_MODEL } from '@/lib/chat/system-prompt'
 import { logChatDecision } from '@/lib/chat/log-chat-decision'
@@ -51,10 +55,12 @@ export async function generateChatResponse(
   })
 
   const persistedMessages = await listConversationMessages(conversation.id, userId)
-  const chatHistory = mapConversationMessagesToPayload(persistedMessages.slice(0, -1))
-    .map((m) =>
+  const persistedChatHistory = mapConversationMessagesToPayload(
+    persistedMessages.slice(0, -1)
+  )
+  const chatHistory = persistedChatHistory.map((m) =>
       m.role === 'user' ? new HumanMessage(m.content) : new AIMessage(m.content)
-    )
+  )
   const chatContext = await buildChatContext({
     userId,
     query: latestUserMessage.content,
@@ -63,8 +69,21 @@ export async function generateChatResponse(
   const multiAgentEnabled = process.env.MULTI_AGENT_MODE === 'true'
   let agentResponse: AgentRunResult
   let specialist: FinancialSpecialist | undefined
+  const resolvedSpecialist = routeFinancialConversation(
+    latestUserMessage.content,
+    persistedChatHistory
+  )
+  const preflightClarification = getScenarioPreflightClarification(latestUserMessage.content)
 
-  if (multiAgentEnabled) {
+  if (preflightClarification) {
+    agentResponse = {
+      content: preflightClarification,
+      tokensUsed: null,
+      toolsUsed: [],
+      toolExecutions: [],
+    }
+    specialist = resolvedSpecialist
+  } else if (multiAgentEnabled || resolvedSpecialist === 'scenario') {
     const multiAgentResponse = await runMultiAgent(
       userId,
       latestUserMessage.content,
@@ -86,6 +105,8 @@ export async function generateChatResponse(
     userMessage: latestUserMessage.content,
     assistantMessage: agentResponse.content,
     toolsUsed: agentResponse.toolsUsed,
+    toolExecutions: agentResponse.toolExecutions ?? [],
+    scenarioMode: resolvedSpecialist === 'scenario',
   })
 
   const savedAssistantMessage = await insertConversationMessage({
@@ -110,6 +131,7 @@ export async function generateChatResponse(
     modelUsed: CHAT_MODEL,
     tokensUsed: agentResponse.tokensUsed,
     toolsUsed: agentResponse.toolsUsed,
+    calculations: agentResponse.toolExecutions ?? [],
     responseTimeMs: Date.now() - startedAt,
     specialist,
   })

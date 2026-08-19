@@ -2,6 +2,7 @@ import { ApiError } from '@/lib/api/errors'
 import { ChatMessagePayload } from '@/lib/api/validation'
 import { createAdminSupabaseClient } from '@/lib/supabase'
 import type { AgentToolUsage } from '@/lib/ai/agent'
+import type { AgentToolExecution } from '@/lib/ai/agent'
 import type { FinancialSpecialist } from '@/lib/agents/router'
 
 interface LogChatDecisionParams {
@@ -13,6 +14,7 @@ interface LogChatDecisionParams {
   modelUsed: string
   tokensUsed: number | null
   toolsUsed: AgentToolUsage[]
+  calculations?: AgentToolExecution[]
   responseTimeMs: number
   specialist?: FinancialSpecialist
 }
@@ -26,6 +28,7 @@ export async function logChatDecision({
   modelUsed,
   tokensUsed,
   toolsUsed,
+  calculations = [],
   responseTimeMs,
   specialist,
 }: LogChatDecisionParams) {
@@ -58,7 +61,7 @@ export async function logChatDecision({
       ? [...toolsUsed, { tool: 'specialist_router', args: { specialist } }]
       : toolsUsed,
     data_accessed: null,
-    calculations: null,
+    calculations,
     model_used: modelUsed,
     tokens_used: tokensUsed,
     response_time_ms: responseTimeMs,

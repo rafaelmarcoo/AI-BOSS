@@ -2,14 +2,26 @@
 
 import type { ReactNode } from "react";
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
+  Alert,
   Box,
   Button,
   Chip,
+  Divider,
   Paper,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Typography,
 } from "@mui/material";
 import ChatBubbleRoundedIcon from "@mui/icons-material/ChatBubbleRounded";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import {
   CartesianGrid,
   Legend,
@@ -41,6 +53,7 @@ import type {
   PlanningChecklistWidget as PlanningChecklistWidgetModel,
   RiskThresholdTimelineWidget as RiskThresholdTimelineWidgetModel,
   ScenarioComparisonWidget as ScenarioComparisonWidgetModel,
+  ScenarioAnalysisWidget as ScenarioAnalysisWidgetModel,
 } from "@/lib/gen-ui/types";
 
 type AskChatbotMode = "selection" | "prompt";
@@ -316,6 +329,235 @@ function ScenarioComparisonWidgetView({
       <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
         {widget.data.note}
       </Typography>
+    </WidgetFrame>
+  );
+}
+
+const SCENARIO_COLORS = ["#38bdf8", "#a78bfa", "#f59e0b", "#22c55e"];
+
+function ScenarioAnalysisWidgetView({
+  widget,
+}: {
+  widget: ScenarioAnalysisWidgetModel;
+}) {
+  const { result } = widget.data;
+  const projectedMonths = result.panels.find((panel) => panel.available)?.series[0]?.points ?? [];
+  const projectedPeriod = projectedMonths.length > 0
+    ? `${projectedMonths[0].month}–${projectedMonths.at(-1)?.month}`
+    : `${result.projectionStartMonth} onward`;
+  const openEditor = () => {
+    window.sessionStorage.setItem(
+      "ai-boss-scenario-draft",
+      JSON.stringify({ input: result.input, result }),
+    );
+    window.location.assign(widget.data.editHref);
+  };
+
+  return (
+    <WidgetFrame title={widget.title} reason={widget.reason}>
+      <Stack spacing={2}>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          <Chip label={`Currency: ${result.currency}`} size="small" sx={chartContextChipSx} />
+          <Chip label={`Source: ${result.sourceLabel}`} size="small" sx={chartContextChipSx} />
+          <Chip label={`Projected period: ${projectedPeriod}`} size="small" sx={chartContextChipSx} />
+          <Chip label={`Horizon: ${result.input.horizon} months`} size="small" sx={chartContextChipSx} />
+          <Chip label={`Historical range: ${result.input.trendRange.toUpperCase()}`} size="small" sx={chartContextChipSx} />
+        </Stack>
+
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", sm: "repeat(4, minmax(0, 1fr))" },
+            gap: 1,
+          }}
+        >
+          {[
+            ["Cash", result.openingBridge.cash],
+            ["Accounts receivable", result.openingBridge.accountsReceivable],
+            ["Accounts payable", -result.openingBridge.accountsPayable],
+            ["Opening liquidity", result.openingLiquidity],
+          ].map(([label, value]) => (
+            <Box key={String(label)} sx={{ p: 1.25, borderRadius: 1, bgcolor: "rgba(255,255,255,0.035)" }}>
+              <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>{label}</Typography>
+              <Typography variant="body2" fontWeight={700}>{formatCurrency(Number(value), result.currency)}</Typography>
+            </Box>
+          ))}
+        </Box>
+        <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
+          Opening available liquidity: {formatCurrency(result.openingBridge.cash, result.currency)} cash + {formatCurrency(result.openingBridge.accountsReceivable, result.currency)} receivables − {formatCurrency(result.openingBridge.accountsPayable, result.currency)} payables = {formatCurrency(result.openingLiquidity, result.currency)}. AI-BOSS assumes current receivables are collected and current payables are paid before Month 1.
+        </Typography>
+
+        <Box>
+          <Typography variant="subtitle2" fontWeight={700}>Baseline inputs and evidence</Typography>
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" }, gap: 1, mt: 1 }}>
+            {([
+              ["Cash", result.metricInputs.cash],
+              ["Accounts receivable", result.metricInputs.accountsReceivable],
+              ["Accounts payable", result.metricInputs.accountsPayable],
+              ["Monthly burn", result.metricInputs.burnRate],
+              ["Monthly revenue", result.metricInputs.monthlyRevenue],
+              ["Monthly expenses", result.metricInputs.monthlyExpenses],
+            ] as const).map(([label, metric]) => (
+              <Box key={label} sx={{ p: 1.25, border: "1px solid", borderColor: dashboardTokens.border, borderRadius: 1 }}>
+                <Stack direction="row" justifyContent="space-between" spacing={1} alignItems="center">
+                  <Typography variant="body2" fontWeight={700}>{label}</Typography>
+                  <Chip
+                    size="small"
+                    color={metric?.origin === "manual" ? "warning" : metric ? "success" : "default"}
+                    label={metric?.origin === "manual" ? "Manual — unverified" : metric ? "Verified" : "Missing"}
+                  />
+                </Stack>
+                {metric ? (
+                  <Typography variant="caption" display="block" sx={{ color: dashboardTokens.textMuted, mt: 0.5 }}>
+                    {formatCurrency(metric.value, result.currency)} · {metric.sourceLabel} · reporting date {metric.reportingDate} · {metric.confidence === null ? "no verification confidence" : `${Math.round(metric.confidence * 100)}% confidence`}
+                  </Typography>
+                ) : (
+                  <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>Not available for this source.</Typography>
+                )}
+              </Box>
+            ))}
+          </Box>
+        </Box>
+
+        {result.warnings.map((warning) => (
+          <Alert key={warning} severity="warning" variant="outlined">{warning}</Alert>
+        ))}
+
+        <Alert severity="info" variant="outlined">
+          Both charts start from the same opening liquidity. The dashed Baseline means no new decision. Each coloured line adds that scenario&apos;s cash effects, beginning in its stated month. Each plotted month is the projected month-end balance, after that month&apos;s movement.
+        </Alert>
+
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", xl: "repeat(2, minmax(0, 1fr))" },
+            gap: 2,
+          }}
+        >
+          {result.panels.map((panel) => {
+            if (!panel.available) {
+              return (
+                <Paper key={panel.method} variant="outlined" sx={{ p: 2, bgcolor: "transparent", borderColor: dashboardTokens.border }}>
+                  <Typography fontWeight={700}>{panel.label}</Typography>
+                  <Alert severity="info" sx={{ mt: 1 }}>{panel.unavailableReason}</Alert>
+                </Paper>
+              );
+            }
+
+            const chartData = panel.series[0]?.points.map((point, index) => ({
+              month: point.month,
+              ...Object.fromEntries(panel.series.map((series) => [series.id, series.points[index]?.value])),
+            })) ?? [];
+
+            return (
+              <Paper key={panel.method} variant="outlined" sx={{ p: 1.5, bgcolor: "transparent", borderColor: dashboardTokens.border }}>
+                <Typography fontWeight={700}>
+                  {panel.method === "current_run_rate"
+                    ? "Current run rate (latest monthly burn)"
+                    : "Historical trend (past cash movement continued)"}
+                </Typography>
+                <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
+                  Baseline monthly movement: {formatCurrency(panel.baselineMonthlyMovement, result.currency)}
+                </Typography>
+                <Typography variant="body2" sx={{ color: dashboardTokens.textMuted, mt: 0.75 }}>
+                  {panel.method === "current_run_rate"
+                    ? `Shows what happens if the latest monthly burn of ${formatCurrency(Math.abs(panel.baselineMonthlyMovement ?? 0), result.currency)} continues every month.`
+                    : `Shows what happens if the observed cash trend of ${formatCurrency(panel.baselineMonthlyMovement ?? 0, result.currency)} per month continues.`}
+                </Typography>
+                <Typography variant="caption" display="block" sx={{ color: dashboardTokens.textMuted, mt: 0.5 }}>
+                  Value axis: Projected available liquidity ({result.currency}) · Time axis: Projection month
+                </Typography>
+                <Box sx={{ height: 290, mt: 1 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData} margin={{ top: 12, right: 14, left: 8, bottom: 26 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={dashboardTokens.border} />
+                      <XAxis dataKey="month" stroke={dashboardTokens.textMuted} style={{ fontSize: "0.7rem" }} />
+                      <YAxis width={72} stroke={dashboardTokens.textMuted} style={{ fontSize: "0.7rem" }} tickFormatter={(value) => formatAxisNumber(Number(value), false)} />
+                      <Legend />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: dashboardTokens.surface, border: `1px solid ${dashboardTokens.border}`, borderRadius: 4 }}
+                        formatter={(value, name) => [formatCurrency(Number(value), result.currency), panel.series.find((series) => series.id === name)?.label ?? name]}
+                      />
+                      {panel.series.map((series, index) => (
+                        <Line
+                          key={series.id}
+                          type="monotone"
+                          dataKey={series.id}
+                          name={series.label}
+                          stroke={SCENARIO_COLORS[index]}
+                          strokeWidth={series.kind === "baseline" ? 2 : 2.5}
+                          strokeDasharray={series.kind === "baseline" ? "6 4" : undefined}
+                          dot={false}
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </Box>
+                <Stack spacing={0.75}>
+                  {panel.series.map((series, index) => (
+                    <Box key={series.id}>
+                      <Stack direction="row" justifyContent="space-between" spacing={1}>
+                        <Typography variant="caption" sx={{ color: SCENARIO_COLORS[index], fontWeight: 700 }}>{series.label}</Typography>
+                        <Typography variant="caption" sx={{ color: dashboardTokens.textMuted, textAlign: "right" }}>
+                          End {formatCurrency(series.summary.endingLiquidity, result.currency)} · {series.summary.cashOutMonth ? `cash-out ${series.summary.cashOutMonth}` : "no cash-out in horizon"}
+                        </Typography>
+                      </Stack>
+                      <Typography variant="caption" display="block" sx={{ color: dashboardTokens.textMuted }}>
+                        Change vs baseline {formatCurrency(series.summary.changeFromBaseline, result.currency)} · lowest {formatCurrency(series.summary.lowestLiquidity, result.currency)} · average monthly net movement {formatCurrency(series.summary.averageMonthlyNetMovement, result.currency)}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Stack>
+              </Paper>
+            );
+          })}
+        </Box>
+
+        <Box>
+          <Typography variant="subtitle2" fontWeight={700}>Scenario assumptions</Typography>
+          {result.input.scenarios.map((scenario) => (
+            <Box key={scenario.id} sx={{ mt: 1, p: 1.25, border: "1px solid", borderColor: dashboardTokens.border, borderRadius: 1 }}>
+              <Typography variant="body2" fontWeight={700}>{scenario.label}</Typography>
+              {scenario.adjustments.map((adjustment) => {
+                const resolved = result.panels.find((panel) => panel.available)?.series
+                  .find((series) => series.id === scenario.id)?.resolvedAdjustments
+                  .find((item) => item.id === adjustment.id);
+                return <Typography key={adjustment.id} variant="caption" display="block" sx={{ color: dashboardTokens.textMuted }}>{resolved?.description ?? adjustment.label}</Typography>;
+              })}
+            </Box>
+          ))}
+        </Box>
+
+        <Accordion disableGutters sx={{ bgcolor: "transparent", border: "1px solid", borderColor: dashboardTokens.border, "&:before": { display: "none" } }}>
+          <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}>
+            <Typography fontWeight={700}>View month-by-month values</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <TableContainer>
+              <Table size="small" aria-label="Monthly scenario comparison">
+                <TableHead><TableRow><TableCell>Method</TableCell><TableCell>Series</TableCell><TableCell>Month</TableCell><TableCell align="right">Liquidity</TableCell><TableCell align="right">Net movement</TableCell></TableRow></TableHead>
+                <TableBody>
+                  {result.panels.flatMap((panel) => panel.series.flatMap((series) => series.points.map((point) => (
+                    <TableRow key={`${panel.method}-${series.id}-${point.month}`}>
+                      <TableCell>{panel.label}</TableCell><TableCell>{series.label}</TableCell><TableCell>{point.month}</TableCell>
+                      <TableCell align="right">{formatCurrency(point.value, result.currency)}</TableCell>
+                      <TableCell align="right">{formatCurrency(point.netMovement, result.currency)}</TableCell>
+                    </TableRow>
+                  ))))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </AccordionDetails>
+        </Accordion>
+
+        <Divider />
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="space-between" alignItems={{ sm: "center" }}>
+          <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
+            Deterministic model only. Review major decisions with a qualified professional.
+          </Typography>
+          <Button variant="outlined" onClick={openEditor}>Edit in Scenarios workspace</Button>
+        </Stack>
+      </Stack>
     </WidgetFrame>
   );
 }
@@ -739,6 +981,8 @@ export function GenUiWidgetRenderer({
       return <MetricForecastChartWidgetView widget={widget} />;
     case "scenario_comparison":
       return <ScenarioComparisonWidgetView widget={widget} />;
+    case "scenario_analysis":
+      return <ScenarioAnalysisWidgetView widget={widget} />;
     case "planning_checklist":
       return <PlanningChecklistWidgetView widget={widget} />;
     case "risk_threshold_timeline":

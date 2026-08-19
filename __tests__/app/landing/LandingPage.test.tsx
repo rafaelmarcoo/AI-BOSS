@@ -101,21 +101,13 @@ describe('LandingPage quick actions', () => {
     expect(mockPush).toHaveBeenCalledWith('/dashboard/documents')
   })
 
-  it('explains scenario availability before offering the workspace', async () => {
+  it('opens the dedicated scenarios workspace', async () => {
     const user = userEvent.setup()
     renderLandingPage()
 
     await user.click(screen.getByRole('button', { name: 'Scenarios' }))
 
-    expect(
-      screen.getByRole('heading', { name: 'Scenario planning is coming next' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByText(/structured comparisons and what-if analysis/),
-    ).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Open workspace' }))
-    expect(mockPush).toHaveBeenCalledWith('/dashboard')
+    expect(mockPush).toHaveBeenCalledWith('/dashboard/scenarios')
   })
 
   it('shows upload failures without navigating away', async () => {

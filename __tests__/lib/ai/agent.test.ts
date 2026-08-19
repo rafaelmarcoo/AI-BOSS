@@ -1,5 +1,6 @@
 import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages'
-import { buildAgentMessages, preserveFinancialCurrencyCoverage } from '@/lib/ai/agent'
+import { ToolInputParsingException } from '@langchain/core/tools'
+import { buildAgentMessages, preserveFinancialCurrencyCoverage, toolInputRepairResult } from '@/lib/ai/agent'
 
 describe('buildAgentMessages', () => {
   it('places supplied context after the system prompt and before chat history', () => {
@@ -45,5 +46,24 @@ describe('preserveFinancialCurrencyCoverage', () => {
       original,
       [{ name: 'get_financial_forecast', content: toolResult }]
     )).toBe(original)
+  })
+})
+
+describe('toolInputRepairResult', () => {
+  it('turns schema failures into a repair instruction for the model', () => {
+    const result = toolInputRepairResult(
+      'model_scenario',
+      new ToolInputParsingException('Received tool input did not match expected schema')
+    )
+
+    expect(result).toMatchObject({
+      status: 'invalid_tool_input',
+      tool: 'model_scenario',
+    })
+    expect(result?.message).toContain('call the same tool again')
+  })
+
+  it('does not hide non-validation tool failures', () => {
+    expect(toolInputRepairResult('model_scenario', new Error('Database unavailable'))).toBeNull()
   })
 })

@@ -84,3 +84,35 @@ not clamped. Forecasts are trend-continuation estimates, not guarantees, and
 are unavailable with fewer than two comparable dated observations. When
 multiple supported currencies are present, each currency is forecast
 independently.
+
+## Scenario Comparisons
+
+Scenario analysis uses a shared validated contract and the deterministic engine
+in `lib/scenarios/`. Chat, `POST /api/scenarios/analyse`, generated UI, and the
+Scenarios workspace all call the same server-side service. The model may
+interpret a request and explain the result, but it does not calculate balances.
+
+Each calculation selects exactly one owned source and one supported currency.
+It never combines statements, NZD and AUD, or performs conversion. Opening
+available liquidity is:
+
+`cash + accounts receivable - accounts payable`
+
+This assumes receivables are collected and payables are paid immediately before
+Month 1. The engine then calculates two independent baselines when data exists:
+
+- current run rate continues the latest verified or manual monthly burn
+- historical trend continues the existing date-aware cash slope over 3M, 6M,
+  or all comparable observations
+
+One-off and recurring cash adjustments are applied to inclusive calendar-month
+buckets. Percentage changes use verified or explicitly manual revenue, expense,
+or burn values. A plain percentage is a fixed monthly step; compounding occurs
+only when explicitly selected. Compounding growth stops at its end month and
+retains that final level afterward. Balances may continue below zero, and
+cash-out is reported as the first month ending at or below zero.
+
+Manual baseline overrides are unverified scenario assumptions only. They are
+shown in the result and are never written to `financial_metric_observations`.
+Saved results remain frozen until an owner explicitly re-runs them; observation
+fingerprints are used only to warn that source data changed.

@@ -2,13 +2,13 @@
 
 **Database:** Supabase (PostgreSQL)  
 **Created:** March 22, 2025  
-**Last Updated:** May 18, 2026
+**Last Updated:** August 19, 2026
 
 ---
 
 ## Overview
 
-The database now consists of 12 main tables:
+The database now consists of 13 main tables:
 - **companies** - Company identities used as shared-data access boundaries
 - **users** - User profiles (extends Supabase Auth)
 - **conversations** - User-owned chat threads
@@ -21,6 +21,7 @@ The database now consists of 12 main tables:
 - **oauth_tokens** - Provider-neutral encrypted OAuth credential/details table
 - **oauth_connection_states** - Temporary OAuth state values used for CSRF protection
 - **financial_metric_observations** - Source-aware normalized financial metric values
+- **scenarios** - Saved private or company-visible scenario assumptions and latest deterministic results
 
 ---
 
@@ -386,6 +387,41 @@ one source/period, rather than a wide snapshot of all metrics.
 
 ---
 
+### 12. scenarios
+
+Stores reusable what-if drafts and the latest explicitly calculated result. The
+application validates both JSON payloads. A baseline fingerprint lets AI-BOSS
+warn when source observations changed instead of silently rewriting an earlier
+decision analysis.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID (PK) | Saved scenario identifier |
+| user_id | UUID (FK) | Owner; only the owner may edit or delete |
+| company_id | UUID (FK) | Company access boundary for explicitly shared scenarios |
+| name | TEXT | Required name, 1–80 trimmed characters |
+| description | TEXT | Optional description, maximum 500 characters |
+| status | TEXT | `draft` or `calculated` |
+| visibility | TEXT | `private` or `company`; drafts must remain private |
+| input_payload | JSONB | Structured scenario assumptions |
+| result_payload | JSONB | Latest deterministic result snapshot, or null for a draft |
+| baseline_fingerprint | JSONB | Observation IDs and update timestamps used by the latest result |
+| calculated_at | TIMESTAMP | Time of the latest successful calculation |
+| created_at | TIMESTAMP | Creation time |
+| updated_at | TIMESTAMP | Last saved change |
+
+**RLS Policies:**
+- Owners can view, insert, update, and delete their own scenarios
+- Company members can view company-visible calculated scenarios
+- Company members cannot edit shared originals; duplication creates a new private owner copy
+- Incomplete drafts cannot be company-visible
+
+**Indexes:**
+- `idx_scenarios_owner_updated` on (user_id, updated_at DESC)
+- `idx_scenarios_company_visibility_updated` on (company_id, visibility, updated_at DESC)
+
+---
+
 ## Relationships
 ```
 users (1) ──< (many) conversations
@@ -401,6 +437,8 @@ users (1) ──< (many) oauth_connection_states
 users (1) ──< (many) financial_metric_observations
 data_connections (1) ──< (many) financial_metric_observations
 documents (1) ──< (many) financial_metric_observations
+users (1) ──< (many) scenarios
+companies (1) ──< (many) scenarios
 ```
 
 ---
@@ -417,10 +455,11 @@ All schema changes are tracked in `db/migrations/`:
 - `007_drop_financial_snapshots.sql` - Drops the legacy financial snapshots table
 - `008_accounting_oauth_tokens.sql` - Adds provider-neutral OAuth tokens and drops the Xero-specific credential table
 - `009_conversation_message_ui_payload.sql` - Adds validated Gen UI payloads to assistant messages
-- `013_delete_document_and_derived_metrics.sql` - Adds atomic owner-only cleanup of a document and its document-derived financial observations
 - `010_add_user_type.sql` - Adds admin/employee roles used by company signup and joining; existing company accounts are backfilled as admins
 - `011_company_chat_visibility.sql` - Adds company-scoped conversation history and message read access
 - `012_conversation_visibility_modes.sql` - Adds private, company, and admins-only conversation visibility
+- `013_delete_document_and_derived_metrics.sql` - Adds atomic owner-only cleanup of a document and its document-derived financial observations
+- `014_saved_scenarios.sql` - Adds private drafts, company-visible calculated scenarios, result snapshots, and stale-data fingerprints
 
 ---
 
@@ -470,10 +509,9 @@ ORDER BY created_at ASC;
 ## Future Enhancements
 
 Planned for Sprint 2+:
-- **scenarios** table - Store "what-if" scenario configurations
 - **forecasts** table - Store AI-generated forecasts
 - **document extraction pipeline** - Promote uploaded document data into structured financial metric observations
 
 ---
 
-**Last Updated:** May 18, 2026 by Rafael Manubay
+**Last Updated:** August 19, 2026 by Rafael Manubay

@@ -18,10 +18,9 @@ export default async function ScenariosPage() {
   return (
     <Box component="main" sx={{ minHeight: '100vh', bgcolor: dashboardTokens.shell }}>
       <DashboardHeader />
-      <Box sx={{ maxWidth: 1480, mx: 'auto', px: { xs: 2, sm: 4 }, py: { xs: 3, sm: 5 } }}>
+      <Box sx={{ maxWidth: 1800, mx: 'auto', px: { xs: 2, sm: 4 }, py: { xs: 3, sm: 5 } }}>
         <ScenariosWorkspace />
       </Box>
     </Box>
   )
 }
-

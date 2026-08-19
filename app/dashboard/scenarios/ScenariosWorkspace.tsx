@@ -352,9 +352,22 @@ export function ScenariosWorkspace() {
       </Box>
 
       {error ? <Alert severity="error" onClose={() => setError(null)}>{error}</Alert> : null}
-      {dirty && result ? <Alert severity="warning">Changes not calculated. Run the comparison to update the displayed result.</Alert> : null}
 
-      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, bgcolor: dashboardTokens.surface, borderColor: dashboardTokens.border }}>
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: 'minmax(0, 1fr)',
+            lg: 'minmax(400px, 500px) minmax(0, 1fr)',
+            xl: 'minmax(420px, 540px) minmax(0, 1fr)',
+          },
+          gap: { xs: 3, lg: 2.5 },
+          alignItems: 'start',
+        }}
+      >
+        <Stack spacing={2.5} sx={{ minWidth: 0 }}>
+
+      <Paper variant="outlined" sx={{ p: 2.5, bgcolor: dashboardTokens.surface, borderColor: dashboardTokens.border }}>
         <Stack spacing={2}>
           <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
             <Box>
@@ -377,7 +390,7 @@ export function ScenariosWorkspace() {
           ) : (
             <Stack divider={<Divider flexItem />}>
               {savedScenarios.map((scenario) => (
-                <Stack key={scenario.id} direction={{ xs: 'column', md: 'row' }} spacing={1.5} py={1.5} alignItems={{ md: 'center' }}>
+                <Stack key={scenario.id} spacing={1.5} py={1.5}>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                       <Typography fontWeight={700}>{scenario.name}</Typography>
@@ -400,7 +413,7 @@ export function ScenariosWorkspace() {
         </Stack>
       </Paper>
 
-      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, bgcolor: dashboardTokens.surface, borderColor: dashboardTokens.border }}>
+      <Paper variant="outlined" sx={{ p: 2.5, bgcolor: dashboardTokens.surface, borderColor: dashboardTokens.border }}>
         <Stack spacing={2.5}>
           <Typography variant="h6" fontWeight={700}>Baseline and timing</Typography>
           {baselinesLoading ? <CircularProgress size={24} /> : baselines.length === 0 ? (
@@ -433,7 +446,7 @@ export function ScenariosWorkspace() {
           )}
 
           {input ? (
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, gap: 2 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 2 }}>
               <TextField select label="Planning horizon" value={input.horizon} onChange={(event) => updateInput((current) => ({ ...current, horizon: Number(event.target.value) as ScenarioAnalysisInput['horizon'] }))}>
                 {[3, 6, 12, 24].map((value) => <MenuItem key={value} value={value}>{value} months</MenuItem>)}
               </TextField>
@@ -448,7 +461,7 @@ export function ScenariosWorkspace() {
               <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}><Typography fontWeight={700}>Manual baseline overrides</Typography></AccordionSummary>
               <AccordionDetails>
                 <Alert severity="warning" sx={{ mb: 2 }}>Overrides are unverified scenario assumptions. They are never saved as financial observations.</Alert>
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 2 }}>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' }, gap: 2 }}>
                   {[
                     ['cash', 'Cash', 'cash'], ['accountsReceivable', 'Accounts receivable', 'accounts_receivable'],
                     ['accountsPayable', 'Accounts payable', 'accounts_payable'], ['burnRate', 'Monthly burn', 'burn_rate'],
@@ -485,7 +498,7 @@ export function ScenariosWorkspace() {
       {input ? (
         <Stack spacing={2}>
           {input.scenarios.map((scenario, scenarioIndex) => (
-            <Paper key={scenario.id} variant="outlined" sx={{ p: { xs: 2, md: 3 }, bgcolor: dashboardTokens.surface, borderColor: dashboardTokens.border }}>
+            <Paper key={scenario.id} variant="outlined" sx={{ p: 2.5, bgcolor: dashboardTokens.surface, borderColor: dashboardTokens.border }}>
               <Stack spacing={2}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }}>
                   <TextField fullWidth label={`Scenario ${scenarioIndex + 1} name`} value={scenario.label} onChange={(event) => updateScenario(scenario.id, (current) => ({ ...current, label: event.target.value }))} />
@@ -506,7 +519,7 @@ export function ScenariosWorkspace() {
                         {scenario.adjustments.length > 1 ? <Button color="error" onClick={() => updateScenario(scenario.id, (current) => ({ ...current, adjustments: current.adjustments.filter((item) => item.id !== adjustment.id) }))}>Remove</Button> : null}
                       </Stack>
 
-                      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 2 }}>
+                      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' }, gap: 2 }}>
                         {adjustment.kind === 'fixed' ? <>
                           <TextField select label="Cash flow" value={adjustment.flow} onChange={(event) => updateAdjustment(scenario.id, adjustment.id, (current) => current.kind === 'fixed' ? { ...current, flow: event.target.value as 'inflow' | 'outflow' } : current)}><MenuItem value="inflow">Inflow</MenuItem><MenuItem value="outflow">Outflow</MenuItem></TextField>
                           <TextField select label="Frequency" value={adjustment.frequency} onChange={(event) => updateAdjustment(scenario.id, adjustment.id, (current) => current.kind === 'fixed' ? { ...current, frequency: event.target.value as 'one_off' | 'recurring', ...(event.target.value === 'one_off' ? { endMonth: undefined } : {}) } : current)}><MenuItem value="one_off">One-off</MenuItem><MenuItem value="recurring">Recurring monthly</MenuItem></TextField>
@@ -533,7 +546,7 @@ export function ScenariosWorkspace() {
             <Button variant="contained" disabled={running || !selectedBaseline} onClick={() => void runComparison()}>{running ? 'Calculating…' : 'Run comparison'}</Button>
           </Stack>
 
-          <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, bgcolor: dashboardTokens.surface, borderColor: dashboardTokens.border }}>
+          <Paper variant="outlined" sx={{ p: 2.5, bgcolor: dashboardTokens.surface, borderColor: dashboardTokens.border }}>
             <Stack spacing={2}>
               <Box>
                 <Typography variant="h6" fontWeight={700}>Save to library</Typography>
@@ -565,7 +578,7 @@ export function ScenariosWorkspace() {
               {loadedScenario && !loadedScenario.isOwner ? (
                 <Alert severity="info">This is a company-shared frozen result. Duplicate it, then choose one of your own sources before recalculating.</Alert>
               ) : null}
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr 3fr 1fr' }, gap: 2 }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 2 }}>
                 <TextField label="Library name" value={savedName} disabled={loadedScenario ? !loadedScenario.isOwner : false} onChange={(event) => setSavedName(event.target.value)} inputProps={{ maxLength: 80 }} />
                 <TextField label="Description (optional)" value={savedDescription} disabled={loadedScenario ? !loadedScenario.isOwner : false} onChange={(event) => setSavedDescription(event.target.value)} inputProps={{ maxLength: 500 }} />
                 <TextField select label="Visibility" value={savedVisibility} disabled={(loadedScenario ? !loadedScenario.isOwner : false) || !result || dirty} onChange={(event) => setSavedVisibility(event.target.value as ScenarioVisibility)}>
@@ -590,19 +603,63 @@ export function ScenariosWorkspace() {
         </Stack>
       ) : null}
 
-      {result ? (
-        <Stack spacing={1.5}>
+        </Stack>
+
+        <Box
+          component="section"
+          aria-label="Scenario comparison results"
+          sx={{
+            minWidth: 0,
+            position: { xs: 'static', lg: 'sticky' },
+            top: { lg: 88 },
+            maxHeight: { lg: 'calc(100vh - 112px)' },
+            overflowY: { lg: 'auto' },
+            pr: { lg: 0.5 },
+          }}
+        >
+          <Stack spacing={1.5}>
+            <Box>
+              <Typography variant="h5" fontWeight={700}>Comparison results</Typography>
+              <Typography variant="body2" sx={{ color: dashboardTokens.textMuted, mt: 0.5 }}>
+                Run the assumptions on the left to compare the baseline with up to three scenarios.
+              </Typography>
+            </Box>
           {dirty ? (
             <Alert severity="warning">
-              These scenario results are from the previous calculation. Your edited assumptions have not been applied yet—select Run comparison to update them.
+              {result
+                ? 'These results are from the previous calculation. Your edited assumptions have not been applied yet—select Run comparison to update them.'
+                : 'Changes not calculated. Select Run comparison to generate the comparison.'}
             </Alert>
           ) : null}
-          <GenUiWidgetRenderer
-            widget={{ id: 'workspace-scenario-result', type: 'scenario_analysis', title: 'Scenario comparison results', reason: 'Calculated from the assumptions above using trusted deterministic code.', data: { result, editHref: '/dashboard/scenarios' } }}
-            onAskChatbot={() => undefined}
-          />
-        </Stack>
-      ) : null}
+          {result ? (
+            <GenUiWidgetRenderer
+              widget={{ id: 'workspace-scenario-result', type: 'scenario_analysis', title: 'Scenario comparison results', reason: 'Calculated from the assumptions on the left using trusted deterministic code.', data: { result, editHref: '/dashboard/scenarios' } }}
+              onAskChatbot={() => undefined}
+            />
+          ) : (
+            <Paper
+              variant="outlined"
+              sx={{
+                minHeight: 360,
+                p: 4,
+                bgcolor: dashboardTokens.surface,
+                borderColor: dashboardTokens.border,
+                display: 'grid',
+                placeItems: 'center',
+                textAlign: 'center',
+              }}
+            >
+              <Box sx={{ maxWidth: 460 }}>
+                <Typography variant="h6" fontWeight={700}>Your comparison will appear here</Typography>
+                <Typography variant="body2" sx={{ color: dashboardTokens.textMuted, mt: 1 }}>
+                  Choose a source, configure the scenarios on the left, then select Run comparison. Results remain visible here while you edit the controls.
+                </Typography>
+              </Box>
+            </Paper>
+          )}
+          </Stack>
+        </Box>
+      </Box>
     </Stack>
   )
 }

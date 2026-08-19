@@ -157,7 +157,7 @@ export function DocumentsWorkspace() {
           slotProps={{ input: { startAdornment: <SearchRoundedIcon fontSize="small" sx={{ mr: 1, color: dashboardTokens.textMuted }} /> } }}
           sx={{ flex: 1, minWidth: 200, ...fieldStyles }}
         />
-        <FilterSelect label="File type" value={fileFilter} onChange={(value) => setFileFilter(value as FileFilter)} options={[["all", "All files"], ["pdf", "PDF"], ["csv", "CSV"]]} />
+        <FilterSelect label="File type" value={fileFilter} onChange={(value) => setFileFilter(value as FileFilter)} options={[["all", "All files"], ["pdf", "PDF"], ["csv", "CSV"], ["image", "Images"]]} />
         <FilterSelect label="Status" value={statusFilter} onChange={(value) => setStatusFilter(value as StatusFilter)} options={[["all", "All statuses"], ["uploaded", "Uploaded"], ["processing", "Processing"], ["ready", "Ready"], ["failed", "Failed"]]} />
         <FilterSelect label="Sort" value={sort} onChange={(value) => setSort(value as SortOption)} options={[["newest", "Newest first"], ["oldest", "Oldest first"], ["name", "Name A–Z"]]} />
       </Stack>

@@ -12,6 +12,7 @@ describe('document chunking', () => {
         user_id: 'user-1',
         file_type: 'csv',
         file_name: 'forecast.csv',
+        mime_type: 'text/csv',
       },
       csv
     )
@@ -56,6 +57,7 @@ describe('document chunking', () => {
         user_id: 'user-1',
         file_type: 'csv',
         file_name: 'test csv.csv',
+        mime_type: 'text/csv',
       },
       csv
     )

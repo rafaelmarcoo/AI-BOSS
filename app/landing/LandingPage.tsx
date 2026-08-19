@@ -49,20 +49,29 @@ const QUICK_ACTIONS = [
     description: "Add statements, reports or financial documents.",
     meta: "CSV, PDF and images",
     icon: CloudUploadOutlinedIcon,
+    href: "/dashboard/documents",
   },
   {
     title: "Accounts",
     description: "View and manage connected accounts.",
     meta: "Connections and balances",
     icon: AccountBalanceWalletRoundedIcon,
+    href: undefined,
   },
   {
     title: "Scenarios",
     description: "Test forecasts and financial decisions.",
     meta: "Planning and what-if analysis",
     icon: RouteRoundedIcon,
+    href: undefined,
   },
-];
+] satisfies Array<{
+  title: string;
+  description: string;
+  meta: string;
+  icon: typeof CloudUploadOutlinedIcon;
+  href: string | undefined;
+}>;
 
 function getFirstName(fullName: string | null, email: string) {
   const trimmedName = fullName?.trim();
@@ -341,10 +350,24 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
           >
             {QUICK_ACTIONS.map((action) => {
               const Icon = action.icon;
+              const href = action.href;
 
               return (
                 <Box
                   key={action.title}
+                  role={href ? "button" : undefined}
+                  tabIndex={href ? 0 : undefined}
+                  onClick={href ? () => router.push(href) : undefined}
+                  onKeyDown={
+                    href
+                      ? (event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            router.push(href);
+                          }
+                        }
+                      : undefined
+                  }
                   sx={{
                     minHeight: 142,
                     p: 2.5,
@@ -352,6 +375,7 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
                     border: "1px solid",
                     borderColor: dashboardTokens.border,
                     bgcolor: dashboardTokens.surface,
+                    cursor: href ? "pointer" : "default",
                     transition: "background-color 140ms ease, border-color 140ms ease, transform 140ms ease",
                     "&:hover": {
                       bgcolor: dashboardTokens.surfaceAlt,

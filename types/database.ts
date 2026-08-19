@@ -61,7 +61,7 @@ export interface Document {
   user_id: string
   conversation_id: string | null
   file_name: string
-  file_type: 'pdf' | 'csv'
+  file_type: 'pdf' | 'csv' | 'image'
   mime_type: string
   storage_path: string
   status: 'uploaded' | 'processing' | 'ready' | 'failed'

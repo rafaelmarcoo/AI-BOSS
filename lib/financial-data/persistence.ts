@@ -159,6 +159,51 @@ export async function listLatestFinancialMetricValues(userId: string) {
   return metrics
 }
 
+export interface FinancialMetricBySource {
+  metricKey: FinancialMetricKey
+  sourceType: string
+  sourceLabel: string
+  value: number
+  currency: string | null
+}
+
+export async function listLatestFinancialMetricValuesBySource(
+  userId: string
+): Promise<FinancialMetricBySource[]> {
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase
+    .from('financial_metric_observations')
+    .select(FINANCIAL_METRIC_OBSERVATION_SELECT)
+    .eq('user_id', userId)
+    .order('updated_at', { ascending: false })
+
+  if (error) {
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to load financial metric observations.'
+    )
+  }
+
+  const latestBySourceAndMetric = new Map<string, FinancialMetricObservation>()
+
+  for (const row of (data ?? []) as FinancialMetricObservation[]) {
+    const groupKey = `${row.metric_key}::${row.source_type}`
+
+    if (!latestBySourceAndMetric.has(groupKey)) {
+      latestBySourceAndMetric.set(groupKey, row)
+    }
+  }
+
+  return [...latestBySourceAndMetric.values()].map((row) => ({
+    metricKey: row.metric_key,
+    sourceType: row.source_type,
+    sourceLabel: row.source_label,
+    value: Number(row.value),
+    currency: row.currency,
+  }))
+}
+
 export async function listFinancialMetricObservationHistory(params: {
   userId: string
   metricKey: FinancialMetricKey

@@ -6,7 +6,7 @@ import {
   createImageChunks,
   createPdfChunks,
 } from '@/lib/documents/chunking'
-import { extractImageText } from '@/lib/documents/image-extraction'
+import { extractImageMetrics, extractImageText } from '@/lib/documents/image-extraction'
 import type {
   ParsedCsvRow,
   ParsedDocumentResult,
@@ -252,9 +252,21 @@ async function parseImageDocument(
       )
     }
 
+    let extractedMetrics: Record<string, number> = {}
+
+    try {
+      extractedMetrics = await extractImageMetrics(fileBytes, document.mime_type)
+    } catch (metricsError) {
+      console.error(
+        `Failed to extract structured metrics from ${document.file_name}.`,
+        metricsError
+      )
+    }
+
     return {
       rawText: text,
-      metadata: {},
+      metadata:
+        Object.keys(extractedMetrics).length > 0 ? { extractedMetrics } : {},
       chunks: createImageChunks({
         documentId: document.id,
         userId: document.user_id,

@@ -11,6 +11,43 @@ const IMAGE_EXTRACTION_PROMPT =
   'ledger), also note the document type and any totals, dates, or line items ' +
   'you can identify. Do not summarize or omit content — transcribe everything visible.'
 
+const IMAGE_METRICS_PROMPT =
+  'Identify any financial figures in this image (expenses, revenue, totals, ' +
+  'line items, department or category breakdowns, etc.). Return them as a ' +
+  'flat JSON object mapping a short, human-readable label to its numeric ' +
+  'value, e.g. {"Icecream Expenses": 500, "Revenue": 4000}. Only include ' +
+  'values you can clearly read. If there are no financial figures, return {}. ' +
+  'Respond with ONLY the JSON object and nothing else — no markdown, no ' +
+  'explanation.'
+
+function parseMetricsJson(raw: string): Record<string, number> {
+  const jsonMatch = raw.match(/\{[\s\S]*\}/)
+
+  if (!jsonMatch) {
+    return {}
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(jsonMatch[0])
+
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {}
+    }
+
+    const metrics: Record<string, number> = {}
+
+    for (const [label, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        metrics[label] = value
+      }
+    }
+
+    return metrics
+  } catch {
+    return {}
+  }
+}
+
 export async function extractImageText(
   fileBytes: Uint8Array,
   mimeType: string
@@ -41,6 +78,39 @@ export async function extractImageText(
   ])
 
   return typeof response.content === 'string' ? response.content.trim() : ''
+}
+
+export async function extractImageMetrics(
+  fileBytes: Uint8Array,
+  mimeType: string
+): Promise<Record<string, number>> {
+  const apiKey = process.env.OPENAI_API_KEY
+
+  if (!apiKey) {
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Missing required environment variable: OPENAI_API_KEY.'
+    )
+  }
+
+  const model = new ChatOpenAI({ model: OPENAI_VISION_MODEL, temperature: 0, apiKey })
+  const base64Data = Buffer.from(fileBytes).toString('base64')
+
+  const response = await model.invoke([
+    new HumanMessage({
+      content: [
+        { type: 'text', text: IMAGE_METRICS_PROMPT },
+        {
+          type: 'image_url',
+          image_url: { url: `data:${mimeType};base64,${base64Data}` },
+        },
+      ],
+    }),
+  ])
+
+  const raw = typeof response.content === 'string' ? response.content : ''
+  return parseMetricsJson(raw)
 }
 
 // --- Anthropic vision alternative (currently unused) ---

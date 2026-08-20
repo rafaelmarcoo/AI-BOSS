@@ -128,6 +128,14 @@ function matchMetricLabel(value: string): MetricLabelMatch | null {
     return { key: 'accounts_payable', confidence: 0.95 }
   }
 
+  if (/\b(cost of sales|cost of goods sold|cogs|cost of revenue)\b/.test(label)) {
+    return { key: 'cost_of_sales', confidence: 0.9 }
+  }
+
+  if (/\b(operating profit|operating income|ebit)\b/.test(label)) {
+    return { key: 'operating_profit', confidence: 0.9 }
+  }
+
   if (/\b(monthly revenue|revenue|income|sales|turnover)\b/.test(label)) {
     return { key: 'monthly_revenue', confidence: 0.85 }
   }
@@ -136,6 +144,22 @@ function matchMetricLabel(value: string): MetricLabelMatch | null {
     /\b(monthly expenses|expenses|operating expenses|opex|costs)\b/.test(label)
   ) {
     return { key: 'monthly_expenses', confidence: 0.85 }
+  }
+
+  if (/\b(current assets|total current assets)\b/.test(label)) {
+    return { key: 'current_assets', confidence: 0.9 }
+  }
+
+  if (/\b(current liabilities|total current liabilities)\b/.test(label)) {
+    return { key: 'current_liabilities', confidence: 0.9 }
+  }
+
+  if (/\b(total debt|total borrowings|loans and lease liabilities)\b/.test(label)) {
+    return { key: 'total_debt', confidence: 0.9 }
+  }
+
+  if (/\b(total equity|shareholders equity|shareholders' equity)\b/.test(label)) {
+    return { key: 'total_equity', confidence: 0.9 }
   }
 
   if (/\b(runway|runway months)\b/.test(label)) {

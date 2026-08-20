@@ -360,7 +360,7 @@ one source/period, rather than a wide snapshot of all metrics.
 | user_id | UUID (FK) | References users(id) |
 | connection_id | UUID (FK) | Optional source connection from data_connections |
 | document_id | UUID (FK) | Optional uploaded document source |
-| metric_key | TEXT | Canonical key: `cash`, `accounts_receivable`, `accounts_payable`, `monthly_revenue`, `monthly_expenses`, `burn_rate`, or `runway_months` |
+| metric_key | TEXT | Canonical key, constrained by a CHECK. Cash position: `cash`, `accounts_receivable`, `accounts_payable`, `monthly_revenue`, `monthly_expenses`, `burn_rate`, `runway_months`. Income statement: `cost_of_sales`, `operating_profit`. Balance sheet: `current_assets`, `current_liabilities`, `total_debt`, `total_equity` |
 | value | NUMERIC(18,4) | Normalized metric value |
 | currency | TEXT | Optional ISO currency code such as `NZD` or `AUD` |
 | period_start | DATE | Optional period start for period-based metrics |

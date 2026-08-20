@@ -109,6 +109,22 @@ strictness buys little and costs compatibility with two models.
 specialist. Both are fine on the other two, and GLM-5 Turbo is fine on all three.
 The failure is loud — an error, not a wrong answer.
 
+**Important caveat — this result is branch-specific.** These runs were made on
+`model-comparsion`, which was three commits behind `main`. `main` has since
+gained `toolInputRepairResult` in `lib/ai/agent.ts`: when a tool input fails
+schema validation it returns a message asking the model to correct the arguments
+and call the tool again, rather than failing the run.
+
+That is a plausible fix for this exact failure — GLM would be told its
+`recordLimit` was invalid and could retry with an accepted value. **The
+underlying model behaviour still stands: GLM-5.2 and GLM-5.3 send arguments
+outside a declared enum where six other models do not.** What changes is the
+consequence — a hard failure here, likely a recovered retry on `main`.
+
+This should be re-run after the branches are merged. Until then, treat the
+4 failures as "these models produce invalid tool arguments", not as "these
+models cannot answer historical questions".
+
 ### 4. OpenAI compatibility is a floor, not a guarantee
 
 Seven of eight models run through one client with a different base URL, because
@@ -196,3 +212,8 @@ the same kind would add little; questions of a different kind — long documents
 multi-turn sessions, other currencies — would likely surface different results.
 
 **Claude is untested**, and it is named in the card.
+
+**Run on `model-comparsion`, three commits behind `main`.** `main` has since added
+tiered model configuration (`lib/ai/model-config.ts`) and tool-input repair. The
+latter affects finding 3 directly — see the caveat there. The default model on
+`main` is now `gpt-5.6-luna`, which is not in the catalogue and was not tested.

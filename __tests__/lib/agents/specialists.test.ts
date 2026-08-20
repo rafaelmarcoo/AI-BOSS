@@ -21,6 +21,9 @@ jest.mock('@/lib/tools/financial/get-financial-forecast', () => ({
 jest.mock('@/lib/tools/financial/model-scenario', () => ({
   createModelScenarioTool: jest.fn(() => ({ name: 'model_scenario' })),
 }))
+jest.mock('@/lib/tools/financial/calculate-ratios', () => ({
+  createCalculateRatiosTool: jest.fn(() => ({ name: 'calculate_ratios' })),
+}))
 
 const mockRunAgent = jest.mocked(runAgent)
 

@@ -4,6 +4,7 @@ import {
   summarizeMetricAvailability,
   type FinancialMetricSet,
 } from '@/lib/financial-data'
+import { FINANCIAL_METRIC_KEYS } from '@/lib/financial-data/metric-keys'
 
 function createMetric(
   key: 'cash' | 'accounts_receivable' | 'accounts_payable' | 'burn_rate',
@@ -47,15 +48,7 @@ describe('financial data read service helpers', () => {
       sourceLabel: null,
       updatedAt: null,
     })
-    expect(Object.keys(metrics)).toEqual([
-      'cash',
-      'accounts_receivable',
-      'accounts_payable',
-      'monthly_revenue',
-      'monthly_expenses',
-      'burn_rate',
-      'runway_months',
-    ])
+    expect(Object.keys(metrics)).toEqual([...FINANCIAL_METRIC_KEYS])
   })
 
   it('summarizes available and unavailable metric counts', () => {
@@ -66,7 +59,7 @@ describe('financial data read service helpers', () => {
 
     expect(summarizeMetricAvailability(metrics)).toEqual({
       availableMetricCount: 2,
-      unavailableMetricCount: 5,
+      unavailableMetricCount: FINANCIAL_METRIC_KEYS.length - 2,
     })
   })
 

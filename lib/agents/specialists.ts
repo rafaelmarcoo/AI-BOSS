@@ -4,6 +4,7 @@ import { DEFAULT_MODEL, isModelName, type ModelName } from '@/lib/ai/models'
 import { AGENT_SYSTEM_PROMPT } from '@/lib/chat/system-prompt'
 import { routeFinancialQuestion, type FinancialSpecialist } from '@/lib/agents/router'
 import { calculateRunwayTool } from '@/lib/tools/financial/calculate-runway'
+import { createCalculateRatiosTool } from '@/lib/tools/financial/calculate-ratios'
 import { createGetFinancialForecastTool } from '@/lib/tools/financial/get-financial-forecast'
 import { createGetFinancialHistoryTool } from '@/lib/tools/financial/get-financial-history'
 import { createGetLatestSnapshotTool } from '@/lib/tools/financial/get-latest-snapshot'
@@ -14,7 +15,7 @@ const SPECIALIST_PROMPTS: Record<FinancialSpecialist, string> = {
   financial_position: `${AGENT_SYSTEM_PROMPT}
 
 ## Assigned specialist
-You are handling current financial position and runway only. Use get_latest_snapshot for current values. Use calculate_runway only from confirmed snapshot values. If the request is about history, forecasting, or a scenario, explain that this request needs the appropriate analysis instead of inventing an answer.`,
+You are handling current financial position, runway and financial ratios. Use get_latest_snapshot for current values. Use calculate_runway only from confirmed snapshot values. Use calculate_ratios for any question about margins, profitability, liquidity or leverage — never work a ratio out yourself, and never substitute a near-enough input such as treating cash plus receivables as current assets. If calculate_ratios reports a ratio as unavailable, state exactly which figures are missing. If the request is about history, forecasting, or a scenario, explain that this request needs the appropriate analysis instead of inventing an answer.`,
   historical_forecast: `${AGENT_SYSTEM_PROMPT}
 
 ## Assigned specialist
@@ -51,7 +52,11 @@ export function modelForSpecialist(specialist: FinancialSpecialist): ModelName {
 
 function specialistTools(userId: string, specialist: FinancialSpecialist): AppTool[] {
   if (specialist === 'financial_position') {
-    return [createGetLatestSnapshotTool(userId), calculateRunwayTool]
+    return [
+      createGetLatestSnapshotTool(userId),
+      calculateRunwayTool,
+      createCalculateRatiosTool(userId),
+    ]
   }
 
   if (specialist === 'historical_forecast') {

@@ -1,5 +1,6 @@
 import { readSourceAwareMetrics } from '@/lib/financial-data/read-service'
 import { listLatestFinancialMetricValues } from '@/lib/financial-data/persistence'
+import { FINANCIAL_METRIC_KEYS } from '@/lib/financial-data/metric-keys'
 
 jest.mock('@/lib/financial-data/persistence', () => ({
   listLatestFinancialMetricValues: jest.fn(),
@@ -80,7 +81,7 @@ describe('readSourceAwareMetrics', () => {
 
     await expect(readSourceAwareMetrics('user-123')).resolves.toMatchObject({
       availableMetricCount: 4,
-      unavailableMetricCount: 3,
+      unavailableMetricCount: FINANCIAL_METRIC_KEYS.length - 4,
       runwayInput: {
         cash: 120000,
         ar: 45000,

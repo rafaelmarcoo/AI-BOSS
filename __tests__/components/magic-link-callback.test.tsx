@@ -18,7 +18,7 @@ describe('MagicLinkCallback', () => {
     window.history.pushState(
       {},
       '',
-      '/auth/callback#access_token=access&refresh_token=refresh'
+      '/auth/callback?flow=signup#access_token=access&refresh_token=refresh'
     )
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
@@ -34,6 +34,7 @@ describe('MagicLinkCallback', () => {
         body: JSON.stringify({
           accessToken: 'access',
           refreshToken: 'refresh',
+          flow: 'signup',
         }),
       })
     )

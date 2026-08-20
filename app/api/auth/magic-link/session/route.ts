@@ -6,9 +6,14 @@ import {
   readJsonBody,
   validateMagicLinkSessionPayload,
 } from '@/lib/api/validation'
-import { applySessionCookies, getPendingSignInEmail } from '@/lib/auth'
+import {
+  applySessionCookies,
+  getPendingSignInEmail,
+  getPendingSignUpEmail,
+} from '@/lib/auth'
 import {
   COOKIE_MAGIC_LINK_STATE,
+  COOKIE_SIGNUP_STATE,
   createServerSupabaseClient,
 } from '@/lib/supabase'
 
@@ -17,7 +22,10 @@ export async function POST(request: NextRequest) {
     const payload = assertValid(
       validateMagicLinkSessionPayload(await readJsonBody(request))
     )
-    const expectedEmail = getPendingSignInEmail(request)
+    const expectedEmail =
+      payload.flow === 'signup'
+        ? getPendingSignUpEmail(request)
+        : getPendingSignInEmail(request)
 
     if (!expectedEmail) {
       throw new ApiError(401, 'AUTH_INVALID', 'This sign-in link is invalid or expired.')
@@ -43,7 +51,9 @@ export async function POST(request: NextRequest) {
       'Signed in successfully.'
     )
     await applySessionCookies(response, data.session)
-    response.cookies.delete(COOKIE_MAGIC_LINK_STATE)
+    response.cookies.delete(
+      payload.flow === 'signup' ? COOKIE_SIGNUP_STATE : COOKIE_MAGIC_LINK_STATE
+    )
 
     return response
   } catch (error) {

@@ -8,9 +8,11 @@ import { createServerSupabaseClient } from '@/lib/supabase'
 jest.mock('@/lib/auth', () => ({
   applySessionCookies: jest.fn(),
   getPendingSignInEmail: jest.fn(() => 'person@example.com'),
+  getPendingSignUpEmail: jest.fn(() => 'person@example.com'),
 }))
 jest.mock('@/lib/supabase', () => ({
   COOKIE_MAGIC_LINK_STATE: 'magic-link-state',
+  COOKIE_SIGNUP_STATE: 'signup-state',
   createServerSupabaseClient: jest.fn(),
 }))
 
@@ -48,6 +50,7 @@ describe('/api/auth/magic-link/session', () => {
       body: JSON.stringify({
         accessToken: 'access',
         refreshToken: 'refresh',
+        flow: 'signin',
       }),
     })
 
@@ -82,6 +85,7 @@ describe('/api/auth/magic-link/session', () => {
       body: JSON.stringify({
         accessToken: 'access',
         refreshToken: 'refresh',
+        flow: 'signin',
       }),
     })
 
@@ -89,5 +93,37 @@ describe('/api/auth/magic-link/session', () => {
 
     expect(response.status).toBe(401)
     expect(mockedApplySessionCookies).not.toHaveBeenCalled()
+  })
+
+  it('creates the app session after a matching signup confirmation', async () => {
+    const session = {
+      access_token: 'signup-access',
+      refresh_token: 'signup-refresh',
+      expires_in: 3600,
+    }
+    setSession.mockResolvedValue({
+      data: {
+        session,
+        user: { id: 'user-1', email: 'person@example.com' },
+      },
+      error: null,
+    })
+    const request = new NextRequest('http://localhost/api/auth/magic-link/session', {
+      method: 'POST',
+      headers: {
+        cookie: `signup-state=${Buffer.from('person@example.com').toString('base64url')}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        accessToken: 'signup-access',
+        refreshToken: 'signup-refresh',
+        flow: 'signup',
+      }),
+    })
+
+    const response = await POST(request)
+
+    expect(response.status).toBe(200)
+    expect(mockedApplySessionCookies).toHaveBeenCalledWith(response, session)
   })
 })

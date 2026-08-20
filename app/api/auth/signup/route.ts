@@ -1,7 +1,7 @@
 import type { User } from '@supabase/supabase-js'
 import { ApiError } from '@/lib/api/errors'
 import { handleRouteError, successResponse } from '@/lib/api/responses'
-import { applySessionCookies } from '@/lib/auth'
+import { applyPendingSignUpCookie, applySessionCookies } from '@/lib/auth'
 import {
   assertValid,
   readJsonBody,
@@ -64,9 +64,14 @@ export async function POST(request: Request) {
 
       createdUser = data.user
     } else {
+      const callbackUrl = new URL('/auth/callback', request.url)
+      callbackUrl.searchParams.set('flow', 'signup')
       const { data, error } = await supabase.auth.signUp({
         email: payload.email,
         password: payload.password,
+        options: {
+          emailRedirectTo: callbackUrl.toString(),
+        },
       })
 
       if (error || !data.user || data.user.identities?.length === 0) {
@@ -162,6 +167,7 @@ export async function POST(request: Request) {
       { status: 201 },
       'Account created. Check your email for the verification link.'
     )
+    applyPendingSignUpCookie(response, payload.email)
 
     return response
   } catch (error) {

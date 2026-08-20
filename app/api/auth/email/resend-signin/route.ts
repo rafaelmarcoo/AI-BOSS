@@ -19,6 +19,7 @@ export async function POST(request: NextRequest) {
     }
 
     const callbackUrl = new URL('/auth/callback', request.url)
+    callbackUrl.searchParams.set('flow', 'signin')
     const supabase = createServerSupabaseClient()
     const { error } = await supabase.auth.signInWithOtp({
       email,

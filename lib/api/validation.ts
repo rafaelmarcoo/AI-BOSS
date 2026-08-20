@@ -69,6 +69,7 @@ export interface EmailPayload {
 export interface MagicLinkSessionPayload {
   accessToken: string
   refreshToken: string
+  flow: 'signin' | 'signup'
 }
 
 // Keep the accepted chat roles narrow so the API contract stays predictable.
@@ -246,13 +247,23 @@ export function validateMagicLinkSessionPayload(
     'refreshToken',
     details
   )
-  if (Object.keys(details).length > 0 || !accessToken || !refreshToken) {
+  const flow = readTrimmedString(Reflect.get(input, 'flow'), 'flow', details)
+  const validatedFlow = flow === 'signin' || flow === 'signup' ? flow : null
+  if (flow && !validatedFlow) {
+    details.flow = 'flow must be either signin or signup.'
+  }
+  if (
+    Object.keys(details).length > 0 ||
+    !accessToken ||
+    !refreshToken ||
+    !validatedFlow
+  ) {
     return { success: false, details }
   }
 
   return {
     success: true,
-    data: { accessToken, refreshToken },
+    data: { accessToken, refreshToken, flow: validatedFlow },
   }
 }
 

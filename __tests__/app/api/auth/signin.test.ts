@@ -57,7 +57,7 @@ describe('/api/auth/signin', () => {
       email: 'person@example.com',
       options: {
         shouldCreateUser: false,
-        emailRedirectTo: 'http://localhost/auth/callback',
+        emailRedirectTo: 'http://localhost/auth/callback?flow=signin',
       },
     })
     expect(mockedApplyPendingSignInCookie).toHaveBeenCalledWith(

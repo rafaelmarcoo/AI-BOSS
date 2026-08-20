@@ -1,7 +1,7 @@
 /** @jest-environment node */
 
 import { POST } from '@/app/api/auth/signup/route'
-import { applySessionCookies } from '@/lib/auth'
+import { applyPendingSignUpCookie, applySessionCookies } from '@/lib/auth'
 import { findCompanyByJoinCode, findCompanyByName } from '@/lib/companies'
 import {
   createAdminSupabaseClient,
@@ -12,7 +12,10 @@ jest.mock('@/lib/companies', () => ({
   findCompanyByJoinCode: jest.fn(),
   findCompanyByName: jest.fn(),
 }))
-jest.mock('@/lib/auth', () => ({ applySessionCookies: jest.fn() }))
+jest.mock('@/lib/auth', () => ({
+  applyPendingSignUpCookie: jest.fn(),
+  applySessionCookies: jest.fn(),
+}))
 jest.mock('@/lib/supabase', () => ({
   createAdminSupabaseClient: jest.fn(),
   createServerSupabaseClient: jest.fn(),
@@ -21,6 +24,7 @@ jest.mock('@/lib/supabase', () => ({
 const mockedFindCompanyByJoinCode = jest.mocked(findCompanyByJoinCode)
 const mockedFindCompanyByName = jest.mocked(findCompanyByName)
 const mockedApplySessionCookies = jest.mocked(applySessionCookies)
+const mockedApplyPendingSignUpCookie = jest.mocked(applyPendingSignUpCookie)
 const mockedCreateAdminSupabaseClient = jest.mocked(createAdminSupabaseClient)
 const mockedCreateServerSupabaseClient = jest.mocked(createServerSupabaseClient)
 const signUp = jest.fn()
@@ -93,6 +97,13 @@ describe('/api/auth/signup company codes', () => {
     )
 
     expect(response.status).toBe(201)
+    expect(signUp).toHaveBeenCalledWith({
+      email: 'employee@example.com',
+      password: 'password123',
+      options: {
+        emailRedirectTo: 'http://localhost/auth/callback?flow=signup',
+      },
+    })
     expect(mockedFindCompanyByJoinCode).toHaveBeenCalledWith(
       'A3F9-7C21-D84B-6E10'
     )
@@ -103,6 +114,10 @@ describe('/api/auth/signup company codes', () => {
         user_type: 'employee',
       }),
       { onConflict: 'id' }
+    )
+    expect(mockedApplyPendingSignUpCookie).toHaveBeenCalledWith(
+      response,
+      'employee@example.com'
     )
   })
 

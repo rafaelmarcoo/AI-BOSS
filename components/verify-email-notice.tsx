@@ -7,7 +7,7 @@ export function VerifyEmailNotice() {
     <EmailLinkNotice
       storageKey="pending-signup-email"
       heading="Check your email"
-      description="Supabase sent you a verification link. Open the email and click the link to verify your address, then return here to sign in."
+      description="We sent you a verification link. Open the email and click the link to verify your address and sign in automatically."
       helperText="Check this inbox and its spam folder."
       resendUrl="/api/auth/email/resend"
       resendLabel="Resend verification email"

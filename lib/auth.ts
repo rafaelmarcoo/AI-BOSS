@@ -4,6 +4,7 @@ import {
   COOKIE_ACCESS_TOKEN,
   COOKIE_MAGIC_LINK_STATE,
   COOKIE_REFRESH_TOKEN,
+  COOKIE_SIGNUP_STATE,
   createAdminSupabaseClient,
   createServerSupabaseClient,
 } from '@/lib/supabase'
@@ -112,8 +113,28 @@ export function clearSessionCookies(response: NextResponse) {
 }
 
 export function applyPendingSignInCookie(response: NextResponse, email: string) {
+  applyPendingEmailCookie(response, COOKIE_MAGIC_LINK_STATE, email)
+}
+
+export function getPendingSignInEmail(request: NextRequest) {
+  return getPendingEmail(request, COOKIE_MAGIC_LINK_STATE)
+}
+
+export function applyPendingSignUpCookie(response: NextResponse, email: string) {
+  applyPendingEmailCookie(response, COOKIE_SIGNUP_STATE, email)
+}
+
+export function getPendingSignUpEmail(request: NextRequest) {
+  return getPendingEmail(request, COOKIE_SIGNUP_STATE)
+}
+
+function applyPendingEmailCookie(
+  response: NextResponse,
+  cookieName: string,
+  email: string
+) {
   response.cookies.set(
-    COOKIE_MAGIC_LINK_STATE,
+    cookieName,
     Buffer.from(email.toLowerCase(), 'utf8').toString('base64url'),
     {
       httpOnly: true,
@@ -125,8 +146,8 @@ export function applyPendingSignInCookie(response: NextResponse, email: string) 
   )
 }
 
-export function getPendingSignInEmail(request: NextRequest) {
-  const value = request.cookies.get(COOKIE_MAGIC_LINK_STATE)?.value
+function getPendingEmail(request: NextRequest, cookieName: string) {
+  const value = request.cookies.get(cookieName)?.value
   if (!value) return null
 
   try {

@@ -21,11 +21,17 @@ export function MagicLinkCallback() {
       const accessToken = hash.get('access_token')
       const refreshToken = hash.get('refresh_token')
       const query = new URLSearchParams(window.location.search)
+      const flow = query.get('flow')
       const providerError = hash.get('error_description') ?? query.get('error_description')
 
       window.history.replaceState({}, document.title, window.location.pathname)
 
-      if (providerError || !accessToken || !refreshToken) {
+      if (
+        providerError ||
+        !accessToken ||
+        !refreshToken ||
+        (flow !== 'signin' && flow !== 'signup')
+      ) {
         setErrorMessage(providerError ?? 'This sign-in link is invalid or expired.')
         return
       }
@@ -34,7 +40,7 @@ export function MagicLinkCallback() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ accessToken, refreshToken }),
+        body: JSON.stringify({ accessToken, refreshToken, flow }),
       })
       const payload = (await response.json().catch(() => null)) as
         | { success: true }
@@ -51,6 +57,7 @@ export function MagicLinkCallback() {
       }
 
       window.sessionStorage.removeItem('pending-signin-email')
+      window.sessionStorage.removeItem('pending-signup-email')
       router.replace('/landing')
       router.refresh()
     }

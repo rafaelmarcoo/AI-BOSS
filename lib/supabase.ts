@@ -15,6 +15,7 @@ function requireEnv(name: string, value: string | undefined) {
 export const COOKIE_ACCESS_TOKEN = 'ai-boss-access-token'
 export const COOKIE_REFRESH_TOKEN = 'ai-boss-refresh-token'
 export const COOKIE_MAGIC_LINK_STATE = 'ai-boss-magic-link-state'
+export const COOKIE_SIGNUP_STATE = 'ai-boss-signup-state'
 
 const url = requireEnv('NEXT_PUBLIC_SUPABASE_URL', supabaseUrl)
 const anonKey = requireEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', supabaseAnonKey)

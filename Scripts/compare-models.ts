@@ -200,6 +200,13 @@ async function runOne(
     }
   }
 }
+function demoteHeadings(answer: string) {
+  return answer.replace(
+    /^(#{1,4}) /gm,
+    (_match, hashes: string) =>
+      `${'#'.repeat(Math.min(6, Math.max(5, hashes.length + 2)))} `
+  )
+}
 
 function buildMarkdown(models: ModelName[], results: Result[]) {
   const find = (model: ModelName, questionId: string) =>
@@ -312,7 +319,7 @@ function buildMarkdown(models: ModelName[], results: Result[]) {
         `\`${result.specialist}\` · tools: ${result.toolsUsed.join(', ') || 'none'} · ` +
           `${result.tokensUsed ?? '?'} tokens · ${(result.ms / 1000).toFixed(1)}s`,
         '',
-        result.answer.trim(),
+        demoteHeadings(result.answer.trim()),
         ''
       )
     }

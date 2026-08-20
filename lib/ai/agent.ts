@@ -7,6 +7,7 @@ import {
 } from '@langchain/core/messages'
 import {
   createChatModel,
+  resolveModel,
   DEFAULT_MODEL,
   type ModelName,
 } from '@/lib/ai/models'
@@ -83,8 +84,20 @@ export async function runAgent(
   modelName: ModelName = DEFAULT_MODEL
 ): Promise<AgentRunResult> {
   const model = createAgentModel(modelName)
-  const langChainTools = adaptToolsToLangChain(tools)
-  const llm = langChainTools.length > 0 ? model.bindTools(langChainTools) : model
+  const dialect =
+    resolveModel(modelName).provider.sdk === 'google' ? 'google' : 'json-schema'
+  const langChainTools = adaptToolsToLangChain(tools, dialect)
+
+  if (langChainTools.length > 0 && typeof model.bindTools !== 'function') {
+    throw new Error(
+      `Model "${modelName}" does not support tool calling, which this agent requires.`
+    )
+  }
+
+  const llm =
+    langChainTools.length > 0 && model.bindTools
+      ? model.bindTools(langChainTools)
+      : model
 
   const messages = buildAgentMessages({
     input,

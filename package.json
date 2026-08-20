@@ -11,12 +11,14 @@
     "test:watch": "jest --watch",
     "test:agent": "tsx Scripts/test-agent.ts",
     "check:models": "node --env-file=.env.local --import=tsx Scripts/check-models.ts",
-    "list:models": "node --env-file=.env.local --import=tsx Scripts/list-provider-models.ts"
+    "list:models": "node --env-file=.env.local --import=tsx Scripts/list-provider-models.ts",
+    "compare:models": "node --env-file=.env.local --import=tsx Scripts/compare-models.ts"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@langchain/core": "^1.1.38",
+    "@langchain/google-genai": "^2.2.0",
     "@langchain/openai": "^1.4.1",
     "@mui/icons-material": "^7.3.9",
     "@mui/material": "^7.3.9",
@@ -28,6 +30,7 @@
     "react-dom": "19.2.4",
     "react-markdown": "^10.1.0",
     "recharts": "^3.8.1",
+    "remark-gfm": "^4.0.1",
     "zod": "^4.3.6"
   },
   "devDependencies": {

@@ -88,7 +88,8 @@ export async function runMultiAgent(
   userId: string,
   input: string,
   chatHistory: BaseMessage[] = [],
-  contextMessages: BaseMessage[] = []
+  contextMessages: BaseMessage[] = [],
+  modelOverride?: ModelName
 ): Promise<MultiAgentRunResult> {
   const specialist = routeFinancialQuestion(input)
   const percentageValidation =
@@ -100,11 +101,11 @@ export async function runMultiAgent(
       tokensUsed: null,
       toolsUsed: [],
       specialist,
-      modelName: modelForSpecialist(specialist),
+      modelName: modelOverride ?? modelForSpecialist(specialist),
     }
   }
 
-  const modelName = modelForSpecialist(specialist)
+  const modelName = modelOverride ?? modelForSpecialist(specialist)
   const result = await runAgent(
     input,
     chatHistory,

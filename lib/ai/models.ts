@@ -1,4 +1,6 @@
 ﻿import { ChatOpenAI } from '@langchain/openai'
+import { ChatGoogleGenerativeAI } from '@langchain/google-genai'
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { ApiError } from '@/lib/api/errors'
 import { CHAT_MODEL } from '@/lib/chat/system-prompt'
 
@@ -11,6 +13,7 @@ import { CHAT_MODEL } from '@/lib/chat/system-prompt'
 export interface ModelProvider {
   label: string
   apiKeyEnv: string
+  sdk: 'openai' | 'google'
   baseUrl?: string
   docsUrl: string
 }
@@ -19,31 +22,35 @@ export const MODEL_PROVIDERS = {
   openai: {
     label: 'OpenAI',
     apiKeyEnv: 'OPENAI_API_KEY',
+    sdk: 'openai',
     docsUrl: 'https://platform.openai.com/docs/models',
   },
   zhipu: {
     label: 'Zhipu GLM',
     apiKeyEnv: 'ZHIPU_API_KEY',
+    sdk: 'openai',
     baseUrl: 'https://api.z.ai/api/paas/v4',
     docsUrl: 'https://docs.z.ai',
   },
   deepseek: {
     label: 'DeepSeek',
     apiKeyEnv: 'DEEPSEEK_API_KEY',
+    sdk: 'openai',
     baseUrl: 'https://api.deepseek.com',
     docsUrl: 'https://api-docs.deepseek.com',
   },
   xai: {
     label: 'xAI Grok',
     apiKeyEnv: 'XAI_API_KEY',
+    sdk: 'openai',
     baseUrl: 'https://api.x.ai/v1',
     docsUrl: 'https://docs.x.ai/docs/models',
   },
   google: {
     label: 'Google Gemini',
     apiKeyEnv: 'GEMINI_API_KEY',
-    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-    docsUrl: 'https://ai.google.dev/gemini-api/docs/openai',
+    sdk: 'google',
+    docsUrl: 'https://ai.google.dev/gemini-api/docs',
   },
 } as const satisfies Record<string, ModelProvider>
 
@@ -133,7 +140,16 @@ function buildModel(
   apiKey: string,
   temperature: number,
   maxRetries?: number
-) {
+): BaseChatModel {
+  if (provider.sdk === 'google') {
+    return new ChatGoogleGenerativeAI({
+      model: spec.model,
+      temperature,
+      apiKey,
+      ...(maxRetries === undefined ? {} : { maxRetries }),
+    })
+  }
+
   return new ChatOpenAI({
     model: spec.model,
     temperature,

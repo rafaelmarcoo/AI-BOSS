@@ -1,6 +1,7 @@
 import { Box, Paper, Stack } from "@mui/material";
 import { keyframes } from "@mui/system";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { dashboardTokens } from "@/app/theme";
 
 const assistantMarkdownSx = {
@@ -20,6 +21,32 @@ const assistantMarkdownSx = {
   },
   "& h1:first-child, & h2:first-child, & h3:first-child, & h4:first-child": {
     mt: 0,
+  },
+  "& table": {
+    width: "100%",
+    borderCollapse: "collapse",
+    my: 1,
+    fontSize: "0.94em",
+    display: "block",
+    overflowX: "auto",
+  },
+  "& th, & td": {
+    border: "1px solid rgba(255,255,255,0.18)",
+    px: 1,
+    py: 0.5,
+    textAlign: "left",
+    verticalAlign: "top",
+  },
+  "& th": {
+    fontWeight: 700,
+    bgcolor: "rgba(255,255,255,0.06)",
+  },
+  "& code": {
+    bgcolor: "rgba(255,255,255,0.10)",
+    px: 0.5,
+    py: 0.125,
+    borderRadius: 0.5,
+    fontSize: "0.92em",
   },
 };
 
@@ -103,7 +130,8 @@ export function ChatMessage({
               <Box sx={{ whiteSpace: "pre-wrap" }}>{content}</Box>
             ) : (
               <Box sx={assistantMarkdownSx}>
-                <ReactMarkdown>
+                {}
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {(content ?? "").replace(/\n{3,}/g, "\n\n")}
                 </ReactMarkdown>
               </Box>

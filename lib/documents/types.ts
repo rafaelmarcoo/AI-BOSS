@@ -9,6 +9,7 @@ export type DocumentSummary = Pick<
   | 'mime_type'
   | 'storage_path'
   | 'status'
+  | 'financial_review_status'
   | 'document_type'
   | 'metadata'
   | 'error_message'

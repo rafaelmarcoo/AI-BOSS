@@ -59,6 +59,7 @@ describe('processDocument', () => {
       mime_type: 'text/csv',
       storage_path: 'user-123/summary.csv',
       status: 'ready',
+      financial_review_status: 'legacy',
       document_type: null,
       metadata: null,
       error_message: null,
@@ -86,6 +87,7 @@ describe('processDocument', () => {
       mime_type: 'text/csv',
       storage_path: 'user-123/summary.csv',
       status: 'processing',
+      financial_review_status: 'legacy',
       document_type: null,
       raw_text: null,
       metadata: null,
@@ -147,6 +149,7 @@ describe('processDocument', () => {
       id: 'document-123', user_id: 'user-123', conversation_id: null,
       file_name: 'summary.csv', file_type: 'csv', mime_type: 'text/csv',
       storage_path: 'user-123/summary.csv', status: 'processing', document_type: null,
+      financial_review_status: 'legacy',
       raw_text: null, metadata: null, error_message: null,
       created_at: '2026-05-12T00:00:00.000Z', updated_at: '2026-05-12T00:00:00.000Z',
     })

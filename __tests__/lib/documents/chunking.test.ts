@@ -26,12 +26,12 @@ describe('document chunking', () => {
       chunk_index: 0,
       source_page: null,
     })
-    expect(result.rawText).toContain('Row 1')
+    expect(result.rawText).toContain('Row 2')
     expect(result.rawText).toContain('month: Jan')
     expect(result.csvData?.headers).toEqual(['month', 'revenue', 'expenses'])
     expect(result.csvData?.rows).toHaveLength(3)
     expect(result.csvData?.rows[0]).toMatchObject({
-      rowNumber: 1,
+      rowNumber: 2,
       values: ['Jan', '1000', '600'],
       cells: {
         month: 'Jan',
@@ -61,15 +61,7 @@ describe('document chunking', () => {
     )
 
     expect(result.metadata).toMatchObject({
-      headers: [
-        'Account',
-        'Amount',
-        'Currency',
-        'Date',
-        'column_5',
-        'column_6',
-        'column_7',
-      ],
+      headers: ['Account', 'Amount', 'Currency', 'Date'],
       rowCount: 2,
       skippedRowCount: 1,
     })

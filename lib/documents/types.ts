@@ -57,10 +57,52 @@ export interface ParsedCsvData {
   rows: ParsedCsvRow[]
 }
 
+export interface TabularWarning {
+  code: string
+  message: string
+  sheetName?: string
+  rowNumber?: number
+  columnNumber?: number
+}
+
+export interface ParsedTabularSheet {
+  name: string
+  visibility: 'visible' | 'hidden' | 'veryHidden'
+  headers: string[]
+  rows: ParsedCsvRow[]
+  headerRowNumber: number
+  nonEmptyRowCount: number
+  columnCount: number
+  warnings: TabularWarning[]
+}
+
+export interface TabularSheetMetadata {
+  name: string
+  visibility: ParsedTabularSheet['visibility']
+  nonEmptyRowCount: number
+  columnCount: number
+  suggested: boolean
+  empty: boolean
+}
+
+export interface ParsedTabularData {
+  sourceType: 'csv' | 'xlsx'
+  sheets: ParsedTabularSheet[]
+  selectedSheetNames: string[]
+  suggestedSheetNames: string[]
+  worksheetMetadata: TabularSheetMetadata[]
+  warnings: TabularWarning[]
+}
+
+export interface ParseDocumentOptions {
+  selectedWorksheetNames?: string[]
+}
+
 export interface ParsedDocumentResult {
   rawText: string
   metadata: unknown
   chunks: DocumentChunkInsert[]
   csvData?: ParsedCsvData
+  tabularData?: ParsedTabularData
   pdfPages?: ParsedPdfPage[]
 }

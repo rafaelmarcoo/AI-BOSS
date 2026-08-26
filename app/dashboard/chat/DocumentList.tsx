@@ -171,7 +171,7 @@ export function DocumentList({
 
           {documents.length === 0 ? (
             <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
-              Upload a PDF or CSV to start building your knowledge base.
+              Upload a PDF, CSV or XLSX to start building your knowledge base.
             </Typography>
           ) : (
             <Stack spacing={0.85}>

@@ -19,6 +19,7 @@
     "@mui/icons-material": "^7.3.9",
     "@mui/material": "^7.3.9",
     "@supabase/supabase-js": "^2.99.3",
+    "exceljs": "4.4.0",
     "langchain": "^1.2.39",
     "next": "16.2.1",
     "pdfjs-dist": "^5.4.296",

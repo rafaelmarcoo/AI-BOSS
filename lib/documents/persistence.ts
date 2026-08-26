@@ -50,6 +50,17 @@ function createStoragePath(userId: string, fileName: string) {
 
 async function ensureDocumentsBucketExists() {
   const supabase = createAdminSupabaseClient()
+  const bucketOptions = {
+    public: false,
+    fileSizeLimit: '15MB',
+    allowedMimeTypes: [
+      'application/pdf',
+      'text/csv',
+      'application/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ],
+  }
   const { data, error } = await supabase.storage.listBuckets()
 
   if (error) {
@@ -67,21 +78,27 @@ async function ensureDocumentsBucketExists() {
   )
 
   if (existingBucket) {
+    const { error: updateError } = await supabase.storage.updateBucket(
+      DOCUMENTS_STORAGE_BUCKET,
+      bucketOptions
+    )
+
+    if (updateError) {
+      console.error('Failed to update the document storage bucket.', updateError)
+      throw new ApiError(
+        500,
+        'INTERNAL_ERROR',
+        'Failed to configure document storage.',
+        updateError.message
+      )
+    }
+
     return
   }
 
   const { error: createError } = await supabase.storage.createBucket(
     DOCUMENTS_STORAGE_BUCKET,
-    {
-      public: false,
-      fileSizeLimit: '15MB',
-      allowedMimeTypes: [
-        'application/pdf',
-        'text/csv',
-        'application/csv',
-        'application/vnd.ms-excel',
-      ],
-    }
+    bucketOptions
   )
 
   if (createError && createError.message !== 'Bucket already exists') {

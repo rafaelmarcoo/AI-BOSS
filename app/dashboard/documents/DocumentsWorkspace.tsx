@@ -26,7 +26,7 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import type { DocumentSummary } from "@/lib/documents/types";
 import { dashboardTokens } from "@/app/theme";
 
-type FileFilter = "all" | "pdf" | "csv";
+type FileFilter = "all" | "pdf" | "csv" | "xlsx";
 type StatusFilter = "all" | DocumentSummary["status"];
 type SortOption = "newest" | "oldest" | "name";
 
@@ -142,7 +142,7 @@ export function DocumentsWorkspace() {
         <Stack spacing={0.5}>
           <Typography variant="h5" fontWeight={700} color="common.white">Documents</Typography>
           <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
-            Manage your uploaded PDFs and CSVs. Removing a CSV also removes its derived dashboard, history, and forecast data.
+            Manage uploaded PDF, CSV and XLSX files and their calculation-ready data.
           </Typography>
         </Stack>
       </Stack>
@@ -157,7 +157,7 @@ export function DocumentsWorkspace() {
           slotProps={{ input: { startAdornment: <SearchRoundedIcon fontSize="small" sx={{ mr: 1, color: dashboardTokens.textMuted }} /> } }}
           sx={{ flex: 1, minWidth: 200, ...fieldStyles }}
         />
-        <FilterSelect label="File type" value={fileFilter} onChange={(value) => setFileFilter(value as FileFilter)} options={[["all", "All files"], ["pdf", "PDF"], ["csv", "CSV"]]} />
+        <FilterSelect label="File type" value={fileFilter} onChange={(value) => setFileFilter(value as FileFilter)} options={[["all", "All files"], ["pdf", "PDF"], ["csv", "CSV"], ["xlsx", "XLSX"]]} />
         <FilterSelect label="Status" value={statusFilter} onChange={(value) => setStatusFilter(value as StatusFilter)} options={[["all", "All statuses"], ["uploaded", "Uploaded"], ["processing", "Processing"], ["ready", "Ready"], ["failed", "Failed"]]} />
         <FilterSelect label="Sort" value={sort} onChange={(value) => setSort(value as SortOption)} options={[["newest", "Newest first"], ["oldest", "Oldest first"], ["name", "Name A–Z"]]} />
       </Stack>
@@ -174,7 +174,7 @@ export function DocumentsWorkspace() {
             {documents.length === 0 ? "No documents uploaded yet" : "No documents match these filters"}
           </Typography>
           <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
-            Upload a PDF or CSV from chat to add it to your workspace.
+            Upload a PDF, CSV or XLSX from chat to add it to your workspace.
           </Typography>
         </Box>
       ) : (

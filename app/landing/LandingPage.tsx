@@ -51,7 +51,7 @@ const QUICK_ACTIONS = [
     id: "upload" as const,
     title: "Upload files",
     description: "Add statements, reports or financial documents.",
-    meta: "PDF and CSV",
+    meta: "PDF, CSV and XLSX",
     icon: CloudUploadOutlinedIcon,
   },
   {
@@ -304,7 +304,7 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf,.csv,application/pdf,text/csv"
+            accept=".pdf,.csv,.xlsx,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             hidden
             onChange={(event) => void handleFileChange(event)}
           />

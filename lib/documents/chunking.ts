@@ -84,11 +84,28 @@ export function createCsvChunks(params: {
   rowBlocks: string[]
   headers: string[]
 }) {
+  return createTabularChunks({
+    ...params,
+    source: 'csv',
+    sheetName: null,
+  })
+}
+
+export function createTabularChunks(params: {
+  documentId: string
+  userId: string
+  rowBlocks: string[]
+  rowNumbers?: number[]
+  headers: string[]
+  source: 'csv' | 'xlsx'
+  sheetName: string | null
+  startingChunkIndex?: number
+}) {
   const chunks: DocumentChunkInsert[] = []
   let currentChunkRows: string[] = []
   let currentLength = 0
   let rowStart = 1
-  let chunkIndex = 0
+  let chunkIndex = params.startingChunkIndex ?? 0
 
   params.rowBlocks.forEach((rowBlock, index) => {
     const separatorLength = currentChunkRows.length > 0 ? 2 : 0
@@ -107,9 +124,10 @@ export function createCsvChunks(params: {
         content,
         source_page: null,
         metadata: {
-          source: 'csv',
-          rowStart,
-          rowEnd: index,
+          source: params.source,
+          sheetName: params.sheetName,
+          rowStart: params.rowNumbers?.[rowStart - 1] ?? rowStart,
+          rowEnd: params.rowNumbers?.[index - 1] ?? index,
           headers: params.headers,
         },
         embedding: null,
@@ -134,9 +152,12 @@ export function createCsvChunks(params: {
       content: currentChunkRows.join('\n\n'),
       source_page: null,
       metadata: {
-        source: 'csv',
-        rowStart,
-        rowEnd: params.rowBlocks.length,
+        source: params.source,
+        sheetName: params.sheetName,
+        rowStart: params.rowNumbers?.[rowStart - 1] ?? rowStart,
+        rowEnd:
+          params.rowNumbers?.[params.rowBlocks.length - 1] ??
+          params.rowBlocks.length,
         headers: params.headers,
       },
       embedding: null,

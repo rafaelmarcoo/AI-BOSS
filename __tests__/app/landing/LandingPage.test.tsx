@@ -29,7 +29,7 @@ describe('LandingPage quick actions', () => {
           ok: true,
           json: async () => ({
             success: true,
-            data: { document: { file_name: 'statement.csv' } },
+            data: { document: { id: 'document-1', file_name: 'statement.csv' } },
           }),
         } as Response
       }
@@ -75,8 +75,10 @@ describe('LandingPage quick actions', () => {
     expect(uploadCall).toBeDefined()
     expect((uploadCall?.[1]?.body as FormData).get('file')).toEqual(file)
 
-    await user.click(screen.getByRole('button', { name: 'View documents' }))
-    expect(mockPush).toHaveBeenCalledWith('/dashboard/documents')
+    await user.click(
+      screen.getByRole('button', { name: 'Review extracted data' }),
+    )
+    expect(mockPush).toHaveBeenCalledWith('/dashboard/documents/document-1')
   })
 
   it('opens the shared picker from both upload controls', async () => {

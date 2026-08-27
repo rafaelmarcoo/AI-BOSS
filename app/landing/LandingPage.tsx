@@ -93,7 +93,10 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
   const [message, setMessage] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [uploadedDocument, setUploadedDocument] = useState<{
+    id: string;
+    fileName: string;
+  } | null>(null);
   const [conversations, setConversations] = useState<ChatConversationSummary[]>(
     [],
   );
@@ -167,7 +170,7 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
     formData.set("file", file);
     setUploading(true);
     setUploadError(null);
-    setUploadedFileName(null);
+    setUploadedDocument(null);
 
     try {
       const response = await fetch("/api/documents", {
@@ -176,7 +179,7 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
       });
       const payload = (await response.json()) as {
         success: boolean;
-        data?: { document?: { file_name: string } };
+        data?: { document?: { id: string; file_name: string } };
         error?: { message?: string };
       };
 
@@ -184,7 +187,10 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
         throw new Error(payload.error?.message ?? "Could not upload the document.");
       }
 
-      setUploadedFileName(payload.data.document.file_name);
+      setUploadedDocument({
+        id: payload.data.document.id,
+        fileName: payload.data.document.file_name,
+      });
     } catch (error) {
       setUploadError(
         error instanceof Error ? error.message : "Could not upload the document.",
@@ -402,19 +408,23 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
               {uploadError}
             </Alert>
           ) : null}
-          {uploadedFileName ? (
+          {uploadedDocument ? (
             <Alert
               severity="success"
-              onClose={() => setUploadedFileName(null)}
+              onClose={() => setUploadedDocument(null)}
               sx={{ mt: 2 }}
               action={
                 <Stack direction="row" spacing={0.5}>
                   <Button
                     color="inherit"
                     size="small"
-                    onClick={() => router.push("/dashboard/documents")}
+                    onClick={() =>
+                      router.push(
+                        `/dashboard/documents/${encodeURIComponent(uploadedDocument.id)}`,
+                      )
+                    }
                   >
-                    View documents
+                    Review extracted data
                   </Button>
                   <Button
                     color="inherit"
@@ -426,7 +436,7 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
                 </Stack>
               }
             >
-              {uploadedFileName} was uploaded and is being processed.
+              {uploadedDocument.fileName} was uploaded and is being processed.
             </Alert>
           ) : null}
         </Box>

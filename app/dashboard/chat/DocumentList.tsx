@@ -3,6 +3,7 @@
 import {
   Alert,
   Box,
+  Button,
   Chip,
   CircularProgress,
   Stack,
@@ -12,6 +13,7 @@ import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import type { DocumentSummaryView } from "./types";
 import { dashboardTokens } from "@/app/theme";
+import { getDocumentStatusPresentation } from "@/lib/documents/presentation";
 
 interface DocumentListProps {
   documents: DocumentSummaryView[];
@@ -19,35 +21,6 @@ interface DocumentListProps {
   error: string | null;
   open: boolean;
   onToggle: () => void;
-}
-
-function getStatusColor(status: DocumentSummaryView["status"]) {
-  switch (status) {
-    case "ready":
-      return {
-        label: "Ready",
-        borderColor: "rgba(74, 222, 128, 0.28)",
-        color: "#86efac",
-      };
-    case "failed":
-      return {
-        label: "Failed",
-        borderColor: "rgba(248, 113, 113, 0.28)",
-        color: "#fca5a5",
-      };
-    case "processing":
-      return {
-        label: "Processing",
-        borderColor: "rgba(96, 165, 250, 0.28)",
-        color: "#93c5fd",
-      };
-    default:
-      return {
-        label: "Uploaded",
-        borderColor: "rgba(250, 204, 21, 0.28)",
-        color: "#fde68a",
-      };
-  }
 }
 
 export function DocumentList({
@@ -59,6 +32,9 @@ export function DocumentList({
 }: DocumentListProps) {
   const pendingCount = documents.filter((document) =>
     ["uploaded", "processing"].includes(document.status)
+  ).length;
+  const reviewCount = documents.filter(
+    (document) => document.financial_review_status === "pending" && document.status === "ready",
   ).length;
 
   return (
@@ -124,6 +100,7 @@ export function DocumentList({
                 ? "No documents"
                 : `${documents.length} document${documents.length === 1 ? "" : "s"}`}
               {pendingCount > 0 ? ` · ${pendingCount} processing` : ""}
+              {reviewCount > 0 ? ` · ${reviewCount} to review` : ""}
             </Typography>
           </Stack>
           {loading ? (
@@ -176,7 +153,7 @@ export function DocumentList({
           ) : (
             <Stack spacing={0.85}>
               {documents.map((document) => {
-                const status = getStatusColor(document.status);
+                const status = getDocumentStatusPresentation(document);
 
                 return (
                   <Box
@@ -222,6 +199,18 @@ export function DocumentList({
                           >
                             {document.error_message}
                           </Typography>
+                        ) : null}
+                        {document.status === "ready" ? (
+                          <Button
+                            href={`/dashboard/documents/${encodeURIComponent(document.id)}`}
+                            size="small"
+                            variant={document.financial_review_status === "pending" ? "contained" : "text"}
+                            sx={{ alignSelf: "flex-start", mt: 0.4, px: 1 }}
+                          >
+                            {document.financial_review_status === "pending"
+                              ? "Review extracted data"
+                              : "View details"}
+                          </Button>
                         ) : null}
                       </Stack>
 

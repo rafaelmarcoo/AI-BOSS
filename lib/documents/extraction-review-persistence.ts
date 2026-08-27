@@ -1,5 +1,9 @@
 import { ApiError } from '@/lib/api/errors'
-import type { DocumentExtractionCandidateDraft } from '@/lib/documents/types'
+import type {
+  DocumentExtractionCandidateDraft,
+  DocumentReviewCandidate,
+  ReviewedDocumentCandidateInput,
+} from '@/lib/documents/types'
 import { createAdminSupabaseClient } from '@/lib/supabase'
 import type { DocumentExtractionRun } from '@/types/database'
 
@@ -21,6 +25,111 @@ const EXTRACTION_RUN_SELECT = `
   created_at,
   updated_at
 `
+
+const EXTRACTION_CANDIDATE_SELECT = `
+  id,
+  extraction_run_id,
+  original_payload,
+  reviewed_payload,
+  metric_key,
+  value,
+  currency,
+  reporting_date,
+  confidence,
+  evidence,
+  warnings,
+  decision,
+  extractor_version,
+  reviewer_id,
+  reviewed_at,
+  created_at,
+  updated_at
+`
+
+export async function getLatestDocumentExtractionReview(params: {
+  documentId: string
+  userId: string
+}) {
+  const supabase = createAdminSupabaseClient()
+  const { data: run, error: runError } = await supabase
+    .from('document_extraction_runs')
+    .select(EXTRACTION_RUN_SELECT)
+    .eq('document_id', params.documentId)
+    .eq('user_id', params.userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (runError) {
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to load document extraction review.',
+      runError.message
+    )
+  }
+
+  if (!run) {
+    return { extractionRun: null, candidates: [] }
+  }
+
+  const extractionRun = run as DocumentExtractionRun
+  const { data: candidates, error: candidateError } = await supabase
+    .from('document_extraction_candidates')
+    .select(EXTRACTION_CANDIDATE_SELECT)
+    .eq('extraction_run_id', extractionRun.id)
+    .eq('document_id', params.documentId)
+    .eq('user_id', params.userId)
+    .order('created_at', { ascending: true })
+
+  if (candidateError) {
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to load document extraction candidates.',
+      candidateError.message
+    )
+  }
+
+  return {
+    extractionRun,
+    candidates: (candidates ?? []) as DocumentReviewCandidate[],
+  }
+}
+
+export async function confirmDocumentExtraction(params: {
+  documentId: string
+  userId: string
+  extractionRunId: string
+  candidates: ReviewedDocumentCandidateInput[]
+}) {
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase.rpc('confirm_document_extraction', {
+    p_document_id: params.documentId,
+    p_user_id: params.userId,
+    p_extraction_run_id: params.extractionRunId,
+    p_reviewer_id: params.userId,
+    p_reviewed_candidates: params.candidates.map((candidate) => ({
+      candidate_id: candidate.candidateId,
+      decision: candidate.decision,
+      metric_key: candidate.metricKey,
+      value: candidate.value,
+      currency: candidate.currency,
+      reporting_date: candidate.reportingDate,
+    })),
+  })
+
+  if (error || typeof data !== 'number') {
+    throw new ApiError(
+      400,
+      'VALIDATION_ERROR',
+      'The document review could not be confirmed.',
+      error?.message
+    )
+  }
+
+  return data
+}
 
 export async function createDocumentExtractionRun(params: {
   documentId: string

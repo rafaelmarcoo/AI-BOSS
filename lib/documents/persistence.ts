@@ -12,7 +12,6 @@ const DOCUMENT_SUMMARY_SELECT = `
   file_name,
   file_type,
   mime_type,
-  storage_path,
   status,
   financial_review_status,
   document_type,
@@ -312,6 +311,41 @@ export async function downloadDocumentFile(storagePath: string) {
   }
 
   return new Uint8Array(await data.arrayBuffer())
+}
+
+export async function createPdfDocumentPreviewUrl(
+  documentId: string,
+  userId: string,
+  expiresInSeconds = 300
+) {
+  const document = await getDocumentById(documentId, userId)
+
+  if (document.file_type !== 'pdf') {
+    throw new ApiError(
+      400,
+      'BAD_REQUEST',
+      'Signed preview URLs are available only for PDF documents.'
+    )
+  }
+
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase.storage
+    .from(DOCUMENTS_STORAGE_BUCKET)
+    .createSignedUrl(document.storage_path, expiresInSeconds)
+
+  if (error || !data?.signedUrl) {
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to create the document preview URL.',
+      error?.message
+    )
+  }
+
+  return {
+    url: data.signedUrl,
+    expiresAt: new Date(Date.now() + expiresInSeconds * 1000).toISOString(),
+  }
 }
 
 export async function replaceDocumentChunks(

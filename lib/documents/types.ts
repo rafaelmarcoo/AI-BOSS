@@ -1,5 +1,9 @@
 import type { Document } from '@/types/database'
 import type { FinancialMetricKey } from '@/lib/financial-data'
+import type {
+  DocumentExtractionCandidate,
+  DocumentExtractionRun,
+} from '@/types/database'
 
 export type DocumentSummary = Pick<
   Document,
@@ -8,7 +12,6 @@ export type DocumentSummary = Pick<
   | 'file_name'
   | 'file_type'
   | 'mime_type'
-  | 'storage_path'
   | 'status'
   | 'financial_review_status'
   | 'document_type'
@@ -29,6 +32,70 @@ export interface CreateDocumentResponse {
 export interface DeleteDocumentResponse {
   deleted: boolean
   documentId: string
+}
+
+export type DocumentReviewCandidate = Omit<
+  DocumentExtractionCandidate,
+  'user_id' | 'document_id'
+>
+
+export type DocumentReviewExtractionRun = Omit<
+  DocumentExtractionRun,
+  'user_id' | 'document_id'
+>
+
+export interface DocumentDetailsResponse {
+  document: DocumentSummary
+  extractionRun: DocumentReviewExtractionRun | null
+  candidates: DocumentReviewCandidate[]
+}
+
+export interface PdfDocumentPreviewResponse {
+  type: 'pdf'
+  url: string
+  expiresAt: string
+}
+
+export interface TabularDocumentPreviewResponse {
+  type: 'table'
+  sheetName: string
+  availableSheets: Array<{
+    name: string
+    visibility: ParsedTabularSheet['visibility']
+    suggested: boolean
+    empty: boolean
+  }>
+  headers: string[]
+  rows: Array<{ rowNumber: number; values: string[] }>
+  page: number
+  pageSize: number
+  totalRows: number
+  totalPages: number
+  displayedColumnCount: number
+  totalColumnCount: number
+  warnings: TabularWarning[]
+}
+
+export type DocumentPreviewResponse =
+  | PdfDocumentPreviewResponse
+  | TabularDocumentPreviewResponse
+
+export interface ReprocessDocumentResponse {
+  document: DocumentSummary
+}
+
+export interface ConfirmDocumentResponse {
+  includedObservationCount: number
+  financialReviewStatus: 'confirmed'
+}
+
+export interface ReviewedDocumentCandidateInput {
+  candidateId: string
+  decision: 'included' | 'excluded'
+  metricKey: FinancialMetricKey | null
+  value: number | null
+  currency: 'NZD' | 'AUD' | null
+  reportingDate: string | null
 }
 
 export interface DocumentChunkInsert {

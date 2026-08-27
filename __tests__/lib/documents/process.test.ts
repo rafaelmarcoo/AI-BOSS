@@ -63,7 +63,6 @@ describe('processDocument', () => {
       file_name: 'summary.csv',
       file_type: 'csv',
       mime_type: 'text/csv',
-      storage_path: 'user-123/summary.csv',
       status: 'ready',
       financial_review_status: 'legacy',
       document_type: null,

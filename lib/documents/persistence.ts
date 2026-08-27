@@ -226,6 +226,7 @@ export async function createDocumentRecord(params: {
       mime_type: params.mimeType,
       storage_path: params.storagePath,
       status: 'uploaded',
+      financial_review_status: 'pending',
       metadata: null,
     })
     .select(DOCUMENT_SUMMARY_SELECT)
@@ -264,7 +265,14 @@ export async function updateDocumentRecord(
   documentId: string,
   userId: string,
   updates: Partial<
-    Pick<Document, 'status' | 'raw_text' | 'metadata' | 'error_message'>
+    Pick<
+      Document,
+      | 'status'
+      | 'financial_review_status'
+      | 'raw_text'
+      | 'metadata'
+      | 'error_message'
+    >
   >
 ) {
   const supabase = createAdminSupabaseClient()

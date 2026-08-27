@@ -211,11 +211,24 @@ async function parsePdfDocument(
     }
 
     if (pages.length === 0) {
-      throw new ApiError(
-        400,
-        'BAD_REQUEST',
-        `No readable text was found in ${document.file_name}.`
-      )
+      return {
+        rawText: '',
+        metadata: {
+          pageCount: pdf.numPages,
+          scanned: true,
+          extractionAvailable: false,
+          warnings: [
+            {
+              code: 'ocr_unavailable',
+              message:
+                'No readable text was found. The PDF is retained for preview, but OCR extraction is not available.',
+            },
+          ],
+        },
+        chunks: [],
+        pdfPages: [],
+        extractionState: 'scanned',
+      } satisfies ParsedDocumentResult
     }
 
     return {
@@ -229,10 +242,19 @@ async function parsePdfDocument(
         pages,
       }),
       pdfPages: pages,
-    }
+      extractionState: 'text',
+    } satisfies ParsedDocumentResult
   } catch (error) {
     if (error instanceof ApiError) {
       throw error
+    }
+
+    if (error instanceof Error && error.name === 'PasswordException') {
+      throw new ApiError(
+        400,
+        'BAD_REQUEST',
+        `PDF ${document.file_name} is password-protected and cannot be processed.`
+      )
     }
 
     console.error(`Failed to parse PDF ${document.file_name}.`, error)

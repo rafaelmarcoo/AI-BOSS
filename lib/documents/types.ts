@@ -1,4 +1,5 @@
 import type { Document } from '@/types/database'
+import type { FinancialMetricKey } from '@/lib/financial-data'
 
 export type DocumentSummary = Pick<
   Document,
@@ -98,10 +99,23 @@ export interface ParseDocumentOptions {
   selectedWorksheetNames?: string[]
 }
 
+export interface DocumentExtractionCandidateDraft {
+  originalPayload: Record<string, unknown>
+  metricKey: FinancialMetricKey | null
+  value: number | null
+  currency: 'NZD' | 'AUD' | null
+  reportingDate: string | null
+  confidence: number | null
+  evidence: Record<string, unknown>
+  warnings: TabularWarning[]
+  extractorVersion: string
+}
+
 export interface ParsedDocumentResult {
   rawText: string
   metadata: unknown
   chunks: DocumentChunkInsert[]
+  extractionState?: 'text' | 'scanned'
   csvData?: ParsedCsvData
   tabularData?: ParsedTabularData
   pdfPages?: ParsedPdfPage[]

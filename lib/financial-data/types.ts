@@ -20,6 +20,7 @@ export interface FinancialMetricEvidence {
   documentId?: string
   documentChunkId?: string
   sourcePage?: number
+  sourceSheet?: string
   sourceRowStart?: number
   sourceRowEnd?: number
   sourceUrl?: string

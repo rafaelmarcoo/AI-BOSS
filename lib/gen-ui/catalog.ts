@@ -18,9 +18,9 @@ export const GEN_UI_WIDGET_CATALOG = {
   },
   data_connections: {
     type: 'data_connections',
-    label: 'Data connections',
-    description: 'Connection controls and availability for financial data sources.',
-    selectionGuidance: 'Select for connection, integration, Xero, QuickBooks, or upload questions.',
+    label: 'Document sources',
+    description: 'Supported uploaded financial files and review availability.',
+    selectionGuidance: 'Select for document, file upload, or source-review questions.',
     defaultColumnSpan: 2,
   },
   metric_trend_chart: {

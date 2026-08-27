@@ -27,6 +27,22 @@ const PDFJS_STANDARD_FONT_DATA_PATH = `${join(
   'node_modules/pdfjs-dist/standard_fonts'
 )}/`
 
+export function createPdfParsingError(error: unknown, fileName: string) {
+  if (error instanceof Error && error.name === 'PasswordException') {
+    return new ApiError(
+      400,
+      'BAD_REQUEST',
+      `PDF ${fileName} is password-protected and cannot be processed.`
+    )
+  }
+
+  return new ApiError(
+    500,
+    'INTERNAL_ERROR',
+    `Failed to parse PDF ${fileName}.`
+  )
+}
+
 function normalizeWhitespace(value: string) {
   return value
     .replace(/\r\n/g, '\n')
@@ -249,21 +265,11 @@ async function parsePdfDocument(
       throw error
     }
 
-    if (error instanceof Error && error.name === 'PasswordException') {
-      throw new ApiError(
-        400,
-        'BAD_REQUEST',
-        `PDF ${document.file_name} is password-protected and cannot be processed.`
-      )
+    const parsingError = createPdfParsingError(error, document.file_name)
+    if (parsingError.status >= 500) {
+      console.error(`Failed to parse PDF ${document.file_name}.`, error)
     }
-
-    console.error(`Failed to parse PDF ${document.file_name}.`, error)
-
-    throw new ApiError(
-      500,
-      'INTERNAL_ERROR',
-      `Failed to parse PDF ${document.file_name}.`
-    )
+    throw parsingError
   } finally {
     await loadingTask.destroy()
   }

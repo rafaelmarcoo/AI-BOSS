@@ -8,7 +8,7 @@ export function createGetLatestSnapshotTool(
   return {
     name: 'get_latest_snapshot',
     description:
-      'Fetch the current verified financial metrics for the signed-in user, including source and confidence. Use this before answering questions about current cash, revenue, expenses, burn, or runway inputs. Use its confirmed cash, receivables, payables, and burn values before calling calculate_runway; never invent inputs.',
+      'Fetch the current calculation-ready financial metrics for the signed-in user, including source and confidence. Use this before answering questions about current cash, revenue, expenses, burn, or runway inputs. Use its stored cash, receivables, payables, and burn values before calling calculate_runway; never invent inputs.',
     inputSchema: z.object({}),
     async handler() {
       const result = await readSourceAwareMetrics(userId)

@@ -56,7 +56,7 @@ export function createModelScenarioTool(
   return {
     name: 'model_scenario',
     description:
-      'Model one to three read-only financial scenarios over 3, 6, 12, or 24 months. Supports fixed one-off or recurring inflows/outflows and fixed or compounding percentage changes to verified revenue, expenses, or burn. Every scenario requires explicit monthly timing. The tool uses one owned source and one NZD or AUD currency, calculates current-run-rate and historical-trend comparisons in trusted code, and never changes stored financial data.',
+      'Model one to three read-only financial scenarios over 3, 6, 12, or 24 months. Supports fixed one-off or recurring inflows/outflows and fixed or compounding percentage changes to stored revenue, expenses, or burn. Every scenario requires explicit monthly timing. The tool uses one owned source and one NZD or AUD currency, calculates current-run-rate and historical-trend comparisons in trusted code, and never changes stored financial data.',
     inputSchema: ModelScenarioInputSchema,
     async handler(input) {
       const options = await listScenarioBaselineOptions(userId)

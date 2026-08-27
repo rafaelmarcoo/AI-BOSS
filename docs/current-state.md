@@ -1,23 +1,23 @@
 # AI-BOSS Current State
 
-Last updated: 10 August 2026  
-Main branch: `9784932` (`Merge PR #15: multi-user accounts`)
+Last updated: 28 August 2026
 
 ## Current Product Position
 
-AI-BOSS is a multi-source financial decision-support layer. It is not a
-replacement for Xero, QuickBooks, or an accountant. Its current value is in
-source-aware financial questions, document evidence, runway/scenario analysis,
-and an emerging generative financial interface.
+AI-BOSS is a document-led financial decision-support workspace. It does not
+replace accounting software or professional advice. Its current value is in
+reviewed financial-file ingestion, source-aware questions, document evidence,
+and deterministic runway, forecast, and scenario analysis.
 
-## Verified On Main
+## Verified On The Phase 4 Branch
 
-The following checks passed before the latest merges:
+The following checks passed on 28 August 2026 before final commit:
 
-- `npm test -- --runInBand`: 33 suites, 113 tests
+- `npm test -- --runInBand`: 74 suites, 279 tests
 - `npx tsc --noEmit`
 - `npm run lint`
 - `npm run build`
+- `git diff --check`
 
 ## Recently Merged
 
@@ -42,10 +42,10 @@ The following checks passed before the latest merges:
 
 ## Database Deployment Required
 
-Code is merged, but the Supabase database must run migrations `009` through
-`012` before the Gen UI payload and multi-user features are used in a deployed
-environment. In particular, this creates `companies`, adds role/company chat
-fields, and installs the conversation access policies.
+Before deployment, confirm that the target Supabase database has every required
+migration through `015_document_extraction_review.sql`. Migration `015` is the
+schema prerequisite for XLSX types, extraction runs/candidates, review status,
+RLS, and transactional publication of User-confirmed observations.
 
 ## Current Boundaries and Gaps
 
@@ -56,19 +56,22 @@ fields, and installs the conversation access policies.
   employee-management, or role-change screen yet.
 - Company membership currently maps through the profile company name. A
   dedicated company-membership table is the scalable future design.
-- CSV uploads can create deterministic financial metric observations. PDFs are
-  retrieved as RAG evidence; they do not update dashboard metrics. XLSX is not
-  supported yet.
-- Forecasting and historical trend support are still early/rough. Proper 3- and
-  6-month forecasting plus backtesting remain final-stretch work.
-- Xero is the strongest demo path. QuickBooks, FreshBooks, and MYOB have
-  connector foundations but are not yet equally proven live integrations.
+- CSV, XLSX, and PDF originals are supported up to 15 MB. Text PDFs can be
+  extracted; scanned PDFs remain previewable but OCR is not available.
+- New document-derived metrics remain candidates until the owner explicitly
+  includes/excludes every candidate and approves valid metric, value, NZD/AUD
+  currency, and reporting-date fields. Approved values are User-confirmed.
+- Historical connector code and migrations remain in the repository, but
+  accounting connectors are outside the current product setup and UI scope.
+- Fixed-origin deterministic forecast backtesting is maintained as automated
+  test/report evidence rather than another product screen.
 
 ## Immediate Final-Stretch Priorities
 
-1. Apply and smoke-test migrations `009`–`012` in a safe Supabase environment.
+1. Apply and smoke-test all unapplied migrations through `015` in a safe
+   Supabase environment.
 2. Manually test admin signup, employee signup, and each conversation
    visibility mode with two accounts from the same company.
-3. Build deterministic historical forecasting and backtesting.
-4. Improve CSV/PDF ingestion and add XLSX support.
-5. Complete the final report, poster, presentation, demo script, and QA pass.
+3. Execute the manual document-review acceptance checklist in a safe
+   environment with two accounts and non-sensitive fixtures.
+4. Complete the final report, poster, presentation, and demo script.

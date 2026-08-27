@@ -152,4 +152,28 @@ describe('shared tabular parsing', () => {
       parseXlsxTabularData(await workbookBytes(workbook))
     ).rejects.toThrow('the limit is 200')
   })
+
+  it('rejects workbooks with more than 25 worksheets', async () => {
+    const workbook = new ExcelJS.Workbook()
+    for (let index = 1; index <= 26; index += 1) {
+      const worksheet = workbook.addWorksheet(`Sheet ${index}`)
+      worksheet.addRow(['Metric', 'Amount'])
+      worksheet.addRow(['Cash', index])
+    }
+
+    await expect(parseXlsxTabularData(await workbookBytes(workbook))).rejects.toThrow(
+      'the limit is 25'
+    )
+  })
+
+  it('rejects CSV input above 50,000 selected non-empty rows', () => {
+    const rows = ['Metric,Amount']
+    for (let index = 0; index < 50_000; index += 1) {
+      rows.push(`Cash,${index}`)
+    }
+
+    expect(() => parseCsvTabularData(Buffer.from(rows.join('\n')))).toThrow(
+      'the limit is 50000'
+    )
+  })
 })

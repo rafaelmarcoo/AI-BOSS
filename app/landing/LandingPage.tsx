@@ -29,6 +29,7 @@ import { dashboardTokens } from "@/app/theme";
 import { SignOutButton } from "@/components/sign-out-button";
 import { VoiceInputButton } from "@/components/voice-input-button";
 import type { Conversation } from "@/types/database";
+import { RecentActivity } from "@/app/dashboard/RecentActivity";
 
 type ChatConversationSummary = Pick<
   Conversation,
@@ -499,6 +500,10 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
               );
             })}
           </Box>
+        </Box>
+
+        <Box component="section" sx={{ mt: 4 }}>
+          <RecentActivity />
         </Box>
 
         {!historyLoading && recentConversations.length > 0 ? (

@@ -357,7 +357,7 @@ export function calculateScenarioAnalysis(params: {
 
   const missingMetrics = missingPercentageMetrics(input, baselineInputs)
   if (missingMetrics.length > 0) {
-    throw new Error(`Missing verified or manual percentage basis: ${missingMetrics.join(', ')}.`)
+    throw new Error(`Missing stored or manual percentage basis: ${missingMetrics.join(', ')}.`)
   }
 
   const reportingDate = baselineInputs.cash?.reportingDate
@@ -413,7 +413,7 @@ export function calculateScenarioAnalysis(params: {
         method: 'current_run_rate',
         label: 'Current run rate',
         baselineMonthlyMovement: currentMovement,
-        unavailableReason: 'Current run rate requires a verified or manual monthly burn rate.',
+        unavailableReason: 'Current run rate requires a stored or manual monthly burn rate.',
         input,
         inputs: baselineInputs,
         openingLiquidity,
@@ -441,7 +441,7 @@ export function calculateScenarioAnalysis(params: {
         ? ['Baseline metrics use different reporting months. Review each dated input before relying on the comparison.']
         : []),
       ...(hasManualInputs
-        ? ['One or more baseline values are unverified manual scenario assumptions and were not written to stored financial observations.']
+        ? ['One or more baseline values are unreviewed manual scenario assumptions and were not written to stored financial observations.']
         : []),
       ...(input.horizon >= 12
         ? [`The ${input.horizon}-month view extends uncertainty and should be reviewed regularly as actual data changes.`]

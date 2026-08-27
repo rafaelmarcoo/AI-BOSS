@@ -86,4 +86,4 @@ Set `MULTI_AGENT_MODE=true` only in a chosen server environment to use determini
 
 ## PDF metric extraction
 
-PDF documents remain available for retrieved document context. A PDF contributes structured financial metrics only when AI-BOSS finds a clear labelled reporting date and a supported labelled value. Extracted values retain the document filename, page excerpt, confidence, and detected currency. Undated PDFs do not affect dashboard metrics, history, or forecasts.
+CSV, XLSX, and text PDF documents can provide retrieved evidence before review, clearly identified as unreviewed context. Deterministically extracted metric candidates never become calculation inputs automatically. A user must explicitly include or exclude every candidate, correct any metric/value/NZD-or-AUD currency/reporting date, and approve the complete review. Only the resulting User-confirmed observations may affect dashboard metrics, history, forecasts, scenarios, or deterministic tools. Scanned PDFs remain stored and previewable, but OCR extraction is deferred.

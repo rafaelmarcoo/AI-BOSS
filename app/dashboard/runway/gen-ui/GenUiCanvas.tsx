@@ -404,7 +404,7 @@ function ScenarioAnalysisWidgetView({
                   <Chip
                     size="small"
                     color={metric?.origin === "manual" ? "warning" : metric ? "success" : "default"}
-                    label={metric?.origin === "manual" ? "Manual — unverified" : metric ? "Verified" : "Missing"}
+                    label={metric?.origin === "manual" ? "Manual — unreviewed" : metric ? "Stored observation" : "Missing"}
                   />
                 </Stack>
                 {metric ? (
@@ -1089,7 +1089,7 @@ export function GenUiCanvas({
           </Typography>
           <Typography sx={{ mt: 0.75, color: dashboardTokens.textMuted, fontSize: 14, lineHeight: 1.55 }}>
             {missingMetricLabels.length > 0
-              ? "Connect an accounting source or upload current records to complete the runway view."
+              ? "Upload current records and confirm extracted values to complete the runway view."
               : "The core metrics required for runway analysis are available."}
           </Typography>
           {missingMetricLabels.length > 0 ? (

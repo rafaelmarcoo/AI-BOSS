@@ -417,7 +417,7 @@ export function ScenariosWorkspace() {
         <Stack spacing={2.5}>
           <Typography variant="h6" fontWeight={700}>Baseline and timing</Typography>
           {baselinesLoading ? <CircularProgress size={24} /> : baselines.length === 0 ? (
-            <Alert severity="info">Upload a dated NZD or AUD statement containing financial metrics before building a verified scenario.</Alert>
+            <Alert severity="info">Upload and confirm a dated NZD or AUD statement before building a source-backed scenario.</Alert>
           ) : (
             <FormControl fullWidth>
               <InputLabel id="scenario-source-label">Source / statement and currency</InputLabel>
@@ -460,7 +460,7 @@ export function ScenariosWorkspace() {
             <Accordion disableGutters sx={{ bgcolor: 'transparent', border: '1px solid', borderColor: dashboardTokens.border, '&:before': { display: 'none' } }}>
               <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}><Typography fontWeight={700}>Manual baseline overrides</Typography></AccordionSummary>
               <AccordionDetails>
-                <Alert severity="warning" sx={{ mb: 2 }}>Overrides are unverified scenario assumptions. They are never saved as financial observations.</Alert>
+                <Alert severity="warning" sx={{ mb: 2 }}>Overrides are unreviewed scenario assumptions. They are never saved as financial observations.</Alert>
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' }, gap: 2 }}>
                   {[
                     ['cash', 'Cash', 'cash'], ['accountsReceivable', 'Accounts receivable', 'accounts_receivable'],

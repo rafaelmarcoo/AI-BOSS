@@ -23,7 +23,7 @@ describe('LandingPage quick actions', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    fetchMock = jest.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    fetchMock = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       if (init?.method === 'POST') {
         return {
           ok: true,
@@ -31,6 +31,13 @@ describe('LandingPage quick actions', () => {
             success: true,
             data: { document: { id: 'document-1', file_name: 'statement.csv' } },
           }),
+        } as Response
+      }
+
+      if (String(input) === '/api/activity') {
+        return {
+          ok: true,
+          json: async () => ({ success: true, data: { activities: [] } }),
         } as Response
       }
 
@@ -113,17 +120,27 @@ describe('LandingPage quick actions', () => {
   })
 
   it('shows upload failures without navigating away', async () => {
-    fetchMock.mockImplementationOnce(async () => ({
-      ok: true,
-      json: async () => ({ success: true, data: { conversations: [] } }),
-    }) as Response)
-    fetchMock.mockImplementationOnce(async () => ({
-      ok: false,
-      json: async () => ({
-        success: false,
-        error: { message: 'Only PDF, CSV, and XLSX uploads are supported.' },
-      }),
-    }) as Response)
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        return {
+          ok: false,
+          json: async () => ({
+            success: false,
+            error: { message: 'Only PDF, CSV, and XLSX uploads are supported.' },
+          }),
+        } as Response
+      }
+      if (String(input) === '/api/activity') {
+        return {
+          ok: true,
+          json: async () => ({ success: true, data: { activities: [] } }),
+        } as Response
+      }
+      return {
+        ok: true,
+        json: async () => ({ success: true, data: { conversations: [] } }),
+      } as Response
+    })
     const { container } = renderLandingPage()
     const input = container.querySelector('input[type="file"]') as HTMLInputElement
     const file = new File(['invalid'], 'notes.txt', { type: 'text/plain' })

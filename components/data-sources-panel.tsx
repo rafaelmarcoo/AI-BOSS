@@ -1,30 +1,26 @@
 "use client";
 
-import { Box, Chip, Paper, Stack, Typography } from "@mui/material";
-import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
+import { Box, Button, Chip, Paper, Stack, Typography } from "@mui/material";
 import DescriptionIcon from "@mui/icons-material/Description";
+import GridOnRoundedIcon from "@mui/icons-material/GridOnRounded";
 import TableChartIcon from "@mui/icons-material/TableChart";
 import { dashboardTokens } from "@/app/theme";
-import { AccountingConnect } from "@/components/accounting-connect";
 
-const UPCOMING_SOURCES = [
+const DOCUMENT_SOURCES = [
   {
-    label: "CSV uploads",
-    description: "Upload in chat today. Dashboard metric extraction is next.",
+    label: "CSV files",
+    description: "Deterministic table parsing with explicit metric review.",
     icon: TableChartIcon,
-    status: "Chat ready",
+  },
+  {
+    label: "XLSX workbooks",
+    description: "Suggested worksheets, multi-sheet selection, and cached formula values.",
+    icon: GridOnRoundedIcon,
   },
   {
     label: "PDF reports",
-    description: "Upload in chat today. Structured extraction is coming later.",
+    description: "Text evidence and conservative metric candidates; scanned files remain previewable.",
     icon: DescriptionIcon,
-    status: "Chat ready",
-  },
-  {
-    label: "Bank feeds",
-    description: "Live transaction data for cash visibility",
-    icon: AccountBalanceWalletIcon,
-    status: "Soon",
   },
 ];
 
@@ -33,15 +29,15 @@ export function DataSourcesPanel() {
     <Paper
       elevation={0}
       sx={{
-        p: 3,
-        borderRadius: 1,
-        bgcolor: dashboardTokens.runwayV2,
-        color: "common.white",
+        p: { xs: 2, sm: 2.5 },
+        borderRadius: 2.5,
+        bgcolor: dashboardTokens.surface,
+        color: dashboardTokens.text,
         border: "1px solid",
         borderColor: dashboardTokens.border,
       }}
     >
-      <Stack spacing={2.5}>
+      <Stack spacing={2}>
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={1.5}
@@ -50,97 +46,56 @@ export function DataSourcesPanel() {
         >
           <Stack spacing={0.5}>
             <Typography variant="h6" fontWeight={700}>
-              Connect data sources
+              Document sources
             </Typography>
             <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
-              Connected systems and uploaded files will feed source-aware metrics.
+              Upload supported financial files, review extracted candidates, and explicitly approve calculation inputs.
             </Typography>
           </Stack>
-
-          <Chip
-            size="small"
-            label="Metric extraction next"
-            sx={{
-              color: dashboardTokens.textSoft,
-              borderColor: dashboardTokens.borderMuted,
-            }}
-            variant="outlined"
-          />
+          <Button href="/dashboard/documents" variant="outlined">
+            Open documents
+          </Button>
         </Stack>
-
-        <AccountingConnect />
 
         <Box
           sx={{
             display: "grid",
             gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" },
-            gap: 1.5,
+            gap: 1.25,
           }}
         >
-          {UPCOMING_SOURCES.map((source) => {
+          {DOCUMENT_SOURCES.map((source) => {
             const Icon = source.icon;
-
             return (
               <Paper
                 key={source.label}
                 elevation={0}
                 sx={{
-                  p: 2,
-                  borderRadius: 1,
-                  bgcolor: "rgba(255, 255, 255, 0.03)",
-                  border: "1px dashed",
-                  borderColor: dashboardTokens.borderMuted,
-                  color: "common.white",
-                  minHeight: 116,
+                  p: 1.75,
+                  borderRadius: 2,
+                  bgcolor: "rgba(255,255,255,0.025)",
+                  border: "1px solid",
+                  borderColor: dashboardTokens.border,
                 }}
               >
-                <Stack spacing={1.25}>
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    alignItems="center"
-                    justifyContent="space-between"
-                  >
-                    <Box
-                      sx={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 1,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        bgcolor: "rgba(255, 255, 255, 0.06)",
-                      }}
-                    >
-                      <Icon sx={{ fontSize: 18, color: dashboardTokens.textSoft }} />
-                    </Box>
-                    <Chip
-                      size="small"
-                      label={source.status}
-                      sx={{
-                        color: dashboardTokens.textMuted,
-                        borderColor: dashboardTokens.border,
-                      }}
-                      variant="outlined"
-                    />
+                <Stack spacing={1}>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between">
+                    <Icon sx={{ fontSize: 20, color: "#93c5fd" }} />
+                    <Chip size="small" label="Supported" color="success" variant="outlined" />
                   </Stack>
-
-                  <Stack spacing={0.5}>
-                    <Typography variant="subtitle2" fontWeight={700}>
-                      {source.label}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      sx={{ color: dashboardTokens.textMuted }}
-                    >
-                      {source.description}
-                    </Typography>
-                  </Stack>
+                  <Typography variant="subtitle2" fontWeight={700}>{source.label}</Typography>
+                  <Typography variant="caption" sx={{ color: dashboardTokens.textMuted, lineHeight: 1.45 }}>
+                    {source.description}
+                  </Typography>
                 </Stack>
               </Paper>
             );
           })}
         </Box>
+
+        <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
+          New extracted values remain unreviewed evidence until you choose Include or Exclude and approve them.
+        </Typography>
       </Stack>
     </Paper>
   );

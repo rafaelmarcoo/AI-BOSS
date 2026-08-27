@@ -101,12 +101,12 @@ available liquidity is:
 This assumes receivables are collected and payables are paid immediately before
 Month 1. The engine then calculates two independent baselines when data exists:
 
-- current run rate continues the latest verified or manual monthly burn
+- current run rate continues the latest trusted observation or manual monthly burn
 - historical trend continues the existing date-aware cash slope over 3M, 6M,
   or all comparable observations
 
 One-off and recurring cash adjustments are applied to inclusive calendar-month
-buckets. Percentage changes use verified or explicitly manual revenue, expense,
+buckets. Percentage changes use trusted or explicitly manual revenue, expense,
 or burn values. A plain percentage is a fixed monthly step; compounding occurs
 only when explicitly selected. Compounding growth stops at its end month and
 retains that final level afterward. Balances may continue below zero, and

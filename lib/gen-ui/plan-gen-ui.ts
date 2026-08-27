@@ -232,8 +232,8 @@ function defaultWidgetSpecs(
   if (isDataConnectionRequest(userMessage)) {
     widgets.push({
       type: 'data_connections',
-      title: 'Data connections',
-      reason: 'The user is asking about connecting or supplying financial data.',
+      title: 'Document sources',
+      reason: 'The user is asking about supplying or reviewing financial files.',
     })
   }
 
@@ -405,7 +405,7 @@ function buildMetricSnapshotWidget(
 
     const sourceLabel =
       metric.provenance.sourceType === 'document'
-        ? `CSV: ${metric.provenance.sourceLabel}`
+        ? `Document: ${metric.provenance.sourceLabel}`
         : metric.provenance.sourceType === 'demo'
           ? `Demo: ${metric.provenance.sourceLabel}`
           : metric.provenance.sourceLabel
@@ -439,10 +439,10 @@ function buildDataConnectionsWidget(
   return {
     id: widgetId(spec.type, index),
     type: 'data_connections',
-    title: spec.title ?? 'Data connections',
-    reason: spec.reason ?? 'AI-BOSS selected data connection controls for this request.',
+    title: spec.title ?? 'Document sources',
+    reason: spec.reason ?? 'AI-BOSS selected supported document sources for this request.',
     data: {
-      message: 'Connect or review the sources that provide financial context to AI-BOSS.',
+      message: 'Upload or review the financial files that provide context to AI-BOSS.',
     },
   }
 }

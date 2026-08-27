@@ -57,6 +57,19 @@ describe('document upload validation', () => {
     )
   })
 
+  it('rejects empty and oversized supported files', () => {
+    const empty = new File([], 'empty.csv', { type: 'text/csv' })
+    const oversized = new File(['x'], 'too-large.pdf', {
+      type: 'application/pdf',
+    })
+    Object.defineProperty(oversized, 'size', { value: 15 * 1024 * 1024 + 1 })
+
+    expect(() => validateDocumentUpload(empty)).toThrow('Uploaded file is empty.')
+    expect(() => validateDocumentUpload(oversized)).toThrow(
+      'Uploaded file exceeds the 15 MB size limit.'
+    )
+  })
+
   it('reads an optional conversation id', () => {
     expect(readOptionalConversationId(' conversation-123 ')).toBe(
       'conversation-123'

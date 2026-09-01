@@ -60,6 +60,7 @@ export interface ModelSpec {
   provider: ProviderId
   model: string
   label: string
+  summary: string
   /** Confirmed by a live API call. `npm run check:models` reports mismatches. */
   verified: boolean
 }
@@ -69,12 +70,14 @@ export const MODEL_CATALOG = {
     provider: 'openai',
     model: CHAT_MODEL,
     label: 'GPT-4o mini',
+    summary: 'Fastest and cheapest. Concise answers.',
     verified: true,
   },
   'gpt-4o': {
     provider: 'openai',
     model: 'gpt-4o',
     label: 'GPT-4o',
+    summary: 'Fast, with more detail than mini.',
     verified: true,
   },
   // Run `npm run check:models`
@@ -83,36 +86,42 @@ export const MODEL_CATALOG = {
     provider: 'zhipu',
     model: 'glm-5.2',
     label: 'GLM-5.2',
+    summary: 'Thinks more. Fuller explanations.',
     verified: true,
   },
   'glm-5.3': {
     provider: 'zhipu',
     model: 'glm-5.3',
     label: 'GLM-5.3',
+    summary: 'Newest GLM. Uses more tokens for depth.',
     verified: true,
   },
   'glm-5-turbo': {
     provider: 'zhipu',
     model: 'glm-5-turbo',
     label: 'GLM-5 Turbo',
+    summary: 'Longest answers. Takes more thinking.',
     verified: true,
   },
   'deepseek-flash': {
     provider: 'deepseek',
     model: 'deepseek-v4-flash',
     label: 'DeepSeek V4 Flash',
+    summary: 'Cautious. Checks its own claims.',
     verified: true,
   },
   'grok': {
     provider: 'xai',
     model: 'grok-4',
     label: 'Grok 4',
+    summary: 'Quick and to the point.',
     verified: true,
   },
   'gemini-flash': {
     provider: 'google',
     model: 'gemini-3.6-flash',
     label: 'Gemini 3.6 Flash',
+    summary: 'Thorough. Uses more tokens.',
     verified: true,
   },
 } as const satisfies Record<string, ModelSpec>

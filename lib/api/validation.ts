@@ -1,4 +1,5 @@
 import { ApiError } from '@/lib/api/errors'
+import { isModelName, type ModelName } from '@/lib/ai/models'
 import type { ConversationVisibility, UserType } from '@/types/database'
 
 export type ValidationResult<T> =
@@ -70,6 +71,7 @@ export interface ChatMessagePayload {
 export interface ChatPayload {
   conversationId?: string
   visibility?: ConversationVisibility
+  model?: ModelName
   messages: ChatMessagePayload[]
 }
 
@@ -179,6 +181,7 @@ export function validateChatPayload(payload: unknown): ValidationResult<ChatPayl
   const rawMessages = Reflect.get(input, 'messages')
   const rawConversationId = Reflect.get(input, 'conversationId')
   const rawVisibility = Reflect.get(input, 'visibility')
+  const rawModel = Reflect.get(input, 'model')
 
   // Reject early if the caller sends the wrong top-level shape.
   if (!Array.isArray(rawMessages)) {
@@ -248,6 +251,13 @@ export function validateChatPayload(payload: unknown): ValidationResult<ChatPayl
     details.visibility = 'visibility must be private, company, or admins.'
   }
 
+  if (
+    rawModel !== undefined &&
+    (typeof rawModel !== 'string' || !isModelName(rawModel))
+  ) {
+    details.model = 'model must be a known model name.'
+  }
+
   if (Object.keys(details).length > 0) {
     return {
       success: false,
@@ -265,6 +275,9 @@ export function validateChatPayload(payload: unknown): ValidationResult<ChatPayl
       rawVisibility === 'company' ||
       rawVisibility === 'admins'
         ? { visibility: rawVisibility }
+        : {}),
+      ...(typeof rawModel === 'string' && isModelName(rawModel)
+        ? { model: rawModel }
         : {}),
       messages,
     },

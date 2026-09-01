@@ -5,7 +5,7 @@ import { ApiError } from '@/lib/api/errors'
 import { runAgent, type AgentRunResult } from '@/lib/ai/agent'
 import type { FinancialSpecialist } from '@/lib/agents/router'
 import { runMultiAgent } from '@/lib/agents/specialists'
-import { DEFAULT_MODEL, MODEL_CATALOG } from '@/lib/ai/models'
+import { DEFAULT_MODEL, MODEL_CATALOG, type ModelName } from '@/lib/ai/models'
 import { logChatDecision } from '@/lib/chat/log-chat-decision'
 import { buildChatContext } from '@/lib/chat/build-chat-context'
 import { planGenUi } from '@/lib/gen-ui/plan-gen-ui'
@@ -21,7 +21,8 @@ export async function generateChatResponse(
   userId: string,
   messages: ChatMessagePayload[],
   conversationId?: string,
-  visibility: ConversationVisibility = 'company'
+  visibility: ConversationVisibility = 'company',
+  model?: ModelName
 ) {
   const startedAt = Date.now()
   const latestUserMessage = [...messages]
@@ -70,18 +71,23 @@ export async function generateChatResponse(
       userId,
       latestUserMessage.content,
       chatHistory,
-      chatContext.messages
+      chatContext.messages,
+      model
     )
     agentResponse = multiAgentResponse
     specialist = multiAgentResponse.specialist
     modelUsed = MODEL_CATALOG[multiAgentResponse.modelName].model
   } else {
+    const singleAgentModel = model ?? DEFAULT_MODEL
     agentResponse = await runAgent(
-        latestUserMessage.content,
-        chatHistory,
-        getAgentTools(userId),
-        chatContext.messages
-      )
+      latestUserMessage.content,
+      chatHistory,
+      getAgentTools(userId),
+      chatContext.messages,
+      undefined,
+      singleAgentModel
+    )
+    modelUsed = MODEL_CATALOG[singleAgentModel].model
   }
   const uiPlan = await planGenUi({
     userId,

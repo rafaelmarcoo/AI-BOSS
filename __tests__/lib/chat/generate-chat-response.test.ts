@@ -159,7 +159,9 @@ describe('generateChatResponse', () => {
       'What is my runway?',
       [],
       [{ name: 'calculate_runway' }],
-      contextMessages
+      contextMessages,
+      undefined,
+      'gpt-4o-mini'
     )
     expect(mockLogChatDecision).toHaveBeenCalled()
   })
@@ -189,7 +191,7 @@ describe('generateChatResponse', () => {
 
     await generateChatResponse('user-123', [{ role: 'user', content: 'Forecast cash' }], 'conversation-1')
 
-    expect(mockRunMultiAgent).toHaveBeenCalledWith('user-123', 'Forecast cash', [], contextMessages)
+    expect(mockRunMultiAgent).toHaveBeenCalledWith('user-123', 'Forecast cash', [], contextMessages, undefined)
     expect(mockRunAgent).not.toHaveBeenCalled()
     expect(mockLogChatDecision).toHaveBeenCalledWith(expect.objectContaining({ specialist: 'historical_forecast' }))
     expect(mockLogChatDecision).toHaveBeenCalledWith(expect.objectContaining({ modelUsed: 'gpt-4o' }))

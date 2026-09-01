@@ -110,6 +110,8 @@ export function ChatSidebar({
     isReadOnly,
     visibility,
     changeVisibility,
+    model,
+    changeModel,
     conversationMessages,
     loading,
     error,
@@ -341,6 +343,8 @@ export function ChatSidebar({
           onVisibilityChange={(nextVisibility) => {
             void changeVisibility(nextVisibility).catch(() => undefined)
           }}
+          model={model}
+          onModelChange={changeModel}
           conversationMessages={conversationMessages}
           historyLoading={historyLoading}
           loading={loading}

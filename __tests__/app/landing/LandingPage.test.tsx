@@ -6,6 +6,7 @@ const mockPush = jest.fn()
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
+  usePathname: () => '/landing',
 }))
 jest.mock('@/components/voice-input-button', () => ({
   VoiceInputButton({ onTranscript }: { onTranscript: (value: string) => void }) {

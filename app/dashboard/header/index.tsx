@@ -1,6 +1,7 @@
 "use client";
 
-import { Box, Button, Stack, Typography } from "@mui/material";
+import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
+import { Box, Button, IconButton, Stack, Typography } from "@mui/material";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SignOutButton } from "@/components/sign-out-button";
@@ -13,7 +14,11 @@ const navigation = [
   { label: "Settings", href: "/dashboard/settings" },
 ];
 
-export function DashboardHeader() {
+interface DashboardHeaderProps {
+  onOpenPastChats?: () => void;
+}
+
+export function DashboardHeader({ onOpenPastChats }: DashboardHeaderProps = {}) {
   const pathname = usePathname();
 
   return (
@@ -41,6 +46,26 @@ export function DashboardHeader() {
           alignItems="center"
           sx={{ minWidth: 0 }}
         >
+          {onOpenPastChats ? (
+            <IconButton
+              aria-label="Open past chats"
+              size="small"
+              onClick={onOpenPastChats}
+              sx={{
+                width: 34,
+                height: 34,
+                borderRadius: `${dashboardTokens.radiusSm}px`,
+                color: dashboardTokens.textMuted,
+                "&:hover": {
+                  color: dashboardTokens.text,
+                  bgcolor: dashboardTokens.surfaceAlt,
+                },
+              }}
+            >
+              <MenuRoundedIcon fontSize="small" />
+            </IconButton>
+          ) : null}
+
           <Typography
             component={Link}
             href="/landing"

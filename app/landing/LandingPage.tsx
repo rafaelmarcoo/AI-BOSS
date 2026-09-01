@@ -21,12 +21,11 @@ import {
 import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
-import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import FolderRoundedIcon from "@mui/icons-material/FolderRounded";
 import RouteRoundedIcon from "@mui/icons-material/RouteRounded";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
+import { DashboardHeader } from "@/app/dashboard/header";
 import { dashboardTokens } from "@/app/theme";
-import { SignOutButton } from "@/components/sign-out-button";
 import { VoiceInputButton } from "@/components/voice-input-button";
 import type { Conversation } from "@/types/database";
 
@@ -220,50 +219,7 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
         color: dashboardTokens.text,
       }}
     >
-      <Stack
-        component="header"
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        sx={{
-          height: 56,
-          px: { xs: 1.5, sm: 3, lg: 5 },
-          bgcolor: dashboardTokens.sidebar,
-          borderBottom: "1px solid",
-          borderColor: dashboardTokens.border,
-        }}
-      >
-        <Stack direction="row" alignItems="center" spacing={1}>
-          <IconButton
-            aria-label="Open past chats"
-            size="small"
-            onClick={() => setHistoryOpen(true)}
-            sx={{
-              width: 34,
-              height: 34,
-              borderRadius: `${dashboardTokens.radiusSm}px`,
-              color: dashboardTokens.textMuted,
-              "&:hover": {
-                color: dashboardTokens.text,
-                bgcolor: dashboardTokens.surfaceAlt,
-              },
-            }}
-          >
-            <MenuRoundedIcon fontSize="small" />
-          </IconButton>
-          <Typography
-            component="span"
-            sx={{
-              fontSize: 20,
-              fontWeight: 650,
-              letterSpacing: "-0.02em",
-            }}
-          >
-            AI-BOSS
-          </Typography>
-        </Stack>
-        <SignOutButton />
-      </Stack>
+      <DashboardHeader onOpenPastChats={() => setHistoryOpen(true)} />
 
       <Stack
         sx={{

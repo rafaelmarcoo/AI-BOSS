@@ -9,6 +9,7 @@ import {
   type CompleteFinancialMetricSet,
 } from "@/lib/financial-data";
 import { readSourceAwareMetrics } from "@/lib/financial-data/read-service";
+import { isModelName, type ModelName } from "@/lib/ai/models";
 import { DashboardHeader } from "./header";
 import { ResizablePanels } from "./ResizablePanels";
 
@@ -16,6 +17,7 @@ interface DashboardPageProps {
   searchParams?: Promise<{
     conversationId?: string;
     initialMessage?: string;
+    model?: string;
   }>;
 }
 
@@ -23,6 +25,12 @@ function normalizeSearchParam(value: string | undefined) {
   const trimmed = value?.trim();
 
   return trimmed ? trimmed : null;
+}
+
+function normalizeModelParam(value: string | undefined): ModelName | null {
+  const trimmed = normalizeSearchParam(value);
+
+  return trimmed && isModelName(trimmed) ? trimmed : null;
 }
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
@@ -79,6 +87,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         metrics={metrics}
         initialConversationId={normalizeSearchParam(params?.conversationId)}
         initialMessage={normalizeSearchParam(params?.initialMessage)}
+        initialModel={normalizeModelParam(params?.model)}
       />
     </Box>
   );

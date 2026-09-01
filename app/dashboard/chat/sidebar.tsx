@@ -29,6 +29,7 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ForumRoundedIcon from "@mui/icons-material/ForumRounded";
 import { dashboardTokens } from "@/app/theme";
 import { ChatContainer } from "./ChatContainer";
+import type { ModelName } from "@/lib/ai/models";
 import { useChatConversation } from "./useChatConversation";
 import { useDocuments } from "./useDocuments";
 import type { GenUiPlan } from "@/lib/gen-ui/types";
@@ -45,6 +46,7 @@ interface ChatSidebarProps {
   userType: UserType | null;
   initialConversationId?: string | null;
   initialMessage?: string | null;
+  initialModel?: ModelName | null;
   onDocumentsProcessed?: () => void;
   onInitialMessageHandled?: () => void;
   selectionPrompt?: SelectionChatPrompt | null;
@@ -78,6 +80,7 @@ export function ChatSidebar({
   userType,
   initialConversationId = null,
   initialMessage = null,
+  initialModel = null,
   onDocumentsProcessed,
   onInitialMessageHandled,
   selectionPrompt,
@@ -125,6 +128,7 @@ export function ChatSidebar({
     deleteConversation,
   } = useChatConversation({
     initialConversationId,
+    initialModel,
     startEmpty: Boolean(initialMessage) && !initialConversationId,
     onGenUiPlan,
   });

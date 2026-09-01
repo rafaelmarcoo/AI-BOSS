@@ -39,12 +39,14 @@ function getLatestGenUiPlan(messages: ChatApiMessage[]) {
 
 interface UseChatConversationOptions {
   initialConversationId?: string | null;
+  initialModel?: ModelName | null;
   startEmpty?: boolean;
   onGenUiPlan?: (plan: GenUiPlan | null) => void;
 }
 
 export function useChatConversation({
   initialConversationId = null,
+  initialModel = null,
   startEmpty = false,
   onGenUiPlan,
 }: UseChatConversationOptions = {}) {
@@ -55,7 +57,9 @@ export function useChatConversation({
   const [isReadOnly, setIsReadOnly] = useState(false);
   const [visibility, setVisibility] =
     useState<ConversationVisibility>("company");
-  const [model, setModel] = useState<ModelName | undefined>(undefined);
+  const [model, setModel] = useState<ModelName | undefined>(
+    initialModel ?? undefined
+  );
   const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [loading, setLoading] = useState(false);

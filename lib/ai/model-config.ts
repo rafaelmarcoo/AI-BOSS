@@ -28,6 +28,6 @@ export const UTILITY_MODEL = modelFromEnvironment(
  */
 export function mainModelOptions() {
   return CHAT_MODEL === 'gpt-5.6-luna'
-    ? { reasoning: { effort: 'low' as const } }
+    ? { reasoning: { effort: 'none' as const } }
     : { temperature: 0 }
 }

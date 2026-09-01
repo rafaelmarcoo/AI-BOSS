@@ -1,5 +1,9 @@
 import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages'
-import { buildAgentMessages, preserveFinancialCurrencyCoverage } from '@/lib/ai/agent'
+import {
+  buildAgentMessages,
+  mergeSystemMessages,
+  preserveFinancialCurrencyCoverage,
+} from '@/lib/ai/agent'
 
 describe('buildAgentMessages', () => {
   it('places supplied context after the system prompt and before chat history', () => {
@@ -21,6 +25,38 @@ describe('buildAgentMessages', () => {
     ])
     expect(messages[1].content).toBe('structured metrics context')
     expect(messages[4].content).toBe('What is my runway?')
+  })
+})
+
+describe('mergeSystemMessages', () => {
+  it('folds every system message into one leading message, keeping order', () => {
+    const merged = mergeSystemMessages(
+      buildAgentMessages({
+        input: 'What is my runway?',
+        systemPrompt: 'base prompt',
+        contextMessages: [
+          new SystemMessage('metrics context'),
+          new SystemMessage('document context'),
+        ],
+        chatHistory: [new HumanMessage('Earlier'), new AIMessage('Answer')],
+      })
+    )
+
+    expect(merged.map((message) => message._getType())).toEqual([
+      'system',
+      'human',
+      'ai',
+      'human',
+    ])
+    expect(merged[0].content).toBe(
+      'base prompt\n\nmetrics context\n\ndocument context'
+    )
+  })
+
+  it('leaves a conversation without system messages untouched', () => {
+    const conversation = [new HumanMessage('Hello')]
+
+    expect(mergeSystemMessages(conversation)).toEqual(conversation)
   })
 })
 

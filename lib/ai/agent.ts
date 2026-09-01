@@ -63,6 +63,30 @@ function createAgentModel(model: ModelName = DEFAULT_MODEL) {
   return createChatModel(model, { temperature: 0 })
 }
 
+export function mergeSystemMessages(messages: BaseMessage[]): BaseMessage[] {
+  const systemBlocks: string[] = []
+  const conversation: BaseMessage[] = []
+
+  for (const message of messages) {
+    if (!SystemMessage.isInstance(message)) {
+      conversation.push(message)
+      continue
+    }
+
+    systemBlocks.push(
+      typeof message.content === 'string'
+        ? message.content
+        : JSON.stringify(message.content)
+    )
+  }
+
+  if (systemBlocks.length === 0) {
+    return conversation
+  }
+
+  return [new SystemMessage(systemBlocks.join('\n\n')), ...conversation]
+}
+
 function readTotalTokens(message: BaseMessage) {
   if (!AIMessage.isInstance(message)) {
     return 0
@@ -99,12 +123,15 @@ export async function runAgent(
       ? model.bindTools(langChainTools)
       : model
 
-  const messages = buildAgentMessages({
+  const builtMessages = buildAgentMessages({
     input,
     chatHistory,
     contextMessages,
     systemPrompt,
   })
+
+  const messages =
+    dialect === 'google' ? mergeSystemMessages(builtMessages) : builtMessages
 
   const MAX_ITERATIONS = 10
   let totalTokensUsed = 0

@@ -184,7 +184,7 @@ export const GenUiPlanSchema = z.object({
   source: z.enum(['chat', 'selection']),
   generatedAt: z.string(),
   summary: z.string(),
-  widgets: z.array(GenUiWidgetSchema).max(4),
+  widgets: z.array(GenUiWidgetSchema).max(5),
 })
 
 export function parseGenUiPlan(input: unknown): GenUiPlan | null {

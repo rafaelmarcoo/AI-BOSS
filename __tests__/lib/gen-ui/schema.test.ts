@@ -82,4 +82,39 @@ describe('Gen UI plan schema', () => {
       }).success
     ).toBe(false)
   })
+
+  it('allows at most five generated widgets', () => {
+    const widget = {
+      id: 'connections-1',
+      type: 'data_connections' as const,
+      title: 'Data connections',
+      reason: 'The user asked about connected data.',
+      data: { message: 'Connect a financial source.' },
+    }
+    const plan = {
+      version: GEN_UI_PLAN_VERSION,
+      source: 'chat' as const,
+      generatedAt: '2026-09-01T00:00:00.000Z',
+      summary: 'Generated from the latest AI-BOSS chat turn.',
+    }
+
+    expect(
+      GenUiPlanSchema.safeParse({
+        ...plan,
+        widgets: Array.from({ length: 5 }, (_, index) => ({
+          ...widget,
+          id: `connections-${index}`,
+        })),
+      }).success
+    ).toBe(true)
+    expect(
+      GenUiPlanSchema.safeParse({
+        ...plan,
+        widgets: Array.from({ length: 6 }, (_, index) => ({
+          ...widget,
+          id: `connections-${index}`,
+        })),
+      }).success
+    ).toBe(false)
+  })
 })

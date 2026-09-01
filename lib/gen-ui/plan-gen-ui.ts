@@ -28,7 +28,6 @@ import {
 } from '@/lib/financial-data/metric-forecast'
 import {
   GEN_UI_PLAN_VERSION,
-  GEN_UI_WIDGET_TYPES,
   type GenUiPlan,
   type GenUiSource,
   type GenUiWidget,
@@ -37,7 +36,7 @@ import {
 import type { AgentToolExecution, AgentToolUsage } from '@/lib/ai/agent'
 import type { SourceAwareMetricReadResult } from '@/lib/financial-data/read-model'
 import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
-import { describeGenUiWidgetCatalog } from '@/lib/gen-ui/catalog'
+import { listEligibleGenUiWidgetRecipes } from '@/lib/gen-ui/eligibility'
 import {
   isDataConnectionRequest,
   selectMetricKeysForMessage,
@@ -49,20 +48,15 @@ import {
 
 const CAUTION_THRESHOLD = 6
 const URGENT_THRESHOLD = 3
-const MAX_WIDGETS = 4
+const MAX_WIDGETS = 5
 
 const ModelPlannerWidgetSchema = z.object({
-  type: z.enum(GEN_UI_WIDGET_TYPES).describe('The widget to display.'),
+  widgetId: z.string().describe('The exact ID of an eligible widget candidate.'),
   title: z.string().nullable().describe('A short widget title, or null to use the default.'),
   reason: z
     .string()
     .nullable()
     .describe('A concise user-facing explanation of why AI-BOSS chose this widget for the request, or null.'),
-  metricKeys: z
-    .array(z.enum(FINANCIAL_METRIC_KEYS))
-    .max(4)
-    .nullable()
-    .describe('Relevant metric keys for metric_snapshot only; otherwise null.'),
 })
 
 const PlannerOutputSchema = z.object({
@@ -77,6 +71,15 @@ interface PlannerWidget {
   title?: string
   reason?: string
   metricKeys?: FinancialMetricKey[]
+}
+
+interface PlannerCandidate extends PlannerWidget {
+  id: string
+  label: string
+  description: string
+  selectionGuidance: string
+  audience?: readonly string[]
+  redundancyGroup?: string
 }
 
 interface PlanGenUiParams {
@@ -221,12 +224,14 @@ function defaultWidgetSpecs(
   }
 
   if (metricKeys.length > 0) {
-    widgets.push({
-      type: 'metric_snapshot',
-      title: 'Relevant metrics',
-      reason: 'These live metrics directly support the user question.',
-      metricKeys,
-    })
+    widgets.push(
+      ...metricKeys.map((metricKey) => ({
+        type: 'metric_snapshot' as const,
+        title: FINANCIAL_METRIC_LABELS[metricKey],
+        reason: 'This live metric directly supports the user question.',
+        metricKeys: [metricKey],
+      }))
+    )
   }
 
   if (isDataConnectionRequest(userMessage)) {
@@ -283,19 +288,132 @@ function defaultWidgetSpecs(
 }
 
 function dedupeWidgetSpecs(widgets: PlannerWidget[]) {
-  const seen = new Set<GenUiWidgetType>()
+  const seen = new Map<GenUiWidgetType, number>()
+  const seenSnapshotMetrics = new Set<FinancialMetricKey>()
   const deduped: PlannerWidget[] = []
 
   for (const widget of widgets) {
-    if (seen.has(widget.type)) {
+    if (widget.type === 'metric_snapshot' && widget.metricKeys?.length) {
+      const metricKeys = [...new Set(widget.metricKeys)].filter(
+        (metricKey) => !seenSnapshotMetrics.has(metricKey)
+      )
+      if (metricKeys.length === 0) continue
+
+      metricKeys.forEach((metricKey) => seenSnapshotMetrics.add(metricKey))
+      deduped.push({ ...widget, metricKeys })
       continue
     }
 
-    seen.add(widget.type)
+    const existingIndex = seen.get(widget.type)
+
+    if (existingIndex !== undefined) {
+      continue
+    }
+
+    seen.set(widget.type, deduped.length)
     deduped.push(widget)
   }
 
   return deduped
+}
+
+function buildPlannerCandidates(params: {
+  userMessage: string
+  source: GenUiSource
+  snapshot: SourceAwareMetricReadResult
+  historicalMetricKey: HistoricalMetricKey | null
+  hasHistoricalSeries: boolean
+  forecastMetricKey: HistoricalMetricKey | null
+  hasForecastSeries: boolean
+  hasScenarioResult: boolean
+}) {
+  const availableMetricKeys = FINANCIAL_METRIC_KEYS.filter((key) =>
+    isAvailableMetric(params.snapshot.metrics[key])
+  )
+  const candidates: PlannerCandidate[] = listEligibleGenUiWidgetRecipes({
+    availableMetricKeys,
+    historicalMetricKey: params.historicalMetricKey,
+    hasHistoricalSeries: params.hasHistoricalSeries,
+    forecastMetricKey: params.forecastMetricKey,
+    hasForecastSeries: params.hasForecastSeries,
+    hasScenarioResult: params.hasScenarioResult,
+    // Company size is not persisted yet. Audience remains useful catalogue
+    // metadata, but must not be guessed from a single chat question.
+    companySize: null,
+  }).flatMap((recipe) => {
+    if (!recipe.renderer) return []
+
+    return [{
+      id: recipe.id,
+      label: recipe.label,
+      description: recipe.description,
+      selectionGuidance: recipe.selectionGuidance,
+      audience: recipe.audience,
+      redundancyGroup: recipe.redundancyGroup,
+      type: recipe.renderer,
+      ...(recipe.defaultMetricKeys
+        ? { metricKeys: [...recipe.defaultMetricKeys] }
+        : {}),
+    }]
+  })
+
+  const requestedMetricKeys = selectMetricKeysForMessage(params.userMessage)
+  candidates.push(
+    ...requestedMetricKeys.map((metricKey) => ({
+      id: `utility_requested_metric_${metricKey}`,
+      label: FINANCIAL_METRIC_LABELS[metricKey],
+      description: `Shows the live value and provenance for ${FINANCIAL_METRIC_LABELS[metricKey].toLowerCase()}.`,
+      selectionGuidance: 'Use when this named metric materially supports the answer, including when missing data should be explicit.',
+      redundancyGroup: `metric-${metricKey}`,
+      type: 'metric_snapshot' as const,
+      metricKeys: [metricKey],
+    }))
+  )
+
+  if (isDataConnectionRequest(params.userMessage)) {
+    candidates.push({
+      id: 'utility_data_connections',
+      label: 'Data connections',
+      description: 'Explains how the user can provide or connect financial data.',
+      selectionGuidance: 'Use only for questions about connecting, uploading, or supplying financial data.',
+      type: 'data_connections',
+    })
+  }
+
+  if (/\b(source|evidence|data|where|uploaded|metric)\b/i.test(params.userMessage)) {
+    candidates.push({
+      id: 'utility_metric_source_evidence',
+      label: 'Metric source evidence',
+      description: 'Shows the source, confidence, and availability behind relevant aggregate metrics.',
+      selectionGuidance: 'Use when the user asks where a number came from or how trustworthy the available data is.',
+      type: 'metric_source_evidence',
+    })
+  }
+
+  if (params.source === 'selection') {
+    candidates.push({
+      id: 'utility_highlight_explainer',
+      label: 'Highlighted insight',
+      description: 'Explains the exact dashboard text selected by the user.',
+      selectionGuidance: 'Use for a request originating from highlighted dashboard text.',
+      type: 'highlight_explainer',
+    })
+  }
+
+  if (
+    listMissingMetrics(params.snapshot).length > 0 &&
+    (requestedMetricKeys.length > 0 || candidates.length > 0)
+  ) {
+    candidates.push({
+      id: 'utility_missing_data',
+      label: 'Missing data',
+      description: 'Names unavailable aggregate metrics so the interface does not imply the answer is complete.',
+      selectionGuidance: 'Use when missing financial data materially limits the answer or a requested widget.',
+      type: 'missing_data_panel',
+    })
+  }
+
+  return candidates
 }
 
 async function chooseWidgetsWithModel(params: {
@@ -305,10 +423,11 @@ async function chooseWidgetsWithModel(params: {
   snapshot: SourceAwareMetricReadResult
   runwayTrend: RunwayTrendSummary
   source: GenUiSource
+  candidates: PlannerCandidate[]
 }) {
   const apiKey = process.env.OPENAI_API_KEY
 
-  if (!apiKey) {
+  if (!apiKey || params.candidates.length === 0) {
     return null
   }
 
@@ -334,14 +453,14 @@ async function chooseWidgetsWithModel(params: {
       [
         'You are a UI planner for AI-BOSS.',
         'Choose which right-side dashboard widgets should appear for the latest user question.',
-        `Allowed widget types: ${GEN_UI_WIDGET_TYPES.join(', ')}.`,
-        'Choose 0 to 4 widgets. Use empty widgets for unrelated small talk.',
-        'For metric_snapshot, return metricKeys with no more than four allowed metric keys.',
-        'Return null metricKeys for other widget types.',
+        'Choose only from the eligible candidate IDs supplied by the application.',
+        'Choose 0 to 5 widgets. Use an empty widgets array when none would help.',
+        'Prefer at most one candidate from the same redundancy group unless each adds clearly different value.',
+        'Use audience metadata only when the conversation provides reliable company-size context; do not guess company size.',
+        'Never invent a widget ID, metric, transaction, invoice, budget, customer, or supplier detail.',
         'A widget must add useful visual or actionable context beyond the chat answer.',
         'For every selected widget, write a concise reason explaining why AI-BOSS chose it for this specific request.',
         'The reason will be shown directly under that widget in the generated UI.',
-        describeGenUiWidgetCatalog(),
       ].join('\n')
     ),
     new HumanMessage(
@@ -357,27 +476,41 @@ async function chooseWidgetsWithModel(params: {
           runwayTrendDirection: params.runwayTrend.direction,
           toolsUsed: params.toolsUsed.map((tool) => tool.tool),
         },
+        eligibleCandidates: params.candidates.map((candidate) => ({
+          id: candidate.id,
+          label: candidate.label,
+          description: candidate.description,
+          selectionGuidance: candidate.selectionGuidance,
+          audience: candidate.audience,
+          redundancyGroup: candidate.redundancyGroup,
+        })),
         outputShape: {
           widgets: [
             {
-              type: 'metric_forecast_chart',
+              widgetId: 'exact_eligible_candidate_id',
               title: 'short title',
               reason: 'why AI-BOSS chose this widget for the request',
-              metricKeys: null,
             },
           ],
         },
       })
     ),
   ])
-  return response.widgets.map((widget) => ({
-    type: widget.type,
-    ...(widget.title ? { title: widget.title } : {}),
-    ...(widget.reason ? { reason: widget.reason } : {}),
-    ...(widget.metricKeys && widget.metricKeys.length > 0
-      ? { metricKeys: widget.metricKeys }
-      : {}),
-  }))
+  const candidateById = new Map(
+    params.candidates.map((candidate) => [candidate.id, candidate])
+  )
+
+  return response.widgets.flatMap((widget) => {
+    const candidate = candidateById.get(widget.widgetId)
+    if (!candidate) return []
+
+    return [{
+      type: candidate.type,
+      ...(widget.title ? { title: widget.title } : {}),
+      ...(widget.reason ? { reason: widget.reason } : {}),
+      ...(candidate.metricKeys ? { metricKeys: candidate.metricKeys } : {}),
+    }]
+  })
 }
 
 function buildMetricSnapshotWidget(
@@ -858,6 +991,21 @@ export async function planGenUi({
   ])
   const fallbackSpecs = defaultWidgetSpecs(userMessage, snapshot, source)
   const selectedText = extractSelectedText(userMessage)
+  const candidates = buildPlannerCandidates({
+    userMessage,
+    source,
+    snapshot,
+    historicalMetricKey,
+    hasHistoricalSeries:
+      metricHistoryCollection?.series.some((series) => series.points.length > 0) ??
+      false,
+    forecastMetricKey,
+    hasForecastSeries:
+      metricForecastCollection?.series.some(
+        (series) => series.forecastPoints.length > 0
+      ) ?? false,
+    hasScenarioResult: scenarioResult !== null,
+  })
   let modelSpecs: PlannerWidget[] | null = null
 
   try {
@@ -868,6 +1016,7 @@ export async function planGenUi({
       snapshot,
       runwayTrend,
       source,
+      candidates,
     })
   } catch (error) {
     console.error(

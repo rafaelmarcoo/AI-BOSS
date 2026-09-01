@@ -98,13 +98,55 @@ describe('planGenUi', () => {
   })
 
   it('lets the model select widgets for requests outside the keyword fallback', async () => {
+    const metrics = fillUnavailableMetrics({
+      cash: {
+        status: 'available',
+        key: 'cash',
+        value: 120000,
+        currency: 'NZD',
+        periodStart: null,
+        periodEnd: null,
+        asOfDate: '2026-08-31',
+        provenance: {
+          sourceType: 'document',
+          sourceLabel: 'cash-summary.csv',
+        },
+        confidence: 0.95,
+        updatedAt: '2026-08-31T00:00:00.000Z',
+      },
+      runway_months: {
+        status: 'available',
+        key: 'runway_months',
+        value: 8.4,
+        currency: null,
+        periodStart: null,
+        periodEnd: null,
+        asOfDate: '2026-08-31',
+        provenance: {
+          sourceType: 'document',
+          sourceLabel: 'cash-summary.csv',
+        },
+        confidence: 0.9,
+        updatedAt: '2026-08-31T00:00:00.000Z',
+      },
+    })
+    mockReadSourceAwareMetrics.mockResolvedValue({
+      metrics,
+      availableMetricCount: 2,
+      unavailableMetricCount: Object.keys(metrics).length - 2,
+      runwayInput: null,
+    })
     mockPlannerInvoke.mockResolvedValue({
       widgets: [
         {
-          type: 'metric_snapshot',
-          title: 'Affordability signals',
-          reason: 'These metrics help assess affordability.',
-          metricKeys: ['cash', 'burn_rate'],
+          widgetId: 'current_cash_balance',
+          title: 'Available cash',
+          reason: 'Cash helps assess affordability.',
+        },
+        {
+          widgetId: 'cash_runway',
+          title: 'Current runway',
+          reason: 'Runway shows how much operating time remains.',
         },
       ],
     })
@@ -122,11 +164,24 @@ describe('planGenUi', () => {
       expect.objectContaining({ method: 'jsonSchema', strict: true })
     )
     expect(mockPlannerInvoke).toHaveBeenCalled()
-    expect(plan?.widgets).toHaveLength(1)
-    expect(plan?.widgets[0]).toMatchObject({
-      type: 'metric_snapshot',
-      title: 'Affordability signals',
-    })
+    const plannerMessages = mockPlannerInvoke.mock.calls[0][0]
+    expect(String(plannerMessages[1].content)).toContain('current_cash_balance')
+    expect(String(plannerMessages[1].content)).not.toContain('overdue_invoices')
+    expect(plan?.widgets).toHaveLength(2)
+    expect(plan?.widgets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'metric_snapshot',
+          title: 'Available cash',
+          data: { metrics: [expect.objectContaining({ key: 'cash' })] },
+        }),
+        expect.objectContaining({
+          type: 'metric_snapshot',
+          title: 'Current runway',
+          data: { metrics: [expect.objectContaining({ key: 'runway_months' })] },
+        }),
+      ])
+    )
   })
 
   it('respects an intentional empty widget selection from the model', async () => {
@@ -136,6 +191,27 @@ describe('planGenUi', () => {
       userId: 'user-123',
       userMessage: 'Tell me a joke about cash.',
       assistantMessage: 'Why did the cash cross the road?',
+      toolsUsed: [],
+    })
+
+    expect(plan).toBeNull()
+  })
+
+  it('discards a model selection that was not in the eligible candidates', async () => {
+    mockPlannerInvoke.mockResolvedValue({
+      widgets: [
+        {
+          widgetId: 'overdue_invoices',
+          title: 'Overdue invoices',
+          reason: 'This would require invoice-level data.',
+        },
+      ],
+    })
+
+    const plan = await planGenUi({
+      userId: 'user-123',
+      userMessage: 'Show the source data for my invoices.',
+      assistantMessage: 'Invoice details are not currently available.',
       toolsUsed: [],
     })
 
@@ -231,7 +307,7 @@ describe('planGenUi', () => {
 
   it('hydrates scenario UI from the exact validated tool result and ignores legacy model comparisons', async () => {
     mockPlannerInvoke.mockResolvedValue({
-      widgets: [{ type: 'scenario_comparison', title: 'Invented comparison', reason: 'Legacy selection' }],
+      widgets: [{ widgetId: 'scenario_comparison_table', title: 'Invented comparison', reason: 'Legacy selection' }],
     })
     const scenarioResult = {
       input: {

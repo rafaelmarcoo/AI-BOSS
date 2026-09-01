@@ -38,7 +38,10 @@ import {
   isSupportedFinancialCurrency,
 } from "@/lib/financial-data/currency";
 import { DataSourcesPanel } from "@/components/data-sources-panel";
-import { GEN_UI_WIDGET_CATALOG } from "@/lib/gen-ui/catalog";
+import {
+  GEN_UI_WIDGET_CATALOG,
+  GEN_UI_WIDGET_SIZE_DIMENSIONS,
+} from "@/lib/gen-ui/catalog";
 import { MetricCard } from "../../MetricCard";
 import type {
   DataConnectionsWidget as DataConnectionsWidgetModel,
@@ -179,6 +182,7 @@ function WidgetFrame({
         borderColor: dashboardTokens.border,
         color: "common.white",
         minWidth: 0,
+        height: "100%",
       }}
     >
       <Stack spacing={1.75}>
@@ -1130,26 +1134,38 @@ export function GenUiCanvas({
               borderColor: dashboardTokens.border,
               display: "grid",
               gridTemplateColumns: { xs: "1fr", xl: "repeat(2, minmax(0, 1fr))" },
+              gridAutoRows: { xs: "auto", xl: "minmax(240px, auto)" },
               gap: 2,
             }}
           >
-            {plan?.widgets.map((widget) => (
-              <Box
-                key={widget.id}
-                sx={{
-                  minWidth: 0,
-                  gridColumn: {
-                    xs: "span 1",
-                    xl: `span ${GEN_UI_WIDGET_CATALOG[widget.type].defaultColumnSpan}`,
-                  },
-                }}
-              >
-                <GenUiWidgetRenderer
-                  widget={widget}
-                  onAskChatbot={onAskChatbot}
-                />
-              </Box>
-            ))}
+            {plan?.widgets.map((widget) => {
+              const size = GEN_UI_WIDGET_CATALOG[widget.type].defaultSize;
+              const dimensions = GEN_UI_WIDGET_SIZE_DIMENSIONS[size];
+
+              return (
+                <Box
+                  key={widget.id}
+                  data-widget-size={size}
+                  sx={{
+                    minWidth: 0,
+                    height: "100%",
+                    gridColumn: {
+                      xs: "span 1",
+                      xl: `span ${dimensions.columnSpan}`,
+                    },
+                    gridRow: {
+                      xs: "auto",
+                      xl: `span ${dimensions.rowSpan}`,
+                    },
+                  }}
+                >
+                  <GenUiWidgetRenderer
+                    widget={widget}
+                    onAskChatbot={onAskChatbot}
+                  />
+                </Box>
+              );
+            })}
           </Box>
         ) : (
           <Paper

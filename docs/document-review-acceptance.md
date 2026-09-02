@@ -1,6 +1,6 @@
 # Document review regression and acceptance checklist
 
-Use this checklist after applying `db/migrations/015_document_extraction_review.sql` to a safe Supabase environment. The automated suite generates workbook/table fixtures in memory; the PDF extraction fixtures live in `test-fixtures/pdf-metric-extraction.ts`.
+Use this checklist after applying migrations through `db/migrations/016_runway_currency_unit.sql` to a safe Supabase environment. The automated suite generates workbook/table fixtures in memory; the PDF extraction fixtures live in `test-fixtures/pdf-metric-extraction.ts`.
 
 ## Automated fixture coverage
 
@@ -61,13 +61,25 @@ Prepare files that contain no real customer data:
 
 ### Explicit review and calculation trust
 
-1. Before approval, ask chat about the uploaded file. It may cite chunks only as unreviewed evidence.
-2. Check dashboards, forecasts, scenarios, and deterministic tools. New candidate values must not appear in calculations yet.
-3. For every candidate, choose Include or Exclude. Confirm approval remains blocked while any candidate is undecided.
-4. Include a candidate with a missing date, invalid value, or non-NZD/AUD currency. Confirm approval remains blocked.
-5. Correct metric, value, currency, and reporting date. Confirm the original values remain visible beside corrections.
-6. Select **Use these values in AI-BOSS.** Confirm included observations become available and are labelled **User-confirmed**; excluded candidates never enter calculation truth.
-7. Verify NZD and AUD remain separate in history, forecasts, scenarios, and backtesting.
+1. Before approval, ask chat about the uploaded file. It may quote exact chunk values only as unreviewed evidence; it must not derive changes, totals, averages, percentages, trends, forecasts, runway, or other calculations.
+2. Confirm the generated workspace switches to **Document evidence workspace**, shows **Review required**, and does not show runway summaries, missing-metric analysis, or financial-planning follow-ups.
+3. Check dashboards, forecasts, scenarios, and deterministic tools. New candidate values must not appear in calculations yet.
+4. Confirm valid candidates are preselected as Include only in the local review draft; invalid or ambiguous candidates remain undecided.
+5. Test **Include all valid**, **Exclude all**, and **Clear selections**. Confirm none of these controls publishes observations.
+6. Confirm approval remains blocked while any candidate is undecided or invalid.
+7. Include a candidate with a missing date, invalid value, or non-NZD/AUD currency for a monetary metric. Confirm approval remains blocked.
+8. Include `runway_months`. Confirm its unit is shown as Months, its canonical currency is blank, and approval is blocked if a currency is submitted through the API.
+9. Correct metric, value, currency where applicable, and reporting date. Confirm the original values remain visible beside corrections.
+10. Confirm **Use these values in AI-BOSS.** remains blocked until **I reviewed these values against the original document.** is checked. Change a candidate afterward and confirm the acknowledgement resets.
+11. Select **Use these values in AI-BOSS.** Confirm included observations become available and are labelled **User-confirmed**; excluded candidates never enter calculation truth.
+12. Return to the same conversation used before approval. Confirm the old pre-approval answer remains unchanged, but its generated workspace is labelled **Historical snapshot** and explains that the document has since become User-confirmed. Historical chat responses are not rewritten after document state changes.
+13. Ask the same document question again in that conversation. Confirm the second turn succeeds with `POST /api/chat 200`, without **An unexpected error occurred** or `content.findIndex is not a function`.
+14. Confirm the new answer uses the label **User-confirmed**, never exposes internal status text such as `review=confirmed`, and may now calculate the source-specific change. The latest generated workspace must switch from the review-required evidence view to the live financial view.
+15. When confirmed cash and burn share one supported currency, source, and reporting date, confirm **Primary cash runway** is calculated immediately with `cash / burn`. When matching receivables and payables are also present, confirm **Working-capital-adjusted runway** is separately calculated with `(cash + AR - AP) / burn`. Neither measure requires a direct `runway_months` observation.
+16. Open runway history. Confirm AI-BOSS derives one cash-runway point per compatible source/currency/reporting date, labels it calculated, and does not store those points as observations. Confirm the adjusted history skips dates without all four inputs.
+17. Make one required input incompatible in turn: omit it, change its source, change its reporting date, use mixed NZD/AUD, and set burn to zero. Confirm each runway measure explains its exact blocking reason instead of only saying **Unavailable**. Missing receivables or payables must block only the adjusted measure, not primary cash runway.
+18. During a controlled model failure, submit one prompt and confirm the failed turn is not added to conversation history. Restore the model, retry once, and confirm exactly one user prompt and one assistant answer are saved.
+19. Verify NZD and AUD remain separate in history, forecasts, scenarios, and backtesting.
 
 ### Reprocessing, rollback, and legacy compatibility
 
@@ -82,5 +94,6 @@ Prepare files that contain no real customer data:
 2. Confirm Recent Activity contains only documents owned by the user plus conversations/scenarios already accessible under their existing visibility rules.
 3. Navigate the review page using Tab, Shift+Tab, arrow keys in selects, Space/Enter on Include/Exclude, and keyboard pagination. Confirm visible focus and meaningful labels.
 4. Check loading, empty, failed, scanned, review-required, User-confirmed, and no-metrics states in both narrow and wide layouts.
+5. Open the browser console while loading chat and document pages. Confirm there is no MUI warning that `:first-child` is unsafe during server-side rendering.
 
 Record date, environment, migration version, browser/device widths, fixture names, pass/fail result, and screenshots for every manual run. Do not mark this checklist executed until those observations have actually been collected.

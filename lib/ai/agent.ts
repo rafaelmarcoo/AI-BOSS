@@ -73,6 +73,50 @@ export function preserveFinancialCurrencyCoverage(
   return `${response}\n\nAdditional currency series from the deterministic analysis:\n\n${uniqueBlocks.join('\n\n')}`
 }
 
+export function requiresUnavailableAdjustedRunwayCorrection(params: {
+  response: string
+  evidence: string[]
+}) {
+  const adjustedRunwayIsUnavailable = params.evidence.some(
+    (content) =>
+      /working-capital-adjusted runway status:\s*unavailable/i.test(content) ||
+      /working-capital-adjusted runway[^.\n]*(?:is unavailable|cannot calculate)/i.test(
+        content
+      ) ||
+      /cannot calculate working-capital-adjusted runway/i.test(content)
+  )
+
+  if (!adjustedRunwayIsUnavailable) return false
+
+  const directlyLabelledNumericResult =
+    /working-capital-adjusted runway\s*(?::|is|-)?\s*\*{0,2}\s*\d+(?:\.\d+)?\s*months/i.test(
+      params.response
+    )
+  const substitutedAdjustedFormula =
+    /\([^()\n]*\d[^()\n]*[+-][^()\n]*\d[^()\n]*\)\s*(?:÷|\/)\s*[^=\n]+?=\s*\d+(?:\.\d+)?\s*months/i.test(
+      params.response
+    )
+
+  return directlyLabelledNumericResult || substitutedAdjustedFormula
+}
+
+function safeUnavailableAdjustedRunwayResponse(evidence: string[]) {
+  const reason = evidence
+    .flatMap((content) => content.split('\n'))
+    .find((line) => line.startsWith('Reason: '))
+    ?.slice('Reason: '.length)
+
+  return [
+    'I cannot provide a valid numerical working-capital-adjusted runway from the available User-confirmed inputs.',
+    reason ??
+      'The required cash, receivables, payables, and burn inputs are not compatible for one source, currency, and reporting date.',
+    '',
+    '**Formula:** `(cash + accounts receivable − accounts payable) ÷ monthly burn`',
+    '',
+    'No values have been substituted because that would create an invalid mixed-period or mixed-source calculation.',
+  ].join('\n')
+}
+
 function createAgentModel() {
   const apiKey = process.env.OPENAI_API_KEY
 
@@ -97,6 +141,25 @@ function readTotalTokens(message: BaseMessage) {
   }
 
   return message.usage_metadata?.total_tokens ?? 0
+}
+
+/**
+ * LangChain normalizes Responses API output into typed content blocks.
+ * Use its text accessor so UI consumers receive Markdown text, not block JSON.
+ */
+export function readModelMessageText(message: BaseMessage) {
+  return message.text
+}
+
+/**
+ * Persisted assistant replies are stored as plain text, but the Responses API
+ * adapter expects assistant content to be an array when rebuilding a later
+ * turn. Recreate those replies as typed text blocks at the provider boundary.
+ */
+export function createAssistantHistoryMessage(content: string) {
+  return new AIMessage({
+    content: [{ type: 'text', text: content, annotations: [] }],
+  })
 }
 
 /**
@@ -126,6 +189,7 @@ export async function runAgent(
   const toolsUsed: AgentToolUsage[] = []
   const toolExecutions: AgentToolExecution[] = []
   const financialToolResults: FinancialToolResult[] = []
+  let adjustedRunwayCorrectionAttempts = 0
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     const response = await llm.invoke(messages)
@@ -133,9 +197,35 @@ export async function runAgent(
     messages.push(response)
 
     if (!response.tool_calls || response.tool_calls.length === 0) {
-      const content = typeof response.content === 'string'
-        ? response.content
-        : JSON.stringify(response.content)
+      const content = readModelMessageText(response)
+      const calculationEvidence = [
+        ...contextMessages.map((message) => readModelMessageText(message)),
+        ...financialToolResults.map((result) => result.content),
+      ]
+
+      if (
+        requiresUnavailableAdjustedRunwayCorrection({
+          response: content,
+          evidence: calculationEvidence,
+        })
+      ) {
+        if (adjustedRunwayCorrectionAttempts < 2) {
+          adjustedRunwayCorrectionAttempts += 1
+          messages.push(
+            new SystemMessage(
+              'Your draft displayed a numerical working-capital-adjusted runway even though the deterministic data marked it unavailable. Rewrite the complete answer. Keep the valid cash-runway result, show only the symbolic adjusted-runway formula, state the incompatibility or exclusion reason and source, and do not substitute mismatched values or mention the invalid numerical result.'
+            )
+          )
+          continue
+        }
+
+        return {
+          content: safeUnavailableAdjustedRunwayResponse(calculationEvidence),
+          tokensUsed: totalTokensUsed > 0 ? totalTokensUsed : null,
+          toolsUsed,
+          toolExecutions,
+        }
+      }
 
       return {
         content: preserveFinancialCurrencyCoverage(content, financialToolResults),

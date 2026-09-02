@@ -14,12 +14,22 @@ const EXTRACTOR_VERSIONS = {
 function candidateWarnings(metric: AvailableFinancialMetricValue) {
   const warnings: DocumentExtractionCandidateDraft['warnings'] = []
 
-  if (!metric.currency) {
+  if (metric.key === 'runway_months' && metric.currency) {
+    warnings.push({
+      code: 'currency_not_applicable',
+      message:
+        'Runway is measured in months, so its source currency was removed from the calculation candidate.',
+    })
+  } else if (metric.key !== 'runway_months' && !metric.currency) {
     warnings.push({
       code: 'currency_missing',
       message: 'Choose NZD or AUD before including this candidate.',
     })
-  } else if (metric.currency !== 'NZD' && metric.currency !== 'AUD') {
+  } else if (
+    metric.key !== 'runway_months' &&
+    metric.currency !== 'NZD' &&
+    metric.currency !== 'AUD'
+  ) {
     warnings.push({
       code: 'currency_unsupported',
       message: `${metric.currency} cannot be used for calculations; choose NZD or AUD or exclude this candidate.`,
@@ -42,7 +52,8 @@ function metricToCandidate(
 ): DocumentExtractionCandidateDraft {
   const evidence = metric.provenance.evidence ?? {}
   const supportedCurrency =
-    metric.currency === 'NZD' || metric.currency === 'AUD'
+    metric.key !== 'runway_months' &&
+    (metric.currency === 'NZD' || metric.currency === 'AUD')
       ? metric.currency
       : null
 

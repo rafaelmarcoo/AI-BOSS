@@ -1,6 +1,7 @@
 import {
   getOrCreateConversation,
   getCompanyConversation,
+  insertConversationTurn,
   listConversationMessages,
   listUserConversations,
   updateConversationVisibility,
@@ -202,5 +203,64 @@ describe('company conversation persistence', () => {
     await expect(
       updateConversationVisibility('conversation-1', 'employee-1', 'admins')
     ).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' })
+  })
+
+  it('saves a completed user and assistant turn with one atomic insert', async () => {
+    const savedMessages = [
+      {
+        id: 'message-user',
+        conversation_id: 'conversation-1',
+        user_id: 'user-1',
+        role: 'user',
+        content: 'What is my runway?',
+        citations: null,
+        ui_payload: null,
+        created_at: '2026-08-31T00:00:00.000Z',
+      },
+      {
+        id: 'message-assistant',
+        conversation_id: 'conversation-1',
+        user_id: 'user-1',
+        role: 'assistant',
+        content: 'Your runway is 4.82 months.',
+        citations: null,
+        ui_payload: null,
+        created_at: '2026-08-31T00:00:00.001Z',
+      },
+    ]
+    const messageQuery = {
+      insert: jest.fn(),
+      select: jest.fn().mockResolvedValue({ data: savedMessages, error: null }),
+    }
+    messageQuery.insert.mockReturnValue(messageQuery)
+    const conversationQuery = {
+      update: jest.fn(),
+      eq: jest.fn(),
+    }
+    conversationQuery.update.mockReturnValue(conversationQuery)
+    conversationQuery.eq.mockReturnValue(conversationQuery)
+    const from = jest.fn((table: string) =>
+      table === 'conversation_messages' ? messageQuery : conversationQuery
+    )
+    mockedCreateAdminSupabaseClient.mockReturnValue({ from } as unknown as ReturnType<typeof createAdminSupabaseClient>)
+
+    await expect(insertConversationTurn({
+      conversationId: 'conversation-1',
+      userId: 'user-1',
+      userContent: 'What is my runway?',
+      assistantContent: 'Your runway is 4.82 months.',
+    })).resolves.toEqual({
+      userMessage: savedMessages[0],
+      assistantMessage: savedMessages[1],
+    })
+
+    expect(messageQuery.insert).toHaveBeenCalledTimes(1)
+    expect(messageQuery.insert).toHaveBeenCalledWith([
+      expect.objectContaining({ role: 'user', content: 'What is my runway?' }),
+      expect.objectContaining({
+        role: 'assistant',
+        content: 'Your runway is 4.82 months.',
+      }),
+    ])
   })
 })

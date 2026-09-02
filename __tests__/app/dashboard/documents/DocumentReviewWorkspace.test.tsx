@@ -123,7 +123,7 @@ describe('DocumentReviewWorkspace', () => {
     global.fetch = originalFetch
   })
 
-  it('requires an explicit include or exclude decision before approval', async () => {
+  it('preselects valid candidates but requires an explicit review acknowledgement', async () => {
     const user = userEvent.setup()
     render(<DocumentReviewWorkspace documentId="document-1" />)
 
@@ -131,9 +131,11 @@ describe('DocumentReviewWorkspace', () => {
       name: 'Use these values in AI-BOSS.',
     })
     expect(approval).toBeDisabled()
-    expect(screen.getByText('Choose Include or Exclude for every candidate.')).toBeInTheDocument()
+    expect(screen.getByText('1 include · 0 exclude · 0 undecided')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Include candidate 1' }))
+    await user.click(screen.getByRole('checkbox', {
+      name: 'I reviewed these values against the original document.',
+    }))
     expect(approval).toBeEnabled()
     await user.click(approval)
 
@@ -162,15 +164,111 @@ describe('DocumentReviewWorkspace', () => {
   })
 
   it('blocks approval when an included correction is invalid', async () => {
-    const user = userEvent.setup()
     render(<DocumentReviewWorkspace documentId="document-1" />)
 
-    await user.click(await screen.findByRole('button', { name: 'Include candidate 1' }))
+    await screen.findByRole('button', { name: 'Include candidate 1' })
     const value = screen.getByLabelText('Corrected value')
     fireEvent.change(value, { target: { value: '' } })
 
     expect(screen.getByRole('button', { name: 'Use these values in AI-BOSS.' })).toBeDisabled()
     expect(screen.getByText(/candidate needs a valid metric/i)).toBeInTheDocument()
+  })
+
+  it('supports bulk include, exclude, and clear draft selections', async () => {
+    const user = userEvent.setup()
+    render(<DocumentReviewWorkspace documentId="document-1" />)
+
+    expect(await screen.findByText('1 include · 0 exclude · 0 undecided')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Exclude all' }))
+    expect(screen.getByText('0 include · 1 exclude · 0 undecided')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Clear selections' }))
+    expect(screen.getByText('0 include · 0 exclude · 1 undecided')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Include all valid' }))
+    expect(screen.getByText('1 include · 0 exclude · 0 undecided')).toBeInTheDocument()
+  })
+
+  it('shows runway in months and confirms it without currency', async () => {
+    const runwayDetails = {
+      ...details,
+      candidates: [
+        {
+          ...details.candidates[0],
+          original_payload: {
+            metricKey: 'runway_months',
+            value: 7,
+            currency: 'NZD',
+            asOfDate: '2026-07-31',
+          },
+          metric_key: 'runway_months' as const,
+          value: 7,
+          currency: null,
+          warnings: [
+            {
+              code: 'currency_not_applicable',
+              message: 'Runway is measured in months.',
+            },
+          ],
+        },
+      ],
+    }
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.endsWith('/confirm') && init?.method === 'POST') {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: { includedObservationCount: 1, financialReviewStatus: 'confirmed' },
+          }),
+        } as Response
+      }
+      if (url.includes('/preview')) {
+        return {
+          ok: true,
+          json: async () => ({ success: true, data: preview }),
+        } as Response
+      }
+      return {
+        ok: true,
+        json: async () => ({ success: true, data: runwayDetails }),
+      } as Response
+    })
+
+    const user = userEvent.setup()
+    render(<DocumentReviewWorkspace documentId="document-1" />)
+
+    expect(await screen.findByDisplayValue('Months')).toBeDisabled()
+    expect(screen.queryByLabelText('Corrected currency')).not.toBeInTheDocument()
+    expect(screen.getByText('NZD')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('checkbox', {
+      name: 'I reviewed these values against the original document.',
+    }))
+    const approval = screen.getByRole('button', {
+      name: 'Use these values in AI-BOSS.',
+    })
+    expect(approval).toBeEnabled()
+    await user.click(approval)
+
+    const confirmCall = fetchMock.mock.calls.find(
+      ([url, init]) => String(url).endsWith('/confirm') && init?.method === 'POST',
+    )
+    expect(JSON.parse(confirmCall?.[1]?.body as string)).toEqual({
+      extractionRunId: 'run-1',
+      candidates: [
+        {
+          candidateId: 'candidate-1',
+          decision: 'included',
+          metricKey: 'runway_months',
+          value: 7,
+          currency: null,
+          reportingDate: '2026-07-31',
+        },
+      ],
+    })
   })
 
   it('shows source evidence and the original table alongside the review', async () => {

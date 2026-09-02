@@ -133,9 +133,16 @@ export function validateConfirmDocumentPayload(
       if (typeof value !== 'number' || !Number.isFinite(value)) {
         details[field('value')] = 'Included candidates require a value.'
       }
-      if (currency !== 'NZD' && currency !== 'AUD') {
+      if (metricKey === 'runway_months' && currency !== null) {
         details[field('currency')] =
-          'Included candidates require NZD or AUD currency.'
+          'Runway months must not have a currency.'
+      } else if (
+        metricKey !== 'runway_months' &&
+        currency !== 'NZD' &&
+        currency !== 'AUD'
+      ) {
+        details[field('currency')] =
+          'Included monetary candidates require NZD or AUD currency.'
       }
       if (typeof reportingDate !== 'string' || !isIsoDate(reportingDate)) {
         details[field('reportingDate')] =
@@ -159,7 +166,12 @@ export function validateConfirmDocumentPayload(
           ? metricKey
           : null,
       value: typeof value === 'number' && Number.isFinite(value) ? value : null,
-      currency: currency === 'NZD' || currency === 'AUD' ? currency : null,
+      currency:
+        metricKey === 'runway_months'
+          ? null
+          : currency === 'NZD' || currency === 'AUD'
+            ? currency
+            : null,
       reportingDate:
         typeof reportingDate === 'string' && isIsoDate(reportingDate)
           ? reportingDate

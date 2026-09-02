@@ -94,6 +94,57 @@ describe('document extraction candidates', () => {
     })
   })
 
+  it('keeps a runway source currency only as audit evidence', () => {
+    const [candidate] = extractDocumentCandidates({
+      document: {
+        id: 'document-1',
+        file_name: 'financials.csv',
+        file_type: 'csv',
+      },
+      parsedDocument: {
+        ...emptyResult,
+        tabularData: {
+          sourceType: 'csv',
+          selectedSheetNames: ['CSV'],
+          suggestedSheetNames: ['CSV'],
+          worksheetMetadata: [],
+          warnings: [],
+          sheets: [
+            {
+              name: 'CSV',
+              visibility: 'visible',
+              headers: ['Metric', 'Value', 'Currency', 'Date'],
+              rows: [
+                {
+                  rowNumber: 2,
+                  values: ['Runway', '7', 'NZD', '2026-07-31'],
+                  cells: {
+                    Metric: 'Runway',
+                    Value: '7',
+                    Currency: 'NZD',
+                    Date: '2026-07-31',
+                  },
+                },
+              ],
+              headerRowNumber: 1,
+              nonEmptyRowCount: 2,
+              columnCount: 4,
+              warnings: [],
+            },
+          ],
+        },
+      },
+      extractedAt: '2026-08-26T00:00:00.000Z',
+    })
+
+    expect(candidate).toMatchObject({
+      metricKey: 'runway_months',
+      currency: null,
+      originalPayload: { currency: 'NZD' },
+      warnings: [expect.objectContaining({ code: 'currency_not_applicable' })],
+    })
+  })
+
   it('deduplicates identical candidates across selected worksheets', () => {
     const rows = [
       {

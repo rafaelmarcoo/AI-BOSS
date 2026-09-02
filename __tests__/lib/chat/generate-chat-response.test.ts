@@ -5,8 +5,9 @@ import { runAgent } from '@/lib/ai/agent'
 import { runMultiAgent } from '@/lib/agents/specialists'
 import { getAgentTools } from '@/lib/ai/tool-registry'
 import {
+  deleteConversation,
   getOrCreateConversation,
-  insertConversationMessage,
+  insertConversationTurn,
   listConversationMessages,
 } from '@/lib/chat/persistence'
 import { logChatDecision } from '@/lib/chat/log-chat-decision'
@@ -17,6 +18,7 @@ jest.mock('@/lib/chat/build-chat-context', () => ({
 }))
 
 jest.mock('@/lib/ai/agent', () => ({
+  ...jest.requireActual('@/lib/ai/agent'),
   runAgent: jest.fn(),
 }))
 
@@ -29,8 +31,9 @@ jest.mock('@/lib/ai/tool-registry', () => ({
 }))
 
 jest.mock('@/lib/chat/persistence', () => ({
+  deleteConversation: jest.fn(),
   getOrCreateConversation: jest.fn(),
-  insertConversationMessage: jest.fn(),
+  insertConversationTurn: jest.fn(),
   listConversationMessages: jest.fn(),
   mapConversationMessagesToPayload: jest.fn((messages) =>
     messages.map((message: { role: string; content: string }) => ({
@@ -52,8 +55,9 @@ const mockBuildChatContext = jest.mocked(buildChatContext)
 const mockRunAgent = jest.mocked(runAgent)
 const mockRunMultiAgent = jest.mocked(runMultiAgent)
 const mockGetAgentTools = jest.mocked(getAgentTools)
+const mockDeleteConversation = jest.mocked(deleteConversation)
 const mockGetOrCreateConversation = jest.mocked(getOrCreateConversation)
-const mockInsertConversationMessage = jest.mocked(insertConversationMessage)
+const mockInsertConversationTurn = jest.mocked(insertConversationTurn)
 const mockListConversationMessages = jest.mocked(listConversationMessages)
 const mockLogChatDecision = jest.mocked(logChatDecision)
 const mockPlanGenUi = jest.mocked(planGenUi)
@@ -62,6 +66,7 @@ describe('generateChatResponse', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     delete process.env.MULTI_AGENT_MODE
+    mockLogChatDecision.mockResolvedValue(undefined)
   })
 
   it('passes built financial and document context into the agent', async () => {
@@ -76,8 +81,8 @@ describe('generateChatResponse', () => {
       created_at: '2026-05-12T00:00:00.000Z',
       updated_at: '2026-05-12T00:00:00.000Z',
     })
-    mockInsertConversationMessage
-      .mockResolvedValueOnce({
+    mockInsertConversationTurn.mockResolvedValue({
+      userMessage: {
         id: 'message-user',
         conversation_id: 'conversation-1',
         user_id: 'user-123',
@@ -86,8 +91,8 @@ describe('generateChatResponse', () => {
         citations: null,
         ui_payload: null,
         created_at: '2026-05-12T00:00:00.000Z',
-      })
-      .mockResolvedValueOnce({
+      },
+      assistantMessage: {
         id: 'message-assistant',
         conversation_id: 'conversation-1',
         user_id: 'user-123',
@@ -96,46 +101,14 @@ describe('generateChatResponse', () => {
         citations: null,
         ui_payload: null,
         created_at: '2026-05-12T00:00:00.000Z',
-      })
-    mockListConversationMessages
-      .mockResolvedValueOnce([
-        {
-          id: 'message-user',
-          conversation_id: 'conversation-1',
-          user_id: 'user-123',
-          role: 'user',
-          content: 'What is my runway?',
-          citations: null,
-          ui_payload: null,
-          created_at: '2026-05-12T00:00:00.000Z',
-        },
-      ])
-      .mockResolvedValueOnce([
-        {
-          id: 'message-user',
-          conversation_id: 'conversation-1',
-          user_id: 'user-123',
-          role: 'user',
-          content: 'What is my runway?',
-          citations: null,
-          ui_payload: null,
-          created_at: '2026-05-12T00:00:00.000Z',
-        },
-        {
-          id: 'message-assistant',
-          conversation_id: 'conversation-1',
-          user_id: 'user-123',
-          role: 'assistant',
-          content: 'Your runway is 5.4 months.',
-          citations: null,
-          ui_payload: null,
-          created_at: '2026-05-12T00:00:00.000Z',
-        },
-      ])
+      },
+    })
+    mockListConversationMessages.mockResolvedValue([])
     mockBuildChatContext.mockResolvedValue({
       messages: contextMessages,
       metricKeys: ['cash'],
       retrievedChunks: [],
+      hasUnreviewedDocumentEvidence: false,
     })
     mockRunAgent.mockResolvedValue({
       content: 'Your runway is 5.4 months.',
@@ -161,6 +134,9 @@ describe('generateChatResponse', () => {
       [{ name: 'calculate_runway' }],
       contextMessages
     )
+    expect(mockPlanGenUi).toHaveBeenCalledWith(
+      expect.objectContaining({ hasUnreviewedDocumentEvidence: false })
+    )
     expect(mockLogChatDecision).toHaveBeenCalled()
   })
 
@@ -172,17 +148,16 @@ describe('generateChatResponse', () => {
       id: 'conversation-1', user_id: 'user-123', company_id: 'company-1', visibility: 'company',
       title: 'Forecast cash', created_at: '2026-05-12T00:00:00.000Z', updated_at: '2026-05-12T00:00:00.000Z',
     })
-    mockInsertConversationMessage
-      .mockResolvedValueOnce({
+    mockInsertConversationTurn.mockResolvedValue({
+      userMessage: {
         id: 'message-user', conversation_id: 'conversation-1', user_id: 'user-123', role: 'user', content: 'Forecast cash', citations: null, ui_payload: null, created_at: '2026-05-12T00:00:00.000Z',
-      })
-      .mockResolvedValueOnce({
+      },
+      assistantMessage: {
         id: 'message-assistant', conversation_id: 'conversation-1', user_id: 'user-123', role: 'assistant', content: 'Forecast result', citations: null, ui_payload: null, created_at: '2026-05-12T00:00:00.000Z',
-      })
-    mockListConversationMessages
-      .mockResolvedValueOnce([{ id: 'message-user', conversation_id: 'conversation-1', user_id: 'user-123', role: 'user', content: 'Forecast cash', citations: null, ui_payload: null, created_at: '2026-05-12T00:00:00.000Z' }])
-      .mockResolvedValueOnce([])
-    mockBuildChatContext.mockResolvedValue({ messages: contextMessages, metricKeys: ['cash'], retrievedChunks: [] })
+      },
+    })
+    mockListConversationMessages.mockResolvedValue([])
+    mockBuildChatContext.mockResolvedValue({ messages: contextMessages, metricKeys: ['cash'], retrievedChunks: [], hasUnreviewedDocumentEvidence: false })
     mockRunMultiAgent.mockResolvedValue({ content: 'Forecast result', tokensUsed: 88, toolsUsed: [], specialist: 'historical_forecast' })
     mockPlanGenUi.mockResolvedValue(null)
 
@@ -210,13 +185,9 @@ describe('generateChatResponse', () => {
     }
 
     mockGetOrCreateConversation.mockResolvedValue(conversation)
-    mockInsertConversationMessage
-      .mockResolvedValueOnce(userMessage)
-      .mockResolvedValueOnce(assistantMessage)
-    mockListConversationMessages
-      .mockResolvedValueOnce([userMessage])
-      .mockResolvedValueOnce([userMessage, assistantMessage])
-    mockBuildChatContext.mockResolvedValue({ messages: contextMessages, metricKeys: ['cash'], retrievedChunks: [] })
+    mockInsertConversationTurn.mockResolvedValue({ userMessage, assistantMessage })
+    mockListConversationMessages.mockResolvedValue([])
+    mockBuildChatContext.mockResolvedValue({ messages: contextMessages, metricKeys: ['cash'], retrievedChunks: [], hasUnreviewedDocumentEvidence: false })
     mockRunMultiAgent.mockResolvedValue({
       content: 'Trusted scenario result', tokensUsed: 88, toolsUsed: [], toolExecutions: [], specialist: 'scenario',
     })
@@ -230,5 +201,26 @@ describe('generateChatResponse', () => {
       scenarioMode: true,
       toolExecutions: [],
     }))
+  })
+
+  it('does not persist a user message when the model call fails', async () => {
+    mockGetOrCreateConversation.mockResolvedValue({
+      id: 'conversation-1', user_id: 'user-123', company_id: 'company-1', visibility: 'company',
+      title: 'Existing chat', created_at: '2026-08-31T00:00:00.000Z', updated_at: '2026-08-31T00:00:00.000Z',
+    })
+    mockListConversationMessages.mockResolvedValue([])
+    mockBuildChatContext.mockResolvedValue({
+      messages: [], metricKeys: [], retrievedChunks: [], hasUnreviewedDocumentEvidence: false,
+    })
+    mockRunAgent.mockRejectedValue(new Error('Model unavailable'))
+
+    await expect(generateChatResponse(
+      'user-123',
+      [{ role: 'user', content: 'Retry-safe question' }],
+      'conversation-1',
+    )).rejects.toThrow('Model unavailable')
+
+    expect(mockInsertConversationTurn).not.toHaveBeenCalled()
+    expect(mockDeleteConversation).not.toHaveBeenCalled()
   })
 })

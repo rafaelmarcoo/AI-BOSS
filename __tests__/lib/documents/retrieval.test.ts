@@ -35,6 +35,7 @@ describe('document retrieval ranking', () => {
         documents: {
           file_name: 'policy.pdf',
           file_type: 'pdf' as const,
+          financial_review_status: 'not_required' as const,
         },
       },
       {
@@ -50,6 +51,7 @@ describe('document retrieval ranking', () => {
         documents: {
           file_name: 'summary.csv',
           file_type: 'csv' as const,
+          financial_review_status: 'pending' as const,
         },
       },
     ]
@@ -66,6 +68,7 @@ describe('document retrieval ranking', () => {
         documentId: 'document-2',
         documentName: 'summary.csv',
         documentType: 'csv',
+        financialReviewStatus: 'pending',
         chunkIndex: 3,
         content: 'Cash runway is 5.4 months',
         sourcePage: null,

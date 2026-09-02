@@ -27,6 +27,7 @@ describe('AI model configuration', () => {
     expect(config.CHAT_MODEL).toBe('gpt-5.6-luna')
     expect(config.UTILITY_MODEL).toBe('gpt-4o-mini-2024-07-18')
     expect(config.mainModelOptions()).toEqual({
+      useResponsesApi: true,
       reasoning: { effort: 'low' },
     })
   })
@@ -39,6 +40,9 @@ describe('AI model configuration', () => {
 
     expect(config.CHAT_MODEL).toBe('gpt-4o-mini')
     expect(config.UTILITY_MODEL).toBe('test-utility-model')
-    expect(config.mainModelOptions()).toEqual({ temperature: 0 })
+    expect(config.mainModelOptions()).toEqual({
+      useResponsesApi: true,
+      temperature: 0,
+    })
   })
 })

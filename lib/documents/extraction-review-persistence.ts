@@ -6,6 +6,7 @@ import type {
 } from '@/lib/documents/types'
 import { createAdminSupabaseClient } from '@/lib/supabase'
 import type { DocumentExtractionRun } from '@/types/database'
+import type { DocumentExtractionCandidate } from '@/types/database'
 
 const EXTRACTION_RUN_SELECT = `
   id,
@@ -45,6 +46,77 @@ const EXTRACTION_CANDIDATE_SELECT = `
   created_at,
   updated_at
 `
+
+const EXCLUDED_EXTRACTION_CANDIDATE_SELECT = `
+  id,
+  extraction_run_id,
+  document_id,
+  user_id,
+  original_payload,
+  reviewed_payload,
+  metric_key,
+  value,
+  currency,
+  reporting_date,
+  confidence,
+  evidence,
+  warnings,
+  decision,
+  extractor_version,
+  reviewer_id,
+  reviewed_at,
+  created_at,
+  updated_at
+`
+
+export async function listConfirmedDocumentExcludedCandidates(params: {
+  userId: string
+  documentIds: string[]
+  limit?: number
+}) {
+  const documentIds = [...new Set(params.documentIds)]
+  if (documentIds.length === 0) return []
+
+  const supabase = createAdminSupabaseClient()
+  const { data: runs, error: runError } = await supabase
+    .from('document_extraction_runs')
+    .select('id, document_id')
+    .eq('user_id', params.userId)
+    .eq('status', 'confirmed')
+    .in('document_id', documentIds)
+
+  if (runError) {
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to load confirmed document review decisions.'
+    )
+  }
+
+  const extractionRunIds = (runs ?? []).map((run) => run.id)
+  if (extractionRunIds.length === 0) return []
+
+  const { data, error } = await supabase
+    .from('document_extraction_candidates')
+    .select(EXCLUDED_EXTRACTION_CANDIDATE_SELECT)
+    .eq('user_id', params.userId)
+    .eq('decision', 'excluded')
+    .in('document_id', documentIds)
+    .in('extraction_run_id', extractionRunIds)
+    .order('reporting_date', { ascending: false, nullsFirst: false })
+    .order('reviewed_at', { ascending: false, nullsFirst: false })
+    .limit(params.limit ?? 200)
+
+  if (error) {
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to load excluded document review candidates.'
+    )
+  }
+
+  return (data ?? []) as DocumentExtractionCandidate[]
+}
 
 export async function getLatestDocumentExtractionReview(params: {
   documentId: string

@@ -10,6 +10,7 @@ import {
   Chip,
   CircularProgress,
   FormControl,
+  FormControlLabel,
   InputLabel,
   MenuItem,
   Pagination,
@@ -72,13 +73,19 @@ function readOriginalValue(candidate: DocumentReviewCandidate, key: string) {
 }
 
 function candidateEdit(candidate: DocumentReviewCandidate): CandidateEdit {
-  return {
+  const edit: CandidateEdit = {
     decision: candidate.decision,
     metricKey: candidate.metric_key ?? "",
     value: candidate.value === null ? "" : String(candidate.value),
-    currency: candidate.currency ?? "",
+    currency: candidate.metric_key === "runway_months" ? "" : candidate.currency ?? "",
     reportingDate: candidate.reporting_date ?? "",
   };
+
+  if (candidate.decision === "pending" && candidateFieldsAreValid(edit)) {
+    return { ...edit, decision: "included" };
+  }
+
+  return edit;
 }
 
 function isValidIsoDate(value: string) {
@@ -87,15 +94,23 @@ function isValidIsoDate(value: string) {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
-function includedCandidateIsValid(edit: CandidateEdit) {
+function candidateFieldsAreValid(edit: CandidateEdit) {
+  const hasValidUnit =
+    edit.metricKey === "runway_months"
+      ? edit.currency === ""
+      : edit.currency === "NZD" || edit.currency === "AUD";
+
   return (
-    edit.decision === "included" &&
     isFinancialMetricKey(edit.metricKey) &&
     edit.value.trim() !== "" &&
     Number.isFinite(Number(edit.value)) &&
-    (edit.currency === "NZD" || edit.currency === "AUD") &&
+    hasValidUnit &&
     isValidIsoDate(edit.reportingDate)
   );
+}
+
+function includedCandidateIsValid(edit: CandidateEdit) {
+  return edit.decision === "included" && candidateFieldsAreValid(edit);
 }
 
 function evidenceLocation(candidate: DocumentReviewCandidate) {
@@ -139,6 +154,7 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
   const [reprocessing, setReprocessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [reviewAcknowledged, setReviewAcknowledged] = useState(false);
 
   const loadDetails = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -155,6 +171,7 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
           payload.data.candidates.map((candidate) => [candidate.id, candidateEdit(candidate)]),
         ),
       );
+      setReviewAcknowledged(false);
       const selected = payload.data.extractionRun?.selected_worksheet_names ?? [];
       setSelectedSheets(selected);
       setPreviewSheet((current) => current || selected[0] || "");
@@ -231,13 +248,31 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
     candidates.length > 0 &&
     summary.pending === 0 &&
     summary.invalid === 0 &&
+    reviewAcknowledged &&
     !submitting;
 
   const updateEdit = (candidateId: string, updates: Partial<CandidateEdit>) => {
+    setReviewAcknowledged(false);
     setEdits((current) => ({
       ...current,
       [candidateId]: { ...current[candidateId], ...updates },
     }));
+  };
+
+  const setAllCandidateDecisions = (
+    decision: "included_valid" | "excluded" | "pending",
+  ) => {
+    setReviewAcknowledged(false);
+    setEdits((current) => Object.fromEntries(
+      candidates.map((candidate) => {
+        const edit = current[candidate.id] ?? candidateEdit(candidate);
+        const nextDecision: CandidateDecision =
+          decision === "included_valid"
+            ? candidateFieldsAreValid(edit) ? "included" : "pending"
+            : decision;
+        return [candidate.id, { ...edit, decision: nextDecision }];
+      }),
+    ));
   };
 
   const confirmReview = async () => {
@@ -255,7 +290,8 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
         metricKey: included && isFinancialMetricKey(edit.metricKey) ? edit.metricKey : null,
         value: included ? Number(edit.value) : null,
         currency:
-          included && (edit.currency === "NZD" || edit.currency === "AUD")
+          included && edit.metricKey !== "runway_months" &&
+          (edit.currency === "NZD" || edit.currency === "AUD")
             ? edit.currency
             : null,
         reportingDate: included ? edit.reportingDate : null,
@@ -434,10 +470,27 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
 
         <Stack spacing={1.5} sx={{ minWidth: 0 }}>
           <Paper variant="outlined" sx={panelStyles}>
-            <Typography component="h2" variant="h6" fontWeight={750}>Extraction review</Typography>
-            <Typography variant="body2" sx={{ mt: 0.5, color: dashboardTokens.textMuted }}>
-              Compare every candidate with the original. Choose Include or Exclude, and correct any included value before approval.
-            </Typography>
+            <Stack spacing={1.25}>
+              <Stack>
+                <Typography component="h2" variant="h6" fontWeight={750}>Extraction review</Typography>
+                <Typography variant="body2" sx={{ mt: 0.5, color: dashboardTokens.textMuted }}>
+                  Valid candidates are preselected for convenience but remain unreviewed. Compare them with the original, correct any value, and explicitly confirm the final selection.
+                </Typography>
+              </Stack>
+              {reviewable && candidates.length > 0 ? (
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                  <Button variant="outlined" size="small" onClick={() => setAllCandidateDecisions("included_valid")}>
+                    Include all valid
+                  </Button>
+                  <Button variant="outlined" color="error" size="small" onClick={() => setAllCandidateDecisions("excluded")}>
+                    Exclude all
+                  </Button>
+                  <Button variant="text" size="small" onClick={() => setAllCandidateDecisions("pending")}>
+                    Clear selections
+                  </Button>
+                </Stack>
+              ) : null}
+            </Stack>
           </Paper>
 
           {candidates.length === 0 ? (
@@ -477,11 +530,22 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
                 </Stack>
                 {summary.invalid > 0 ? (
                   <Alert severity="warning">
-                    {summary.invalid} included {summary.invalid === 1 ? "candidate needs" : "candidates need"} a valid metric, value, NZD/AUD currency, and reporting date.
+                    {summary.invalid} included {summary.invalid === 1 ? "candidate needs" : "candidates need"} a valid metric, value, reporting date, and NZD/AUD currency for monetary metrics.
                   </Alert>
                 ) : null}
                 {summary.pending > 0 && reviewable ? (
                   <Alert severity="info">Choose Include or Exclude for every candidate.</Alert>
+                ) : null}
+                {reviewable ? (
+                  <FormControlLabel
+                    control={(
+                      <Checkbox
+                        checked={reviewAcknowledged}
+                        onChange={(event) => setReviewAcknowledged(event.target.checked)}
+                      />
+                    )}
+                    label="I reviewed these values against the original document."
+                  />
                 ) : null}
                 <Button
                   fullWidth
@@ -530,7 +594,17 @@ function OriginalPreview({
   onPageChange: (page: number) => void;
 }) {
   return (
-    <Paper variant="outlined" sx={{ ...panelStyles, minWidth: 0 }}>
+    <Paper
+      variant="outlined"
+      sx={{
+        ...panelStyles,
+        minWidth: 0,
+        position: { lg: "sticky" },
+        top: { lg: 72 },
+        maxHeight: { lg: "calc(100vh - 88px)" },
+        overflowY: { lg: "auto" },
+      }}
+    >
       <Stack spacing={1.5}>
         <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1}>
           <Stack>
@@ -575,7 +649,14 @@ function OriginalPreview({
             {preview.warnings.length > 0 ? (
               <Alert severity="warning">{preview.warnings.length} worksheet warning{preview.warnings.length === 1 ? "" : "s"}. Review formula and formatting notes beside extracted candidates.</Alert>
             ) : null}
-            <TableContainer sx={{ maxHeight: 680, border: "1px solid", borderColor: dashboardTokens.border, borderRadius: 1.5 }}>
+            <TableContainer
+              sx={{
+                maxHeight: { xs: 680, lg: "calc(100vh - 250px)" },
+                border: "1px solid",
+                borderColor: dashboardTokens.border,
+                borderRadius: 1.5,
+              }}
+            >
               <Table stickyHeader size="small" aria-label={`${preview.sheetName} original table preview`}>
                 <TableHead><TableRow><TableCell sx={{ minWidth: 70 }}>Row</TableCell>{preview.headers.map((header, index) => <TableCell key={`${header}-${index}`} sx={{ minWidth: 130 }}>{header}</TableCell>)}</TableRow></TableHead>
                 <TableBody>
@@ -661,19 +742,40 @@ function CandidateReviewCard({
           <OriginalField label="Original metric" value={readOriginalValue(candidate, "metricKey")} />
           <FormControl size="small" fullWidth disabled={readOnly || edit.decision === "excluded"} error={invalidIncluded && !isFinancialMetricKey(edit.metricKey)}>
             <InputLabel id={`metric-${candidate.id}`}>Corrected metric</InputLabel>
-            <Select labelId={`metric-${candidate.id}`} label="Corrected metric" value={edit.metricKey} onChange={(event) => onChange({ metricKey: event.target.value })}>
+            <Select
+              labelId={`metric-${candidate.id}`}
+              label="Corrected metric"
+              value={edit.metricKey}
+              onChange={(event) => {
+                const metricKey = event.target.value;
+                onChange({
+                  metricKey,
+                  ...(metricKey === "runway_months" ? { currency: "" } : {}),
+                });
+              }}
+            >
               {FINANCIAL_METRIC_KEYS.map((key) => <MenuItem key={key} value={key}>{FINANCIAL_METRIC_LABELS[key]}</MenuItem>)}
             </Select>
           </FormControl>
           <OriginalField label="Original value" value={readOriginalValue(candidate, "value")} />
           <TextField size="small" label="Corrected value" inputMode="decimal" value={edit.value} disabled={readOnly || edit.decision === "excluded"} error={invalidIncluded && (edit.value.trim() === "" || !Number.isFinite(Number(edit.value)))} onChange={(event) => onChange({ value: event.target.value })} />
           <OriginalField label="Original currency" value={readOriginalValue(candidate, "currency")} />
-          <FormControl size="small" fullWidth disabled={readOnly || edit.decision === "excluded"} error={invalidIncluded && edit.currency !== "NZD" && edit.currency !== "AUD"}>
-            <InputLabel id={`currency-${candidate.id}`}>Corrected currency</InputLabel>
-            <Select labelId={`currency-${candidate.id}`} label="Corrected currency" value={edit.currency} onChange={(event) => onChange({ currency: event.target.value })}>
-              <MenuItem value="NZD">NZD</MenuItem><MenuItem value="AUD">AUD</MenuItem>
-            </Select>
-          </FormControl>
+          {edit.metricKey === "runway_months" ? (
+            <TextField
+              size="small"
+              label="Corrected unit"
+              value="Months"
+              disabled
+              helperText="Runway is unit-based and has no currency."
+            />
+          ) : (
+            <FormControl size="small" fullWidth disabled={readOnly || edit.decision === "excluded"} error={invalidIncluded && edit.currency !== "NZD" && edit.currency !== "AUD"}>
+              <InputLabel id={`currency-${candidate.id}`}>Corrected currency</InputLabel>
+              <Select labelId={`currency-${candidate.id}`} label="Corrected currency" value={edit.currency} onChange={(event) => onChange({ currency: event.target.value })}>
+                <MenuItem value="NZD">NZD</MenuItem><MenuItem value="AUD">AUD</MenuItem>
+              </Select>
+            </FormControl>
+          )}
           <OriginalField label="Original reporting date" value={readOriginalValue(candidate, "asOfDate") !== "Not found" ? readOriginalValue(candidate, "asOfDate") : readOriginalValue(candidate, "periodEnd")} />
           <TextField size="small" type="date" label="Corrected reporting date" value={edit.reportingDate} disabled={readOnly || edit.decision === "excluded"} error={invalidIncluded && !isValidIsoDate(edit.reportingDate)} onChange={(event) => onChange({ reportingDate: event.target.value })} slotProps={{ inputLabel: { shrink: true } }} />
         </Box>

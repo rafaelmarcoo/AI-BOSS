@@ -5,6 +5,7 @@ export interface RetrievedDocumentChunk {
   documentId: string
   documentName: string
   documentType: Document['file_type']
+  financialReviewStatus: Document['financial_review_status']
   chunkIndex: number
   content: string
   sourcePage: number | null
@@ -17,6 +18,7 @@ export type EmbeddedDocumentChunk = Omit<DocumentChunk, 'embedding'> & {
   documents: {
     file_name: string
     file_type: Document['file_type']
+    financial_review_status: Document['financial_review_status']
   }
 }
 
@@ -97,6 +99,7 @@ export function rankDocumentChunksBySimilarity(params: {
           documentId: chunk.document_id,
           documentName: chunk.documents.file_name,
           documentType: chunk.documents.file_type,
+          financialReviewStatus: chunk.documents.financial_review_status,
           chunkIndex: chunk.chunk_index,
           content: chunk.content,
           sourcePage: chunk.source_page,

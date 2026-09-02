@@ -405,7 +405,7 @@ export async function listUserEmbeddedDocumentChunks(userId: string) {
         metadata,
         embedding,
         created_at,
-        documents!inner(file_name, file_type)
+        documents!inner(file_name, file_type, financial_review_status)
       `
     )
     .eq('user_id', userId)
@@ -428,10 +428,12 @@ export async function listUserEmbeddedDocumentChunks(userId: string) {
         | {
             file_name: string
             file_type: Document['file_type']
+            financial_review_status: Document['financial_review_status']
           }
         | Array<{
             file_name: string
             file_type: Document['file_type']
+            financial_review_status: Document['financial_review_status']
           }>
     }
   >).flatMap((row) => {

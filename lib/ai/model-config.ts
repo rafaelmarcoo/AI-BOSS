@@ -25,9 +25,14 @@ export const UTILITY_MODEL = modelFromEnvironment(
 /**
  * Low reasoning gives Luna a small reasoning budget for request interpretation
  * and tool selection without using its more expensive default medium setting.
+ * Main chat always uses Responses because it combines reasoning, function tools,
+ * and multi-turn agent work; Chat Completions rejects that Luna combination.
  */
 export function mainModelOptions() {
   return CHAT_MODEL === 'gpt-5.6-luna'
-    ? { reasoning: { effort: 'low' as const } }
-    : { temperature: 0 }
+    ? {
+        useResponsesApi: true,
+        reasoning: { effort: 'low' as const },
+      }
+    : { useResponsesApi: true, temperature: 0 }
 }

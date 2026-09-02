@@ -1,0 +1,7 @@
+Metric,Amount,Currency,Date
+Cash at bank,75000,NZD,2026-06-30
+Accounts receivable,12500,NZD,
+Accounts payable,(9000),NZD,2026-06-30
+Monthly revenue,45500,AUD,2026-06-30
+Monthly expenses,62000,USD,2026-06-30
+Office headcount,14,NZD,2026-06-30

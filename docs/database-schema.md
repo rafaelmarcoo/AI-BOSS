@@ -2,13 +2,13 @@
 
 **Database:** Supabase (PostgreSQL)  
 **Created:** March 22, 2025  
-**Last Updated:** August 19, 2026
+**Last Updated:** August 26, 2026
 
 ---
 
 ## Overview
 
-The database now consists of 13 main tables:
+The database now consists of 15 main tables:
 - **companies** - Company identities used as shared-data access boundaries
 - **users** - User profiles (extends Supabase Auth)
 - **conversations** - User-owned chat threads
@@ -17,6 +17,8 @@ The database now consists of 13 main tables:
 - **decision_log** - Audit trail of AI actions, tool usage, retrieval, and calculations
 - **documents** - Uploaded user files stored in Supabase Storage
 - **document_chunks** - Chunked document content used for semantic retrieval
+- **document_extraction_runs** - Versioned processing/reprocessing attempts and worksheet warnings
+- **document_extraction_candidates** - Owner-protected metric candidates awaiting explicit review
 - **data_connections** - Provider-neutral registry for user financial data sources
 - **oauth_tokens** - Provider-neutral encrypted OAuth credential/details table
 - **oauth_connection_states** - Temporary OAuth state values used for CSRF protection
@@ -212,10 +214,11 @@ Stores uploaded user files and their ingestion state.
 | user_id | UUID (FK) | References users(id) |
 | conversation_id | UUID (FK) | Optional link to the conversation that uploaded/used the file |
 | file_name | TEXT | Original file name |
-| file_type | TEXT | `pdf` or `csv` |
+| file_type | TEXT | `pdf`, `csv`, or `xlsx` |
 | mime_type | TEXT | Uploaded MIME type |
 | storage_path | TEXT | Path in Supabase Storage |
 | status | TEXT | `uploaded`, `processing`, `ready`, `failed` |
+| financial_review_status | TEXT | Separate calculation-trust state: `legacy`, `not_required`, `pending`, or `confirmed` |
 | document_type | TEXT | Optional business meaning like `policy`, `report`, `statement` |
 | raw_text | TEXT | Extracted text used for chunking |
 | metadata | JSONB | Flexible metadata such as page counts or CSV columns |
@@ -233,7 +236,7 @@ Stores uploaded user files and their ingestion state.
 - `idx_documents_created_at` on created_at (DESC)
 
 **Deletion behaviour:**
-- The server-only `delete_owned_document_and_derived_metrics(document_id, user_id)` function removes a user's document and every financial metric observation derived from it in one database transaction. Its RAG chunks are removed by the document foreign-key cascade. The file itself is removed from private Supabase Storage immediately before this transaction.
+- The server-only `delete_owned_document_and_derived_metrics(document_id, user_id)` function removes a user's document and every financial metric observation derived from it in one database transaction. Its RAG chunks, extraction runs, and extraction candidates are removed by document foreign-key cascades. The file itself is removed from private Supabase Storage immediately before this transaction.
 
 ---
 
@@ -263,7 +266,85 @@ Stores chunked document content and embeddings for semantic retrieval.
 
 ---
 
-### 8. data_connections
+### 8. document_extraction_runs
+
+Stores each versioned extraction or reprocessing attempt. A newly extracted run
+can remain pending while observations from the previously confirmed run continue
+to supply calculation truth.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID (PK) | Extraction run identifier |
+| document_id | UUID (FK) | Source document |
+| user_id | UUID (FK) | Document owner |
+| status | TEXT | `processing`, `extracted`, `failed`, `confirmed`, or `superseded` |
+| selected_worksheet_names | TEXT[] | XLSX worksheets selected for this attempt |
+| suggested_worksheet_names | TEXT[] | Deterministically suggested XLSX worksheets |
+| worksheet_metadata | JSONB | Sanitised worksheet names, visibility, dimensions, and preview metadata |
+| warnings | JSONB | Run-level extraction and data-quality warnings |
+| extractor_version | TEXT | Deterministic extractor version |
+| error_message | TEXT | Processing failure details, if any |
+| started_at | TIMESTAMP | Attempt start time |
+| completed_at | TIMESTAMP | Extraction completion time |
+| confirmed_at | TIMESTAMP | Successful user-confirmation time |
+| superseded_at | TIMESTAMP | Time a newer confirmed run replaced this run |
+| created_at | TIMESTAMP | Record creation time |
+| updated_at | TIMESTAMP | Last state update |
+
+**RLS and mutation boundary:**
+- Owners can view only their own extraction runs.
+- Inserts and updates are server-only so worksheet/extractor audit evidence cannot be rewritten directly by a browser client.
+- At most one run per document may have `confirmed` status.
+
+**Indexes:**
+- `idx_document_extraction_runs_document_created` on (document_id, created_at DESC)
+- `idx_document_extraction_runs_owner_status` on (user_id, status, created_at DESC)
+- `idx_document_extraction_runs_active_confirmation` unique on document_id where status is `confirmed`
+
+---
+
+### 9. document_extraction_candidates
+
+Stores one reviewable metric candidate per extraction result. `original_payload`
+is retained as immutable extraction evidence; reviewed/canonical fields record the
+owner's corrections and include/exclude decision.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID (PK) | Candidate identifier |
+| extraction_run_id | UUID (FK) | Versioned extraction attempt |
+| document_id | UUID (FK) | Source document |
+| user_id | UUID (FK) | Document owner |
+| original_payload | JSONB | Original extracted fields and values |
+| reviewed_payload | JSONB | Submitted corrections and final decision |
+| metric_key | TEXT | Canonical supported metric, nullable while pending |
+| value | NUMERIC(18,4) | Canonical reviewed value |
+| currency | TEXT | Canonical `NZD` or `AUD` for monetary metrics; `NULL` for unit-based `runway_months` |
+| reporting_date | DATE | Canonical reviewed reporting date |
+| confidence | NUMERIC(4,3) | Extractor confidence from 0 to 1 |
+| evidence | JSONB | Source page, sheet, row, cell range, and excerpt evidence |
+| warnings | JSONB | Candidate-level extraction/data-quality warnings |
+| decision | TEXT | `pending`, `included`, or `excluded` |
+| extractor_version | TEXT | Extractor version that created the candidate |
+| reviewer_id | UUID (FK) | Owner who reviewed the candidate |
+| reviewed_at | TIMESTAMP | Review time |
+| created_at | TIMESTAMP | Candidate creation time |
+| updated_at | TIMESTAMP | Last review update |
+
+**RLS and confirmation boundary:**
+- Owners can view only their own candidates.
+- Candidate mutations are server-only to protect the original extraction evidence.
+- `confirm_document_extraction(...)` verifies owner/run/candidate relationships and the complete review payload, requires valid included candidates, replaces only that document's observations, and marks the run confirmed in one transaction.
+- Published observations carry `User-confirmed` trust and candidate/run audit references in `raw_data`.
+- Any validation or persistence failure rolls back the complete approval transaction.
+
+**Indexes:**
+- `idx_document_extraction_candidates_run_decision` on (extraction_run_id, decision)
+- `idx_document_extraction_candidates_owner_document` on (user_id, document_id)
+
+---
+
+### 10. data_connections
 
 Provider-neutral registry for all financial data sources a user has connected,
 uploaded, or made available. OAuth credential rows link back to this table.
@@ -294,7 +375,7 @@ uploaded, or made available. OAuth credential rows link back to this table.
 
 ---
 
-### 9. oauth_tokens
+### 11. oauth_tokens
 
 Stores provider-neutral tenant details and OAuth credentials for accounting
 providers. This table links to `data_connections`, which is the source of truth
@@ -324,7 +405,7 @@ storage and are only decrypted server-side when calling or revoking a provider.
 
 ---
 
-### 10. oauth_connection_states
+### 12. oauth_connection_states
 
 Stores short-lived state values during OAuth redirect flows. A state row is
 created when the user starts connecting an OAuth provider and deleted after
@@ -348,12 +429,16 @@ callback validation.
 
 ---
 
-### 11. financial_metric_observations
+### 13. financial_metric_observations
 
 Stores normalized financial metric values from Xero, uploaded documents, manual
 inputs, and demo data. This table is the long-term source of truth for
 source-aware metric values. Each row is one observation for one metric key from
 one source/period, rather than a wide snapshot of all metrics.
+
+Existing document-derived rows remain calculation truth after migration and are
+represented by their document's `legacy` review state. New document-derived rows
+are published only from included candidates through `confirm_document_extraction`.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -363,7 +448,7 @@ one source/period, rather than a wide snapshot of all metrics.
 | document_id | UUID (FK) | Optional uploaded document source |
 | metric_key | TEXT | Canonical key: `cash`, `accounts_receivable`, `accounts_payable`, `monthly_revenue`, `monthly_expenses`, `burn_rate`, or `runway_months` |
 | value | NUMERIC(18,4) | Normalized metric value |
-| currency | TEXT | Optional ISO currency code such as `NZD` or `AUD` |
+| currency | TEXT | `NZD` or `AUD` for monetary metrics; `NULL` for unit-based `runway_months` |
 | period_start | DATE | Optional period start for period-based metrics |
 | period_end | DATE | Optional period end for period-based metrics |
 | as_of_date | DATE | Optional point-in-time date for balance metrics |
@@ -387,7 +472,7 @@ one source/period, rather than a wide snapshot of all metrics.
 
 ---
 
-### 12. scenarios
+### 14. scenarios
 
 Stores reusable what-if drafts and the latest explicitly calculated result. The
 application validates both JSON payloads. A baseline fingerprint lets AI-BOSS
@@ -431,6 +516,8 @@ users (1) ──< (many) policy_rules
 users (1) ──< (many) decision_log
 users (1) ──< (many) documents
 documents (1) ──< (many) document_chunks
+documents (1) ──< (many) document_extraction_runs
+document_extraction_runs (1) ──< (many) document_extraction_candidates
 users (1) ──< (many) data_connections
 data_connections (1) ──< (one) oauth_tokens
 users (1) ──< (many) oauth_connection_states
@@ -460,6 +547,8 @@ All schema changes are tracked in `db/migrations/`:
 - `012_conversation_visibility_modes.sql` - Adds private, company, and admins-only conversation visibility
 - `013_delete_document_and_derived_metrics.sql` - Adds atomic owner-only cleanup of a document and its document-derived financial observations
 - `014_saved_scenarios.sql` - Adds private drafts, company-visible calculated scenarios, result snapshots, and stale-data fingerprints
+- `015_document_extraction_review.sql` - Adds XLSX document support, separate financial review state, versioned extraction runs/candidates, owner-protected review evidence, and transactional publication of user-confirmed observations
+- `016_runway_currency_unit.sql` - Enforces currency-free `runway_months` candidates during transactional confirmation while retaining source currency in original audit evidence
 
 ---
 

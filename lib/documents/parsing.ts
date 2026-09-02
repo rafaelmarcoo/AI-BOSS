@@ -1,11 +1,17 @@
 import { join } from 'node:path'
 
 import { ApiError } from '@/lib/api/errors'
-import { createCsvChunks, createPdfChunks } from '@/lib/documents/chunking'
+import { createPdfChunks, createTabularChunks } from '@/lib/documents/chunking'
+import {
+  parseCsvTabularData,
+  parseXlsxTabularData,
+} from '@/lib/documents/tabular'
 import type {
-  ParsedCsvRow,
+  ParseDocumentOptions,
   ParsedDocumentResult,
   ParsedPdfPage,
+  ParsedTabularData,
+  ParsedTabularSheet,
 } from '@/lib/documents/types'
 import type { Document } from '@/types/database'
 
@@ -20,6 +26,22 @@ const PDFJS_STANDARD_FONT_DATA_PATH = `${join(
   process.cwd(),
   'node_modules/pdfjs-dist/standard_fonts'
 )}/`
+
+export function createPdfParsingError(error: unknown, fileName: string) {
+  if (error instanceof Error && error.name === 'PasswordException') {
+    return new ApiError(
+      400,
+      'BAD_REQUEST',
+      `PDF ${fileName} is password-protected and cannot be processed.`
+    )
+  }
+
+  return new ApiError(
+    500,
+    'INTERNAL_ERROR',
+    `Failed to parse PDF ${fileName}.`
+  )
+}
 
 function normalizeWhitespace(value: string) {
   return value
@@ -60,160 +82,97 @@ function createPdfTextLines(items: Array<{ str?: string; transform?: number[] }>
   return lines
 }
 
-function parseCsvLine(line: string) {
-  const cells: string[] = []
-  let current = ''
-  let inQuotes = false
-
-  for (let index = 0; index < line.length; index += 1) {
-    const character = line[index]
-    const nextCharacter = line[index + 1]
-
-    if (character === '"') {
-      if (inQuotes && nextCharacter === '"') {
-        current += '"'
-        index += 1
-      } else {
-        inQuotes = !inQuotes
-      }
-
-      continue
-    }
-
-    if (character === ',' && !inQuotes) {
-      cells.push(current)
-      current = ''
-      continue
-    }
-
-    current += character
-  }
-
-  cells.push(current)
-
-  return cells.map((cell) => cell.trim())
-}
-
-function parseCsvContent(value: string) {
-  const normalized = value.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-  const rows: string[][] = []
-  let current = ''
-  let inQuotes = false
-
-  for (let index = 0; index < normalized.length; index += 1) {
-    const character = normalized[index]
-    const nextCharacter = normalized[index + 1]
-
-    if (character === '"') {
-      current += character
-
-      if (inQuotes && nextCharacter === '"') {
-        current += nextCharacter
-        index += 1
-      } else {
-        inQuotes = !inQuotes
-      }
-
-      continue
-    }
-
-    if (character === '\n' && !inQuotes) {
-      rows.push(parseCsvLine(current))
-      current = ''
-      continue
-    }
-
-    current += character
-  }
-
-  if (current || normalized.endsWith('\n')) {
-    rows.push(parseCsvLine(current))
-  }
-
-  return rows.filter((row) => row.some((cell) => cell.length > 0))
-}
-
-function normalizeHeaders(headers: string[]) {
-  return headers.map((header, index) => header || `column_${index + 1}`)
-}
-
-function normalizeHeaderText(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[_-]+/g, ' ')
-    .replace(/[^a-z0-9 ]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-function rowHasHeaderCandidate(row: string[], candidates: string[]) {
-  const normalizedCells = row.map(normalizeHeaderText)
-
-  return candidates.some((candidate) =>
-    normalizedCells.includes(normalizeHeaderText(candidate))
-  )
-}
-
-function findCsvHeaderRowIndex(rows: string[][]) {
-  const labelHeaderCandidates = [
-    'metric',
-    'name',
-    'label',
-    'account',
-    'account name',
-    'description',
-    'category',
-  ]
-  const amountHeaderCandidates = [
-    'value',
-    'amount',
-    'balance',
-    'total',
-    'closing balance',
-  ]
-
-  const detectedHeaderIndex = rows.findIndex(
-    (row) =>
-      rowHasHeaderCandidate(row, labelHeaderCandidates) &&
-      rowHasHeaderCandidate(row, amountHeaderCandidates)
-  )
-
-  return detectedHeaderIndex >= 0 ? detectedHeaderIndex : 0
-}
-
-function createCsvRowBlock(
-  headers: string[],
-  row: string[],
-  rowNumber: number
-) {
-  const pairs = headers.map((header, index) => {
-    const value = row[index]?.trim() ?? ''
+function createTabularRowBlock(sheet: ParsedTabularSheet, rowIndex: number) {
+  const row = sheet.rows[rowIndex]
+  const pairs = sheet.headers.map((header, columnIndex) => {
+    const value = row.values[columnIndex]?.trim() ?? ''
     return `${header}: ${value || '(empty)'}`
   })
 
-  return `Row ${rowNumber}\n${pairs.join('\n')}`
+  return `Row ${row.rowNumber}\n${pairs.join('\n')}`
 }
 
-function createStructuredCsvRows(
-  headers: string[],
-  rows: string[][]
-): ParsedCsvRow[] {
-  return rows.map((row, index) => ({
-    rowNumber: index + 1,
-    values: row,
-    cells: headers.reduce<Record<string, string>>((cells, header, cellIndex) => {
-      cells[header] = row[cellIndex]?.trim() ?? ''
-      return cells
-    }, {}),
-  }))
+function createTabularDocumentResult(params: {
+  document: Pick<Document, 'id' | 'user_id' | 'file_type' | 'file_name'>
+  tabularData: ParsedTabularData
+}): ParsedDocumentResult {
+  const rawTextParts: string[] = []
+  const chunks: ParsedDocumentResult['chunks'] = []
+
+  for (const sheet of params.tabularData.sheets) {
+    const rowBlocks = sheet.rows.map((_, index) =>
+      createTabularRowBlock(sheet, index)
+    )
+    const sheetHeading =
+      params.tabularData.sourceType === 'xlsx' ? `Worksheet: ${sheet.name}\n` : ''
+
+    rawTextParts.push(
+      `${sheetHeading}Columns: ${sheet.headers.join(', ')}\n\n${rowBlocks.join('\n\n')}`
+    )
+    chunks.push(
+      ...createTabularChunks({
+        documentId: params.document.id,
+        userId: params.document.user_id,
+        rowBlocks,
+        rowNumbers: sheet.rows.map((row) => row.rowNumber),
+        headers: sheet.headers,
+        source: params.tabularData.sourceType,
+        sheetName:
+          params.tabularData.sourceType === 'xlsx' ? sheet.name : null,
+        startingChunkIndex: chunks.length,
+      })
+    )
+  }
+
+  const firstSheet = params.tabularData.sheets[0]
+  const commonMetadata = {
+    sourceType: params.tabularData.sourceType,
+    selectedSheetNames: params.tabularData.selectedSheetNames,
+    suggestedSheetNames: params.tabularData.suggestedSheetNames,
+    worksheetMetadata: params.tabularData.worksheetMetadata,
+    warnings: params.tabularData.warnings,
+  }
+
+  return {
+    rawText: rawTextParts.join('\n\n'),
+    metadata:
+      params.tabularData.sourceType === 'csv'
+        ? {
+            ...commonMetadata,
+            headers: firstSheet.headers,
+            rowCount: firstSheet.rows.length,
+            skippedRowCount: Math.max(0, firstSheet.headerRowNumber - 1),
+          }
+        : commonMetadata,
+    chunks,
+    csvData:
+      params.tabularData.sourceType === 'csv'
+        ? { headers: firstSheet.headers, rows: firstSheet.rows }
+        : undefined,
+    tabularData: params.tabularData,
+  }
 }
 
 export async function parseDocumentContent(
   document: Pick<Document, 'id' | 'user_id' | 'file_type' | 'file_name'>,
-  fileBytes: Uint8Array
+  fileBytes: Uint8Array,
+  options: ParseDocumentOptions = {}
 ): Promise<ParsedDocumentResult> {
   if (document.file_type === 'csv') {
-    return parseCsvDocument(document, fileBytes)
+    return createTabularDocumentResult({
+      document,
+      tabularData: parseCsvTabularData(fileBytes),
+    })
+  }
+
+  if (document.file_type === 'xlsx') {
+    return createTabularDocumentResult({
+      document,
+      tabularData: await parseXlsxTabularData(
+        fileBytes,
+        options.selectedWorksheetNames
+      ),
+    })
   }
 
   if (document.file_type === 'pdf') {
@@ -268,11 +227,24 @@ async function parsePdfDocument(
     }
 
     if (pages.length === 0) {
-      throw new ApiError(
-        400,
-        'BAD_REQUEST',
-        `No readable text was found in ${document.file_name}.`
-      )
+      return {
+        rawText: '',
+        metadata: {
+          pageCount: pdf.numPages,
+          scanned: true,
+          extractionAvailable: false,
+          warnings: [
+            {
+              code: 'ocr_unavailable',
+              message:
+                'No readable text was found. The PDF is retained for preview, but OCR extraction is not available.',
+            },
+          ],
+        },
+        chunks: [],
+        pdfPages: [],
+        extractionState: 'scanned',
+      } satisfies ParsedDocumentResult
     }
 
     return {
@@ -286,88 +258,19 @@ async function parsePdfDocument(
         pages,
       }),
       pdfPages: pages,
-    }
+      extractionState: 'text',
+    } satisfies ParsedDocumentResult
   } catch (error) {
     if (error instanceof ApiError) {
       throw error
     }
 
-    console.error(`Failed to parse PDF ${document.file_name}.`, error)
-
-    throw new ApiError(
-      500,
-      'INTERNAL_ERROR',
-      `Failed to parse PDF ${document.file_name}.`
-    )
+    const parsingError = createPdfParsingError(error, document.file_name)
+    if (parsingError.status >= 500) {
+      console.error(`Failed to parse PDF ${document.file_name}.`, error)
+    }
+    throw parsingError
   } finally {
     await loadingTask.destroy()
-  }
-}
-
-function parseCsvDocument(
-  document: Pick<Document, 'id' | 'user_id' | 'file_type' | 'file_name'>,
-  fileBytes: Uint8Array
-) {
-  try {
-    const decoded = normalizeWhitespace(Buffer.from(fileBytes).toString('utf8'))
-    const rows = parseCsvContent(decoded)
-
-    if (rows.length === 0) {
-      throw new ApiError(
-        400,
-        'BAD_REQUEST',
-        `No rows were found in ${document.file_name}.`
-      )
-    }
-
-    const headerRowIndex = findCsvHeaderRowIndex(rows)
-    const headers = normalizeHeaders(rows[headerRowIndex] ?? [])
-    const dataRows = rows.slice(headerRowIndex + 1)
-
-    if (dataRows.length === 0) {
-      throw new ApiError(
-        400,
-        'BAD_REQUEST',
-        `CSV ${document.file_name} must include at least one data row.`
-      )
-    }
-
-    const rowBlocks = dataRows.map((row, index) =>
-      createCsvRowBlock(headers, row, index + 1)
-    )
-    const structuredRows = createStructuredCsvRows(headers, dataRows)
-    const rawText = [
-      `Columns: ${headers.join(', ')}`,
-      ...rowBlocks,
-    ].join('\n\n')
-
-    return {
-      rawText,
-      metadata: {
-        headers,
-        rowCount: dataRows.length,
-        skippedRowCount: headerRowIndex,
-      },
-      csvData: {
-        headers,
-        rows: structuredRows,
-      },
-      chunks: createCsvChunks({
-        documentId: document.id,
-        userId: document.user_id,
-        rowBlocks,
-        headers,
-      }),
-    }
-  } catch (error) {
-    if (error instanceof ApiError) {
-      throw error
-    }
-
-    throw new ApiError(
-      500,
-      'INTERNAL_ERROR',
-      `Failed to parse CSV ${document.file_name}.`
-    )
   }
 }

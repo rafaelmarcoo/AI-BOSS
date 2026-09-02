@@ -9,7 +9,7 @@ import { StructuredTool } from '@/lib/tools/contracts'
 export const calculateRunwayTool: StructuredTool<RunwayInput, RunwayResult> = {
   name: 'calculate_runway',
   description:
-    'Calculate runway months from confirmed cash, accounts receivable, accounts payable, and monthly burn rate. Use only values returned by get_latest_snapshot or values explicitly supplied by the user; never invent inputs.',
+    'Calculate both conservative cash runway (cash / monthly burn) and working-capital-adjusted runway ((cash + receivables - payables) / monthly burn). For stored data, call this only when get_latest_snapshot explicitly returns Confirmed runway inputs and working-capital-adjusted runway status AVAILABLE. Never substitute individually listed values when that tool returns UNAVAILABLE.',
   inputSchema: RunwayInputSchema,
   handler(input) {
     return calculateRunwayResult(input)

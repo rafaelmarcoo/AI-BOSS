@@ -4,6 +4,8 @@ import { HistoricalMetricsChart } from "../BurnRateChart";
 import type { GenUiPlan } from "@/lib/gen-ui/types";
 import {
   formatFinancialCurrency,
+  buildUnavailableWorkingCapitalAdjustedRunwayMetric,
+  buildWorkingCapitalAdjustedRunwayMetric,
   getMetricNumber,
   isAvailableMetric,
   isSupportedFinancialCurrency,
@@ -34,8 +36,10 @@ function formatCurrencyMetric(metric: FinancialMetricValue) {
   return formatFinancialCurrency(metric.value, metric.currency);
 }
 
-function formatRunway(value: number | null) {
-  return value === null ? "unavailable" : `${value.toFixed(1)} months`;
+function formatRunway(metric: FinancialMetricValue) {
+  return isAvailableMetric(metric)
+    ? `${metric.value.toFixed(2)} months`
+    : metric.detail ?? "unavailable";
 }
 
 export function RunwaySection({
@@ -43,7 +47,6 @@ export function RunwaySection({
   genUiPlan,
   onAskChatbot,
 }: RunwaySectionProps) {
-  const runway = getMetricNumber(metrics, "runway_months");
   const missingMetricLabels = ([
     ["cash", "Cash"],
     ["accounts_receivable", "Accounts receivable"],
@@ -55,7 +58,15 @@ export function RunwaySection({
   ] satisfies Array<[FinancialMetricKey, string]>)
     .filter(([key]) => getMetricNumber(metrics, key) === null)
     .map(([, label]) => label);
-  const baselineSummary = `Current runway is ${formatRunway(runway)}, with cash of ${formatCurrencyMetric(metrics.cash)} and monthly burn of ${formatCurrencyMetric(metrics.burn_rate)}.`;
+  const workingCapitalAdjustedRunway =
+    buildWorkingCapitalAdjustedRunwayMetric(metrics) ??
+    buildUnavailableWorkingCapitalAdjustedRunwayMetric(metrics);
+  const primaryRunwayLabel =
+    isAvailableMetric(metrics.runway_months) &&
+    !metrics.runway_months.provenance.sourceLabel.includes("cash runway calculated")
+      ? "Reported runway"
+      : "Primary cash runway";
+  const baselineSummary = `${primaryRunwayLabel}: ${formatRunway(metrics.runway_months)} Working-capital-adjusted runway: ${formatRunway(workingCapitalAdjustedRunway)} Cash is ${formatCurrencyMetric(metrics.cash)} and monthly burn is ${formatCurrencyMetric(metrics.burn_rate)}.`;
   const historyRefreshKey = Object.values(metrics)
     .map((metric) => metric.updatedAt ?? "")
     .join("|");

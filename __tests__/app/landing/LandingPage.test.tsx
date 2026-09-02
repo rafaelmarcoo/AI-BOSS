@@ -23,14 +23,21 @@ describe('LandingPage quick actions', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    fetchMock = jest.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    fetchMock = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       if (init?.method === 'POST') {
         return {
           ok: true,
           json: async () => ({
             success: true,
-            data: { document: { file_name: 'statement.csv' } },
+            data: { document: { id: 'document-1', file_name: 'statement.csv' } },
           }),
+        } as Response
+      }
+
+      if (String(input) === '/api/activity') {
+        return {
+          ok: true,
+          json: async () => ({ success: true, data: { activities: [] } }),
         } as Response
       }
 
@@ -52,7 +59,7 @@ describe('LandingPage quick actions', () => {
     )
   }
 
-  it('uploads a PDF or CSV as a workspace document', async () => {
+  it('uploads a supported workspace document', async () => {
     const user = userEvent.setup()
     const { container } = renderLandingPage()
     const input = container.querySelector('input[type="file"]') as HTMLInputElement
@@ -62,7 +69,7 @@ describe('LandingPage quick actions', () => {
 
     expect(input).toHaveAttribute(
       'accept',
-      '.pdf,.csv,application/pdf,text/csv',
+      '.pdf,.csv,.xlsx,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
     await user.upload(input, file)
 
@@ -75,8 +82,10 @@ describe('LandingPage quick actions', () => {
     expect(uploadCall).toBeDefined()
     expect((uploadCall?.[1]?.body as FormData).get('file')).toEqual(file)
 
-    await user.click(screen.getByRole('button', { name: 'View documents' }))
-    expect(mockPush).toHaveBeenCalledWith('/dashboard/documents')
+    await user.click(
+      screen.getByRole('button', { name: 'Review extracted data' }),
+    )
+    expect(mockPush).toHaveBeenCalledWith('/dashboard/documents/document-1')
   })
 
   it('opens the shared picker from both upload controls', async () => {
@@ -111,17 +120,27 @@ describe('LandingPage quick actions', () => {
   })
 
   it('shows upload failures without navigating away', async () => {
-    fetchMock.mockImplementationOnce(async () => ({
-      ok: true,
-      json: async () => ({ success: true, data: { conversations: [] } }),
-    }) as Response)
-    fetchMock.mockImplementationOnce(async () => ({
-      ok: false,
-      json: async () => ({
-        success: false,
-        error: { message: 'Only PDF and CSV uploads are supported right now.' },
-      }),
-    }) as Response)
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        return {
+          ok: false,
+          json: async () => ({
+            success: false,
+            error: { message: 'Only PDF, CSV, and XLSX uploads are supported.' },
+          }),
+        } as Response
+      }
+      if (String(input) === '/api/activity') {
+        return {
+          ok: true,
+          json: async () => ({ success: true, data: { activities: [] } }),
+        } as Response
+      }
+      return {
+        ok: true,
+        json: async () => ({ success: true, data: { conversations: [] } }),
+      } as Response
+    })
     const { container } = renderLandingPage()
     const input = container.querySelector('input[type="file"]') as HTMLInputElement
     const file = new File(['invalid'], 'notes.txt', { type: 'text/plain' })
@@ -130,7 +149,7 @@ describe('LandingPage quick actions', () => {
     fireEvent.change(input, { target: { files: [file] } })
 
     expect(
-      await screen.findByText('Only PDF and CSV uploads are supported right now.'),
+      await screen.findByText('Only PDF, CSV, and XLSX uploads are supported.'),
     ).toBeInTheDocument()
     expect(mockPush).not.toHaveBeenCalled()
   })

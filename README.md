@@ -14,10 +14,10 @@ For the verified implementation status, deployment prerequisites, and remaining
 final-stretch gaps, see [Current Project State](docs/current-state.md).
 
 AI-BOSS helps small business founders make better financial decisions through:
-- Real-time financial insights from Xero integration
-- AI-powered forecasting using multi-agent system (LangGraph)
-- Scenario modeling (What if I hire 2 people?)
-- Privacy-first architecture with MCP security boundary
+- Reviewed CSV, XLSX, and PDF financial-document workflows
+- Deterministic historical trends, forecasts, runway, and scenario calculations
+- Source-aware AI explanations backed by owned document evidence
+- Explicit user approval before newly extracted values become calculation inputs
 
 ---
 
@@ -25,9 +25,9 @@ AI-BOSS helps small business founders make better financial decisions through:
 
 - **Frontend:** Next.js 16, TypeScript, Material-UI, Tailwind CSS
 - **Backend:** Next.js API Routes
-- **AI:** LangChain.js, LangGraph.js, OpenAI GPT-4o / Claude 3.5 Sonnet
+- **AI:** LangChain.js and configurable OpenAI models
 - **Database:** Supabase (PostgreSQL)
-- **Integration:** Xero API (OAuth 2.0)
+- **Document processing:** PDF.js and server-side ExcelJS
 - **Deployment:** Vercel
 
 ---
@@ -112,7 +112,7 @@ AI-BOSS/
 2. **Clone + branch** – `git clone https://github.com/rafaelmarcoo/AI-BOSS.git`, `cd AI-BOSS`, `git checkout -b feature/<card-name>`. Branch from `main`, keep histories tidy, and push via `git push -u origin feature/...` before opening a PR.
 3. **Environment setup**
    - Install Node.js 22+ and npm 10+ via `nvm` or Homebrew. Confirm versions with `node -v` and `npm -v`.
-   - Copy `.env.example` to `.env.local` and update keys (`OPENAI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `XERO_*`). Treat `.env.local` as private.
+   - Copy `.env.example` to `.env.local` and update the OpenAI and Supabase keys. Treat `.env.local` as private.
 4. **Install dependencies** – Run `npm install`. If you hit conflicts, remove `node_modules` + `package-lock.json` and reinstall clean.
 5. **Run locally** – `npm run dev` and visit `http://localhost:3000`. Expect live reload when you edit files.
 

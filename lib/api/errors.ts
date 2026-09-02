@@ -5,6 +5,7 @@ export type ApiErrorCode =
   | 'NOT_FOUND'
   | 'INTERNAL_ERROR'
   | 'BAD_REQUEST'
+  | 'CONFLICT'
   | 'FORBIDDEN'
 
 export class ApiError extends Error {

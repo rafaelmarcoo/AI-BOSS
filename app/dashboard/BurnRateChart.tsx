@@ -65,6 +65,7 @@ const RECORD_LIMIT_LABELS: Record<MetricHistoryRecordLimit, string> = {
 const METRIC_DISPLAY_LABELS: Record<HistoricalMetricKey, string> = {
   ...FINANCIAL_METRIC_LABELS,
   cash: "Cash balance",
+  runway_months: "Runway",
 };
 const METRIC_COLORS: Record<HistoricalMetricKey, string> = {
   cash: "#00e5a0",
@@ -95,6 +96,7 @@ interface ForecastResponse {
 
 type ChartMode = "history" | "forecast";
 type CurrencyFilter = "all" | SupportedFinancialCurrency;
+type RunwayPlotSelection = "both" | "cash" | "working_capital_adjusted";
 
 function formatValue(value: number, metricKey: HistoricalMetricKey, currency: string | null) {
   if (metricKey === "runway_months") return `${value.toFixed(1)} mo`;
@@ -165,7 +167,7 @@ function MetricSeriesPanel({
     return (
       <Paper variant="outlined" sx={{ p: 2, bgcolor: dashboardTokens.surfaceAlt, borderColor: dashboardTokens.border }}>
         <Alert severity="info">
-          {history.metricKey === "runway_months" ? "Runway" : history.currency} needs at least two dated records to display a trend.
+          {history.metricKey === "runway_months" ? "Cash runway" : history.currency} needs at least two compatible dated records to display a trend.
         </Alert>
       </Paper>
     );
@@ -200,8 +202,13 @@ function MetricSeriesPanel({
           Value axis: <Box component="span" sx={{ color: "#bae6fd" }}>{chartAxisLabel(history)}</Box>
         </Typography>
 
-        <Box sx={{ width: "100%", height: 320 }}>
-          <ResponsiveContainer width="100%" height="100%">
+        <Box sx={{ width: "100%", minWidth: 0, height: 320 }}>
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+            minWidth={0}
+            initialDimension={{ width: 800, height: 320 }}
+          >
             <LineChart data={chartData} margin={{ top: 12, right: 20, left: 8, bottom: 32 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={dashboardTokens.border} />
               <XAxis dataKey="date" stroke={dashboardTokens.textMuted} style={{ fontSize: "0.75rem" }} tickFormatter={formatAxisDate} label={{ value: "Reporting date", position: "insideBottom", offset: -18 }} />
@@ -269,11 +276,95 @@ function MetricSeriesPanel({
             <Stack spacing={0.75}>
               <Typography variant="body2">Sources: {history.sourceLabels.join(", ")}</Typography>
               <Typography variant="body2">Date quality: {history.hasRecordedDateFallback ? "Includes upload/recorded-date fallbacks" : "Financial reporting dates"}</Typography>
-              <Typography variant="body2">Currency treatment: {history.metricKey === "runway_months" ? "Not applicable; runway is measured in months" : `${history.currency}; calculated independently with no conversion or cross-currency combination`}</Typography>
-              <Typography variant="body2">Calculation: {mode === "forecast" ? "Date-aware linear trend projected from the latest actual observation" : "Deterministic change across dated financial observations"}</Typography>
+              <Typography variant="body2">Currency treatment: {history.metricKey === "runway_months" ? `${history.currency}; cash and burn matched without conversion` : `${history.currency}; calculated independently with no conversion or cross-currency combination`}</Typography>
+              <Typography variant="body2">Calculation: {mode === "forecast" ? "Date-aware linear trend projected from the latest actual observation" : history.metricKey === "runway_months" ? "Cash divided by monthly burn for each matching source, currency, and reporting date" : "Deterministic change across dated financial observations"}</Typography>
             </Stack>
           </AccordionDetails>
         </Accordion>
+      </Stack>
+    </Paper>
+  );
+}
+
+function RunwayComparisonPanel({
+  views,
+  mode,
+}: {
+  views: Array<{ history: MetricHistorySummary; forecast?: MetricForecastSummary }>;
+  mode: ChartMode;
+}) {
+  const cash = views.find((view) => view.history.runwayVariant === "cash");
+  const adjusted = views.find(
+    (view) => view.history.runwayVariant === "working_capital_adjusted",
+  );
+  const dates = [
+    ...(cash?.history.points ?? []).map((point) => point.date),
+    ...(adjusted?.history.points ?? []).map((point) => point.date),
+    ...(mode === "forecast" ? (cash?.forecast?.forecastPoints ?? []).map((point) => point.date) : []),
+    ...(mode === "forecast" ? (adjusted?.forecast?.forecastPoints ?? []).map((point) => point.date) : []),
+  ];
+  const uniqueDates = [...new Set(dates)].sort();
+  const valueAt = (points: Array<{ date: string; value: number }>, date: string) =>
+    points.find((point) => point.date === date)?.value;
+  const forecastValueAt = (
+    view: { history: MetricHistorySummary; forecast?: MetricForecastSummary } | undefined,
+    date: string,
+  ) => {
+    const forecastValue = valueAt(view?.forecast?.forecastPoints ?? [], date);
+    const latestActual = view?.history.points.at(-1);
+    return forecastValue ?? (latestActual?.date === date ? latestActual.value : undefined);
+  };
+  const chartData = uniqueDates.map((date) => ({
+    date,
+    cashActual: valueAt(cash?.history.points ?? [], date),
+    adjustedActual: valueAt(adjusted?.history.points ?? [], date),
+    cashForecast: forecastValueAt(cash, date),
+    adjustedForecast: forecastValueAt(adjusted, date),
+  }));
+  const reportingPeriod = uniqueDates.length === 0
+    ? "Unavailable"
+    : uniqueDates[0] === uniqueDates.at(-1)
+      ? formatDate(uniqueDates[0])
+      : `${formatDate(uniqueDates[0])}–${formatDate(uniqueDates.at(-1) as string)}`;
+  const latest = (view?: { history: MetricHistorySummary }) => view?.history.latestValue;
+
+  if (views.every((view) => view.history.points.length < 2)) {
+    return <Alert severity="info">The selected runway view needs at least two compatible dated records to display a trend.</Alert>;
+  }
+
+  return (
+    <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, bgcolor: dashboardTokens.surfaceAlt, borderColor: dashboardTokens.border }}>
+      <Stack spacing={1.75}>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          <Chip size="small" label="Unit: months" sx={contextChipSx} />
+          <Chip size="small" label={`Reporting period: ${reportingPeriod}`} sx={contextChipSx} />
+          <Chip size="small" label={`Cash observations: ${cash?.history.points.length ?? 0}`} sx={contextChipSx} />
+          <Chip size="small" label={`Adjusted observations: ${adjusted?.history.points.length ?? 0}`} sx={contextChipSx} />
+        </Stack>
+        <Typography variant="body2" fontWeight={700} sx={{ color: dashboardTokens.text }}>
+          Value axis: <Box component="span" sx={{ color: "#bae6fd" }}>Runway (months)</Box>
+        </Typography>
+        <Box sx={{ width: "100%", minWidth: 0, height: 320 }}>
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 800, height: 320 }}>
+            <LineChart data={chartData} margin={{ top: 12, right: 20, left: 8, bottom: 32 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={dashboardTokens.border} />
+              <XAxis dataKey="date" stroke={dashboardTokens.textMuted} style={{ fontSize: "0.75rem" }} tickFormatter={formatAxisDate} label={{ value: "Reporting date", position: "insideBottom", offset: -18 }} />
+              <YAxis width={64} stroke={dashboardTokens.textMuted} style={{ fontSize: "0.75rem" }} tickFormatter={(value) => Number(value).toFixed(1)} />
+              <Legend verticalAlign="top" formatter={(value) => ({ cashActual: "Cash runway", adjustedActual: "Working-capital-adjusted runway", cashForecast: "Cash runway forecast", adjustedForecast: "Adjusted runway forecast" }[String(value)] ?? value)} />
+              <Tooltip contentStyle={{ backgroundColor: dashboardTokens.surfaceAlt, border: `1px solid ${dashboardTokens.border}`, borderRadius: 4, color: "white" }} labelFormatter={(value) => formatDate(String(value))} formatter={(value, name) => [`${Number(value).toFixed(2)} months`, ({ cashActual: "Cash runway", adjustedActual: "Working-capital-adjusted runway", cashForecast: "Cash runway forecast", adjustedForecast: "Adjusted runway forecast" }[String(name)] ?? name)]} />
+              {cash ? <Line type="monotone" dataKey="cashActual" stroke="#4da6ff" strokeWidth={2} dot={{ fill: "#4da6ff", r: 4 }} connectNulls={false} /> : null}
+              {adjusted ? <Line type="monotone" dataKey="adjustedActual" stroke="#22d3ee" strokeWidth={2} dot={{ fill: "#22d3ee", r: 4 }} connectNulls={false} /> : null}
+              {mode === "forecast" && cash ? <Line type="monotone" dataKey="cashForecast" stroke="#4da6ff" strokeDasharray="6 4" strokeWidth={2} connectNulls={false} /> : null}
+              {mode === "forecast" && adjusted ? <Line type="monotone" dataKey="adjustedForecast" stroke="#22d3ee" strokeDasharray="6 4" strokeWidth={2} connectNulls={false} /> : null}
+            </LineChart>
+          </ResponsiveContainer>
+        </Box>
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" }, gap: 1 }}>
+          {cash ? <Paper variant="outlined" sx={{ p: 1.25, bgcolor: "rgba(77,166,255,0.08)", borderColor: "rgba(77,166,255,0.28)" }}><Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>Latest cash runway</Typography><Typography fontWeight={700}>{latest(cash)?.toFixed(2) ?? "-"} months</Typography></Paper> : null}
+          {adjusted ? <Paper variant="outlined" sx={{ p: 1.25, bgcolor: "rgba(34,211,238,0.08)", borderColor: "rgba(34,211,238,0.28)" }}><Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>Latest working-capital-adjusted runway</Typography><Typography fontWeight={700}>{latest(adjusted)?.toFixed(2) ?? "-"} months</Typography></Paper> : null}
+        </Box>
+        {!adjusted ? <Alert severity="info">Working-capital-adjusted runway is unavailable for this selection because there are not enough same-source, same-currency, same-date confirmed inputs.</Alert> : null}
+        <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>Cash runway uses cash ÷ burn. Adjusted runway uses (cash + receivables − payables) ÷ burn. Missing adjusted dates are left as gaps.</Typography>
       </Stack>
     </Paper>
   );
@@ -287,6 +378,7 @@ export function HistoricalMetricsChart({ refreshKey }: { refreshKey: string }) {
   const [currency, setCurrency] = useState<CurrencyFilter>("all");
   const [sourceKey, setSourceKey] = useState("all");
   const [recordLimit, setRecordLimit] = useState<MetricHistoryRecordLimit>(12);
+  const [runwayPlot, setRunwayPlot] = useState<RunwayPlotSelection>("both");
   const [history, setHistory] = useState<MetricHistorySeriesCollection | null>(null);
   const [forecast, setForecast] = useState<MetricForecastSeriesCollection | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -335,6 +427,16 @@ export function HistoricalMetricsChart({ refreshKey }: { refreshKey: string }) {
   const seriesViews = mode === "history"
     ? (history?.series ?? []).map((series) => ({ history: series, forecast: undefined }))
     : (forecast?.series ?? []).map((series) => ({ history: series.history, forecast: series }));
+  const selectedSeriesViews = metricKey === "runway_months"
+    ? seriesViews.filter((view) => runwayPlot === "both" || view.history.runwayVariant === runwayPlot)
+    : seriesViews;
+  const runwayGroups = metricKey === "runway_months"
+    ? [...selectedSeriesViews.reduce((groups, view) => {
+        const key = `${view.history.seriesKey ?? view.history.sourceLabels.join("|")}:${view.history.currency ?? "unitless"}`;
+        groups.set(key, [...(groups.get(key) ?? []), view]);
+        return groups;
+      }, new Map<string, typeof selectedSeriesViews>()).values()]
+    : [];
 
   return (
     <Paper elevation={0} sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: `${dashboardTokens.radiusMd}px`, bgcolor: dashboardTokens.surface, color: dashboardTokens.text, border: "1px solid", borderColor: dashboardTokens.border }}>
@@ -369,6 +471,15 @@ export function HistoricalMetricsChart({ refreshKey }: { refreshKey: string }) {
           </TextField>
         </Stack>
 
+        {metricKey === "runway_months" ? (
+          <Stack spacing={0.5} alignItems="flex-start">
+            <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>Runway plots</Typography>
+            <ButtonGroup size="small" aria-label="Runway plots">
+              {(["both", "cash", "working_capital_adjusted"] as const).map((option) => <Button key={option} onClick={() => setRunwayPlot(option)} variant={runwayPlot === option ? "contained" : "outlined"} sx={{ color: runwayPlot === option ? "common.white" : dashboardTokens.textMuted, borderColor: dashboardTokens.borderMuted, textTransform: "none" }}>{option === "both" ? "Both" : option === "cash" ? "Cash runway" : "Working-capital-adjusted"}</Button>)}
+            </ButtonGroup>
+          </Stack>
+        ) : null}
+
         <Stack direction="row" spacing={1.25} alignItems="flex-end" flexWrap="wrap" useFlexGap>
           <Stack spacing={0.5}>
             <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>History range</Typography>
@@ -393,7 +504,7 @@ export function HistoricalMetricsChart({ refreshKey }: { refreshKey: string }) {
         ) : (
           <>
             {collection && collection.excludedCurrencyObservationCount > 0 ? <Alert severity="warning">{collection.excludedCurrencyObservationCount} observation{collection.excludedCurrencyObservationCount === 1 ? " was" : "s were"} excluded because currency was missing or unsupported.{collection.unsupportedCurrencies.length > 0 ? ` Unsupported: ${collection.unsupportedCurrencies.join(", ")}.` : ""}</Alert> : null}
-            {seriesViews.length === 0 ? <Alert severity="info">No supported observations match the selected metric, currency, source, date range, and record limit.</Alert> : <Stack spacing={2}>{seriesViews.map((view) => <MetricSeriesPanel key={view.history.metricKey === "runway_months" ? "runway" : view.history.currency ?? "unknown"} history={view.history} forecast={view.forecast} mode={mode} />)}</Stack>}
+            {selectedSeriesViews.length === 0 ? <Alert severity="info">No supported observations match the selected metric, currency, source, date range, and record limit.</Alert> : metricKey === "runway_months" ? <Stack spacing={2}>{runwayGroups.map((views, index) => <RunwayComparisonPanel key={`${views[0]?.history.seriesKey ?? "runway"}:${index}`} views={views} mode={mode} />)}</Stack> : <Stack spacing={2}>{selectedSeriesViews.map((view) => <MetricSeriesPanel key={`${view.history.metricKey}:${view.history.sourceLabels.join("|")}:${view.history.currency ?? "unitless"}`} history={view.history} forecast={view.forecast} mode={mode} />)}</Stack>}
           </>
         )}
       </Stack>

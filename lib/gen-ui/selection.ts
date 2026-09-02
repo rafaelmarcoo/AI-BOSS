@@ -29,7 +29,7 @@ export function selectMetricKeysForMessage(
 }
 
 export function isDataConnectionRequest(userMessage: string) {
-  return /\b(connect|connection|integration|xero|quickbooks|upload|bank feed)\b/i.test(
+  return /\b(document|file|upload|spreadsheet|workbook|pdf|csv|xlsx)\b/i.test(
     userMessage,
   )
 }

@@ -24,9 +24,10 @@ import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
 import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import type { DocumentSummary } from "@/lib/documents/types";
+import { getDocumentStatusPresentation } from "@/lib/documents/presentation";
 import { dashboardTokens } from "@/app/theme";
 
-type FileFilter = "all" | "pdf" | "csv";
+type FileFilter = "all" | "pdf" | "csv" | "xlsx";
 type StatusFilter = "all" | DocumentSummary["status"];
 type SortOption = "newest" | "oldest" | "name";
 
@@ -34,13 +35,6 @@ interface DocumentsResponse {
   success: boolean;
   data?: { documents: DocumentSummary[] };
   error?: { message?: string };
-}
-
-function statusPresentation(status: DocumentSummary["status"]) {
-  if (status === "ready") return { label: "Ready", color: "#86efac" };
-  if (status === "failed") return { label: "Failed", color: "#fca5a5" };
-  if (status === "processing") return { label: "Processing", color: "#93c5fd" };
-  return { label: "Uploaded", color: "#fde68a" };
 }
 
 export function DocumentsWorkspace() {
@@ -142,7 +136,7 @@ export function DocumentsWorkspace() {
         <Stack spacing={0.5}>
           <Typography variant="h5" fontWeight={700} color="common.white">Documents</Typography>
           <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
-            Manage your uploaded PDFs and CSVs. Removing a CSV also removes its derived dashboard, history, and forecast data.
+            Manage uploaded PDF, CSV and XLSX files and their calculation-ready data.
           </Typography>
         </Stack>
       </Stack>
@@ -157,7 +151,7 @@ export function DocumentsWorkspace() {
           slotProps={{ input: { startAdornment: <SearchRoundedIcon fontSize="small" sx={{ mr: 1, color: dashboardTokens.textMuted }} /> } }}
           sx={{ flex: 1, minWidth: 200, ...fieldStyles }}
         />
-        <FilterSelect label="File type" value={fileFilter} onChange={(value) => setFileFilter(value as FileFilter)} options={[["all", "All files"], ["pdf", "PDF"], ["csv", "CSV"]]} />
+        <FilterSelect label="File type" value={fileFilter} onChange={(value) => setFileFilter(value as FileFilter)} options={[["all", "All files"], ["pdf", "PDF"], ["csv", "CSV"], ["xlsx", "XLSX"]]} />
         <FilterSelect label="Status" value={statusFilter} onChange={(value) => setStatusFilter(value as StatusFilter)} options={[["all", "All statuses"], ["uploaded", "Uploaded"], ["processing", "Processing"], ["ready", "Ready"], ["failed", "Failed"]]} />
         <FilterSelect label="Sort" value={sort} onChange={(value) => setSort(value as SortOption)} options={[["newest", "Newest first"], ["oldest", "Oldest first"], ["name", "Name A–Z"]]} />
       </Stack>
@@ -174,7 +168,7 @@ export function DocumentsWorkspace() {
             {documents.length === 0 ? "No documents uploaded yet" : "No documents match these filters"}
           </Typography>
           <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
-            Upload a PDF or CSV from chat to add it to your workspace.
+            Upload a PDF, CSV or XLSX from chat to add it to your workspace.
           </Typography>
         </Box>
       ) : (
@@ -183,7 +177,7 @@ export function DocumentsWorkspace() {
             {visibleDocuments.length} {visibleDocuments.length === 1 ? "document" : "documents"}
           </Typography>
           {visibleDocuments.map((document) => {
-            const status = statusPresentation(document.status);
+            const status = getDocumentStatusPresentation(document);
 
             return (
               <Box key={document.id} sx={documentCardStyles}>
@@ -209,9 +203,18 @@ export function DocumentsWorkspace() {
                       {document.error_message ? <Alert severity="error">{document.error_message}</Alert> : null}
                     </Stack>
                   </Stack>
-                  <Button color="error" startIcon={<DeleteOutlineRoundedIcon />} onClick={() => setDocumentToDelete(document)} sx={{ alignSelf: { xs: "flex-start", sm: "center" }, borderRadius: 2, px: 1.25 }}>
-                    Delete
-                  </Button>
+                  <Stack direction={{ xs: "row", sm: "column" }} spacing={0.75} sx={{ alignSelf: { xs: "stretch", sm: "center" } }}>
+                    <Button
+                      variant={document.financial_review_status === "pending" ? "contained" : "outlined"}
+                      href={`/dashboard/documents/${encodeURIComponent(document.id)}`}
+                      sx={{ borderRadius: 2, whiteSpace: "nowrap" }}
+                    >
+                      {document.financial_review_status === "pending" ? "Review extracted data" : "View details"}
+                    </Button>
+                    <Button color="error" startIcon={<DeleteOutlineRoundedIcon />} onClick={() => setDocumentToDelete(document)} sx={{ borderRadius: 2, px: 1.25 }}>
+                      Delete
+                    </Button>
+                  </Stack>
                 </Stack>
               </Box>
             );

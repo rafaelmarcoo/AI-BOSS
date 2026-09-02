@@ -1,5 +1,6 @@
 import {
   HISTORICAL_METRIC_KEYS,
+  readFinancialMetricHistorySeries,
   summarizeMetricHistory,
   summarizeMetricHistorySeries,
   type HistoricalMetricKey,
@@ -10,6 +11,7 @@ import {
 } from '@/lib/financial-data/metric-history'
 import type { AvailableFinancialMetricValue } from '@/lib/financial-data/types'
 import type { SupportedFinancialCurrency } from '@/lib/financial-data/currency'
+import { readDerivedRunwayHistory } from '@/lib/financial-data/runway-history'
 
 export const FORECAST_HORIZONS = [3, 6] as const
 export type ForecastHorizon = (typeof FORECAST_HORIZONS)[number]
@@ -50,8 +52,31 @@ function parseDate(date: string) {
 }
 
 function addCalendarMonths(date: string, months: number) {
-  const result = parseDate(date)
-  result.setUTCMonth(result.getUTCMonth() + months)
+  const source = parseDate(date)
+  const sourceDay = source.getUTCDate()
+  const sourceIsMonthEnd =
+    sourceDay ===
+    new Date(Date.UTC(source.getUTCFullYear(), source.getUTCMonth() + 1, 0)).getUTCDate()
+  const targetMonthStart = new Date(
+    Date.UTC(source.getUTCFullYear(), source.getUTCMonth() + months, 1)
+  )
+  const targetMonthEnd = new Date(
+    Date.UTC(
+      targetMonthStart.getUTCFullYear(),
+      targetMonthStart.getUTCMonth() + 1,
+      0
+    )
+  )
+  const targetDay = sourceIsMonthEnd
+    ? targetMonthEnd.getUTCDate()
+    : Math.min(sourceDay, targetMonthEnd.getUTCDate())
+  const result = new Date(
+    Date.UTC(
+      targetMonthStart.getUTCFullYear(),
+      targetMonthStart.getUTCMonth(),
+      targetDay
+    )
+  )
   return result.toISOString().slice(0, 10)
 }
 
@@ -174,14 +199,18 @@ export async function readFinancialMetricForecast(params: {
 }) {
   const range = params.range ?? 'all'
   const horizon = params.horizon ?? 3
-  const { listFinancialMetricObservationHistory } = await import(
-    '@/lib/financial-data/persistence'
-  )
-  const observations = await listFinancialMetricObservationHistory({
-    userId: params.userId,
-    metricKey: params.metricKey,
-    limit: 100,
-  })
+  const observations = params.metricKey === 'runway_months'
+    ? await readDerivedRunwayHistory(params.userId, 'cash')
+    : await (async () => {
+        const { listFinancialMetricObservationHistory } = await import(
+          '@/lib/financial-data/persistence'
+        )
+        return listFinancialMetricObservationHistory({
+          userId: params.userId,
+          metricKey: params.metricKey,
+          limit: 100,
+        })
+      })()
 
   return summarizeMetricForecast({
     metricKey: params.metricKey,
@@ -202,14 +231,35 @@ export async function readFinancialMetricForecastSeries(params: {
 }) {
   const range = params.range ?? 'all'
   const horizon = params.horizon ?? 3
-  const { listFinancialMetricObservationHistory } = await import(
-    '@/lib/financial-data/persistence'
-  )
-  const observations = await listFinancialMetricObservationHistory({
-    userId: params.userId,
-    metricKey: params.metricKey,
-    limit: 'all',
-  })
+  if (params.metricKey === 'runway_months') {
+    const histories = await readFinancialMetricHistorySeries({
+      userId: params.userId,
+      metricKey: params.metricKey,
+      range,
+      recordLimit: params.recordLimit,
+      currency: params.currency,
+      sourceKey: params.sourceKey,
+    })
+
+    return {
+      ...histories,
+      horizon,
+      series: histories.series.map((history) =>
+        buildMetricForecastFromHistory(history, horizon)
+      ),
+    }
+  }
+
+  const observations = await (async () => {
+        const { listFinancialMetricObservationHistory } = await import(
+          '@/lib/financial-data/persistence'
+        )
+        return listFinancialMetricObservationHistory({
+          userId: params.userId,
+          metricKey: params.metricKey,
+          limit: 'all',
+        })
+      })()
 
   return summarizeMetricForecastSeries({
     metricKey: params.metricKey,

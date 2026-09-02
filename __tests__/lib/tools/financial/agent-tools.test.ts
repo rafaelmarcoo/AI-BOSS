@@ -107,6 +107,7 @@ function availableMetrics(overrides: FinancialMetricSet = {}) {
       ap: 21000,
       burn: 28000,
     },
+    workingCapitalAdjustedRunway: metrics.runway_months,
   }
 }
 
@@ -134,11 +135,39 @@ describe('financial agent tools', () => {
       availableMetricCount: 0,
       unavailableMetricCount: 7,
       runwayInput: null,
+      workingCapitalAdjustedRunway: metrics.runway_months,
     })
 
     await expect(
       createGetLatestSnapshotTool('user-123').handler({})
     ).resolves.toContain('No financial metrics are available yet')
+  })
+
+  it('forbids a numerical adjusted-runway result when inputs are incompatible', async () => {
+    const result = availableMetrics()
+    mockReadSourceAwareMetrics.mockResolvedValue({
+      ...result,
+      runwayInput: null,
+      workingCapitalAdjustedRunway: {
+        status: 'unavailable',
+        key: 'runway_months',
+        reason: 'incompatible_reporting_date',
+        sourceType: null,
+        sourceLabel: null,
+        updatedAt: null,
+        detail:
+          'Cannot calculate working-capital-adjusted runway because accounts receivable for 2026-05-31 was explicitly excluded during document review.',
+      },
+    })
+
+    const output = await createGetLatestSnapshotTool('user-123').handler({})
+
+    expect(output).toContain(
+      'Working-capital-adjusted runway status: UNAVAILABLE'
+    )
+    expect(output).toContain('show the symbolic formula only')
+    expect(output).toContain('Do not substitute mismatched values')
+    expect(output).not.toContain('Confirmed runway inputs:')
   })
 
   it('model_scenario resolves one owned source and returns the deterministic result', async () => {

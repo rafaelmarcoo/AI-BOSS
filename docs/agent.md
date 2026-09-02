@@ -52,7 +52,7 @@ The current app registry lives in `lib/ai/tool-registry.ts` and registers five a
 | Tool | Purpose |
 |---|---|
 | `get_latest_snapshot` | Reads source-aware current metrics and confirms runway inputs. |
-| `calculate_runway` | Calculates runway from confirmed cash, receivables, payables, and burn. |
+| `calculate_runway` | Calculates primary cash runway and separately labelled working-capital-adjusted runway from confirmed inputs. |
 | `model_scenario` | Validates and calculates one to three source-aware what-if alternatives using the shared deterministic scenario engine. |
 | `get_financial_history` | Summarises deterministic historical movement for a supported metric. |
 | `get_financial_forecast` | Creates a deterministic 3- or 6-month trend-continuation forecast. |
@@ -86,4 +86,4 @@ Set `MULTI_AGENT_MODE=true` only in a chosen server environment to use determini
 
 ## PDF metric extraction
 
-PDF documents remain available for retrieved document context. A PDF contributes structured financial metrics only when AI-BOSS finds a clear labelled reporting date and a supported labelled value. Extracted values retain the document filename, page excerpt, confidence, and detected currency. Undated PDFs do not affect dashboard metrics, history, or forecasts.
+CSV, XLSX, and text PDF documents can provide retrieved evidence before review, clearly identified as unreviewed context. Deterministically extracted metric candidates never become calculation inputs automatically. A user must explicitly include or exclude every candidate, correct any metric/value/NZD-or-AUD currency/reporting date, and approve the complete review. Only the resulting User-confirmed observations may affect dashboard metrics, history, forecasts, scenarios, or deterministic tools. Scanned PDFs remain stored and previewable, but OCR extraction is deferred.

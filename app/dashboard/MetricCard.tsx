@@ -9,6 +9,8 @@ interface MetricCardProps {
   loading?: boolean;
   sourceLabel?: string;
   sourceTone?: "available" | "unavailable" | "derived";
+  contextLabel?: string;
+  detail?: string | null;
 }
 
 export function MetricCard({
@@ -19,6 +21,8 @@ export function MetricCard({
   loading = false,
   sourceLabel,
   sourceTone = "available",
+  contextLabel,
+  detail,
 }: MetricCardProps) {
   const sourceColor =
     sourceTone === "available"
@@ -40,7 +44,7 @@ export function MetricCard({
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
-        minHeight: 124,
+        minHeight: 148,
       }}
     >
       <Stack spacing={1.5} sx={{ minWidth: 0 }}>
@@ -147,6 +151,22 @@ export function MetricCard({
           >
             {sourceLabel ? `Source: ${sourceLabel}` : "Source unavailable"}
           </Typography>
+          {contextLabel ? (
+            <Typography
+              variant="caption"
+              sx={{ color: sourceColor, fontSize: "0.72rem", lineHeight: 1.45 }}
+            >
+              {contextLabel}
+            </Typography>
+          ) : null}
+          {detail ? (
+            <Typography
+              variant="caption"
+              sx={{ color: dashboardTokens.textMuted, fontSize: "0.7rem", lineHeight: 1.45 }}
+            >
+              {detail}
+            </Typography>
+          ) : null}
         </Stack>
       </Stack>
     </Paper>

@@ -11,6 +11,9 @@ const CSV_MIME_TYPES = [
   'application/csv',
   'application/vnd.ms-excel',
 ]
+const XLSX_MIME_TYPES = [
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+]
 
 function getFileExtension(fileName: string) {
   const extension = fileName.split('.').pop()
@@ -20,20 +23,19 @@ function getFileExtension(fileName: string) {
 
 function detectDocumentType(file: File): SupportedDocumentType | null {
   const extension = getFileExtension(file.name)
+  const mimeType = file.type.toLowerCase()
 
-  if (
-    extension === 'pdf' ||
-    PDF_MIME_TYPES.includes(file.type.toLowerCase())
-  ) {
-    return 'pdf'
-  }
+  if (extension === 'pdf') return 'pdf'
+  if (extension === 'csv') return 'csv'
+  if (extension === 'xlsx') return 'xlsx'
 
-  if (
-    extension === 'csv' ||
-    CSV_MIME_TYPES.includes(file.type.toLowerCase())
-  ) {
-    return 'csv'
-  }
+  // A named file with an unsupported extension must not become supported only
+  // because the browser supplied a broad or incorrect MIME type.
+  if (extension) return null
+
+  if (PDF_MIME_TYPES.includes(mimeType)) return 'pdf'
+  if (CSV_MIME_TYPES.includes(mimeType)) return 'csv'
+  if (XLSX_MIME_TYPES.includes(mimeType)) return 'xlsx'
 
   return null
 }
@@ -82,7 +84,7 @@ export function validateDocumentUpload(
     throw new ApiError(
       400,
       'BAD_REQUEST',
-      'Only PDF and CSV uploads are supported right now.'
+      'Only PDF, CSV, and XLSX uploads are supported.'
     )
   }
 

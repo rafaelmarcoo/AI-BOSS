@@ -1,0 +1,1 @@
+This is intentionally not an XLSX workbook. It tests corrupt-workbook failure behaviour.

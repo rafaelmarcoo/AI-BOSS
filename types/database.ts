@@ -8,6 +8,24 @@ export type UserType = 'admin' | 'employee'
 export type ConversationVisibility = 'private' | 'company' | 'admins'
 export type ScenarioVisibility = 'private' | 'company'
 export type ScenarioStatus = 'draft' | 'calculated'
+export type DocumentFileType = 'pdf' | 'csv' | 'xlsx'
+export type DocumentProcessingStatus =
+  | 'uploaded'
+  | 'processing'
+  | 'ready'
+  | 'failed'
+export type DocumentFinancialReviewStatus =
+  | 'legacy'
+  | 'not_required'
+  | 'pending'
+  | 'confirmed'
+export type DocumentExtractionRunStatus =
+  | 'processing'
+  | 'extracted'
+  | 'failed'
+  | 'confirmed'
+  | 'superseded'
+export type DocumentExtractionDecision = 'pending' | 'included' | 'excluded'
 
 export interface User {
   id: string
@@ -65,14 +83,57 @@ export interface Document {
   user_id: string
   conversation_id: string | null
   file_name: string
-  file_type: 'pdf' | 'csv'
+  file_type: DocumentFileType
   mime_type: string
   storage_path: string
-  status: 'uploaded' | 'processing' | 'ready' | 'failed'
+  status: DocumentProcessingStatus
+  financial_review_status: DocumentFinancialReviewStatus
   document_type: string | null
   raw_text: string | null
   metadata: unknown
   error_message: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface DocumentExtractionRun {
+  id: string
+  document_id: string
+  user_id: string
+  status: DocumentExtractionRunStatus
+  selected_worksheet_names: string[]
+  suggested_worksheet_names: string[]
+  worksheet_metadata: unknown[]
+  warnings: unknown[]
+  extractor_version: string
+  error_message: string | null
+  started_at: string
+  completed_at: string | null
+  confirmed_at: string | null
+  superseded_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface DocumentExtractionCandidate {
+  id: string
+  extraction_run_id: string
+  document_id: string
+  user_id: string
+  original_payload: Record<string, unknown>
+  reviewed_payload: Record<string, unknown> | null
+  metric_key: FinancialMetricKey | null
+  value: number | null
+  /** NZD/AUD for monetary metrics; null when metric_key is runway_months. */
+  currency: 'NZD' | 'AUD' | null
+  reporting_date: string | null
+  confidence: number | null
+  evidence: Record<string, unknown>
+  warnings: unknown[]
+  decision: DocumentExtractionDecision
+  extractor_version: string
+  reviewer_id: string | null
+  reviewed_at: string | null
   created_at: string
   updated_at: string
 }
@@ -153,6 +214,7 @@ export interface FinancialMetricObservation {
   document_id: string | null
   metric_key: FinancialMetricKey
   value: number
+  /** Currency for monetary observations; null for unit-based runway_months. */
   currency: string | null
   period_start: string | null
   period_end: string | null

@@ -5,6 +5,10 @@ import {
 import type { AvailableFinancialMetricValue } from '@/lib/financial-data/types'
 import { isSupportedFinancialCurrency } from '@/lib/financial-data/currency'
 import type { SupportedFinancialCurrency } from '@/lib/financial-data/currency'
+import {
+  readDerivedRunwayHistory,
+  type DerivedRunwayVariant,
+} from '@/lib/financial-data/runway-history'
 
 export const HISTORICAL_METRIC_KEYS = [
   'cash',
@@ -40,6 +44,8 @@ export interface MetricHistoryPoint {
 
 export interface MetricHistorySummary {
   metricKey: HistoricalMetricKey
+  runwayVariant?: DerivedRunwayVariant
+  seriesKey?: string
   label: string
   range: MetricHistoryRange
   points: MetricHistoryPoint[]
@@ -221,6 +227,8 @@ export function summarizeMetricHistory(params: {
   range: MetricHistoryRange
   observations: AvailableFinancialMetricValue[]
   recordLimit?: MetricHistoryRecordLimit
+  runwayVariant?: DerivedRunwayVariant
+  seriesKey?: string
 }): MetricHistorySummary {
   const selectedForRange = filterObservationsByRange(
     selectLatestObservationPerDate(params.observations),
@@ -272,6 +280,8 @@ export function summarizeMetricHistory(params: {
   if (!hasComparableData) {
     return {
       metricKey: params.metricKey,
+      ...(params.runwayVariant ? { runwayVariant: params.runwayVariant } : {}),
+      ...(params.seriesKey ? { seriesKey: params.seriesKey } : {}),
       label: FINANCIAL_METRIC_LABELS[params.metricKey],
       range: params.range,
       points,
@@ -301,6 +311,8 @@ export function summarizeMetricHistory(params: {
 
   return {
     metricKey: params.metricKey,
+    ...(params.runwayVariant ? { runwayVariant: params.runwayVariant } : {}),
+    ...(params.seriesKey ? { seriesKey: params.seriesKey } : {}),
     label: FINANCIAL_METRIC_LABELS[params.metricKey],
     range: params.range,
     points,
@@ -329,6 +341,7 @@ export function summarizeMetricHistorySeries(params: {
   recordLimit?: MetricHistoryRecordLimit
   currency?: SupportedFinancialCurrency | null
   sourceKey?: string | null
+  runwayVariant?: DerivedRunwayVariant
 }): MetricHistorySeriesCollection {
   const recordLimit = params.recordLimit ?? 12
   const isMonetaryMetric = params.metricKey !== 'runway_months'
@@ -369,21 +382,39 @@ export function summarizeMetricHistorySeries(params: {
               (observation) => observation.currency === currency
             ),
             recordLimit,
+            runwayVariant: params.runwayVariant,
+            seriesKey: `currency:${currency}`,
           })
         )
         .filter((summary) => summary.points.length > 0)
-    : [
-        summarizeMetricHistory({
-          metricKey: params.metricKey,
-          range: params.range,
-          observations: selected,
-          recordLimit,
-        }),
-      ].filter((summary) => summary.points.length > 0)
+    : listSourceOptions(selected)
+        .map((source) =>
+          summarizeMetricHistory({
+            metricKey: params.metricKey,
+            range: params.range,
+            observations: selected.filter(
+              (observation) => getSourceKey(observation) === source.key
+            ),
+            recordLimit,
+            runwayVariant: params.runwayVariant,
+            seriesKey: source.key,
+          })
+        )
+        .filter((summary) => summary.points.length > 0)
+        .map((summary) => ({
+          ...summary,
+          label:
+            params.runwayVariant === 'working_capital_adjusted'
+              ? 'Working-capital-adjusted runway'
+              : 'Cash runway',
+        }))
 
   return {
     metricKey: params.metricKey,
-    label: FINANCIAL_METRIC_LABELS[params.metricKey],
+    label:
+      params.metricKey === 'runway_months'
+        ? 'Runway'
+        : FINANCIAL_METRIC_LABELS[params.metricKey],
     range: params.range,
     recordLimit,
     selectedCurrency: params.currency ?? null,
@@ -405,14 +436,18 @@ export async function readFinancialMetricHistory(params: {
   range?: MetricHistoryRange
 }) {
   const range = params.range ?? 'all'
-  const { listFinancialMetricObservationHistory } = await import(
-    '@/lib/financial-data/persistence'
-  )
-  const observations = await listFinancialMetricObservationHistory({
-    userId: params.userId,
-    metricKey: params.metricKey,
-    limit: 100,
-  })
+  const observations = params.metricKey === 'runway_months'
+    ? await readDerivedRunwayHistory(params.userId, 'cash')
+    : await (async () => {
+        const { listFinancialMetricObservationHistory } = await import(
+          '@/lib/financial-data/persistence'
+        )
+        return listFinancialMetricObservationHistory({
+          userId: params.userId,
+          metricKey: params.metricKey,
+          limit: 100,
+        })
+      })()
 
   return summarizeMetricHistory({
     metricKey: params.metricKey,
@@ -430,14 +465,50 @@ export async function readFinancialMetricHistorySeries(params: {
   sourceKey?: string | null
 }) {
   const range = params.range ?? 'all'
-  const { listFinancialMetricObservationHistory } = await import(
-    '@/lib/financial-data/persistence'
-  )
-  const observations = await listFinancialMetricObservationHistory({
-    userId: params.userId,
-    metricKey: params.metricKey,
-    limit: 'all',
-  })
+  if (params.metricKey === 'runway_months') {
+    const [cashObservations, adjustedObservations] = await Promise.all([
+      readDerivedRunwayHistory(params.userId, 'cash'),
+      readDerivedRunwayHistory(params.userId, 'working_capital_adjusted'),
+    ])
+    const sharedParams = {
+      metricKey: params.metricKey,
+      range,
+      recordLimit: params.recordLimit,
+      currency: params.currency,
+      sourceKey: params.sourceKey,
+    }
+    const cash = summarizeMetricHistorySeries({
+      ...sharedParams,
+      observations: cashObservations,
+      runwayVariant: 'cash',
+    })
+    const adjusted = summarizeMetricHistorySeries({
+      ...sharedParams,
+      observations: adjustedObservations,
+      runwayVariant: 'working_capital_adjusted',
+    })
+
+    return {
+      ...cash,
+      label: 'Runway',
+      availableSources: cash.availableSources,
+      availableCurrencies: [
+        ...new Set([...cash.availableCurrencies, ...adjusted.availableCurrencies]),
+      ].sort(),
+      series: [...cash.series, ...adjusted.series],
+    }
+  }
+
+  const observations = await (async () => {
+        const { listFinancialMetricObservationHistory } = await import(
+          '@/lib/financial-data/persistence'
+        )
+        return listFinancialMetricObservationHistory({
+          userId: params.userId,
+          metricKey: params.metricKey,
+          limit: 'all',
+        })
+      })()
 
   return summarizeMetricHistorySeries({
     metricKey: params.metricKey,

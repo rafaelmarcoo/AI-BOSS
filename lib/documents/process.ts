@@ -5,84 +5,74 @@ import {
 } from '@/lib/documents/embeddings'
 import { logDocumentIngestion } from '@/lib/documents/log-document-ingestion'
 import { parseDocumentContent } from '@/lib/documents/parsing'
-import { extractCsvFinancialMetrics } from '@/lib/financial-data/extraction/csv'
-import { extractPdfFinancialMetrics } from '@/lib/financial-data/extraction/pdf'
 import {
-  deleteFinancialMetricObservationsForDocument,
-  saveFinancialMetricObservations,
-} from '@/lib/financial-data/persistence'
+  extractDocumentCandidates,
+  getDocumentExtractorVersion,
+} from '@/lib/documents/extraction-candidates'
 import {
-  deleteDocumentFile,
+  completeDocumentExtractionRun,
+  createDocumentExtractionRun,
+  failDocumentExtractionRun,
+  saveDocumentExtractionCandidates,
+} from '@/lib/documents/extraction-review-persistence'
+import {
   downloadDocumentFile,
   getDocumentById,
   replaceDocumentChunks,
   updateDocumentRecord,
 } from '@/lib/documents/persistence'
-import type { ParsedDocumentResult } from '@/lib/documents/types'
+import type { ParseDocumentOptions } from '@/lib/documents/types'
 
-function addMetricObservationCount(
+function addExtractionMetadata(
   metadata: unknown,
-  metricObservationCount: number,
-  embeddingModel: string
+  params: {
+    metricCandidateCount: number
+    extractionRunId: string
+    embeddingModel: string
+  }
 ) {
   if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
     return {
       ...metadata,
-      metricObservationCount,
-      embeddingModel,
+      ...params,
     }
   }
 
-  return {
-    metricObservationCount,
-    embeddingModel,
-  }
+  return params
 }
 
-function getCsvMetrics(params: {
-  document: Awaited<ReturnType<typeof getDocumentById>>
-  parsedDocument: ParsedDocumentResult
-}) {
-  if (params.document.file_type !== 'csv' || !params.parsedDocument.csvData) {
+function metadataWarnings(metadata: unknown) {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
     return []
   }
 
-  const extractedAt = new Date().toISOString()
-  const metrics = extractCsvFinancialMetrics({
-    csvData: params.parsedDocument.csvData,
-    documentId: params.document.id,
-    sourceLabel: params.document.file_name,
-    extractedAt,
-  })
-
-  return metrics
+  const warnings = (metadata as { warnings?: unknown }).warnings
+  return Array.isArray(warnings) ? warnings : []
 }
 
-function getPdfMetrics(params: {
-  document: Awaited<ReturnType<typeof getDocumentById>>
-  parsedDocument: ParsedDocumentResult
-}) {
-  if (params.document.file_type !== 'pdf' || !params.parsedDocument.pdfPages) {
-    return []
-  }
-
-  return extractPdfFinancialMetrics({
-    pages: params.parsedDocument.pdfPages,
-    documentId: params.document.id,
-    sourceLabel: params.document.file_name,
-    extractedAt: new Date().toISOString(),
-  })
-}
-
-export async function processDocument(documentId: string, userId: string) {
+export async function processDocument(
+  documentId: string,
+  userId: string,
+  options: ParseDocumentOptions = {}
+) {
   const startedAt = Date.now()
   const document = await getDocumentById(documentId, userId)
+  let extractionRunId: string | null = null
 
   try {
+    const extractionRun = await createDocumentExtractionRun({
+      documentId: document.id,
+      userId: document.user_id,
+      extractorVersion: getDocumentExtractorVersion(document.file_type),
+    })
+    extractionRunId = extractionRun.id
     const fileBytes = await downloadDocumentFile(document.storage_path)
-    const parsedDocument = await parseDocumentContent(document, fileBytes)
+    const parsedDocument = await parseDocumentContent(document, fileBytes, options)
 
-    if (parsedDocument.chunks.length === 0) {
+    if (
+      parsedDocument.chunks.length === 0 &&
+      parsedDocument.extractionState !== 'scanned'
+    ) {
       throw new ApiError(
         400,
         'BAD_REQUEST',
@@ -90,44 +80,55 @@ export async function processDocument(documentId: string, userId: string) {
       )
     }
 
-    const embeddedChunks = await embedDocumentChunks(parsedDocument.chunks)
+    const embeddedChunks =
+      parsedDocument.chunks.length > 0
+        ? await embedDocumentChunks(parsedDocument.chunks)
+        : []
 
+    // Reprocessing replaces retrieval evidence even when a scanned PDF has no
+    // extractable text, so stale chunks from an earlier run cannot be cited.
     await replaceDocumentChunks(document.id, document.user_id, embeddedChunks)
-    const csvMetrics = getCsvMetrics({
+    const candidates = extractDocumentCandidates({
       document,
       parsedDocument,
+      extractedAt: new Date().toISOString(),
     })
-    const pdfMetrics = getPdfMetrics({ document, parsedDocument })
+    await saveDocumentExtractionCandidates({
+      extractionRunId,
+      documentId: document.id,
+      userId: document.user_id,
+      candidates,
+    })
 
-    // Reprocessing must replace the document's derived metrics, not append stale values.
-    await deleteFinancialMetricObservationsForDocument(document.id, document.user_id)
-    await saveFinancialMetricObservations({
-      userId: document.user_id,
+    const tabularData = parsedDocument.tabularData
+    await completeDocumentExtractionRun({
+      extractionRunId,
       documentId: document.id,
-      metrics: csvMetrics,
-      rawData: {
-        extractor: 'deterministic_csv_v1',
-        fileName: document.file_name,
-      },
-    })
-    await saveFinancialMetricObservations({
       userId: document.user_id,
-      documentId: document.id,
-      metrics: pdfMetrics,
-      rawData: {
-        extractor: 'deterministic_pdf_v1',
-        fileName: document.file_name,
-      },
+      selectedWorksheetNames: tabularData?.selectedSheetNames ?? [],
+      suggestedWorksheetNames: tabularData?.suggestedSheetNames ?? [],
+      worksheetMetadata: tabularData?.worksheetMetadata ?? [],
+      warnings: tabularData?.warnings ?? metadataWarnings(parsedDocument.metadata),
     })
-    const metricObservationCount = csvMetrics.length + pdfMetrics.length
-    const metadata = addMetricObservationCount(
+
+    const financialReviewStatus =
+      candidates.length > 0
+        ? 'pending'
+        : document.financial_review_status === 'pending'
+          ? 'not_required'
+          : document.financial_review_status
+    const metadata = addExtractionMetadata(
       parsedDocument.metadata,
-      metricObservationCount,
-      DOCUMENT_EMBEDDING_MODEL
+      {
+        metricCandidateCount: candidates.length,
+        extractionRunId,
+        embeddingModel: DOCUMENT_EMBEDDING_MODEL,
+      }
     )
 
     await updateDocumentRecord(document.id, document.user_id, {
       status: 'ready',
+      financial_review_status: financialReviewStatus,
       raw_text: parsedDocument.rawText,
       metadata,
       error_message: null,
@@ -147,22 +148,20 @@ export async function processDocument(documentId: string, userId: string) {
     const message =
       error instanceof Error ? error.message : 'Document processing failed.'
 
-    try {
-      await deleteFinancialMetricObservationsForDocument(document.id, document.user_id)
-    } catch (cleanupError) {
-      console.error(
-        `Failed to clean up financial metrics for ${document.file_name}.`,
-        cleanupError
-      )
-    }
-
-    try {
-      await deleteDocumentFile(document.storage_path)
-    } catch (cleanupError) {
-      console.error(
-        `Failed to clean up storage object for ${document.file_name}.`,
-        cleanupError
-      )
+    if (extractionRunId) {
+      try {
+        await failDocumentExtractionRun({
+          extractionRunId,
+          documentId: document.id,
+          userId: document.user_id,
+          errorMessage: message,
+        })
+      } catch (runError) {
+        console.error(
+          `Failed to record extraction failure for ${document.file_name}.`,
+          runError
+        )
+      }
     }
 
     await updateDocumentRecord(document.id, document.user_id, {

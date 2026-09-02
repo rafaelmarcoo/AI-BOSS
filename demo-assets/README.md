@@ -6,10 +6,13 @@ Use this folder as the single source of truth for the live demo flow and QA pass
 
 - `demo-runbook.md` - live stakeholder demo script with what to say, click, upload, ask, and expect.
 - `qa-checklist.md` - broader end-to-end test checklist for the repo before demo.
+- `document-review-fixtures/` - Phase 4 CSV, XLSX, PDF, scanned, corrupt,
+  unsupported, limit, and review-correction fixtures plus a step-by-step manual
+  acceptance guide.
 - `ai-boss-demo-full-metrics.csv` - baseline structured metrics.
 - `ai-boss-demo-updated-month.csv` - partial newer month that proves source mixing.
 - `ai-boss-demo-risky-month.csv` - urgent low-runway month that proves warnings, trends, and forecast behavior.
-- `ai-boss-demo-consistent.csv` - three dated, same-currency months for multi-agent history, forecast, and scenario testing.
+- `ai-boss-demo-consistent.csv` - three dated, same-currency months for multi-agent history, forecast, scenario, and derived runway testing. Runway is intentionally not supplied; AI-BOSS calculates cash runway and working-capital-adjusted runway from the confirmed inputs.
 - `ai-boss-test-aud.csv` - three supported AUD months for currency display and calculation testing.
 - `ai-boss-demo-mixed-nzd-aud.csv` - mixed-currency cash history that must warn and block combined calculations.
 - `ai-boss-test-usd.csv` - unsupported-currency observations that must be excluded with a warning.
@@ -94,8 +97,12 @@ Which metrics are unavailable?
 
 ## Product Rules To Say Out Loud
 
-- CSV files feed structured financial metrics.
-- PDF files always feed RAG/evidence context. Clearly dated PDFs with recognised financial labels can also create low-confidence structured observations; undated PDFs remain document-only.
+- CSV and XLSX files create extraction candidates that require explicit user
+  review before they can feed calculations.
+- Text PDFs feed RAG/evidence context and may create low-confidence extraction
+  candidates. Scanned PDFs remain previewable, but OCR is not available.
+- New document-derived metrics become calculation truth only after the user
+  selects **Use these values in AI-BOSS.**
 - Dashboard calculations never come directly from raw chunks.
 - Chat should prefer structured metrics for calculations and use document chunks as supporting context.
 - Scenario modelling is read-only and should not save results.

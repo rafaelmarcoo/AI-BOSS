@@ -91,7 +91,7 @@ export function ChatInput({
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,.csv,application/pdf,text/csv"
+        accept=".pdf,.csv,.xlsx,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         hidden
         onChange={(event) => void handleFileChange(event)}
       />

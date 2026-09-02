@@ -21,8 +21,8 @@ describe('Gen UI relevance selection', () => {
     ])
   })
 
-  it('detects data connection requests', () => {
-    expect(isDataConnectionRequest('How do I connect Xero?')).toBe(true)
+  it('detects supported document-source requests', () => {
+    expect(isDataConnectionRequest('How do I upload an XLSX workbook?')).toBe(true)
     expect(isDataConnectionRequest('What is my runway?')).toBe(false)
   })
 })

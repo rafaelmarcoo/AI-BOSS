@@ -1,6 +1,55 @@
 import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { ToolInputParsingException } from '@langchain/core/tools'
-import { buildAgentMessages, preserveFinancialCurrencyCoverage, toolInputRepairResult } from '@/lib/ai/agent'
+import { convertMessagesToResponsesInput } from '@langchain/openai'
+import {
+  buildAgentMessages,
+  createAssistantHistoryMessage,
+  preserveFinancialCurrencyCoverage,
+  readModelMessageText,
+  requiresUnavailableAdjustedRunwayCorrection,
+  toolInputRepairResult,
+} from '@/lib/ai/agent'
+
+describe('readModelMessageText', () => {
+  it('extracts Markdown text from Responses API content blocks', () => {
+    const message = new AIMessage({
+      content: [
+        {
+          type: 'text',
+          text: 'The uploaded CSV shows:\n\n- **31 Mar 2026:** NZD 100,000',
+          annotations: [],
+        },
+      ],
+    })
+
+    expect(readModelMessageText(message)).toBe(
+      'The uploaded CSV shows:\n\n- **31 Mar 2026:** NZD 100,000'
+    )
+  })
+
+  it('preserves plain Chat Completions text', () => {
+    expect(readModelMessageText(new AIMessage('Plain response'))).toBe(
+      'Plain response'
+    )
+  })
+})
+
+describe('createAssistantHistoryMessage', () => {
+  it('rebuilds persisted text as a Responses-compatible content block', () => {
+    const message = createAssistantHistoryMessage('Earlier answer')
+
+    expect(message.content).toEqual([
+      { type: 'text', text: 'Earlier answer', annotations: [] },
+    ])
+    expect(message.text).toBe('Earlier answer')
+
+    expect(() => convertMessagesToResponsesInput({
+      messages: [message],
+      zdrEnabled: false,
+      model: 'gpt-5.6-luna',
+    })).not.toThrow()
+  })
+})
 
 describe('buildAgentMessages', () => {
   it('places supplied context after the system prompt and before chat history', () => {
@@ -46,6 +95,41 @@ describe('preserveFinancialCurrencyCoverage', () => {
       original,
       [{ name: 'get_financial_forecast', content: toolResult }]
     )).toBe(original)
+  })
+})
+
+describe('requiresUnavailableAdjustedRunwayCorrection', () => {
+  const evidence = [
+    'Working-capital-adjusted runway status: UNAVAILABLE.\nReason: Accounts receivable for 2026-05-31 was explicitly excluded.',
+  ]
+
+  it('rejects a numeric result calculated from mismatched adjusted-runway inputs', () => {
+    expect(
+      requiresUnavailableAdjustedRunwayCorrection({
+        response:
+          'Working-capital-adjusted runway:\n`(NZD 100,000 + NZD 18,000 - NZD 14,000) / NZD 17,000 = 6.12 months`',
+        evidence,
+      })
+    ).toBe(true)
+  })
+
+  it('allows the valid cash result with only a symbolic adjusted formula', () => {
+    expect(
+      requiresUnavailableAdjustedRunwayCorrection({
+        response:
+          'Cash runway: NZD 100,000 / NZD 17,000 = 5.88 months.\n\nWorking-capital-adjusted runway is unavailable. Formula: `(cash + accounts receivable - accounts payable) / monthly burn`.',
+        evidence,
+      })
+    ).toBe(false)
+  })
+
+  it('does not restrict an adjusted result when deterministic evidence says it is available', () => {
+    expect(
+      requiresUnavailableAdjustedRunwayCorrection({
+        response: 'Working-capital-adjusted runway: 6.12 months.',
+        evidence: ['Working-capital-adjusted runway status: AVAILABLE.'],
+      })
+    ).toBe(false)
   })
 })
 

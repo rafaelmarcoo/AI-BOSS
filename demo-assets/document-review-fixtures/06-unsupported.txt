@@ -1,0 +1,2 @@
+AI-BOSS manual acceptance fixture.
+This file is intentionally unsupported because only CSV, XLSX, and PDF uploads are allowed.

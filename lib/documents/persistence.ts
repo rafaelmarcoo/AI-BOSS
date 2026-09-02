@@ -12,8 +12,8 @@ const DOCUMENT_SUMMARY_SELECT = `
   file_name,
   file_type,
   mime_type,
-  storage_path,
   status,
+  financial_review_status,
   document_type,
   metadata,
   error_message,
@@ -30,6 +30,7 @@ const DOCUMENT_FULL_SELECT = `
   mime_type,
   storage_path,
   status,
+  financial_review_status,
   document_type,
   raw_text,
   metadata,
@@ -48,6 +49,17 @@ function createStoragePath(userId: string, fileName: string) {
 
 async function ensureDocumentsBucketExists() {
   const supabase = createAdminSupabaseClient()
+  const bucketOptions = {
+    public: false,
+    fileSizeLimit: '15MB',
+    allowedMimeTypes: [
+      'application/pdf',
+      'text/csv',
+      'application/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ],
+  }
   const { data, error } = await supabase.storage.listBuckets()
 
   if (error) {
@@ -65,21 +77,27 @@ async function ensureDocumentsBucketExists() {
   )
 
   if (existingBucket) {
+    const { error: updateError } = await supabase.storage.updateBucket(
+      DOCUMENTS_STORAGE_BUCKET,
+      bucketOptions
+    )
+
+    if (updateError) {
+      console.error('Failed to update the document storage bucket.', updateError)
+      throw new ApiError(
+        500,
+        'INTERNAL_ERROR',
+        'Failed to configure document storage.',
+        updateError.message
+      )
+    }
+
     return
   }
 
   const { error: createError } = await supabase.storage.createBucket(
     DOCUMENTS_STORAGE_BUCKET,
-    {
-      public: false,
-      fileSizeLimit: '15MB',
-      allowedMimeTypes: [
-        'application/pdf',
-        'text/csv',
-        'application/csv',
-        'application/vnd.ms-excel',
-      ],
-    }
+    bucketOptions
   )
 
   if (createError && createError.message !== 'Bucket already exists') {
@@ -207,6 +225,7 @@ export async function createDocumentRecord(params: {
       mime_type: params.mimeType,
       storage_path: params.storagePath,
       status: 'uploaded',
+      financial_review_status: 'pending',
       metadata: null,
     })
     .select(DOCUMENT_SUMMARY_SELECT)
@@ -245,7 +264,14 @@ export async function updateDocumentRecord(
   documentId: string,
   userId: string,
   updates: Partial<
-    Pick<Document, 'status' | 'raw_text' | 'metadata' | 'error_message'>
+    Pick<
+      Document,
+      | 'status'
+      | 'financial_review_status'
+      | 'raw_text'
+      | 'metadata'
+      | 'error_message'
+    >
   >
 ) {
   const supabase = createAdminSupabaseClient()
@@ -285,6 +311,41 @@ export async function downloadDocumentFile(storagePath: string) {
   }
 
   return new Uint8Array(await data.arrayBuffer())
+}
+
+export async function createPdfDocumentPreviewUrl(
+  documentId: string,
+  userId: string,
+  expiresInSeconds = 300
+) {
+  const document = await getDocumentById(documentId, userId)
+
+  if (document.file_type !== 'pdf') {
+    throw new ApiError(
+      400,
+      'BAD_REQUEST',
+      'Signed preview URLs are available only for PDF documents.'
+    )
+  }
+
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase.storage
+    .from(DOCUMENTS_STORAGE_BUCKET)
+    .createSignedUrl(document.storage_path, expiresInSeconds)
+
+  if (error || !data?.signedUrl) {
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to create the document preview URL.',
+      error?.message
+    )
+  }
+
+  return {
+    url: data.signedUrl,
+    expiresAt: new Date(Date.now() + expiresInSeconds * 1000).toISOString(),
+  }
 }
 
 export async function replaceDocumentChunks(
@@ -344,7 +405,7 @@ export async function listUserEmbeddedDocumentChunks(userId: string) {
         metadata,
         embedding,
         created_at,
-        documents!inner(file_name, file_type)
+        documents!inner(file_name, file_type, financial_review_status)
       `
     )
     .eq('user_id', userId)
@@ -367,10 +428,12 @@ export async function listUserEmbeddedDocumentChunks(userId: string) {
         | {
             file_name: string
             file_type: Document['file_type']
+            financial_review_status: Document['financial_review_status']
           }
         | Array<{
             file_name: string
             file_type: Document['file_type']
+            financial_review_status: Document['financial_review_status']
           }>
     }
   >).flatMap((row) => {

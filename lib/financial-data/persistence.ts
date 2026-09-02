@@ -190,6 +190,36 @@ export async function listFinancialMetricObservations(userId: string) {
   return rows
 }
 
+export async function listFinancialMetricObservationsForDocuments(params: {
+  userId: string
+  documentIds: string[]
+  limit?: number
+}) {
+  const documentIds = [...new Set(params.documentIds)]
+  if (documentIds.length === 0) return []
+
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase
+    .from('financial_metric_observations')
+    .select(FINANCIAL_METRIC_OBSERVATION_SELECT)
+    .eq('user_id', params.userId)
+    .in('document_id', documentIds)
+    .order('as_of_date', { ascending: false, nullsFirst: false })
+    .order('period_end', { ascending: false, nullsFirst: false })
+    .order('updated_at', { ascending: false })
+    .limit(params.limit ?? 200)
+
+  if (error) {
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to load confirmed document financial observations.'
+    )
+  }
+
+  return (data ?? []) as FinancialMetricObservation[]
+}
+
 export async function listFinancialMetricObservationHistory(params: {
   userId: string
   metricKey: FinancialMetricKey

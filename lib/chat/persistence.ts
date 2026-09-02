@@ -106,6 +106,64 @@ export async function insertConversationMessage(params: {
   return data as ConversationMessage
 }
 
+/**
+ * Saves one completed user/assistant turn with a single database INSERT.
+ * PostgreSQL treats the multi-row statement atomically, so a failed model call
+ * never leaves an orphaned user message that will be duplicated on retry.
+ */
+export async function insertConversationTurn(params: {
+  conversationId: string
+  userId: string
+  userContent: string
+  assistantContent: string
+  assistantUiPayload?: GenUiPlan | null
+}) {
+  const supabase = createAdminSupabaseClient()
+  const userCreatedAt = new Date()
+  const assistantCreatedAt = new Date(userCreatedAt.getTime() + 1)
+  const { data, error } = await supabase
+    .from('conversation_messages')
+    .insert([
+      {
+        conversation_id: params.conversationId,
+        user_id: params.userId,
+        role: 'user',
+        content: params.userContent,
+        citations: null,
+        ui_payload: null,
+        created_at: userCreatedAt.toISOString(),
+      },
+      {
+        conversation_id: params.conversationId,
+        user_id: params.userId,
+        role: 'assistant',
+        content: params.assistantContent,
+        citations: null,
+        ui_payload: params.assistantUiPayload ?? null,
+        created_at: assistantCreatedAt.toISOString(),
+      },
+    ])
+    .select(
+      'id, conversation_id, user_id, role, content, citations, ui_payload, created_at'
+    )
+
+  const messages = (data ?? []) as ConversationMessage[]
+  const userMessage = messages.find((message) => message.role === 'user')
+  const assistantMessage = messages.find((message) => message.role === 'assistant')
+
+  if (error || !userMessage || !assistantMessage) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to save completed chat turn.')
+  }
+
+  await supabase
+    .from('conversations')
+    .update({ updated_at: assistantCreatedAt.toISOString() })
+    .eq('id', params.conversationId)
+    .eq('user_id', params.userId)
+
+  return { userMessage, assistantMessage }
+}
+
 export async function listConversationMessages(
   conversationId: string,
   userId: string

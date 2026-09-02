@@ -126,6 +126,51 @@ describe('HistoricalMetricsChart', () => {
 
     render(<HistoricalMetricsChart refreshKey="empty" />)
 
-    await waitFor(() => expect(screen.getByText(/needs at least two dated records/)).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText(/needs at least two compatible dated records/)).toBeInTheDocument())
+  })
+
+  it('lets users view both runway plots or either derived variant', async () => {
+    const cashRunway = {
+      ...history,
+      metricKey: 'runway_months',
+      runwayVariant: 'cash',
+      seriesKey: 'document:statement-1',
+      label: 'Cash runway',
+      currency: 'NZD',
+      latestValue: 6.47,
+      points: history.points.map((point, index) => ({ ...point, value: 6 + index * 0.47 })),
+    }
+    const adjustedRunway = {
+      ...cashRunway,
+      runwayVariant: 'working_capital_adjusted',
+      label: 'Working-capital-adjusted runway',
+      latestValue: 6.59,
+      points: history.points.map((point, index) => ({ ...point, value: 6.1 + index * 0.49 })),
+    }
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: {
+          ...historyCollection,
+          metricKey: 'runway_months',
+          label: 'Runway',
+          series: [cashRunway, adjustedRunway],
+        },
+      }),
+    })
+
+    render(<HistoricalMetricsChart refreshKey="runway" />)
+    fireEvent.mouseDown(screen.getByLabelText('Financial metric'))
+    fireEvent.click(await screen.findByRole('option', { name: 'Runway' }))
+
+    const controls = await screen.findByRole('group', { name: 'Runway plots' })
+    expect(within(controls).getByRole('button', { name: 'Both' })).toBeInTheDocument()
+    expect(screen.getByText('Latest cash runway')).toBeInTheDocument()
+    expect(screen.getByText('Latest working-capital-adjusted runway')).toBeInTheDocument()
+
+    fireEvent.click(within(controls).getByRole('button', { name: 'Cash runway' }))
+    expect(screen.getByText('Latest cash runway')).toBeInTheDocument()
+    expect(screen.queryByText('Latest working-capital-adjusted runway')).not.toBeInTheDocument()
   })
 })

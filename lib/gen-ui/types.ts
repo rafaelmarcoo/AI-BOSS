@@ -21,6 +21,19 @@ export type GenUiWidgetType = (typeof GEN_UI_WIDGET_TYPES)[number]
 
 export type GenUiSource = 'chat' | 'selection'
 
+export type GenUiMetricDateStatus =
+  | 'latest_recorded'
+  | 'calculated_for'
+  | 'unavailable_for'
+  | 'undated'
+
+export type GenUiMetricCalculationRole =
+  | 'used'
+  | 'compatible_input'
+  | 'context_only'
+  | 'derived'
+  | 'unavailable'
+
 export interface GenUiWidgetBase {
   id: string
   type: GenUiWidgetType
@@ -33,11 +46,16 @@ export interface MetricSnapshotWidget extends GenUiWidgetBase {
   data: {
     metrics: Array<{
       key: FinancialMetricKey
+      runwayVariant?: 'cash' | 'working_capital_adjusted'
       label: string
       value: string
       unit: string | null
       sourceLabel: string
       sourceTone: 'available' | 'unavailable' | 'derived'
+      reportingDate?: string | null
+      dateStatus?: GenUiMetricDateStatus
+      calculationRole?: GenUiMetricCalculationRole
+      detail?: string | null
     }>
   }
 }
@@ -66,6 +84,16 @@ export interface MetricTrendChartWidget extends GenUiWidgetBase {
     hasMixedSources: boolean
     hasRecordedDateFallback: boolean
     note: string
+    runwaySeries?: Array<{
+      variant: 'cash' | 'working_capital_adjusted'
+      label: string
+      points: Array<{
+        date: string
+        value: number
+        sourceLabel: string
+        confidence: number
+      }>
+    }>
   }
 }
 
@@ -90,6 +118,17 @@ export interface MetricForecastChartWidget extends GenUiWidgetBase {
     hasMixedSources: boolean
     hasRecordedDateFallback: boolean
     note: string
+    runwaySeries?: Array<{
+      variant: 'cash' | 'working_capital_adjusted'
+      label: string
+      actualPoints: Array<{
+        date: string
+        value: number
+        sourceLabel: string
+        confidence: number
+      }>
+      forecastPoints: Array<{ date: string; value: number }>
+    }>
   }
 }
 
@@ -135,6 +174,7 @@ export interface RiskThresholdTimelineWidget extends GenUiWidgetBase {
   type: 'risk_threshold_timeline'
   data: {
     currentRunway: number | null
+    workingCapitalAdjustedRunway?: number | null
     monthsUntilCaution: number | null
     monthsUntilUrgent: number | null
     status: 'urgent' | 'caution' | 'healthy' | 'unknown'
@@ -152,6 +192,10 @@ export interface MetricSourceEvidenceWidget extends GenUiWidgetBase {
       sourceType: string
       confidence: number | null
       tone: 'available' | 'unavailable' | 'derived'
+      reportingDate?: string | null
+      dateStatus?: GenUiMetricDateStatus
+      calculationRole?: GenUiMetricCalculationRole
+      detail?: string | null
     }>
   }
 }
@@ -191,4 +235,11 @@ export interface GenUiPlan {
   generatedAt: string
   summary: string
   widgets: GenUiWidget[]
+  /** Optional for backward compatibility with plans saved before review mode. */
+  workspaceMode?: 'financial' | 'document_review'
+  /** Review state captured when a document-evidence answer was generated. */
+  documentReviewSnapshot?: {
+    documentIds: string[]
+    statusAtGeneration: 'pending'
+  }
 }

@@ -10,7 +10,11 @@ export {
   isUnavailableMetric,
 } from '@/lib/financial-data/metrics'
 export {
+  buildCalculatedRunwayMetric,
+  buildWorkingCapitalAdjustedRunwayMetric,
   buildRunwayInputFromMetrics,
+  buildUnavailableRunwayMetric,
+  buildUnavailableWorkingCapitalAdjustedRunwayMetric,
   fillUnavailableMetrics,
   getSharedSupportedCurrency,
   summarizeMetricAvailability,
@@ -62,6 +66,11 @@ export {
   summarizeMetricForecast,
   summarizeMetricForecastSeries,
 } from '@/lib/financial-data/metric-forecast'
+export { backtestMetricForecasts } from '@/lib/financial-data/forecast-backtest'
+export type {
+  ForecastBacktestPoint,
+  ForecastBacktestSeries,
+} from '@/lib/financial-data/forecast-backtest'
 export type {
   ForecastHorizon,
   MetricForecastPoint,

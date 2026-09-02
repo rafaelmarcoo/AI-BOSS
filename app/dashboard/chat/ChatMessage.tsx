@@ -18,7 +18,7 @@ const assistantMarkdownSx = {
     mt: 0.75,
     mb: 0.35,
   },
-  "& h1:first-child, & h2:first-child, & h3:first-child, & h4:first-child": {
+  "& h1:first-of-type, & h2:first-of-type, & h3:first-of-type, & h4:first-of-type": {
     mt: 0,
   },
 };

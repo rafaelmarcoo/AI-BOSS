@@ -14,6 +14,7 @@ export function createUnavailableMetric(params: {
   sourceType?: FinancialMetricSourceType | null
   sourceLabel?: string | null
   updatedAt?: string | null
+  detail?: string
 }): UnavailableFinancialMetricValue {
   return {
     status: 'unavailable',
@@ -22,6 +23,7 @@ export function createUnavailableMetric(params: {
     sourceType: params.sourceType ?? null,
     sourceLabel: params.sourceLabel ?? null,
     updatedAt: params.updatedAt ?? null,
+    ...(params.detail ? { detail: params.detail } : {}),
   }
 }
 

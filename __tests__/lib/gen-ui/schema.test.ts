@@ -8,6 +8,11 @@ describe('Gen UI plan schema', () => {
       source: 'chat',
       generatedAt: '2026-07-19T00:00:00.000Z',
       summary: 'Generated from the latest AI-BOSS chat turn.',
+      workspaceMode: 'document_review',
+      documentReviewSnapshot: {
+        documentIds: ['9d36fa7e-77a3-49dc-be8c-5074a80797db'],
+        statusAtGeneration: 'pending',
+      },
       widgets: [
         {
           id: 'metric-1',
@@ -81,5 +86,34 @@ describe('Gen UI plan schema', () => {
         ],
       }).success
     ).toBe(false)
+  })
+
+  it('accepts optional metric date and calculation-role context', () => {
+    expect(GenUiPlanSchema.safeParse({
+      version: GEN_UI_PLAN_VERSION,
+      source: 'chat',
+      generatedAt: '2026-09-02T00:00:00.000Z',
+      summary: 'Date-aware metric context.',
+      widgets: [{
+        id: 'metric-1',
+        type: 'metric_snapshot',
+        title: 'Runway inputs',
+        reason: 'Date-aware context.',
+        data: {
+          metrics: [{
+            key: 'accounts_receivable',
+            label: 'Accounts receivable',
+            value: 'NZD 18,000',
+            unit: null,
+            sourceLabel: 'Document: finance.csv',
+            sourceTone: 'available',
+            reportingDate: '2026-04-30',
+            dateStatus: 'latest_recorded',
+            calculationRole: 'context_only',
+            detail: 'Does not match the 2026-05-31 runway calculation date.',
+          }],
+        },
+      }],
+    }).success).toBe(true)
   })
 })

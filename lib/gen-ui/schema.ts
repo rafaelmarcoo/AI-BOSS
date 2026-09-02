@@ -18,11 +18,20 @@ const MetricSnapshotWidgetSchema = WidgetBaseSchema.extend({
     metrics: z.array(
       z.object({
         key: z.enum(FINANCIAL_METRIC_KEYS),
+        runwayVariant: z.enum(['cash', 'working_capital_adjusted']).optional(),
         label: z.string(),
         value: z.string(),
         unit: z.string().nullable(),
         sourceLabel: z.string(),
         sourceTone: z.enum(['available', 'unavailable', 'derived']),
+        reportingDate: z.string().nullable().optional(),
+        dateStatus: z
+          .enum(['latest_recorded', 'calculated_for', 'unavailable_for', 'undated'])
+          .optional(),
+        calculationRole: z
+          .enum(['used', 'compatible_input', 'context_only', 'derived', 'unavailable'])
+          .optional(),
+        detail: z.string().nullable().optional(),
       })
     ).max(4),
   }),
@@ -54,6 +63,16 @@ const MetricTrendChartWidgetSchema = WidgetBaseSchema.extend({
     hasMixedSources: z.boolean(),
     hasRecordedDateFallback: z.boolean(),
     note: z.string(),
+    runwaySeries: z.array(z.object({
+      variant: z.enum(['cash', 'working_capital_adjusted']),
+      label: z.string(),
+      points: z.array(z.object({
+        date: z.string(),
+        value: z.number(),
+        sourceLabel: z.string(),
+        confidence: z.number(),
+      })),
+    })).optional(),
   }),
 })
 
@@ -77,6 +96,17 @@ const MetricForecastChartWidgetSchema = WidgetBaseSchema.extend({
     hasMixedSources: z.boolean(),
     hasRecordedDateFallback: z.boolean(),
     note: z.string(),
+    runwaySeries: z.array(z.object({
+      variant: z.enum(['cash', 'working_capital_adjusted']),
+      label: z.string(),
+      actualPoints: z.array(z.object({
+        date: z.string(),
+        value: z.number(),
+        sourceLabel: z.string(),
+        confidence: z.number(),
+      })),
+      forecastPoints: z.array(z.object({ date: z.string(), value: z.number() })),
+    })).optional(),
   }),
 })
 
@@ -126,6 +156,7 @@ const RiskThresholdTimelineWidgetSchema = WidgetBaseSchema.extend({
   type: z.literal('risk_threshold_timeline'),
   data: z.object({
     currentRunway: z.number().nullable(),
+    workingCapitalAdjustedRunway: z.number().nullable().optional(),
     monthsUntilCaution: z.number().nullable(),
     monthsUntilUrgent: z.number().nullable(),
     status: z.enum(['urgent', 'caution', 'healthy', 'unknown']),
@@ -144,6 +175,14 @@ const MetricSourceEvidenceWidgetSchema = WidgetBaseSchema.extend({
         sourceType: z.string(),
         confidence: z.number().nullable(),
         tone: z.enum(['available', 'unavailable', 'derived']),
+        reportingDate: z.string().nullable().optional(),
+        dateStatus: z
+          .enum(['latest_recorded', 'calculated_for', 'unavailable_for', 'undated'])
+          .optional(),
+        calculationRole: z
+          .enum(['used', 'compatible_input', 'context_only', 'derived', 'unavailable'])
+          .optional(),
+        detail: z.string().nullable().optional(),
       })
     ),
   }),
@@ -185,6 +224,11 @@ export const GenUiPlanSchema = z.object({
   generatedAt: z.string(),
   summary: z.string(),
   widgets: z.array(GenUiWidgetSchema).max(4),
+  workspaceMode: z.enum(['financial', 'document_review']).optional(),
+  documentReviewSnapshot: z.object({
+    documentIds: z.array(z.string().uuid()).min(1),
+    statusAtGeneration: z.literal('pending'),
+  }).optional(),
 })
 
 export function parseGenUiPlan(input: unknown): GenUiPlan | null {

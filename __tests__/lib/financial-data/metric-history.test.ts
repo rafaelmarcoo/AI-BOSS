@@ -195,6 +195,26 @@ describe('summarizeMetricHistorySeries', () => {
     expect(collection.series[0].points.map((point) => point.value)).toEqual([200, 220])
   })
 
+  it('keeps derived runway histories separate by source and currency', () => {
+    const collection = summarizeMetricHistorySeries({
+      metricKey: 'runway_months',
+      range: 'all',
+      observations: [
+        observation({ key: 'runway_months', value: 6, asOfDate: '2026-05-01', currency: 'NZD', sourceId: 'nzd-cash-runway', sourceLabel: 'NZD.csv — NZD (cash runway calculated)' }),
+        observation({ key: 'runway_months', value: 5, asOfDate: '2026-06-01', currency: 'NZD', sourceId: 'nzd-cash-runway', sourceLabel: 'NZD.csv — NZD (cash runway calculated)' }),
+        observation({ key: 'runway_months', value: 8, asOfDate: '2026-05-01', currency: 'AUD', sourceId: 'aud-cash-runway', sourceLabel: 'AUD.csv — AUD (cash runway calculated)' }),
+        observation({ key: 'runway_months', value: 9, asOfDate: '2026-06-01', currency: 'AUD', sourceId: 'aud-cash-runway', sourceLabel: 'AUD.csv — AUD (cash runway calculated)' }),
+      ],
+    })
+
+    expect(collection.label).toBe('Runway')
+    expect(collection.series).toHaveLength(2)
+    expect(collection.series).toEqual(expect.arrayContaining([
+      expect.objectContaining({ currency: 'NZD', sourceLabels: ['NZD.csv — NZD (cash runway calculated)'] }),
+      expect.objectContaining({ currency: 'AUD', sourceLabels: ['AUD.csv — AUD (cash runway calculated)'] }),
+    ]))
+  })
+
   it('supports a configurable record limit and a true all-records view', () => {
     const observations = Array.from({ length: 15 }, (_, index) =>
       observation({

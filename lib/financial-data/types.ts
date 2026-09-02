@@ -15,6 +15,10 @@ export type FinancialMetricAvailabilityReason =
   | 'not_provided'
   | 'insufficient_data'
   | 'unsupported_source'
+  | 'incompatible_currency'
+  | 'incompatible_source'
+  | 'incompatible_reporting_date'
+  | 'invalid_input'
 
 export interface FinancialMetricEvidence {
   documentId?: string
@@ -54,6 +58,7 @@ export interface UnavailableFinancialMetricValue {
   sourceType: FinancialMetricSourceType | null
   sourceLabel: string | null
   updatedAt: string | null
+  detail?: string
 }
 
 export type FinancialMetricValue =

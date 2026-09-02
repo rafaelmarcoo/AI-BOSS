@@ -20,29 +20,44 @@ export interface RunwayBreakdown {
   monthlyBurnRate: number
   netAvailableCash: number
   formula: string
+  workingCapitalAdjustedFormula: string
 }
 
 export interface RunwayResult {
+  /** Primary, conservative cash runway. Kept as the canonical compatibility field. */
   runway_months: number
+  cash_runway_months: number
+  working_capital_adjusted_runway_months: number
   calculation_breakdown: RunwayBreakdown
   policy: RunwayPolicy
+  working_capital_adjusted_policy: RunwayPolicy
 }
 
 export function calculateRunway(input: RunwayInput): RunwayResult {
   const { cash, ar, ap, burn } = RunwayInputSchema.parse(input)
   const netAvailableCash = cash + ar - ap
-  const runwayMonths = parseFloat((netAvailableCash / burn).toFixed(2))
+  const cashRunwayMonths = parseFloat((cash / burn).toFixed(2))
+  const workingCapitalAdjustedRunwayMonths = parseFloat(
+    (netAvailableCash / burn).toFixed(2)
+  )
 
   return {
-    runway_months: runwayMonths,
+    runway_months: cashRunwayMonths,
+    cash_runway_months: cashRunwayMonths,
+    working_capital_adjusted_runway_months:
+      workingCapitalAdjustedRunwayMonths,
     calculation_breakdown: {
       cash,
       accountsReceivable: ar,
       accountsPayable: ap,
       monthlyBurnRate: burn,
       netAvailableCash,
-      formula: `(${cash} + ${ar} - ${ap}) / ${burn} = ${runwayMonths} months`,
+      formula: `${cash} / ${burn} = ${cashRunwayMonths} months`,
+      workingCapitalAdjustedFormula: `(${cash} + ${ar} - ${ap}) / ${burn} = ${workingCapitalAdjustedRunwayMonths} months`,
     },
-    policy: assessRunwayPolicy(runwayMonths),
+    policy: assessRunwayPolicy(cashRunwayMonths),
+    working_capital_adjusted_policy: assessRunwayPolicy(
+      workingCapitalAdjustedRunwayMonths
+    ),
   }
 }

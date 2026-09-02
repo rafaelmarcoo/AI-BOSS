@@ -11,34 +11,39 @@ export function createGetRunwayHistoryTool(
   return {
     name: 'get_runway_history',
     description:
-      'Describe historical runway movement from runway_months observations. Use this when the user asks whether runway is improving, declining, or changing over time.',
+      'Describe derived historical cash runway and working-capital-adjusted runway from compatible confirmed observations. Each point requires one source, currency, and reporting date; values are never silently combined.',
     inputSchema: z.object({}),
     async handler() {
       const summary = await readRunwayObservationHistory(userId)
 
-      if (summary.observations.length === 0) {
-        return 'No runway history is available yet. Upload CSVs that include runway months to build history.'
+      if (
+        summary.observations.length === 0 &&
+        summary.workingCapitalAdjusted.observations.length === 0
+      ) {
+        return 'No derived runway history is available yet. Confirm dated cash and burn values from one source and currency; receivables and payables are also required for the adjusted series.'
       }
 
-      const lines = [
-        `Runway history from ${summary.observations.length} observation(s):`,
-      ]
-
-      for (const metric of summary.observations) {
-        lines.push(
-          `- ${getMetricObservationDate(metric)}: ${metric.value} months ` +
-            `(source: ${metric.provenance.sourceLabel}, confidence: ${Math.round(metric.confidence * 100)}%)`
-        )
-      }
-
-      if (summary.direction === 'insufficient_data') {
-        lines.push('At least 2 runway observations are needed to describe a trend.')
-      } else if (summary.direction === 'stable') {
-        lines.push('Trend: runway has stayed flat across these observations.')
-      } else {
-        lines.push(
-          `Trend: runway is ${summary.direction}; total change is ${summary.change} months.`
-        )
+      const lines: string[] = []
+      for (const [label, trend] of [
+        ['Cash runway', summary],
+        ['Working-capital-adjusted runway', summary.workingCapitalAdjusted],
+      ] as const) {
+        lines.push(`${label} history from ${trend.observations.length} calculated point(s):`)
+        for (const metric of trend.observations) {
+          lines.push(
+            `- ${getMetricObservationDate(metric)}: ${metric.value} months ` +
+              `(source: ${metric.provenance.sourceLabel}, confidence: ${Math.round(metric.confidence * 100)}%)`
+          )
+        }
+        if (trend.direction === 'insufficient_data') {
+          lines.push(`At least 2 compatible ${label.toLowerCase()} points are needed to describe a trend.`)
+        } else if (trend.direction === 'stable') {
+          lines.push(`Trend: ${label.toLowerCase()} has stayed flat.`)
+        } else {
+          lines.push(
+            `Trend: ${label.toLowerCase()} is ${trend.direction}; total change is ${trend.change} months.`
+          )
+        }
       }
 
       return lines.join('\n')

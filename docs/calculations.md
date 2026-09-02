@@ -2,7 +2,12 @@
 
 ## Runway Calculation
 
-**Formula:** `runway_months = (cash + AR - AP) / monthly_burn_rate`
+AI-BOSS presents two distinct deterministic measures:
+
+- **Primary cash runway:** `cash_runway_months = cash / monthly_burn_rate`
+- **Working-capital-adjusted runway:** `working_capital_adjusted_runway_months = (cash + AR - AP) / monthly_burn_rate`
+
+The compatibility field `runway_months` contains the primary cash-runway value.
 
 **Implemented in:** `lib/calculations/runway.ts` — `calculateRunway()`
 **Persistence service:** `lib/services/runway-service.ts`
@@ -24,14 +29,16 @@
 
 | Field | Description |
 |-------|-------------|
-| `runway_months` | How many months of runway remain (2 decimal places) |
-| `calculation_breakdown` | Step-by-step breakdown including each input and the formula string |
+| `runway_months` | Primary cash runway in months (2 decimal places) |
+| `cash_runway_months` | Explicit primary cash-runway value |
+| `working_capital_adjusted_runway_months` | Secondary runway after adding receivables and subtracting payables |
+| `calculation_breakdown` | Inputs plus both deterministic formula strings |
 
 ---
 
-### Why AR and AP are included
+### Why the measures are separate
 
-Cash alone understates available liquidity. AR is money already earned that will convert to cash shortly. AP is an obligation that will reduce cash shortly. Including both gives a more accurate picture of net available cash before dividing by burn rate.
+Cash runway is the conservative headline because cash on hand can fund operations immediately. The adjusted measure is secondary because it assumes receivables are collected and payables are settled on the represented timing. AI-BOSS labels it explicitly instead of silently treating those assumptions as cash.
 
 ---
 
@@ -39,7 +46,8 @@ Cash alone understates available liquidity. AR is money already earned that will
 
 - `burn` must be greater than zero — division by zero is rejected with an error
 - `cash`, `ar`, and `ap` must be non-negative — negative values are rejected with an error
-- A **negative** `runway_months` result is valid — it means liabilities already exceed available cash (business is already insolvent)
+- Primary cash runway cannot be negative because cash inputs are non-negative
+- A negative **working-capital-adjusted runway** is valid and means payables exceed cash plus receivables
 
 ---
 
@@ -51,17 +59,19 @@ Runway calculation is shared across two consumers:
 - the chat agent tool, which reuses the shared runway calculation operation
 
 Historical analysis uses `financial_metric_observations`, rather than legacy
-snapshot rows. It supports cash, monthly revenue, monthly expenses, burn rate,
-and runway observations. The analysis is deterministic: it prioritises financial
-reporting dates, preserves source labels, warns when sources are mixed, and does
-not compare values across different currencies.
+snapshot rows. Historical cash runway is calculated on read for each reporting
+date where confirmed cash and burn match exactly on source and currency.
+Working-capital-adjusted history additionally requires matching receivables and
+payables. Derived runway points are not written back as observations. Incomplete
+dates are skipped and sources or currencies are never silently combined.
 
 ## Currency Safety
 
 The MVP supports NZD and AUD monetary observations. Values keep their recorded
 currency code and are never silently converted, added, or compared across
-currencies. Runway inputs are accepted only when cash, accounts receivable,
-accounts payable, and monthly burn all use the same supported currency.
+currencies. Primary cash runway requires cash and burn to share one supported
+currency, source, and reporting date. The adjusted measure applies the same
+boundary to cash, accounts receivable, accounts payable, and burn.
 
 Historical and forecast calculations exclude monetary observations whose
 currency is missing or unsupported, while keeping the uploaded document

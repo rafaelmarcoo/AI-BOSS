@@ -10,7 +10,11 @@ export {
   isUnavailableMetric,
 } from '@/lib/financial-data/metrics'
 export {
+  buildCalculatedRunwayMetric,
+  buildWorkingCapitalAdjustedRunwayMetric,
   buildRunwayInputFromMetrics,
+  buildUnavailableRunwayMetric,
+  buildUnavailableWorkingCapitalAdjustedRunwayMetric,
   fillUnavailableMetrics,
   getSharedSupportedCurrency,
   summarizeMetricAvailability,

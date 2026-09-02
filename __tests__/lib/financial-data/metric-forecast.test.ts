@@ -70,6 +70,25 @@ describe('summarizeMetricForecast', () => {
     expect(summary.forecastPoints.at(-1)?.date).toBe('2026-08-01')
   })
 
+  it('preserves month-end reporting dates without skipping shorter months', () => {
+    const summary = forecast({
+      horizon: 6,
+      observations: [
+        observation({ key: 'runway_months', value: 6, asOfDate: '2026-04-30', currency: null }),
+        observation({ key: 'runway_months', value: 6.5, asOfDate: '2026-05-31', currency: null }),
+      ],
+    })
+
+    expect(summary.forecastPoints.map((point) => point.date)).toEqual([
+      '2026-06-30',
+      '2026-07-31',
+      '2026-08-31',
+      '2026-09-30',
+      '2026-10-31',
+      '2026-11-30',
+    ])
+  })
+
   it('never forecasts runway below zero', () => {
     const summary = forecast({
       key: 'runway_months',

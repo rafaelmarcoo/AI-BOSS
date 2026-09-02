@@ -319,7 +319,7 @@ owner's corrections and include/exclude decision.
 | reviewed_payload | JSONB | Submitted corrections and final decision |
 | metric_key | TEXT | Canonical supported metric, nullable while pending |
 | value | NUMERIC(18,4) | Canonical reviewed value |
-| currency | TEXT | Canonical `NZD` or `AUD` currency |
+| currency | TEXT | Canonical `NZD` or `AUD` for monetary metrics; `NULL` for unit-based `runway_months` |
 | reporting_date | DATE | Canonical reviewed reporting date |
 | confidence | NUMERIC(4,3) | Extractor confidence from 0 to 1 |
 | evidence | JSONB | Source page, sheet, row, cell range, and excerpt evidence |
@@ -448,7 +448,7 @@ are published only from included candidates through `confirm_document_extraction
 | document_id | UUID (FK) | Optional uploaded document source |
 | metric_key | TEXT | Canonical key: `cash`, `accounts_receivable`, `accounts_payable`, `monthly_revenue`, `monthly_expenses`, `burn_rate`, or `runway_months` |
 | value | NUMERIC(18,4) | Normalized metric value |
-| currency | TEXT | Optional ISO currency code such as `NZD` or `AUD` |
+| currency | TEXT | `NZD` or `AUD` for monetary metrics; `NULL` for unit-based `runway_months` |
 | period_start | DATE | Optional period start for period-based metrics |
 | period_end | DATE | Optional period end for period-based metrics |
 | as_of_date | DATE | Optional point-in-time date for balance metrics |
@@ -548,6 +548,7 @@ All schema changes are tracked in `db/migrations/`:
 - `013_delete_document_and_derived_metrics.sql` - Adds atomic owner-only cleanup of a document and its document-derived financial observations
 - `014_saved_scenarios.sql` - Adds private drafts, company-visible calculated scenarios, result snapshots, and stale-data fingerprints
 - `015_document_extraction_review.sql` - Adds XLSX document support, separate financial review state, versioned extraction runs/candidates, owner-protected review evidence, and transactional publication of user-confirmed observations
+- `016_runway_currency_unit.sql` - Enforces currency-free `runway_months` candidates during transactional confirmation while retaining source currency in original audit evidence
 
 ---
 

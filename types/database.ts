@@ -124,6 +124,7 @@ export interface DocumentExtractionCandidate {
   reviewed_payload: Record<string, unknown> | null
   metric_key: FinancialMetricKey | null
   value: number | null
+  /** NZD/AUD for monetary metrics; null when metric_key is runway_months. */
   currency: 'NZD' | 'AUD' | null
   reporting_date: string | null
   confidence: number | null
@@ -213,6 +214,7 @@ export interface FinancialMetricObservation {
   document_id: string | null
   metric_key: FinancialMetricKey
   value: number
+  /** Currency for monetary observations; null for unit-based runway_months. */
   currency: string | null
   period_start: string | null
   period_end: string | null

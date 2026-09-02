@@ -53,12 +53,19 @@ describe('planGenUi', () => {
       availableMetricCount: 0,
       unavailableMetricCount: Object.keys(metrics).length,
       runwayInput: null,
+      workingCapitalAdjustedRunway: metrics.runway_months,
     })
     mockReadRunwayObservationHistory.mockResolvedValue({
       observations: [],
       direction: 'insufficient_data',
       change: null,
       averageChange: null,
+      workingCapitalAdjusted: {
+        observations: [],
+        direction: 'insufficient_data',
+        change: null,
+        averageChange: null,
+      },
     })
     mockReadFinancialMetricHistorySeries.mockResolvedValue({
       metricKey: 'cash',
@@ -140,6 +147,274 @@ describe('planGenUi', () => {
     })
 
     expect(plan).toBeNull()
+  })
+
+  it('limits unreviewed document evidence to a focused review workspace', async () => {
+    const plan = await planGenUi({
+      userId: 'user-123',
+      userMessage: 'What does 01-valid-nzd-history.csv say about cash?',
+      assistantMessage: 'The unreviewed document lists three exact cash values.',
+      toolsUsed: [],
+      hasUnreviewedDocumentEvidence: true,
+      unreviewedDocumentIds: ['9d36fa7e-77a3-49dc-be8c-5074a80797db'],
+    })
+
+    expect(plan).toMatchObject({
+      workspaceMode: 'document_review',
+      documentReviewSnapshot: {
+        documentIds: ['9d36fa7e-77a3-49dc-be8c-5074a80797db'],
+        statusAtGeneration: 'pending',
+      },
+      widgets: [
+        expect.objectContaining({
+          type: 'data_connections',
+          title: 'Review document values',
+        }),
+      ],
+    })
+    expect(mockChatOpenAI).not.toHaveBeenCalled()
+    expect(mockReadSourceAwareMetrics).not.toHaveBeenCalled()
+    expect(mockReadRunwayObservationHistory).not.toHaveBeenCalled()
+    expect(mockReadFinancialMetricHistorySeries).not.toHaveBeenCalled()
+  })
+
+  it('shows deterministically calculated runway as available source evidence', async () => {
+    const calculatedRunway = {
+      status: 'available' as const,
+      key: 'runway_months' as const,
+      value: 4.71,
+      currency: null,
+      periodStart: null,
+      periodEnd: null,
+      asOfDate: '2026-05-31',
+      provenance: {
+        sourceType: 'document' as const,
+        sourceLabel: '01-valid-nzd-history.csv (cash runway calculated)',
+        sourceId: 'document-123',
+        evidence: {
+          excerpt: '80000 / 17000 = 4.71 months',
+        },
+      },
+      confidence: 0.95,
+      updatedAt: '2026-05-31T00:00:00.000Z',
+    }
+    const adjustedRunway = {
+      ...calculatedRunway,
+      value: 4.82,
+      provenance: {
+        ...calculatedRunway.provenance,
+        sourceLabel:
+          '01-valid-nzd-history.csv (working-capital-adjusted runway calculated)',
+        evidence: {
+          excerpt: '(80000 + 16000 - 14000) / 17000 = 4.82 months',
+        },
+      },
+    }
+    const metrics = fillUnavailableMetrics({ runway_months: calculatedRunway })
+    mockReadSourceAwareMetrics.mockResolvedValue({
+      metrics,
+      availableMetricCount: 1,
+      unavailableMetricCount: 6,
+      runwayInput: { cash: 80000, ar: 16000, ap: 14000, burn: 17000 },
+      workingCapitalAdjustedRunway: adjustedRunway,
+    })
+    mockPlannerInvoke.mockResolvedValue({
+      widgets: [{
+        type: 'metric_source_evidence',
+        title: 'Source evidence',
+        reason: 'Show the confirmed calculation source.',
+        metricKeys: null,
+      }],
+    })
+
+    const plan = await planGenUi({
+      userId: 'user-123',
+      userMessage: 'Show my current financial sources.',
+      assistantMessage: 'Current values are confirmed.',
+      toolsUsed: [],
+    })
+
+    expect(plan?.widgets[0]).toMatchObject({
+      type: 'metric_source_evidence',
+      data: {
+        metrics: expect.arrayContaining([
+          expect.objectContaining({
+            label: 'Cash runway',
+            value: '4.71 months',
+            sourceLabel: '01-valid-nzd-history.csv (cash runway calculated)',
+            tone: 'derived',
+          }),
+          expect.objectContaining({
+            label: 'Working-capital-adjusted runway',
+            value: '4.82 months',
+            tone: 'derived',
+          }),
+        ]),
+      },
+    })
+  })
+
+  it('labels dated runway inputs as used, compatible, contextual, or unavailable', async () => {
+    const metric = (
+      key:
+        | 'cash'
+        | 'accounts_receivable'
+        | 'accounts_payable'
+        | 'burn_rate'
+        | 'monthly_expenses',
+      value: number,
+      asOfDate: string
+    ) => ({
+      status: 'available' as const,
+      key,
+      value,
+      currency: 'NZD',
+      periodStart: null,
+      periodEnd: null,
+      asOfDate,
+      provenance: {
+        sourceType: 'document' as const,
+        sourceLabel: '01-valid-nzd-history.csv',
+        sourceId: 'document-123',
+      },
+      confidence: 0.95,
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    })
+    const cashRunway = {
+      status: 'available' as const,
+      key: 'runway_months' as const,
+      value: 5.88,
+      currency: null,
+      periodStart: null,
+      periodEnd: null,
+      asOfDate: '2026-05-31',
+      provenance: {
+        sourceType: 'document' as const,
+        sourceLabel: '01-valid-nzd-history.csv (cash runway calculated)',
+        sourceId: 'document-123',
+      },
+      confidence: 0.95,
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    }
+    const metrics = fillUnavailableMetrics({
+      cash: metric('cash', 100000, '2026-05-31'),
+      accounts_receivable: metric('accounts_receivable', 18000, '2026-04-30'),
+      accounts_payable: metric('accounts_payable', 14000, '2026-05-31'),
+      burn_rate: metric('burn_rate', 17000, '2026-05-31'),
+      monthly_expenses: metric('monthly_expenses', 63000, '2026-05-31'),
+      runway_months: cashRunway,
+    })
+    mockReadSourceAwareMetrics.mockResolvedValue({
+      metrics,
+      availableMetricCount: 6,
+      unavailableMetricCount: 1,
+      runwayInput: null,
+      workingCapitalAdjustedRunway: {
+        status: 'unavailable',
+        key: 'runway_months',
+        reason: 'incompatible_reporting_date',
+        sourceType: null,
+        sourceLabel: null,
+        updatedAt: null,
+        detail:
+          'Cannot calculate working-capital-adjusted runway because accounts receivable for 2026-05-31 was explicitly excluded during document review.',
+      },
+    })
+    mockPlannerInvoke.mockResolvedValue({
+      widgets: [
+        {
+          type: 'metric_snapshot',
+          title: 'Runway values',
+          reason: 'All of these values were used in the calculation.',
+          metricKeys: [
+            'cash',
+            'monthly_expenses',
+            'accounts_receivable',
+            'runway_months',
+          ],
+        },
+        {
+          type: 'metric_source_evidence',
+          title: 'Source and dates',
+          reason: 'All values were used.',
+          metricKeys: null,
+        },
+      ],
+    })
+
+    const plan = await planGenUi({
+      userId: 'user-123',
+      userMessage:
+        'Calculate both my cash runway and working-capital-adjusted runway.',
+      assistantMessage: 'Cash runway is 5.88 months; adjusted runway is unavailable.',
+      toolsUsed: [],
+    })
+
+    expect(plan?.widgets[0]).toMatchObject({
+      type: 'metric_snapshot',
+      reason: expect.stringContaining('reporting dates'),
+      data: {
+        metrics: expect.arrayContaining([
+          expect.objectContaining({
+            key: 'cash',
+            reportingDate: '2026-05-31',
+            dateStatus: 'latest_recorded',
+            calculationRole: 'used',
+          }),
+          expect.objectContaining({
+            key: 'burn_rate',
+            reportingDate: '2026-05-31',
+            calculationRole: 'used',
+          }),
+          expect.objectContaining({
+            key: 'runway_months',
+            reportingDate: '2026-05-31',
+            dateStatus: 'calculated_for',
+            calculationRole: 'derived',
+          }),
+          expect.objectContaining({
+            key: 'runway_months',
+            runwayVariant: 'working_capital_adjusted',
+            reportingDate: '2026-05-31',
+            calculationRole: 'unavailable',
+          }),
+        ]),
+      },
+    })
+    expect(
+      plan?.widgets[0].type === 'metric_snapshot'
+        ? plan.widgets[0].data.metrics.map((metric) => metric.key)
+        : []
+    ).toEqual(['cash', 'burn_rate', 'runway_months', 'runway_months'])
+    expect(
+      plan?.widgets[0].type === 'metric_snapshot'
+        ? plan.widgets[0].data.metrics
+        : []
+    ).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'monthly_expenses' }),
+      ])
+    )
+    expect(plan?.widgets[0].reason).not.toContain('All of these values were used')
+    expect(plan?.widgets[1]).toMatchObject({
+      type: 'metric_source_evidence',
+      data: {
+        metrics: expect.arrayContaining([
+          expect.objectContaining({
+            label: 'Accounts receivable',
+            reportingDate: '2026-04-30',
+            calculationRole: 'context_only',
+          }),
+          expect.objectContaining({
+            label: 'Working-capital-adjusted runway',
+            reportingDate: '2026-05-31',
+            dateStatus: 'unavailable_for',
+            calculationRole: 'unavailable',
+            detail: expect.stringContaining('explicitly excluded'),
+          }),
+        ]),
+      },
+    })
   })
 
   it('uses deterministic selection only when model planning fails', async () => {

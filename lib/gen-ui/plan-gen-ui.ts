@@ -33,6 +33,9 @@ import {
   type GenUiSource,
   type GenUiWidget,
   type GenUiWidgetType,
+  type MetricSnapshotWidget,
+  type GenUiMetricCalculationRole,
+  type GenUiMetricDateStatus,
 } from '@/lib/gen-ui/types'
 import type { AgentToolExecution, AgentToolUsage } from '@/lib/ai/agent'
 import type { SourceAwareMetricReadResult } from '@/lib/financial-data/read-model'
@@ -86,6 +89,8 @@ interface PlanGenUiParams {
   toolsUsed: AgentToolUsage[]
   toolExecutions?: AgentToolExecution[]
   scenarioMode?: boolean
+  hasUnreviewedDocumentEvidence?: boolean
+  unreviewedDocumentIds?: string[]
 }
 
 interface GenUiDataContext {
@@ -97,6 +102,92 @@ interface GenUiDataContext {
   metricHistories: MetricHistorySummary[]
   metricForecasts: MetricForecastSummary[]
   scenarioResult: ScenarioAnalysisResult | null
+}
+
+function metricReportingDate(
+  metric: SourceAwareMetricReadResult['metrics'][FinancialMetricKey]
+) {
+  return isAvailableMetric(metric)
+    ? metric.asOfDate ?? metric.periodEnd ?? metric.periodStart
+    : null
+}
+
+function runwayReferenceDate(snapshot: SourceAwareMetricReadResult) {
+  const runway = snapshot.metrics.runway_months
+  const cash = snapshot.metrics.cash
+
+  return metricReportingDate(runway) ?? metricReportingDate(cash)
+}
+
+function metricDisplayContext(params: {
+  key: FinancialMetricKey
+  context: GenUiDataContext
+  adjustedRunway?: boolean
+}) {
+  const metric = params.adjustedRunway
+    ? params.context.snapshot.workingCapitalAdjustedRunway
+    : params.context.snapshot.metrics[params.key]
+  const runwayQuestion = /\brunway\b/i.test(params.context.userMessage)
+  const referenceDate = runwayReferenceDate(params.context.snapshot)
+
+  if (!isAvailableMetric(metric)) {
+    return {
+      reportingDate: params.adjustedRunway ? referenceDate : null,
+      dateStatus: (params.adjustedRunway && referenceDate
+        ? 'unavailable_for'
+        : 'undated') as GenUiMetricDateStatus,
+      calculationRole: 'unavailable' as GenUiMetricCalculationRole,
+      detail: metric.detail ?? metric.sourceLabel ?? 'Unavailable',
+    }
+  }
+
+  const reportingDate = metricReportingDate(metric)
+  const calculated =
+    params.key === 'runway_months' &&
+    metric.provenance.sourceLabel.includes('calculated')
+
+  let calculationRole: GenUiMetricCalculationRole | undefined
+  let detail: string | null = null
+
+  if (calculated) {
+    calculationRole = 'derived'
+  } else if (runwayQuestion) {
+    const matchesReferenceDate =
+      reportingDate !== null && reportingDate === referenceDate
+
+    if (params.key === 'cash' || params.key === 'burn_rate') {
+      calculationRole = matchesReferenceDate ? 'used' : 'context_only'
+    } else if (
+      params.key === 'accounts_receivable' ||
+      params.key === 'accounts_payable'
+    ) {
+      calculationRole = matchesReferenceDate
+        ? 'compatible_input'
+        : 'context_only'
+    } else {
+      calculationRole = 'context_only'
+    }
+
+    if (
+      calculationRole === 'context_only' &&
+      reportingDate &&
+      referenceDate &&
+      reportingDate !== referenceDate
+    ) {
+      detail = `Does not match the ${referenceDate} runway calculation date.`
+    }
+  }
+
+  return {
+    reportingDate,
+    dateStatus: (reportingDate
+      ? calculated
+        ? 'calculated_for'
+        : 'latest_recorded'
+      : 'undated') as GenUiMetricDateStatus,
+    ...(calculationRole ? { calculationRole } : {}),
+    detail,
+  }
 }
 
 function historicalMetricKeyForMessage(userMessage: string): HistoricalMetricKey | null {
@@ -313,6 +404,11 @@ async function chooseWidgetsWithModel(params: {
   }
 
   const currentRunway = metricValueForPrompt(params.snapshot, 'runway_months')
+  const adjustedRunway = isAvailableMetric(
+    params.snapshot.workingCapitalAdjustedRunway
+  )
+    ? params.snapshot.workingCapitalAdjustedRunway.value
+    : null
   const monthlyBurn = metricValueForPrompt(params.snapshot, 'burn_rate')
   const cash = metricValueForPrompt(params.snapshot, 'cash')
   const missingMetrics = listMissingMetrics(params.snapshot).map(
@@ -351,6 +447,7 @@ async function chooseWidgetsWithModel(params: {
         source: params.source,
         dataSummary: {
           currentRunway,
+          workingCapitalAdjustedRunway: adjustedRunway,
           monthlyBurn,
           cash,
           missingMetrics,
@@ -385,21 +482,45 @@ function buildMetricSnapshotWidget(
   index: number,
   context: GenUiDataContext
 ): GenUiWidget {
-  const selectedKeys =
-    spec.metricKeys && spec.metricKeys.length > 0
-      ? [...new Set(spec.metricKeys)].slice(0, 4)
+  const runwayQuestion = /\brunway\b/i.test(context.userMessage)
+  const requestedKeys = [...new Set(spec.metricKeys ?? [])]
+  const runwayCoreKeys = [
+    'cash',
+    'burn_rate',
+    'runway_months',
+  ] satisfies FinancialMetricKey[]
+  const runwaySupportingKeys = new Set<FinancialMetricKey>([
+    'accounts_receivable',
+    'accounts_payable',
+  ])
+  const requestedRunwaySupportingKeys = requestedKeys.filter((key) =>
+    runwaySupportingKeys.has(key)
+  )
+  const selectedKeys = runwayQuestion
+    ? [
+        ...runwayCoreKeys,
+        ...requestedRunwaySupportingKeys,
+        'accounts_receivable' as const,
+        'accounts_payable' as const,
+      ]
+        .filter((key, keyIndex, keys) => keys.indexOf(key) === keyIndex)
+        .slice(0, 3)
+    : requestedKeys.length > 0
+      ? requestedKeys.slice(0, 4)
       : (['runway_months', 'cash', 'burn_rate'] satisfies FinancialMetricKey[])
-  const metrics = selectedKeys.map((key) => {
+  const metrics: MetricSnapshotWidget['data']['metrics'] = selectedKeys.map((key) => {
     const metric = context.snapshot.metrics[key]
+    const displayContext = metricDisplayContext({ key, context })
 
     if (!isAvailableMetric(metric)) {
       return {
         key,
-        label: FINANCIAL_METRIC_LABELS[key],
+        label: key === 'runway_months' ? 'Cash runway' : FINANCIAL_METRIC_LABELS[key],
         value: '-',
         unit: key === 'runway_months' ? 'months' : null,
         sourceLabel: metric.sourceLabel ?? 'Unavailable',
         sourceTone: 'unavailable' as const,
+        ...displayContext,
       }
     }
 
@@ -412,22 +533,60 @@ function buildMetricSnapshotWidget(
 
     return {
       key,
-      label: FINANCIAL_METRIC_LABELS[key],
+      label: key === 'runway_months' ? 'Cash runway' : FINANCIAL_METRIC_LABELS[key],
       value:
         key === 'runway_months'
-          ? formatNumber(metric.value)
+          ? formatNumber(metric.value, 2)
           : formatCurrency(metric.value, metric.currency),
       unit: key === 'runway_months' ? 'months' : null,
       sourceLabel,
-      sourceTone: 'available' as const,
+      sourceTone:
+        displayContext.calculationRole === 'derived'
+          ? ('derived' as const)
+          : ('available' as const),
+      ...displayContext,
     }
   })
+
+  if (runwayQuestion) {
+    const adjusted = context.snapshot.workingCapitalAdjustedRunway
+    const adjustedContext = metricDisplayContext({
+      key: 'runway_months',
+      context,
+      adjustedRunway: true,
+    })
+
+    metrics.push(
+      isAvailableMetric(adjusted)
+        ? {
+            key: 'runway_months',
+            runwayVariant: 'working_capital_adjusted',
+            label: 'Working-capital-adjusted runway',
+            value: formatNumber(adjusted.value, 2),
+            unit: 'months',
+            sourceLabel: adjusted.provenance.sourceLabel,
+            sourceTone: 'derived',
+            ...adjustedContext,
+          }
+        : {
+            key: 'runway_months',
+            runwayVariant: 'working_capital_adjusted',
+            label: 'Working-capital-adjusted runway',
+            value: '-',
+            unit: 'months',
+            sourceLabel: adjusted.sourceLabel ?? 'Unavailable',
+            sourceTone: 'unavailable',
+            ...adjustedContext,
+          }
+    )
+  }
 
   return {
     id: widgetId(spec.type, index),
     type: 'metric_snapshot',
     title: spec.title ?? 'Relevant metrics',
-    reason: spec.reason ?? 'AI-BOSS selected the metrics that support this answer.',
+    reason:
+      'Shows the latest recorded values, their reporting dates, and whether each value was used, derived, contextual, or unavailable for this request.',
     data: { metrics },
   }
 }
@@ -459,6 +618,27 @@ function buildMetricTrendWidget(
     return null
   }
 
+  const runwaySeries = history.metricKey === 'runway_months'
+    ? context.metricHistories
+        .filter(
+          (series) =>
+            series.metricKey === 'runway_months' &&
+            series.runwayVariant &&
+            series.seriesKey === history.seriesKey &&
+            series.currency === history.currency
+        )
+        .map((series) => ({
+          variant: series.runwayVariant as 'cash' | 'working_capital_adjusted',
+          label: series.label,
+          points: series.points.map((point) => ({
+            date: point.date,
+            value: point.value,
+            sourceLabel: point.sourceLabel,
+            confidence: point.confidence,
+          })),
+        }))
+    : undefined
+
   return {
     id: widgetId(spec.type, index),
     type: 'metric_trend_chart',
@@ -488,6 +668,7 @@ function buildMetricTrendWidget(
           ? `${history.excludedCurrencyObservationCount} observation(s) with missing or unsupported currency were excluded.`
           : null,
       ].filter(Boolean).join(' '),
+      ...(runwaySeries && runwaySeries.length > 0 ? { runwaySeries } : {}),
     },
   }
 }
@@ -503,6 +684,28 @@ function buildMetricForecastWidget(
   if (!forecast || forecast.forecastPoints.length === 0 || forecast.monthlySlope === null) {
     return null
   }
+
+  const runwaySeries = forecast.metricKey === 'runway_months'
+    ? context.metricForecasts
+        .filter(
+          (series) =>
+            series.metricKey === 'runway_months' &&
+            series.history.runwayVariant &&
+            series.history.seriesKey === forecast.history.seriesKey &&
+            series.history.currency === forecast.history.currency
+        )
+        .map((series) => ({
+          variant: series.history.runwayVariant as 'cash' | 'working_capital_adjusted',
+          label: series.label,
+          actualPoints: series.history.points.map((point) => ({
+            date: point.date,
+            value: point.value,
+            sourceLabel: point.sourceLabel,
+            confidence: point.confidence,
+          })),
+          forecastPoints: series.forecastPoints.map(({ date, value }) => ({ date, value })),
+        }))
+    : undefined
 
   return {
     id: widgetId(spec.type, index),
@@ -527,6 +730,7 @@ function buildMetricForecastWidget(
       hasMixedSources: forecast.history.hasMixedSources,
       hasRecordedDateFallback: forecast.history.hasRecordedDateFallback,
       note: forecast.assumptions.join(' '),
+      ...(runwaySeries && runwaySeries.length > 0 ? { runwaySeries } : {}),
     },
   }
 }
@@ -571,7 +775,7 @@ function buildPlanningChecklistWidget(
       detail:
         currentRunway !== null
           ? `Current runway is ${formatNumber(currentRunway)} months.`
-          : 'Runway is unavailable, so collect cash, AR, AP, and burn first.',
+          : 'Cash runway is unavailable, so collect compatible cash and burn first.',
       tone:
         currentRunway !== null && currentRunway < URGENT_THRESHOLD
           ? ('urgent' as const)
@@ -618,6 +822,11 @@ function buildRiskThresholdTimelineWidget(
     context.snapshot.metrics,
     'runway_months'
   )
+  const workingCapitalAdjustedRunway = isAvailableMetric(
+    context.snapshot.workingCapitalAdjustedRunway
+  )
+    ? context.snapshot.workingCapitalAdjustedRunway.value
+    : null
   const averageChange = context.runwayTrend.averageChange
   const decliningChange =
     averageChange !== null && averageChange < 0 ? Math.abs(averageChange) : null
@@ -664,6 +873,7 @@ function buildRiskThresholdTimelineWidget(
     reason: spec.reason ?? 'AI-BOSS selected threshold timing for this question.',
     data: {
       currentRunway,
+      workingCapitalAdjustedRunway,
       monthsUntilCaution,
       monthsUntilUrgent,
       status,
@@ -677,47 +887,91 @@ function buildMetricSourceEvidenceWidget(
   index: number,
   context: GenUiDataContext
 ): GenUiWidget {
-  const priorityMetrics: FinancialMetricKey[] = [
-    'cash',
-    'burn_rate',
-    'runway_months',
-    'monthly_revenue',
-    'monthly_expenses',
-  ]
+  const runwayQuestion = /\brunway\b/i.test(context.userMessage)
+  const priorityMetrics: FinancialMetricKey[] = runwayQuestion
+    ? [
+        'cash',
+        'accounts_receivable',
+        'accounts_payable',
+        'burn_rate',
+        'runway_months',
+      ]
+    : [
+        'cash',
+        'burn_rate',
+        'runway_months',
+        'monthly_revenue',
+        'monthly_expenses',
+      ]
   const metrics = priorityMetrics.map((key) => {
     const metric = context.snapshot.metrics[key]
+    const displayContext = metricDisplayContext({ key, context })
 
     if (isAvailableMetric(metric)) {
       const value =
         key === 'runway_months'
-          ? formatNumber(metric.value)
+          ? `${formatNumber(metric.value, 2)} months`
           : formatCurrency(metric.value, metric.currency)
+      const isCalculatedRunway =
+        key === 'runway_months' &&
+        metric.provenance.sourceLabel.includes('cash runway calculated')
 
       return {
-        label: FINANCIAL_METRIC_LABELS[key],
+        label: key === 'runway_months' ? 'Cash runway' : FINANCIAL_METRIC_LABELS[key],
         value,
         sourceLabel: metric.provenance.sourceLabel,
         sourceType: metric.provenance.sourceType,
         confidence: metric.confidence,
-        tone: 'available' as const,
+        tone: isCalculatedRunway ? ('derived' as const) : ('available' as const),
+        ...displayContext,
       }
     }
 
     return {
-      label: FINANCIAL_METRIC_LABELS[key],
+      label: key === 'runway_months' ? 'Cash runway' : FINANCIAL_METRIC_LABELS[key],
       value: '-',
       sourceLabel: metric.sourceLabel ?? 'Unavailable',
       sourceType: metric.sourceType ?? 'none',
       confidence: null,
       tone: 'unavailable' as const,
+      ...displayContext,
     }
   })
+  const adjustedRunway = context.snapshot.workingCapitalAdjustedRunway
+  const adjustedDisplayContext = metricDisplayContext({
+    key: 'runway_months',
+    context,
+    adjustedRunway: true,
+  })
+  metrics.push(
+    isAvailableMetric(adjustedRunway)
+      ? {
+          label: 'Working-capital-adjusted runway',
+          value: `${formatNumber(adjustedRunway.value, 2)} months`,
+          sourceLabel: adjustedRunway.provenance.sourceLabel,
+          sourceType: adjustedRunway.provenance.sourceType,
+          confidence: adjustedRunway.confidence,
+          tone: 'derived' as const,
+          ...adjustedDisplayContext,
+        }
+      : {
+          label: 'Working-capital-adjusted runway',
+          value: '-',
+          sourceLabel:
+            adjustedRunway.sourceLabel ?? 'Unavailable',
+          sourceType: adjustedRunway.sourceType ?? 'none',
+          confidence: null,
+          tone: 'unavailable' as const,
+          ...adjustedDisplayContext,
+        }
+  )
 
   return {
     id: widgetId(spec.type, index),
     type: 'metric_source_evidence',
     title: spec.title ?? 'Metric source evidence',
-    reason: spec.reason ?? 'AI-BOSS selected source context for this answer.',
+    reason:
+      "Shows each value's source, reporting date, and whether it was used, derived, contextual, or unavailable for this calculation.",
     data: {
       metrics,
     },
@@ -807,6 +1061,8 @@ export async function planGenUi({
   toolsUsed,
   toolExecutions = [],
   scenarioMode = false,
+  hasUnreviewedDocumentEvidence = false,
+  unreviewedDocumentIds = [],
 }: PlanGenUiParams): Promise<GenUiPlan | null> {
   const source = detectSource(userMessage)
   const scenarioResult = toolExecutions.flatMap((execution) => {
@@ -837,6 +1093,36 @@ export async function planGenUi({
       }],
     }
   }
+
+  if (hasUnreviewedDocumentEvidence) {
+    return {
+      version: GEN_UI_PLAN_VERSION,
+      source,
+      generatedAt: new Date().toISOString(),
+      summary:
+        'This workspace is limited to unreviewed document evidence until the extracted values are confirmed.',
+      workspaceMode: 'document_review',
+      ...(unreviewedDocumentIds.length > 0
+        ? {
+            documentReviewSnapshot: {
+              documentIds: [...new Set(unreviewedDocumentIds)],
+              statusAtGeneration: 'pending' as const,
+            },
+          }
+        : {}),
+      widgets: [
+        buildDataConnectionsWidget(
+          {
+            type: 'data_connections',
+            title: 'Review document values',
+            reason:
+              'The answer used unreviewed document evidence, so calculations remain unavailable until confirmation.',
+          },
+          0
+        ),
+      ],
+    }
+  }
   const historicalMetricKey = historicalMetricKeyForMessage(userMessage)
   const forecastMetricKey = forecastMetricKeyForMessage(userMessage)
   const forecastHorizon = forecastHorizonForMessage(userMessage)
@@ -848,6 +1134,12 @@ export async function planGenUi({
       direction: 'insufficient_data' as const,
       change: null,
       averageChange: null,
+      workingCapitalAdjusted: {
+        observations: [],
+        direction: 'insufficient_data' as const,
+        change: null,
+        averageChange: null,
+      },
     })),
     historicalMetricKey
       ? readFinancialMetricHistorySeries({ userId, metricKey: historicalMetricKey, range: 'all', recordLimit: 'all' }).catch(() => null)

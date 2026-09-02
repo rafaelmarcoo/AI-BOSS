@@ -10,7 +10,7 @@ describe('calculateRunway', () => {
       expect(result.policy.status).toBe('healthy')
     })
 
-    it('calculates runway with AR and AP', () => {
+    it('keeps cash runway primary and calculates the adjusted measure separately', () => {
       const result = calculateRunway({
         cash: 500000,
         ar: 50000,
@@ -18,7 +18,9 @@ describe('calculateRunway', () => {
         burn: 30000,
       })
 
-      expect(result.runway_months).toBe(17.67)
+      expect(result.runway_months).toBe(16.67)
+      expect(result.cash_runway_months).toBe(16.67)
+      expect(result.working_capital_adjusted_runway_months).toBe(17.67)
     })
 
     it('rounds result to 2 decimal places', () => {
@@ -34,10 +36,11 @@ describe('calculateRunway', () => {
       expect(result.policy.status).toBe('urgent')
     })
 
-    it('returns negative runway when AP exceeds cash plus AR', () => {
+    it('does not let large payables change the primary cash runway', () => {
       const result = calculateRunway({ cash: 10000, ar: 0, ap: 50000, burn: 10000 })
 
-      expect(result.runway_months).toBe(-4)
+      expect(result.runway_months).toBe(1)
+      expect(result.working_capital_adjusted_runway_months).toBe(-4)
     })
   })
 
@@ -56,6 +59,9 @@ describe('calculateRunway', () => {
       const result = calculateRunway({ cash: 100000, ar: 0, ap: 0, burn: 10000 })
 
       expect(result.calculation_breakdown.formula).toBe(
+        '100000 / 10000 = 10 months'
+      )
+      expect(result.calculation_breakdown.workingCapitalAdjustedFormula).toBe(
         '(100000 + 0 - 0) / 10000 = 10 months'
       )
     })

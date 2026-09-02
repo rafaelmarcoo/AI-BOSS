@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Accordion,
   AccordionDetails,
@@ -73,6 +73,18 @@ const EXAMPLE_PROMPTS = [
   "Show me a future cash and runway trend.",
 ];
 
+const DOCUMENT_REVIEW_PROMPTS = [
+  "Why can't AI-BOSS calculate with this document yet?",
+  "Which uploaded values still need review?",
+  "How do I confirm extracted document values?",
+];
+
+const HISTORICAL_DOCUMENT_PROMPTS = [
+  "Re-run this document question using the current review status.",
+  "Calculate my current runway from User-confirmed values.",
+  "Show the User-confirmed financial history for this source.",
+];
+
 function formatCurrency(
   value: number | null | undefined,
   currency: string | null | undefined,
@@ -126,6 +138,57 @@ function formatPeriod(points: Array<{ date: string }>) {
 
   if (!first || !latest) return "Unavailable";
   return first === latest ? formatDate(first) : `${formatDate(first)}–${formatDate(latest)}`;
+}
+
+function metricDateLabel(metric: {
+  reportingDate?: string | null;
+  dateStatus?: 'latest_recorded' | 'calculated_for' | 'unavailable_for' | 'undated';
+}) {
+  if (!metric.reportingDate) {
+    return metric.dateStatus === 'undated' ? 'Reporting date unavailable' : null;
+  }
+
+  const date = formatDate(metric.reportingDate);
+  if (metric.dateStatus === 'calculated_for') return `Calculated for ${date}`;
+  if (metric.dateStatus === 'unavailable_for') return `Unavailable for ${date}`;
+  return `Latest recorded · ${date}`;
+}
+
+function calculationRoleLabel(role?:
+  | 'used'
+  | 'compatible_input'
+  | 'context_only'
+  | 'derived'
+  | 'unavailable') {
+  switch (role) {
+    case 'used':
+      return 'Used in cash runway';
+    case 'compatible_input':
+      return 'Same-period adjusted input';
+    case 'context_only':
+      return 'Context only · not used';
+    case 'derived':
+      return 'Derived from compatible inputs';
+    case 'unavailable':
+      return 'Not calculation-ready';
+    default:
+      return null;
+  }
+}
+
+function metricContextLabel(metric: {
+  reportingDate?: string | null;
+  dateStatus?: 'latest_recorded' | 'calculated_for' | 'unavailable_for' | 'undated';
+  calculationRole?:
+    | 'used'
+    | 'compatible_input'
+    | 'context_only'
+    | 'derived'
+    | 'unavailable';
+}) {
+  return [metricDateLabel(metric), calculationRoleLabel(metric.calculationRole)]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 function statusColor(status: RiskThresholdTimelineWidgetModel["data"]["status"]) {
@@ -229,13 +292,15 @@ function MetricSnapshotWidgetView({
       >
         {widget.data.metrics.map((metric) => (
           <MetricCard
-            key={metric.key}
+            key={`${metric.key}:${metric.runwayVariant ?? 'metric'}`}
             label={metric.label}
             value={metric.value}
             unit={metric.unit ?? undefined}
-            color={METRIC_COLORS[metric.key] ?? "#94a3b8"}
+            color={metric.runwayVariant === 'working_capital_adjusted' ? '#22d3ee' : METRIC_COLORS[metric.key] ?? "#94a3b8"}
             sourceLabel={metric.sourceLabel}
             sourceTone={metric.sourceTone}
+            contextLabel={metricContextLabel(metric)}
+            detail={metric.detail}
           />
         ))}
       </Box>
@@ -624,13 +689,18 @@ function RiskThresholdTimelineWidgetView({
     widget.data.currentRunway === null
       ? 0
       : Math.min(100, (widget.data.currentRunway / 12) * 100);
+  const adjustedPercent =
+    widget.data.workingCapitalAdjustedRunway === null ||
+    widget.data.workingCapitalAdjustedRunway === undefined
+      ? 0
+      : Math.min(100, (widget.data.workingCapitalAdjustedRunway / 12) * 100);
 
   return (
     <WidgetFrame title={widget.title} reason={widget.reason}>
       <Stack spacing={1.25}>
         <Stack direction="row" justifyContent="space-between" spacing={1}>
           <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
-            Current runway
+            Cash runway
           </Typography>
           <Typography variant="body2" fontWeight={700} sx={{ color }}>
             {formatNumber(widget.data.currentRunway)} months
@@ -649,6 +719,34 @@ function RiskThresholdTimelineWidgetView({
               width: `${Math.max(0, runwayPercent)}%`,
               height: "100%",
               bgcolor: color,
+              borderRadius: 999,
+            }}
+          />
+        </Box>
+        <Stack direction="row" justifyContent="space-between" spacing={1}>
+          <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
+            Working-capital-adjusted runway
+          </Typography>
+          <Typography variant="body2" fontWeight={700} sx={{ color: "#22d3ee" }}>
+            {widget.data.workingCapitalAdjustedRunway === null ||
+            widget.data.workingCapitalAdjustedRunway === undefined
+              ? "Unavailable"
+              : `${formatNumber(widget.data.workingCapitalAdjustedRunway)} months`}
+          </Typography>
+        </Stack>
+        <Box
+          sx={{
+            height: 10,
+            borderRadius: 999,
+            bgcolor: "rgba(255,255,255,0.08)",
+            overflow: "hidden",
+          }}
+        >
+          <Box
+            sx={{
+              width: `${Math.max(0, adjustedPercent)}%`,
+              height: "100%",
+              bgcolor: "#22d3ee",
               borderRadius: 999,
             }}
           />
@@ -694,23 +792,40 @@ function MetricSourceEvidenceWidgetView({
 }: {
   widget: MetricSourceEvidenceWidgetModel;
 }) {
+  const tonePresentation = {
+    available: { label: "available", color: "#bbf7d0", background: "rgba(34, 197, 94, 0.12)" },
+    derived: { label: "calculated", color: "#bae6fd", background: "rgba(56, 189, 248, 0.12)" },
+    unavailable: { label: "unavailable", color: "#fecdd3", background: "rgba(244, 63, 94, 0.12)" },
+  } as const;
+  const contextOnlyPresentation = {
+    label: "context only",
+    color: "#fde68a",
+    background: "rgba(245, 158, 11, 0.12)",
+  } as const;
+
   return (
     <WidgetFrame title={widget.title} reason={widget.reason}>
       <Stack spacing={1}>
-        {widget.data.metrics.map((metric) => (
-          <Stack
-            key={metric.label}
-            direction={{ xs: "column", sm: "row" }}
-            spacing={1}
-            justifyContent="space-between"
-            sx={{
-              p: 1.25,
-              borderRadius: 1,
-              border: "1px solid",
-              borderColor: dashboardTokens.border,
-              bgcolor: "rgba(255,255,255,0.025)",
-            }}
-          >
+        {widget.data.metrics.map((metric) => {
+          const presentation =
+            metric.calculationRole === "context_only"
+              ? contextOnlyPresentation
+              : tonePresentation[metric.tone];
+
+          return (
+            <Stack
+              key={metric.label}
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1}
+              justifyContent="space-between"
+              sx={{
+                p: 1.25,
+                borderRadius: 1,
+                border: "1px solid",
+                borderColor: dashboardTokens.border,
+                bgcolor: "rgba(255,255,255,0.025)",
+              }}
+            >
             <Box sx={{ minWidth: 0 }}>
               <Typography variant="body2" fontWeight={700}>
                 {metric.label}
@@ -718,25 +833,33 @@ function MetricSourceEvidenceWidgetView({
               <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
                 {metric.sourceLabel}
               </Typography>
+              {metricContextLabel(metric) ? (
+                <Typography variant="caption" sx={{ color: "#bae6fd", display: "block", mt: 0.25 }}>
+                  {metricContextLabel(metric)}
+                </Typography>
+              ) : null}
+              {metric.detail ? (
+                <Typography variant="caption" sx={{ color: dashboardTokens.textMuted, display: "block", mt: 0.25 }}>
+                  {metric.detail}
+                </Typography>
+              ) : null}
             </Box>
             <Stack direction="row" spacing={1} alignItems="center">
               <Typography variant="body2" sx={{ color: "common.white" }}>
                 {metric.value}
               </Typography>
               <Chip
-                label={metric.tone}
+                label={presentation.label}
                 size="small"
                 sx={{
-                  color: metric.tone === "available" ? "#bbf7d0" : "#fecdd3",
-                  bgcolor:
-                    metric.tone === "available"
-                      ? "rgba(34, 197, 94, 0.12)"
-                      : "rgba(244, 63, 94, 0.12)",
+                  color: presentation.color,
+                  bgcolor: presentation.background,
                 }}
               />
             </Stack>
-          </Stack>
-        ))}
+            </Stack>
+          );
+        })}
       </Stack>
     </WidgetFrame>
   );
@@ -749,6 +872,16 @@ function MetricTrendChartWidgetView({
 }) {
   const isRunway = widget.data.metricKey === 'runway_months';
   const color = METRIC_COLORS[widget.data.metricKey];
+  const runwaySeries = isRunway ? (widget.data.runwaySeries ?? []) : [];
+  const chartData: Array<Record<string, string | number | undefined>> = runwaySeries.length > 0
+    ? [...new Set(runwaySeries.flatMap((series) => series.points.map((point) => point.date)))]
+        .sort()
+        .map((date) => ({
+          date,
+          cash: runwaySeries.find((series) => series.variant === 'cash')?.points.find((point) => point.date === date)?.value,
+          adjusted: runwaySeries.find((series) => series.variant === 'working_capital_adjusted')?.points.find((point) => point.date === date)?.value,
+        }))
+    : widget.data.points;
   const formatValue = (value: number) =>
     isRunway
       ? `${value.toFixed(1)} mo`
@@ -768,7 +901,7 @@ function MetricTrendChartWidgetView({
       </Typography>
       <Box sx={{ height: 250 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={widget.data.points} margin={{ top: 10, right: 16, left: 8, bottom: 30 }}>
+          <LineChart data={chartData} margin={{ top: 10, right: 16, left: 8, bottom: 30 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={dashboardTokens.border} />
             <XAxis
               dataKey="date"
@@ -783,7 +916,7 @@ function MetricTrendChartWidgetView({
               style={{ fontSize: "0.72rem" }}
               tickFormatter={(value) => formatAxisNumber(Number(value), isRunway)}
             />
-            <Legend formatter={() => "Actual"} verticalAlign="top" />
+            <Legend formatter={(value) => runwaySeries.length > 0 ? value === 'cash' ? 'Cash runway' : 'Working-capital-adjusted runway' : "Actual"} verticalAlign="top" />
             <Tooltip
               contentStyle={{
                 backgroundColor: dashboardTokens.surface,
@@ -792,11 +925,19 @@ function MetricTrendChartWidgetView({
                 color: "white",
               }}
               formatter={(value, _name, item) => {
+                if (runwaySeries.length > 0) {
+                  return [formatValue(Number(value)), item.dataKey === 'cash' ? 'Cash runway' : 'Working-capital-adjusted runway'];
+                }
                 const point = item.payload as MetricTrendChartWidgetModel['data']['points'][number];
                 return [`${formatValue(Number(value))} — ${point.sourceLabel}`, widget.data.label];
               }}
             />
-            <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={{ fill: color, r: 4 }} />
+            {runwaySeries.length > 0 ? (
+              <>
+                {runwaySeries.some((series) => series.variant === 'cash') ? <Line type="monotone" dataKey="cash" stroke="#4da6ff" strokeWidth={2} dot={{ fill: "#4da6ff", r: 4 }} connectNulls={false} /> : null}
+                {runwaySeries.some((series) => series.variant === 'working_capital_adjusted') ? <Line type="monotone" dataKey="adjusted" stroke="#22d3ee" strokeWidth={2} dot={{ fill: "#22d3ee", r: 4 }} connectNulls={false} /> : null}
+              </>
+            ) : <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={{ fill: color, r: 4 }} />}
           </LineChart>
         </ResponsiveContainer>
       </Box>
@@ -822,6 +963,7 @@ function MetricForecastChartWidgetView({
 }) {
   const isRunway = widget.data.metricKey === "runway_months";
   const color = METRIC_COLORS[widget.data.metricKey];
+  const runwaySeries = isRunway ? (widget.data.runwaySeries ?? []) : [];
   const formatValue = (value: number) =>
     isRunway
       ? `${value.toFixed(1)} mo`
@@ -829,14 +971,34 @@ function MetricForecastChartWidgetView({
         ? formatFinancialCurrency(value, widget.data.currency)
         : "Currency not provided";
   const latestActual = widget.data.actualPoints.at(-1);
-  const data = [
+  const runwayForecastValueAt = (
+    variant: 'cash' | 'working_capital_adjusted',
+    date: string,
+  ) => {
+    const series = runwaySeries.find((candidate) => candidate.variant === variant);
+    const forecastValue = series?.forecastPoints.find((point) => point.date === date)?.value;
+    const latestSeriesActual = series?.actualPoints.at(-1);
+    return forecastValue ?? (latestSeriesActual?.date === date ? latestSeriesActual.value : undefined);
+  };
+  const data: Array<Record<string, string | number | undefined>> = runwaySeries.length > 0
+    ? [...new Set(runwaySeries.flatMap((series) => [
+        ...series.actualPoints.map((point) => point.date),
+        ...series.forecastPoints.map((point) => point.date),
+      ]))].sort().map((date) => ({
+        date,
+        cashActual: runwaySeries.find((series) => series.variant === 'cash')?.actualPoints.find((point) => point.date === date)?.value,
+        adjustedActual: runwaySeries.find((series) => series.variant === 'working_capital_adjusted')?.actualPoints.find((point) => point.date === date)?.value,
+        cashForecast: runwayForecastValueAt('cash', date),
+        adjustedForecast: runwayForecastValueAt('working_capital_adjusted', date),
+      }))
+    : [
     ...widget.data.actualPoints.map((point, index) => ({
       ...point,
       actual: point.value,
       forecast: index === widget.data.actualPoints.length - 1 ? point.value : undefined,
     })),
     ...widget.data.forecastPoints.map((point) => ({ ...point, forecast: point.value })),
-  ];
+    ];
 
   return (
     <WidgetFrame title={widget.title} reason={widget.reason}>
@@ -865,16 +1027,15 @@ function MetricForecastChartWidgetView({
               style={{ fontSize: "0.72rem" }}
               tickFormatter={(value) => formatAxisNumber(Number(value), isRunway)}
             />
-            <Legend
-              verticalAlign="top"
-              formatter={(value) => (value === "actual" ? "Actual" : "Forecast")}
-            />
+            <Legend verticalAlign="top" formatter={(value) => runwaySeries.length > 0 ? ({ cashActual: 'Cash runway', adjustedActual: 'Adjusted runway', cashForecast: 'Cash forecast', adjustedForecast: 'Adjusted forecast' }[String(value)] ?? value) : value === "actual" ? "Actual" : "Forecast"} />
             <Tooltip
               contentStyle={{ backgroundColor: dashboardTokens.surface, border: `1px solid ${dashboardTokens.border}`, borderRadius: 4, color: "white" }}
-              formatter={(value, name) => [formatValue(Number(value)), name === "actual" ? "Actual" : "Forecast"]}
+              formatter={(value, name) => [formatValue(Number(value)), runwaySeries.length > 0 ? ({ cashActual: 'Cash runway', adjustedActual: 'Adjusted runway', cashForecast: 'Cash forecast', adjustedForecast: 'Adjusted forecast' }[String(name)] ?? name) : name === "actual" ? "Actual" : "Forecast"]}
             />
-            <Line type="monotone" dataKey="actual" stroke={color} strokeWidth={2} dot={{ fill: color, r: 4 }} connectNulls={false} />
-            <Line type="monotone" dataKey="forecast" stroke="#fbbf24" strokeWidth={2} strokeDasharray="6 4" dot={{ fill: "#fbbf24", r: 4 }} connectNulls={false} />
+            {runwaySeries.length > 0 ? <>
+              {runwaySeries.some((series) => series.variant === 'cash') ? <><Line type="monotone" dataKey="cashActual" stroke="#4da6ff" strokeWidth={2} dot={{ fill: "#4da6ff", r: 4 }} connectNulls={false} /><Line type="monotone" dataKey="cashForecast" stroke="#4da6ff" strokeWidth={2} strokeDasharray="6 4" connectNulls={false} /></> : null}
+              {runwaySeries.some((series) => series.variant === 'working_capital_adjusted') ? <><Line type="monotone" dataKey="adjustedActual" stroke="#22d3ee" strokeWidth={2} dot={{ fill: "#22d3ee", r: 4 }} connectNulls={false} /><Line type="monotone" dataKey="adjustedForecast" stroke="#22d3ee" strokeWidth={2} strokeDasharray="6 4" connectNulls={false} /></> : null}
+            </> : <><Line type="monotone" dataKey="actual" stroke={color} strokeWidth={2} dot={{ fill: color, r: 4 }} connectNulls={false} /><Line type="monotone" dataKey="forecast" stroke="#fbbf24" strokeWidth={2} strokeDasharray="6 4" dot={{ fill: "#fbbf24", r: 4 }} connectNulls={false} /></>}
           </LineChart>
         </ResponsiveContainer>
       </Box>
@@ -1008,6 +1169,86 @@ export function GenUiCanvas({
   onAskChatbot,
 }: GenUiCanvasProps) {
   const hasPlan = Boolean(plan && plan.widgets.length > 0);
+  const documentReviewMode = plan?.workspaceMode === "document_review";
+  const snapshotKey = plan?.documentReviewSnapshot?.documentIds.join("|") ?? null;
+  const [documentReviewResolution, setDocumentReviewResolution] = useState<{
+    snapshotKey: string;
+    status: "changed" | "confirmed";
+  } | null>(null);
+
+  useEffect(() => {
+    const snapshot = plan?.documentReviewSnapshot;
+
+    if (!documentReviewMode || !snapshot) return;
+
+    let cancelled = false;
+
+    void fetch("/api/documents", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) return null;
+        return response.json() as Promise<{
+          data?: {
+            documents?: Array<{
+              id: string;
+              financial_review_status: "legacy" | "not_required" | "pending" | "confirmed";
+            }>;
+          };
+        }>;
+      })
+      .then((payload) => {
+        if (cancelled || !payload) return;
+
+        const currentStatuses = (payload.data?.documents ?? [])
+          .filter((document) => snapshot.documentIds.includes(document.id))
+          .map((document) => document.financial_review_status);
+
+        if (
+          currentStatuses.length === 0 ||
+          currentStatuses.every((status) => status === "pending")
+        ) {
+          return;
+        }
+
+        setDocumentReviewResolution({
+          snapshotKey: snapshot.documentIds.join("|"),
+          status: currentStatuses.every(
+            (status) => status === "confirmed" || status === "not_required",
+          )
+            ? "confirmed"
+            : "changed",
+        });
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [documentReviewMode, snapshotKey, plan?.documentReviewSnapshot]);
+
+  const historicalDocumentSnapshot =
+    documentReviewMode &&
+    snapshotKey !== null &&
+    documentReviewResolution?.snapshotKey === snapshotKey;
+  const documentReviewState = historicalDocumentSnapshot
+    ? documentReviewResolution.status
+    : "pending";
+  const examplePrompts = historicalDocumentSnapshot
+    ? HISTORICAL_DOCUMENT_PROMPTS
+    : documentReviewMode
+      ? DOCUMENT_REVIEW_PROMPTS
+      : EXAMPLE_PROMPTS;
+  const workspaceTitle = historicalDocumentSnapshot
+    ? "Historical document evidence"
+    : documentReviewMode
+      ? "Document evidence workspace"
+      : "Generated workspace";
+  const workspaceSummary = historicalDocumentSnapshot
+    ? documentReviewState === "confirmed"
+      ? "This workspace was generated before the document became User-confirmed. The earlier answer remains unchanged; ask again for current calculations."
+      : "The document review status has changed since this workspace was generated. Ask again to use the current state."
+    : hasPlan
+      ? plan?.summary
+      : "Financial context generated from your current AI-BOSS conversation.";
 
   return (
     <Paper
@@ -1032,26 +1273,24 @@ export function GenUiCanvas({
           <Stack direction="row" spacing={1.5} alignItems="center">
             <Box sx={{ minWidth: 0 }}>
               <Typography component="h1" sx={{ fontSize: { xs: 20, sm: 22 }, fontWeight: 600, letterSpacing: "-0.02em" }}>
-                Generated workspace
+                {workspaceTitle}
               </Typography>
               <Typography
                 variant="body2"
                 sx={{ color: dashboardTokens.textMuted }}
               >
-                {hasPlan
-                  ? plan?.summary
-                  : "Financial context generated from your current AI-BOSS conversation."}
+                {workspaceSummary}
               </Typography>
             </Box>
           </Stack>
           <Chip
-            label="Live"
+            label={historicalDocumentSnapshot ? "Historical snapshot" : documentReviewMode ? "Review required" : "Live"}
             size="small"
             sx={{
               height: 24,
-              color: dashboardTokens.positive,
-              bgcolor: "rgba(62, 180, 137, 0.10)",
-              borderColor: "rgba(62, 180, 137, 0.22)",
+              color: historicalDocumentSnapshot ? "#bae6fd" : documentReviewMode ? dashboardTokens.warning : dashboardTokens.positive,
+              bgcolor: historicalDocumentSnapshot ? "rgba(56, 189, 248, 0.10)" : documentReviewMode ? "rgba(201, 129, 116, 0.10)" : "rgba(62, 180, 137, 0.10)",
+              borderColor: historicalDocumentSnapshot ? "rgba(56, 189, 248, 0.22)" : documentReviewMode ? "rgba(201, 129, 116, 0.22)" : "rgba(62, 180, 137, 0.22)",
               borderRadius: `${dashboardTokens.radiusSm}px`,
               fontSize: 12,
               alignSelf: { xs: "flex-start", sm: "center" },
@@ -1060,6 +1299,13 @@ export function GenUiCanvas({
           />
         </Stack>
 
+        {historicalDocumentSnapshot ? (
+          <Alert severity="info" sx={{ mb: 3 }}>
+            This saved workspace reflects the review state at the time of the answer. It does not override the document&apos;s current status.
+          </Alert>
+        ) : null}
+
+        {!documentReviewMode ? <>
         <Paper
           elevation={0}
           sx={{
@@ -1121,6 +1367,7 @@ export function GenUiCanvas({
             Reliable cash, burn, revenue, and liability data helps AI-BOSS explain how long the business can operate and where finance teams should focus next.
           </Typography>
         </Box>
+        </> : null}
 
         {hasPlan ? (
           <Box
@@ -1178,7 +1425,7 @@ export function GenUiCanvas({
             Ask a follow-up
           </Typography>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            {EXAMPLE_PROMPTS.map((prompt) => (
+            {examplePrompts.map((prompt) => (
               <Button
                 key={prompt}
                 size="small"

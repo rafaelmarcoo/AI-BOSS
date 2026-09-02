@@ -52,7 +52,7 @@ The current app registry lives in `lib/ai/tool-registry.ts` and registers five a
 | Tool | Purpose |
 |---|---|
 | `get_latest_snapshot` | Reads source-aware current metrics and confirms runway inputs. |
-| `calculate_runway` | Calculates runway from confirmed cash, receivables, payables, and burn. |
+| `calculate_runway` | Calculates primary cash runway and separately labelled working-capital-adjusted runway from confirmed inputs. |
 | `model_scenario` | Validates and calculates one to three source-aware what-if alternatives using the shared deterministic scenario engine. |
 | `get_financial_history` | Summarises deterministic historical movement for a supported metric. |
 | `get_financial_forecast` | Creates a deterministic 3- or 6-month trend-continuation forecast. |

@@ -4,11 +4,6 @@ import { Box } from "@mui/material";
 import { COOKIE_ACCESS_TOKEN } from "@/lib/supabase";
 import { getCurrentUserProfile } from "@/lib/auth";
 import { dashboardTokens } from "@/app/theme";
-import {
-  fillUnavailableMetrics,
-  type CompleteFinancialMetricSet,
-} from "@/lib/financial-data";
-import { readSourceAwareMetrics } from "@/lib/financial-data/read-service";
 import { DashboardHeader } from "./header";
 import { ResizablePanels } from "./ResizablePanels";
 
@@ -40,14 +35,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   const { profile } = currentUser;
 
-  let metrics: CompleteFinancialMetricSet = fillUnavailableMetrics({});
-
-  try {
-    metrics = (await readSourceAwareMetrics(currentUser.user.id)).metrics;
-  } catch (error) {
-    console.error("Failed to fetch dashboard metrics:", error);
-  }
-
   return (
     <Box
       component="main"
@@ -76,7 +63,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         fullName={profile.full_name}
         email={profile.email}
         userType={profile.user_type}
-        metrics={metrics}
         initialConversationId={normalizeSearchParam(params?.conversationId)}
         initialMessage={normalizeSearchParam(params?.initialMessage)}
       />

@@ -63,8 +63,6 @@ type AskChatbotMode = "selection" | "prompt";
 
 interface GenUiCanvasProps {
   plan: GenUiPlan | null;
-  baselineSummary: string;
-  missingMetricLabels: string[];
   onAskChatbot: (text: string, mode?: AskChatbotMode) => void;
 }
 
@@ -1007,8 +1005,6 @@ export function GenUiWidgetRenderer({
 
 export function GenUiCanvas({
   plan,
-  baselineSummary,
-  missingMetricLabels,
   onAskChatbot,
 }: GenUiCanvasProps) {
   const hasPlan = Boolean(plan && plan.widgets.length > 0);
@@ -1044,87 +1040,27 @@ export function GenUiCanvas({
               >
                 {hasPlan
                   ? plan?.summary
-                  : "Financial context generated from your current AI-BOSS conversation."}
+                  : "Choose a follow-up or ask AI Boss a question to generate relevant widgets."}
               </Typography>
             </Box>
           </Stack>
-          <Chip
-            label="Live"
-            size="small"
-            sx={{
-              height: 24,
-              color: dashboardTokens.positive,
-              bgcolor: "rgba(62, 180, 137, 0.10)",
-              borderColor: "rgba(62, 180, 137, 0.22)",
-              borderRadius: `${dashboardTokens.radiusSm}px`,
-              fontSize: 12,
-              alignSelf: { xs: "flex-start", sm: "center" },
-            }}
-            variant="outlined"
-          />
-        </Stack>
-
-        <Paper
-          elevation={0}
-          sx={{
-            py: 3,
-            borderRadius: 0,
-            bgcolor: "transparent",
-            borderTop: "1px solid",
-            borderColor: dashboardTokens.border,
-          }}
-        >
-          <Typography component="h2" sx={{ fontSize: 16, fontWeight: 600 }}>
-            Runway summary
-          </Typography>
-          <Stack spacing={1}>
-            <Typography
-              variant="body2"
-              sx={{ mt: 1, color: dashboardTokens.textMuted, lineHeight: 1.65, userSelect: "text" }}
-            >
-              {baselineSummary}
-            </Typography>
-          </Stack>
-        </Paper>
-
-        <Box sx={{ py: 3, borderTop: "1px solid", borderColor: dashboardTokens.border }}>
-          <Typography component="h2" sx={{ fontSize: 16, fontWeight: 600 }}>
-            {missingMetricLabels.length > 0 ? "Missing financial metrics" : "Financial metrics"}
-          </Typography>
-          <Typography sx={{ mt: 0.75, color: dashboardTokens.textMuted, fontSize: 14, lineHeight: 1.55 }}>
-            {missingMetricLabels.length > 0
-              ? "Connect an accounting source or upload current records to complete the runway view."
-              : "The core metrics required for runway analysis are available."}
-          </Typography>
-          {missingMetricLabels.length > 0 ? (
-            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 2 }}>
-              {missingMetricLabels.map((label) => (
-                <Chip
-                  key={label}
-                  label={label}
-                  size="small"
-                  sx={{
-                    height: 26,
-                    borderRadius: `${dashboardTokens.radiusSm}px`,
-                    color: "#D9AAA3",
-                    bgcolor: "rgba(201, 129, 116, 0.09)",
-                    border: "1px solid rgba(201, 129, 116, 0.18)",
-                    fontSize: 12,
-                  }}
-                />
-              ))}
-            </Stack>
+          {hasPlan ? (
+            <Chip
+              label="Live"
+              size="small"
+              sx={{
+                height: 24,
+                color: dashboardTokens.positive,
+                bgcolor: "rgba(62, 180, 137, 0.10)",
+                borderColor: "rgba(62, 180, 137, 0.22)",
+                borderRadius: `${dashboardTokens.radiusSm}px`,
+                fontSize: 12,
+                alignSelf: { xs: "flex-start", sm: "center" },
+              }}
+              variant="outlined"
+            />
           ) : null}
-        </Box>
-
-        <Box sx={{ py: 3, borderTop: "1px solid", borderColor: dashboardTokens.border }}>
-          <Typography component="h2" sx={{ fontSize: 16, fontWeight: 600 }}>
-            Why this matters
-          </Typography>
-          <Typography sx={{ mt: 0.75, maxWidth: 760, color: dashboardTokens.textMuted, fontSize: 14, lineHeight: 1.6 }}>
-            Reliable cash, burn, revenue, and liability data helps AI-BOSS explain how long the business can operate and where finance teams should focus next.
-          </Typography>
-        </Box>
+        </Stack>
 
         {hasPlan ? (
           <Box
@@ -1167,27 +1103,7 @@ export function GenUiCanvas({
               );
             })}
           </Box>
-        ) : (
-          <Paper
-            elevation={0}
-            sx={{
-              py: 3,
-              borderRadius: 0,
-              bgcolor: "transparent",
-              borderTop: "1px solid",
-              borderColor: dashboardTokens.border,
-            }}
-          >
-            <Stack spacing={0.75}>
-              <Typography sx={{ fontSize: 16, fontWeight: 600 }}>
-                Feature testing context
-              </Typography>
-              <Typography sx={{ color: dashboardTokens.textMuted, fontSize: 14, lineHeight: 1.55 }}>
-                Highlight dashboard text to ask AI-BOSS for an explanation, or use a follow-up below.
-              </Typography>
-            </Stack>
-          </Paper>
-        )}
+        ) : null}
 
         <Stack spacing={1.25}>
           <Typography sx={{ fontSize: 16, fontWeight: 600 }}>

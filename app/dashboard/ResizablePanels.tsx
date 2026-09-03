@@ -25,8 +25,8 @@ interface SelectionChatPrompt {
 type AskChatbotMode = "selection" | "prompt";
 
 const MIN_CHAT_WIDTH = 300;
-const MAX_CHAT_WIDTH = 620;
 const RESIZER_WIDTH = 8;
+const MAX_CHAT_WIDTH_RATIO = 1 / 3;
 
 export function ResizablePanels({
   fullName,
@@ -70,9 +70,13 @@ export function ResizablePanels({
 
       const bounds = container.getBoundingClientRect();
       const nextWidth = event.clientX - bounds.left;
+      const maxChatWidth = Math.max(
+        MIN_CHAT_WIDTH,
+        (bounds.width - RESIZER_WIDTH) * MAX_CHAT_WIDTH_RATIO,
+      );
       const clampedWidth = Math.max(
         MIN_CHAT_WIDTH,
-        Math.min(MAX_CHAT_WIDTH, nextWidth),
+        Math.min(maxChatWidth, nextWidth),
       );
 
       setChatWidth(clampedWidth);

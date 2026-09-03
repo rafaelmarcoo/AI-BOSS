@@ -2,13 +2,13 @@
 
 **Database:** Supabase (PostgreSQL)  
 **Created:** March 22, 2025  
-**Last Updated:** August 19, 2026
+**Last Updated:** September 3, 2026
 
 ---
 
 ## Overview
 
-The database now consists of 13 main tables:
+The database now consists of 14 main tables:
 - **companies** - Company identities used as shared-data access boundaries
 - **users** - User profiles (extends Supabase Auth)
 - **conversations** - User-owned chat threads
@@ -22,6 +22,7 @@ The database now consists of 13 main tables:
 - **oauth_connection_states** - Temporary OAuth state values used for CSRF protection
 - **financial_metric_observations** - Source-aware normalized financial metric values
 - **scenarios** - Saved private or company-visible scenario assumptions and latest deterministic results
+- **user_gen_ui_preferences** - Per-user Gen UI role, focus, detail, horizon, and history-consent settings
 
 ---
 
@@ -43,6 +44,8 @@ Canonical company records used to scope shared conversation access.
 |--------|------|-------------|
 | id | UUID (PK) | Company identifier |
 | name | TEXT | Company display name |
+| business_size | TEXT | Shared Gen UI size profile: `small`, `medium`, `large`, or unset |
+| planning_horizon | INTEGER | Admin-controlled company planning horizon: 3, 6, or 12 months |
 | created_by | UUID (FK) | User who created the company |
 | created_at | TIMESTAMP | Company creation time |
 | updated_at | TIMESTAMP | Last company update |
@@ -422,6 +425,29 @@ decision analysis.
 
 ---
 
+### 13. user_gen_ui_preferences
+
+Stores explicit, user-controlled signals that help AI-BOSS choose useful Gen UI
+widgets. Business size is stored on `companies` because it is shared; these
+settings remain personal to each user. Current-question relevance and available
+data still take priority over these preferences.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| user_id | UUID (PK/FK) | User whose preferences these are |
+| decision_role | TEXT | Admin roles: `owner`, `finance`, `manager`; worker roles: `accountant`, `operations`, `team_member` |
+| priority_topics | TEXT[] | Up to three explicit focus areas |
+| detail_level | TEXT | `quick`, `balanced`, or `detailed` |
+| learn_from_history | BOOLEAN | Explicit opt-in for future user-owned chat-theme learning |
+| created_at | TIMESTAMP | Preference creation time |
+| updated_at | TIMESTAMP | Last preference update |
+
+**RLS Policies:**
+- Users can view, insert, and update only their own preferences
+- Company business size is changed server-side only after verifying the user is a company admin
+
+---
+
 ## Relationships
 ```
 users (1) ──< (many) conversations
@@ -439,6 +465,7 @@ data_connections (1) ──< (many) financial_metric_observations
 documents (1) ──< (many) financial_metric_observations
 users (1) ──< (many) scenarios
 companies (1) ──< (many) scenarios
+users (1) ──< (one) user_gen_ui_preferences
 ```
 
 ---
@@ -460,6 +487,8 @@ All schema changes are tracked in `db/migrations/`:
 - `012_conversation_visibility_modes.sql` - Adds private, company, and admins-only conversation visibility
 - `013_delete_document_and_derived_metrics.sql` - Adds atomic owner-only cleanup of a document and its document-derived financial observations
 - `014_saved_scenarios.sql` - Adds private drafts, company-visible calculated scenarios, result snapshots, and stale-data fingerprints
+- `015_gen_ui_personalization.sql` - Adds shared company size and per-user Gen UI personalization preferences
+- `016_company_gen_ui_controls.sql` - Moves planning horizon to the admin-controlled company profile and adds worker-specific roles
 
 ---
 
@@ -514,4 +543,4 @@ Planned for Sprint 2+:
 
 ---
 
-**Last Updated:** August 19, 2026 by Rafael Manubay
+**Last Updated:** September 3, 2026

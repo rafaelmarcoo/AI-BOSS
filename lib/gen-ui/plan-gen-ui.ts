@@ -37,6 +37,13 @@ import type { AgentToolExecution, AgentToolUsage } from '@/lib/ai/agent'
 import type { SourceAwareMetricReadResult } from '@/lib/financial-data/read-model'
 import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
 import { listEligibleGenUiWidgetRecipes } from '@/lib/gen-ui/eligibility'
+import { getGenUiPersonalization } from '@/lib/gen-ui/preferences-persistence'
+import {
+  DEFAULT_GEN_UI_PERSONALIZATION,
+  recommendedWidgetLimit,
+  type GenUiPersonalization,
+  type GenUiPriorityTopic,
+} from '@/lib/gen-ui/preferences-types'
 import {
   isDataConnectionRequest,
   selectMetricKeysForMessage,
@@ -80,6 +87,7 @@ interface PlannerCandidate extends PlannerWidget {
   selectionGuidance: string
   audience?: readonly string[]
   redundancyGroup?: string
+  personalizationFit: string[]
 }
 
 interface PlanGenUiParams {
@@ -317,6 +325,68 @@ function dedupeWidgetSpecs(widgets: PlannerWidget[]) {
   return deduped
 }
 
+const TOPIC_RECIPE_PATTERNS: Record<GenUiPriorityTopic, RegExp> = {
+  cash_runway: /cash|runway|burn|liquidity/,
+  growth: /revenue|growth|customer_concentration/,
+  cost_control: /expense|cost|payable|supplier|burn/,
+  collections: /receivable|invoice|customer_payment/,
+  forecasting: /forecast|scenario|assumption|runway_date|timeline/,
+  profitability: /profit|margin|break_even|revenue_vs_expenses|net_cash_flow/,
+}
+
+function describePersonalizationFit(
+  recipeId: string,
+  label: string,
+  audience: readonly string[],
+  personalization: GenUiPersonalization
+) {
+  const reasons: string[] = []
+  const normalized = `${recipeId} ${label}`.toLowerCase()
+  const audienceBands =
+    personalization.businessSize === 'small'
+      ? ['micro', 'small']
+      : personalization.businessSize === 'medium'
+        ? ['medium']
+        : personalization.businessSize === 'large'
+          ? ['large', 'enterprise']
+          : []
+
+  if (audienceBands.some((band) => audience.includes(band))) {
+    reasons.push(`suited to ${personalization.businessSize} businesses`)
+  }
+
+  for (const topic of personalization.priorityTopics) {
+    if (TOPIC_RECIPE_PATTERNS[topic].test(normalized)) {
+      reasons.push(`matches the user's ${topic.replaceAll('_', ' ')} focus`)
+    }
+  }
+
+  if (/forecast|scenario|timeline/.test(normalized)) {
+    reasons.push(
+      `matches a usual ${personalization.planningHorizon}-month planning horizon`
+    )
+  }
+
+  if (
+    ['finance', 'accountant'].includes(personalization.decisionRole) &&
+    /forecast|variance|expense|receivable|payable|confidence|source/.test(normalized)
+  ) {
+    reasons.push('suited to a finance and accounting decision role')
+  } else if (
+    personalization.decisionRole === 'owner' &&
+    /cash|runway|growth|revenue|profit|recommended_actions/.test(normalized)
+  ) {
+    reasons.push('suited to an owner-level decision view')
+  } else if (
+    ['manager', 'operations'].includes(personalization.decisionRole) &&
+    /expense|cost|budget|revenue|recommended_actions/.test(normalized)
+  ) {
+    reasons.push('suited to a manager or operations decision view')
+  }
+
+  return reasons
+}
+
 function buildPlannerCandidates(params: {
   userMessage: string
   source: GenUiSource
@@ -326,6 +396,7 @@ function buildPlannerCandidates(params: {
   forecastMetricKey: HistoricalMetricKey | null
   hasForecastSeries: boolean
   hasScenarioResult: boolean
+  personalization: GenUiPersonalization
 }) {
   const availableMetricKeys = FINANCIAL_METRIC_KEYS.filter((key) =>
     isAvailableMetric(params.snapshot.metrics[key])
@@ -337,8 +408,8 @@ function buildPlannerCandidates(params: {
     forecastMetricKey: params.forecastMetricKey,
     hasForecastSeries: params.hasForecastSeries,
     hasScenarioResult: params.hasScenarioResult,
-    // Company size is not persisted yet. Audience remains useful catalogue
-    // metadata, but must not be guessed from a single chat question.
+    // Audience personalises ranking, not data eligibility. A direct question
+    // must still be able to select a useful widget outside the usual profile.
     companySize: null,
   }).flatMap((recipe) => {
     if (!recipe.renderer) return []
@@ -350,6 +421,12 @@ function buildPlannerCandidates(params: {
       selectionGuidance: recipe.selectionGuidance,
       audience: recipe.audience,
       redundancyGroup: recipe.redundancyGroup,
+      personalizationFit: describePersonalizationFit(
+        recipe.id,
+        recipe.label,
+        recipe.audience,
+        params.personalization
+      ),
       type: recipe.renderer,
       ...(recipe.defaultMetricKeys
         ? { metricKeys: [...recipe.defaultMetricKeys] }
@@ -367,6 +444,7 @@ function buildPlannerCandidates(params: {
       redundancyGroup: `metric-${metricKey}`,
       type: 'metric_snapshot' as const,
       metricKeys: [metricKey],
+      personalizationFit: [],
     }))
   )
 
@@ -377,6 +455,7 @@ function buildPlannerCandidates(params: {
       description: 'Explains how the user can provide or connect financial data.',
       selectionGuidance: 'Use only for questions about connecting, uploading, or supplying financial data.',
       type: 'data_connections',
+      personalizationFit: [],
     })
   }
 
@@ -387,6 +466,7 @@ function buildPlannerCandidates(params: {
       description: 'Shows the source, confidence, and availability behind relevant aggregate metrics.',
       selectionGuidance: 'Use when the user asks where a number came from or how trustworthy the available data is.',
       type: 'metric_source_evidence',
+      personalizationFit: [],
     })
   }
 
@@ -397,6 +477,7 @@ function buildPlannerCandidates(params: {
       description: 'Explains the exact dashboard text selected by the user.',
       selectionGuidance: 'Use for a request originating from highlighted dashboard text.',
       type: 'highlight_explainer',
+      personalizationFit: [],
     })
   }
 
@@ -410,6 +491,7 @@ function buildPlannerCandidates(params: {
       description: 'Names unavailable aggregate metrics so the interface does not imply the answer is complete.',
       selectionGuidance: 'Use when missing financial data materially limits the answer or a requested widget.',
       type: 'missing_data_panel',
+      personalizationFit: [],
     })
   }
 
@@ -424,6 +506,7 @@ async function chooseWidgetsWithModel(params: {
   runwayTrend: RunwayTrendSummary
   source: GenUiSource
   candidates: PlannerCandidate[]
+  personalization: GenUiPersonalization
 }) {
   const apiKey = process.env.OPENAI_API_KEY
 
@@ -436,6 +519,9 @@ async function chooseWidgetsWithModel(params: {
   const cash = metricValueForPrompt(params.snapshot, 'cash')
   const missingMetrics = listMissingMetrics(params.snapshot).map(
     (key) => FINANCIAL_METRIC_LABELS[key]
+  )
+  const recommendedMaximum = recommendedWidgetLimit(
+    params.personalization.detailLevel
   )
 
   const model = new ChatOpenAI({
@@ -454,9 +540,11 @@ async function chooseWidgetsWithModel(params: {
         'You are a UI planner for AI-BOSS.',
         'Choose which right-side dashboard widgets should appear for the latest user question.',
         'Choose only from the eligible candidate IDs supplied by the application.',
-        'Choose 0 to 5 widgets. Use an empty widgets array when none would help.',
+        `Choose 0 to ${recommendedMaximum} widgets for this user's usual detail level. Use an empty widgets array when none would help.`,
+        'The latest user question and hard data eligibility are always stronger than profile preferences.',
+        'Use the explicit profile only as a relevance and presentation tie-breaker; never force a widget merely because it matches the profile.',
         'Prefer at most one candidate from the same redundancy group unless each adds clearly different value.',
-        'Use audience metadata only when the conversation provides reliable company-size context; do not guess company size.',
+        'The application supplies an explicit company size when the company has set one. Never infer a missing company size.',
         'Never invent a widget ID, metric, transaction, invoice, budget, customer, or supplier detail.',
         'A widget must add useful visual or actionable context beyond the chat answer.',
         'For every selected widget, write a concise reason explaining why AI-BOSS chose it for this specific request.',
@@ -476,6 +564,15 @@ async function chooseWidgetsWithModel(params: {
           runwayTrendDirection: params.runwayTrend.direction,
           toolsUsed: params.toolsUsed.map((tool) => tool.tool),
         },
+        personalization: {
+          businessSize: params.personalization.businessSize,
+          decisionRole: params.personalization.decisionRole,
+          priorityTopics: params.personalization.priorityTopics,
+          detailLevel: params.personalization.detailLevel,
+          usualPlanningHorizonMonths: params.personalization.planningHorizon,
+          recommendedMaximumWidgets: recommendedMaximum,
+          historyLearningActive: false,
+        },
         eligibleCandidates: params.candidates.map((candidate) => ({
           id: candidate.id,
           label: candidate.label,
@@ -483,6 +580,7 @@ async function chooseWidgetsWithModel(params: {
           selectionGuidance: candidate.selectionGuidance,
           audience: candidate.audience,
           redundancyGroup: candidate.redundancyGroup,
+          personalizationFit: candidate.personalizationFit,
         })),
         outputShape: {
           widgets: [
@@ -974,7 +1072,13 @@ export async function planGenUi({
   const forecastMetricKey = forecastMetricKeyForMessage(userMessage)
   const forecastHorizon = forecastHorizonForMessage(userMessage)
 
-  const [snapshot, runwayTrend, metricHistoryCollection, metricForecastCollection] = await Promise.all([
+  const [
+    snapshot,
+    runwayTrend,
+    metricHistoryCollection,
+    metricForecastCollection,
+    personalization,
+  ] = await Promise.all([
     readSourceAwareMetrics(userId),
     readRunwayObservationHistory(userId).catch(() => ({
       observations: [],
@@ -988,6 +1092,13 @@ export async function planGenUi({
     forecastMetricKey
       ? readFinancialMetricForecastSeries({ userId, metricKey: forecastMetricKey, range: 'all', horizon: forecastHorizon, recordLimit: 'all' }).catch(() => null)
       : Promise.resolve(null),
+    getGenUiPersonalization(userId).catch((error) => {
+      console.error(
+        'Gen UI personalization could not be loaded; using neutral defaults.',
+        error
+      )
+      return DEFAULT_GEN_UI_PERSONALIZATION
+    }),
   ])
   const fallbackSpecs = defaultWidgetSpecs(userMessage, snapshot, source)
   const selectedText = extractSelectedText(userMessage)
@@ -1005,6 +1116,7 @@ export async function planGenUi({
         (series) => series.forecastPoints.length > 0
       ) ?? false,
     hasScenarioResult: scenarioResult !== null,
+    personalization,
   })
   let modelSpecs: PlannerWidget[] | null = null
 
@@ -1017,6 +1129,7 @@ export async function planGenUi({
       runwayTrend,
       source,
       candidates,
+      personalization,
     })
   } catch (error) {
     console.error(

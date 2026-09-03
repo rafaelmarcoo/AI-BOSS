@@ -4,6 +4,7 @@ import { readSourceAwareMetrics } from '@/lib/financial-data/read-service'
 import { readRunwayObservationHistory } from '@/lib/financial-data/runway-history'
 import { readFinancialMetricHistorySeries } from '@/lib/financial-data/metric-history'
 import { readFinancialMetricForecastSeries } from '@/lib/financial-data/metric-forecast'
+import { getGenUiPersonalization } from '@/lib/gen-ui/preferences-persistence'
 import { planGenUi } from '@/lib/gen-ui/plan-gen-ui'
 
 const mockPlannerInvoke = jest.fn()
@@ -32,6 +33,9 @@ jest.mock('@/lib/financial-data/metric-history', () => ({
 jest.mock('@/lib/financial-data/metric-forecast', () => ({
   readFinancialMetricForecastSeries: jest.fn(),
 }))
+jest.mock('@/lib/gen-ui/preferences-persistence', () => ({
+  getGenUiPersonalization: jest.fn(),
+}))
 
 const mockChatOpenAI = jest.mocked(ChatOpenAI)
 const mockReadSourceAwareMetrics = jest.mocked(readSourceAwareMetrics)
@@ -40,6 +44,7 @@ const mockReadRunwayObservationHistory = jest.mocked(
 )
 const mockReadFinancialMetricHistorySeries = jest.mocked(readFinancialMetricHistorySeries)
 const mockReadFinancialMetricForecastSeries = jest.mocked(readFinancialMetricForecastSeries)
+const mockGetGenUiPersonalization = jest.mocked(getGenUiPersonalization)
 const originalApiKey = process.env.OPENAI_API_KEY
 
 describe('planGenUi', () => {
@@ -87,6 +92,15 @@ describe('planGenUi', () => {
       metricKey: 'cash', label: 'Cash', range: 'all', horizon: 3,
       }],
     } as never)
+    mockGetGenUiPersonalization.mockResolvedValue({
+      businessSize: null,
+      canEditBusinessSize: false,
+      decisionRole: 'owner',
+      priorityTopics: [],
+      detailLevel: 'balanced',
+      planningHorizon: 6,
+      learnFromHistory: false,
+    })
   })
 
   afterAll(() => {
@@ -195,6 +209,49 @@ describe('planGenUi', () => {
     })
 
     expect(plan).toBeNull()
+  })
+
+  it('uses explicit profile settings as tie-breakers without removing eligible widgets', async () => {
+    const metrics = fillUnavailableMetrics({
+      cash: {
+        status: 'available', key: 'cash', value: 120000, currency: 'NZD',
+        periodStart: null, periodEnd: null, asOfDate: '2026-08-31',
+        provenance: { sourceType: 'document', sourceLabel: 'cash-summary.csv' },
+        confidence: 0.95, updatedAt: '2026-08-31T00:00:00.000Z',
+      },
+    })
+    mockReadSourceAwareMetrics.mockResolvedValue({
+      metrics,
+      availableMetricCount: 1,
+      unavailableMetricCount: Object.keys(metrics).length - 1,
+      runwayInput: null,
+    })
+    mockGetGenUiPersonalization.mockResolvedValue({
+      businessSize: 'large',
+      canEditBusinessSize: true,
+      decisionRole: 'finance',
+      priorityTopics: ['forecasting', 'cost_control'],
+      detailLevel: 'quick',
+      planningHorizon: 12,
+      learnFromHistory: false,
+    })
+    mockPlannerInvoke.mockResolvedValue({ widgets: [] })
+
+    await planGenUi({
+      userId: 'user-123',
+      userMessage: 'Give me a quick view of our cash position.',
+      assistantMessage: 'Here is the latest cash position.',
+      toolsUsed: [],
+    })
+
+    const plannerMessages = mockPlannerInvoke.mock.calls[0][0]
+    const systemPrompt = String(plannerMessages[0].content)
+    const plannerPayload = String(plannerMessages[1].content)
+    expect(systemPrompt).toContain('Choose 0 to 2 widgets')
+    expect(plannerPayload).toContain('"businessSize":"large"')
+    expect(plannerPayload).toContain('"decisionRole":"finance"')
+    expect(plannerPayload).toContain('"usualPlanningHorizonMonths":12')
+    expect(plannerPayload).toContain('current_cash_balance')
   })
 
   it('discards a model selection that was not in the eligible candidates', async () => {

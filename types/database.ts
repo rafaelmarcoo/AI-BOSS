@@ -8,6 +8,23 @@ export type UserType = 'admin' | 'employee'
 export type ConversationVisibility = 'private' | 'company' | 'admins'
 export type ScenarioVisibility = 'private' | 'company'
 export type ScenarioStatus = 'draft' | 'calculated'
+export type BusinessSize = 'small' | 'medium' | 'large'
+export type GenUiDecisionRole =
+  | 'owner'
+  | 'finance'
+  | 'manager'
+  | 'accountant'
+  | 'operations'
+  | 'team_member'
+export type GenUiPriorityTopic =
+  | 'cash_runway'
+  | 'growth'
+  | 'cost_control'
+  | 'collections'
+  | 'forecasting'
+  | 'profitability'
+export type GenUiDetailLevel = 'quick' | 'balanced' | 'detailed'
+export type GenUiPlanningHorizon = 3 | 6 | 12
 
 export interface User {
   id: string
@@ -22,7 +39,19 @@ export interface User {
 export interface Company {
   id: string
   name: string
+  business_size: BusinessSize | null
+  planning_horizon: GenUiPlanningHorizon
   created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface UserGenUiPreferences {
+  user_id: string
+  decision_role: GenUiDecisionRole
+  priority_topics: GenUiPriorityTopic[]
+  detail_level: GenUiDetailLevel
+  learn_from_history: boolean
   created_at: string
   updated_at: string
 }

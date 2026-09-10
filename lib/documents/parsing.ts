@@ -253,9 +253,12 @@ async function parseImageDocument(
     }
 
     let extractedMetrics: Record<string, number> = {}
+    let extractedMetricIssues: Array<{ label: string; rawValue: string }> = []
 
     try {
-      extractedMetrics = await extractImageMetrics(fileBytes, document.mime_type)
+      const result = await extractImageMetrics(fileBytes, document.mime_type)
+      extractedMetrics = result.metrics
+      extractedMetricIssues = result.issues
     } catch (metricsError) {
       console.error(
         `Failed to extract structured metrics from ${document.file_name}.`,
@@ -263,10 +266,19 @@ async function parseImageDocument(
       )
     }
 
+    const metadata: Record<string, unknown> = {}
+
+    if (Object.keys(extractedMetrics).length > 0) {
+      metadata.extractedMetrics = extractedMetrics
+    }
+
+    if (extractedMetricIssues.length > 0) {
+      metadata.extractedMetricIssues = extractedMetricIssues
+    }
+
     return {
       rawText: text,
-      metadata:
-        Object.keys(extractedMetrics).length > 0 ? { extractedMetrics } : {},
+      metadata,
       chunks: createImageChunks({
         documentId: document.id,
         userId: document.user_id,

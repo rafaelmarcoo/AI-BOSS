@@ -14,37 +14,67 @@ const IMAGE_EXTRACTION_PROMPT =
 const IMAGE_METRICS_PROMPT =
   'Identify any financial figures in this image (expenses, revenue, totals, ' +
   'line items, department or category breakdowns, etc.). Return them as a ' +
-  'flat JSON object mapping a short, human-readable label to its numeric ' +
-  'value, e.g. {"Icecream Expenses": 500, "Revenue": 4000}. Only include ' +
-  'values you can clearly read. If there are no financial figures, return {}. ' +
-  'Respond with ONLY the JSON object and nothing else — no markdown, no ' +
+  'flat JSON object mapping a short, human-readable label to its value ' +
+  'exactly as written in the image, as a string, e.g. ' +
+  '{"Icecream Expenses": "500", "Revenue": "4000"}. Include every value you ' +
+  'can see next to a label, even if it does not look like a valid number ' +
+  '(e.g. {"Expenses": "egg"}) — do not skip or omit anything, do not try to ' +
+  'correct or guess at a number. If there are no financial figures, return ' +
+  '{}. Respond with ONLY the JSON object and nothing else — no markdown, no ' +
   'explanation.'
 
-function parseMetricsJson(raw: string): Record<string, number> {
+export interface ImageMetricIssue {
+  label: string
+  rawValue: string
+}
+
+export interface ImageMetricsResult {
+  metrics: Record<string, number>
+  issues: ImageMetricIssue[]
+}
+
+function parseMetricsJson(raw: string): ImageMetricsResult {
+  const empty: ImageMetricsResult = { metrics: {}, issues: [] }
   const jsonMatch = raw.match(/\{[\s\S]*\}/)
 
   if (!jsonMatch) {
-    return {}
+    return empty
   }
 
   try {
     const parsed: unknown = JSON.parse(jsonMatch[0])
 
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return {}
+      return empty
     }
 
     const metrics: Record<string, number> = {}
+    const issues: ImageMetricIssue[] = []
 
     for (const [label, value] of Object.entries(parsed as Record<string, unknown>)) {
       if (typeof value === 'number' && Number.isFinite(value)) {
         metrics[label] = value
+        continue
+      }
+
+      const rawValue = String(value).trim()
+
+      if (!rawValue) {
+        continue
+      }
+
+      const numeric = Number(rawValue.replace(/[,$£€¥]/g, ''))
+
+      if (Number.isFinite(numeric)) {
+        metrics[label] = numeric
+      } else {
+        issues.push({ label, rawValue })
       }
     }
 
-    return metrics
+    return { metrics, issues }
   } catch {
-    return {}
+    return empty
   }
 }
 
@@ -83,7 +113,7 @@ export async function extractImageText(
 export async function extractImageMetrics(
   fileBytes: Uint8Array,
   mimeType: string
-): Promise<Record<string, number>> {
+): Promise<ImageMetricsResult> {
   const apiKey = process.env.OPENAI_API_KEY
 
   if (!apiKey) {

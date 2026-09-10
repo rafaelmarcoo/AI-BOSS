@@ -30,34 +30,66 @@ function isPendingStatus(status: DocumentSummaryView["status"]) {
   return status === "uploaded" || status === "processing";
 }
 
-function getMetricObservationCount(metadata: unknown): number | null {
+function asMetadataRecord(metadata: unknown): Record<string, unknown> | null {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
     return null;
   }
 
-  const count = (metadata as Record<string, unknown>).metricObservationCount;
-
-  return typeof count === "number" ? count : null;
+  return metadata as Record<string, unknown>;
 }
 
-interface CsvValueIssue {
-  rowNumber: number;
+// CSV/PDF metrics are counted via metricObservationCount (financial_metric_observations
+// rows). Images store their own metrics separately in extractedMetrics, since they
+// don't feed financial_metric_observations. A document "succeeded" if either produced
+// at least one recognized value.
+function hasAnyRecognizedMetric(metadata: unknown): boolean {
+  const record = asMetadataRecord(metadata);
+
+  if (!record) {
+    return false;
+  }
+
+  const observationCount = record.metricObservationCount;
+
+  if (typeof observationCount === "number" && observationCount > 0) {
+    return true;
+  }
+
+  const extractedMetrics = record.extractedMetrics;
+
+  return (
+    Boolean(extractedMetrics) &&
+    typeof extractedMetrics === "object" &&
+    Object.keys(extractedMetrics as Record<string, unknown>).length > 0
+  );
+}
+
+interface ValueIssue {
   label: string;
   rawValue: string;
 }
 
-function getCsvValueIssues(metadata: unknown): CsvValueIssue[] {
-  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+// CSV issues live under valueIssues, image issues under extractedMetricIssues —
+// same shape (label + rawValue), just written by different extraction paths.
+function getValueIssues(metadata: unknown): ValueIssue[] {
+  const record = asMetadataRecord(metadata);
+
+  if (!record) {
     return [];
   }
 
-  const issues = (metadata as Record<string, unknown>).valueIssues;
+  const csvIssues = Array.isArray(record.valueIssues)
+    ? (record.valueIssues as ValueIssue[])
+    : [];
+  const imageIssues = Array.isArray(record.extractedMetricIssues)
+    ? (record.extractedMetricIssues as ValueIssue[])
+    : [];
 
-  return Array.isArray(issues) ? (issues as CsvValueIssue[]) : [];
+  return [...csvIssues, ...imageIssues];
 }
 
 function buildDocumentWarningMessage(document: DocumentSummaryView): string | null {
-  const valueIssues = getCsvValueIssues(document.metadata);
+  const valueIssues = getValueIssues(document.metadata);
 
   if (valueIssues.length > 0) {
     const details = valueIssues
@@ -70,7 +102,7 @@ function buildDocumentWarningMessage(document: DocumentSummaryView): string | nu
     return `${document.file_name}: these values couldn't be read as numbers: ${details}${suffix}.`;
   }
 
-  if (getMetricObservationCount(document.metadata) === 0) {
+  if (!hasAnyRecognizedMetric(document.metadata)) {
     return `${document.file_name} uploaded, but no financial data was recognized in it. Check that it includes recognizable account/amount data.`;
   }
 

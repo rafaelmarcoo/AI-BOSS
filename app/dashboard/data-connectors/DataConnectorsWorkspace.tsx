@@ -47,9 +47,14 @@ interface PivotColumn {
   label: string;
 }
 
+interface PivotCellValue {
+  value: number | null;
+  rawValue?: string;
+}
+
 interface PivotRow {
   metricLabel: string;
-  values: Record<string, number>;
+  values: Record<string, PivotCellValue>;
 }
 
 function formatMetricKeyLabel(metricKey: string) {
@@ -75,6 +80,21 @@ function getExtractedMetrics(metadata: unknown): Record<string, number> | null {
   }
 
   return extractedMetrics as Record<string, number>;
+}
+
+interface ExtractedMetricIssue {
+  label: string;
+  rawValue: string;
+}
+
+function getExtractedMetricIssues(metadata: unknown): ExtractedMetricIssue[] {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return [];
+  }
+
+  const issues = (metadata as Record<string, unknown>).extractedMetricIssues;
+
+  return Array.isArray(issues) ? (issues as ExtractedMetricIssue[]) : [];
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -273,7 +293,13 @@ export function DataConnectorsWorkspace() {
 
   const pivot = useMemo(() => {
     const columns = new Map<string, string>();
-    const pivotRows = new Map<string, Record<string, number>>();
+    const pivotRows = new Map<string, Record<string, PivotCellValue>>();
+
+    const setCell = (metricLabel: string, columnKey: string, cell: PivotCellValue) => {
+      const row = pivotRows.get(metricLabel) ?? {};
+      row[columnKey] = cell;
+      pivotRows.set(metricLabel, row);
+    };
 
     for (const metric of metricsBySource) {
       // Each document gets its own column (same scheme images use below) so
@@ -289,22 +315,24 @@ export function DataConnectorsWorkspace() {
       columns.set(columnKey, columnLabel);
 
       const metricLabel = formatMetricKeyLabel(metric.metricKey);
-      const row = pivotRows.get(metricLabel) ?? {};
-      row[columnKey] = metric.value;
-      pivotRows.set(metricLabel, row);
+      setCell(metricLabel, columnKey, { value: metric.value });
     }
 
     for (const document of documents) {
       const extractedMetrics = getExtractedMetrics(document.metadata);
-      if (!extractedMetrics) continue;
+      const extractedMetricIssues = getExtractedMetricIssues(document.metadata);
+
+      if (!extractedMetrics && extractedMetricIssues.length === 0) continue;
 
       const columnKey = `document-${document.id}`;
       columns.set(columnKey, document.file_name);
 
-      for (const [label, value] of Object.entries(extractedMetrics)) {
-        const row = pivotRows.get(label) ?? {};
-        row[columnKey] = value;
-        pivotRows.set(label, row);
+      for (const [label, value] of Object.entries(extractedMetrics ?? {})) {
+        setCell(label, columnKey, { value });
+      }
+
+      for (const issue of extractedMetricIssues) {
+        setCell(issue.label, columnKey, { value: null, rawValue: issue.rawValue });
       }
     }
 
@@ -538,17 +566,27 @@ export function DataConnectorsWorkspace() {
                     <TableCell sx={{ color: dashboardTokens.text }}>
                       {row.metricLabel}
                     </TableCell>
-                    {visiblePivotColumns.map((column) => (
-                      <TableCell
-                        key={column.key}
-                        align="right"
-                        sx={{ color: dashboardTokens.text }}
-                      >
-                        {row.values[column.key] !== undefined
-                          ? row.values[column.key]
-                          : "—"}
-                      </TableCell>
-                    ))}
+                    {visiblePivotColumns.map((column) => {
+                      const cell = row.values[column.key];
+                      const isFlagged = cell && cell.value === null;
+
+                      return (
+                        <TableCell
+                          key={column.key}
+                          align="right"
+                          sx={{
+                            color: isFlagged ? "#fca5a5" : dashboardTokens.text,
+                          }}
+                          title={isFlagged ? `Couldn't read "${cell.rawValue}" as a number` : undefined}
+                        >
+                          {cell === undefined
+                            ? "—"
+                            : isFlagged
+                              ? `"${cell.rawValue}"`
+                              : cell.value}
+                        </TableCell>
+                      );
+                    })}
                   </TableRow>
                 ))}
               </TableBody>

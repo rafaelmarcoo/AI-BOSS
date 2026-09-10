@@ -165,6 +165,8 @@ export interface FinancialMetricBySource {
   sourceLabel: string
   value: number
   currency: string | null
+  documentId: string | null
+  connectionId: string | null
 }
 
 export async function listLatestFinancialMetricValuesBySource(
@@ -188,7 +190,11 @@ export async function listLatestFinancialMetricValuesBySource(
   const latestBySourceAndMetric = new Map<string, FinancialMetricObservation>()
 
   for (const row of (data ?? []) as FinancialMetricObservation[]) {
-    const groupKey = `${row.metric_key}::${row.source_type}`
+    // Group by the actual document/connection, not just source_type — every
+    // "document" upload otherwise shares one bucket per metric_key and
+    // silently overwrites other uploads' values for the same metric.
+    const sourceIdentity = row.document_id ?? row.connection_id ?? row.source_type
+    const groupKey = `${row.metric_key}::${sourceIdentity}`
 
     if (!latestBySourceAndMetric.has(groupKey)) {
       latestBySourceAndMetric.set(groupKey, row)
@@ -201,6 +207,8 @@ export async function listLatestFinancialMetricValuesBySource(
     sourceLabel: row.source_label,
     value: Number(row.value),
     currency: row.currency,
+    documentId: row.document_id,
+    connectionId: row.connection_id,
   }))
 }
 

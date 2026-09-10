@@ -32,6 +32,8 @@ interface FinancialMetricBySource {
   sourceLabel: string;
   value: number;
   currency: string | null;
+  documentId: string | null;
+  connectionId: string | null;
 }
 
 interface FinancialMetricsBySourceApiResponse {
@@ -274,8 +276,17 @@ export function DataConnectorsWorkspace() {
     const pivotRows = new Map<string, Record<string, number>>();
 
     for (const metric of metricsBySource) {
-      const columnKey = `provider-${metric.sourceType}`;
-      columns.set(columnKey, PROVIDER_LABELS[metric.sourceType] ?? metric.sourceType);
+      // Each document gets its own column (same scheme images use below) so
+      // two different CSV/PDF uploads don't collide into one "document"
+      // column. Accounting connections still key by provider, since a user
+      // only ever has one connection per provider.
+      const columnKey = metric.documentId
+        ? `document-${metric.documentId}`
+        : `provider-${metric.sourceType}`;
+      const columnLabel = metric.documentId
+        ? metric.sourceLabel
+        : (PROVIDER_LABELS[metric.sourceType] ?? metric.sourceType);
+      columns.set(columnKey, columnLabel);
 
       const metricLabel = formatMetricKeyLabel(metric.metricKey);
       const row = pivotRows.get(metricLabel) ?? {};

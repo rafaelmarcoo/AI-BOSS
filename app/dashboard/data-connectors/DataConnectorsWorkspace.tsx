@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Chip,
+  CircularProgress,
   Paper,
+  Snackbar,
   Stack,
   Table,
   TableBody,
@@ -12,6 +14,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
   Typography,
 } from "@mui/material";
 import { dashboardTokens } from "@/app/theme";
@@ -27,6 +30,7 @@ interface ProviderStatusApiResponse {
 }
 
 interface FinancialMetricBySource {
+  id: string;
   metricKey: string;
   sourceType: string;
   sourceLabel: string;
@@ -50,6 +54,10 @@ interface PivotColumn {
 interface PivotCellValue {
   value: number | null;
   rawValue?: string;
+  // Exactly one of these identifies where this cell's value actually lives,
+  // so an edit knows which backend route to call.
+  observationId?: string;
+  documentId?: string;
 }
 
 interface PivotRow {
@@ -156,6 +164,10 @@ export function DataConnectorsWorkspace() {
   const [deselectedPivotColumns, setDeselectedPivotColumns] = useState<
     Set<string>
   >(new Set());
+  const [editingCellKey, setEditingCellKey] = useState<string | null>(null);
+  const [editingValue, setEditingValue] = useState("");
+  const [savingCell, setSavingCell] = useState(false);
+  const [cellError, setCellError] = useState<string | null>(null);
 
   const togglePivotColumn = (key: string) => {
     setDeselectedPivotColumns((previous) => {
@@ -179,6 +191,122 @@ export function DataConnectorsWorkspace() {
       }
       return next;
     });
+  };
+
+  const cellKey = (rowMetricLabel: string, columnKey: string) =>
+    `${rowMetricLabel}::${columnKey}`;
+
+  const startEditingCell = (
+    rowMetricLabel: string,
+    columnKey: string,
+    cell: PivotCellValue | undefined,
+  ) => {
+    // Only cells backed by a real extracted value can be edited — an empty
+    // intersection has nothing to correct, that would be adding new data.
+    if (!cell?.observationId && !cell?.documentId) return;
+
+    setCellError(null);
+    setEditingCellKey(cellKey(rowMetricLabel, columnKey));
+    setEditingValue(
+      cell.value !== null && cell.value !== undefined
+        ? String(cell.value)
+        : cell.rawValue ?? "",
+    );
+  };
+
+  const cancelEditingCell = () => {
+    setEditingCellKey(null);
+    setEditingValue("");
+    setCellError(null);
+  };
+
+  const saveEditingCell = async (
+    rowMetricLabel: string,
+    cell: PivotCellValue | undefined,
+  ) => {
+    const parsed = Number(editingValue.trim());
+
+    if (!editingValue.trim() || !Number.isFinite(parsed)) {
+      setCellError("Enter a valid number.");
+      return;
+    }
+
+    setSavingCell(true);
+    setCellError(null);
+
+    try {
+      if (cell?.observationId) {
+        const response = await fetch(
+          `/api/financial-data/observations/${cell.observationId}`,
+          {
+            method: "PATCH",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ value: parsed }),
+          },
+        );
+        const payload = await response.json();
+
+        if (!response.ok || !payload.success) {
+          throw new Error(payload.error?.message ?? "Could not save the value.");
+        }
+
+        setMetricsBySource((previous) =>
+          previous.map((metric) =>
+            metric.id === cell.observationId ? { ...metric, value: parsed } : metric,
+          ),
+        );
+      } else if (cell?.documentId) {
+        const response = await fetch(
+          `/api/documents/${cell.documentId}/metrics`,
+          {
+            method: "PATCH",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ label: rowMetricLabel, value: parsed }),
+          },
+        );
+        const payload = await response.json();
+
+        if (!response.ok || !payload.success) {
+          throw new Error(payload.error?.message ?? "Could not save the value.");
+        }
+
+        setDocuments((previous) =>
+          previous.map((document) => {
+            if (document.id !== cell.documentId) return document;
+
+            const currentMetadata =
+              document.metadata &&
+              typeof document.metadata === "object" &&
+              !Array.isArray(document.metadata)
+                ? (document.metadata as Record<string, unknown>)
+                : {};
+            const existingMetrics = getExtractedMetrics(currentMetadata) ?? {};
+            const existingIssues = getExtractedMetricIssues(currentMetadata);
+
+            return {
+              ...document,
+              metadata: {
+                ...currentMetadata,
+                extractedMetrics: { ...existingMetrics, [rowMetricLabel]: parsed },
+                extractedMetricIssues: existingIssues.filter(
+                  (issue) => issue.label !== rowMetricLabel,
+                ),
+              },
+            };
+          }),
+        );
+      }
+
+      cancelEditingCell();
+    } catch (saveError) {
+      setCellError(
+        saveError instanceof Error ? saveError.message : "Could not save the value.",
+      );
+    } finally {
+      setSavingCell(false);
+    }
   };
 
   useEffect(() => {
@@ -315,7 +443,7 @@ export function DataConnectorsWorkspace() {
       columns.set(columnKey, columnLabel);
 
       const metricLabel = formatMetricKeyLabel(metric.metricKey);
-      setCell(metricLabel, columnKey, { value: metric.value });
+      setCell(metricLabel, columnKey, { value: metric.value, observationId: metric.id });
     }
 
     for (const document of documents) {
@@ -328,11 +456,15 @@ export function DataConnectorsWorkspace() {
       columns.set(columnKey, document.file_name);
 
       for (const [label, value] of Object.entries(extractedMetrics ?? {})) {
-        setCell(label, columnKey, { value });
+        setCell(label, columnKey, { value, documentId: document.id });
       }
 
       for (const issue of extractedMetricIssues) {
-        setCell(issue.label, columnKey, { value: null, rawValue: issue.rawValue });
+        setCell(issue.label, columnKey, {
+          value: null,
+          rawValue: issue.rawValue,
+          documentId: document.id,
+        });
       }
     }
 
@@ -568,16 +700,68 @@ export function DataConnectorsWorkspace() {
                     </TableCell>
                     {visiblePivotColumns.map((column) => {
                       const cell = row.values[column.key];
-                      const isFlagged = cell && cell.value === null;
+                      const isFlagged = Boolean(cell && cell.value === null);
+                      const isEditable = Boolean(cell?.observationId || cell?.documentId);
+                      const isEditing =
+                        editingCellKey === cellKey(row.metricLabel, column.key);
+
+                      if (isEditing) {
+                        return (
+                          <TableCell key={column.key} align="right">
+                            <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                              <TextField
+                                size="small"
+                                autoFocus
+                                value={editingValue}
+                                onChange={(event) => setEditingValue(event.target.value)}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") {
+                                    void saveEditingCell(row.metricLabel, cell);
+                                  } else if (event.key === "Escape") {
+                                    cancelEditingCell();
+                                  }
+                                }}
+                                disabled={savingCell}
+                                error={Boolean(cellError)}
+                                sx={{ maxWidth: 120 }}
+                                inputProps={{ style: { textAlign: "right" } }}
+                              />
+                              {savingCell ? (
+                                <CircularProgress size={18} />
+                              ) : (
+                                <Stack direction="row" spacing={0}>
+                                  <Chip
+                                    size="small"
+                                    label="Save"
+                                    onClick={() => void saveEditingCell(row.metricLabel, cell)}
+                                    sx={{ cursor: "pointer" }}
+                                  />
+                                </Stack>
+                              )}
+                            </Stack>
+                          </TableCell>
+                        );
+                      }
 
                       return (
                         <TableCell
                           key={column.key}
                           align="right"
+                          onClick={() => startEditingCell(row.metricLabel, column.key, cell)}
                           sx={{
                             color: isFlagged ? "#fca5a5" : dashboardTokens.text,
+                            cursor: isEditable ? "pointer" : "default",
+                            "&:hover": isEditable
+                              ? { bgcolor: dashboardTokens.surfaceAlt }
+                              : undefined,
                           }}
-                          title={isFlagged ? `Couldn't read "${cell.rawValue}" as a number` : undefined}
+                          title={
+                            isFlagged
+                              ? `Couldn't read "${cell.rawValue}" as a number — click to correct`
+                              : isEditable
+                                ? "Click to edit"
+                                : undefined
+                          }
                         >
                           {cell === undefined
                             ? "—"
@@ -594,6 +778,14 @@ export function DataConnectorsWorkspace() {
           </TableContainer>
         )}
       </Box>
+
+      <Snackbar
+        open={Boolean(cellError)}
+        autoHideDuration={5000}
+        onClose={() => setCellError(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        message={cellError}
+      />
     </Stack>
   );
 }

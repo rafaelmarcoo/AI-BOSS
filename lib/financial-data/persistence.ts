@@ -160,6 +160,7 @@ export async function listLatestFinancialMetricValues(userId: string) {
 }
 
 export interface FinancialMetricBySource {
+  id: string
   metricKey: FinancialMetricKey
   sourceType: string
   sourceLabel: string
@@ -202,6 +203,7 @@ export async function listLatestFinancialMetricValuesBySource(
   }
 
   return [...latestBySourceAndMetric.values()].map((row) => ({
+    id: row.id,
     metricKey: row.metric_key,
     sourceType: row.source_type,
     sourceLabel: row.source_label,
@@ -210,6 +212,35 @@ export async function listLatestFinancialMetricValuesBySource(
     documentId: row.document_id,
     connectionId: row.connection_id,
   }))
+}
+
+export async function updateFinancialMetricObservationValue(params: {
+  userId: string
+  observationId: string
+  value: number
+}) {
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase
+    .from('financial_metric_observations')
+    .update({ value: params.value, updated_at: new Date().toISOString() })
+    .eq('id', params.observationId)
+    .eq('user_id', params.userId)
+    .select(FINANCIAL_METRIC_OBSERVATION_SELECT)
+    .maybeSingle()
+
+  if (error) {
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to update financial metric observation.'
+    )
+  }
+
+  if (!data) {
+    throw new ApiError(404, 'NOT_FOUND', 'Financial metric observation not found.')
+  }
+
+  return data as FinancialMetricObservation
 }
 
 export async function listFinancialMetricObservationHistory(params: {

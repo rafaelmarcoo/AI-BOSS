@@ -242,6 +242,41 @@ export async function getDocumentById(documentId: string, userId: string) {
   return data as Document
 }
 
+export async function updateDocumentExtractedMetric(params: {
+  documentId: string
+  userId: string
+  label: string
+  value: number
+}) {
+  const document = await getDocumentById(params.documentId, params.userId)
+  const currentMetadata =
+    document.metadata && typeof document.metadata === 'object' && !Array.isArray(document.metadata)
+      ? (document.metadata as Record<string, unknown>)
+      : {}
+
+  const existingMetrics =
+    currentMetadata.extractedMetrics &&
+    typeof currentMetadata.extractedMetrics === 'object' &&
+    !Array.isArray(currentMetadata.extractedMetrics)
+      ? (currentMetadata.extractedMetrics as Record<string, number>)
+      : {}
+
+  const existingIssues = Array.isArray(currentMetadata.extractedMetricIssues)
+    ? (currentMetadata.extractedMetricIssues as Array<{ label: string; rawValue: string }>)
+    : []
+
+  const updatedMetadata: Record<string, unknown> = {
+    ...currentMetadata,
+    extractedMetrics: { ...existingMetrics, [params.label]: params.value },
+    // Correcting a flagged value resolves the issue that flagged it.
+    extractedMetricIssues: existingIssues.filter((issue) => issue.label !== params.label),
+  }
+
+  return updateDocumentRecord(params.documentId, params.userId, {
+    metadata: updatedMetadata,
+  })
+}
+
 export async function updateDocumentRecord(
   documentId: string,
   userId: string,

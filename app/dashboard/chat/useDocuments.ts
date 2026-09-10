@@ -9,8 +9,14 @@ import type {
 
 const POLL_INTERVAL_MS = 2500;
 
+export interface DocumentWarning {
+  document: DocumentSummaryView;
+  message: string;
+}
+
 interface UseDocumentsOptions {
   onDocumentsProcessed?: () => void;
+  onDocumentWarning?: (warning: DocumentWarning) => void;
 }
 
 function hasPendingDocuments(documents: DocumentSummaryView[]) {
@@ -24,7 +30,54 @@ function isPendingStatus(status: DocumentSummaryView["status"]) {
   return status === "uploaded" || status === "processing";
 }
 
-function didAnyDocumentFinishProcessing(
+function getMetricObservationCount(metadata: unknown): number | null {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return null;
+  }
+
+  const count = (metadata as Record<string, unknown>).metricObservationCount;
+
+  return typeof count === "number" ? count : null;
+}
+
+interface CsvValueIssue {
+  rowNumber: number;
+  label: string;
+  rawValue: string;
+}
+
+function getCsvValueIssues(metadata: unknown): CsvValueIssue[] {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return [];
+  }
+
+  const issues = (metadata as Record<string, unknown>).valueIssues;
+
+  return Array.isArray(issues) ? (issues as CsvValueIssue[]) : [];
+}
+
+function buildDocumentWarningMessage(document: DocumentSummaryView): string | null {
+  const valueIssues = getCsvValueIssues(document.metadata);
+
+  if (valueIssues.length > 0) {
+    const details = valueIssues
+      .slice(0, 3)
+      .map((issue) => `${issue.label} ("${issue.rawValue}")`)
+      .join(", ");
+    const remaining = valueIssues.length - 3;
+    const suffix = remaining > 0 ? `, and ${remaining} more` : "";
+
+    return `${document.file_name}: these values couldn't be read as numbers: ${details}${suffix}.`;
+  }
+
+  if (getMetricObservationCount(document.metadata) === 0) {
+    return `${document.file_name} uploaded, but no financial data was recognized in it. Check that it includes recognizable account/amount data.`;
+  }
+
+  return null;
+}
+
+function findNewlyFinishedDocuments(
   previousDocuments: DocumentSummaryView[],
   nextDocuments: DocumentSummaryView[]
 ) {
@@ -32,11 +85,24 @@ function didAnyDocumentFinishProcessing(
     previousDocuments.map((document) => [document.id, document.status])
   );
 
-  return nextDocuments.some((document) => {
+  return nextDocuments.filter((document) => {
     const previousStatus = previousStatuses.get(document.id);
 
     return Boolean(previousStatus && isPendingStatus(previousStatus) && !isPendingStatus(document.status));
   });
+}
+
+function findNewlyWarnedDocuments(
+  previousDocuments: DocumentSummaryView[],
+  nextDocuments: DocumentSummaryView[]
+): DocumentWarning[] {
+  return findNewlyFinishedDocuments(previousDocuments, nextDocuments)
+    .filter((document) => document.status === "ready")
+    .flatMap((document) => {
+      const message = buildDocumentWarningMessage(document);
+
+      return message ? [{ document, message }] : [];
+    });
 }
 
 export function useDocuments(
@@ -49,10 +115,15 @@ export function useDocuments(
   const [documentsError, setDocumentsError] = useState<string | null>(null);
   const pollingRef = useRef<number | null>(null);
   const onDocumentsProcessedRef = useRef(options.onDocumentsProcessed);
+  const onDocumentWarningRef = useRef(options.onDocumentWarning);
 
   useEffect(() => {
     onDocumentsProcessedRef.current = options.onDocumentsProcessed;
   }, [options.onDocumentsProcessed]);
+
+  useEffect(() => {
+    onDocumentWarningRef.current = options.onDocumentWarning;
+  }, [options.onDocumentWarning]);
 
   const loadDocuments = async (toggleLoading = true) => {
     if (toggleLoading) {
@@ -69,12 +140,27 @@ export function useDocuments(
 
       setDocuments((previousDocuments) => {
         const nextDocuments = payload.data!.documents;
+        const finishedDocuments = findNewlyFinishedDocuments(
+          previousDocuments,
+          nextDocuments
+        );
 
-        if (didAnyDocumentFinishProcessing(previousDocuments, nextDocuments)) {
+        if (finishedDocuments.length > 0) {
           window.setTimeout(() => {
             onDocumentsProcessedRef.current?.();
           }, 0);
         }
+
+        const warnedDocuments = findNewlyWarnedDocuments(
+          previousDocuments,
+          nextDocuments
+        );
+
+        warnedDocuments.forEach((warning) => {
+          window.setTimeout(() => {
+            onDocumentWarningRef.current?.(warning);
+          }, 0);
+        });
 
         return nextDocuments;
       });

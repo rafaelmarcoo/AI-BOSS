@@ -17,6 +17,7 @@ import {
   ListItemText,
   Menu,
   MenuItem,
+  Snackbar,
   Stack,
   TextField,
   Tooltip,
@@ -95,6 +96,7 @@ export function ChatSidebar({
     string | null
   >(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [documentWarning, setDocumentWarning] = useState<string | null>(null);
   const lastHandledPromptId = useRef<string | null>(null);
   const lastHandledInitialMessage = useRef<string | null>(null);
   const {
@@ -121,7 +123,10 @@ export function ChatSidebar({
   const {
     uploading,
     uploadDocument,
-  } = useDocuments(conversationId, { onDocumentsProcessed });
+  } = useDocuments(conversationId, {
+    onDocumentsProcessed,
+    onDocumentWarning: (warning) => setDocumentWarning(warning.message),
+  });
 
   const activeConversation =
     conversations.find((conversation) => conversation.id === conversationId) ??
@@ -624,6 +629,20 @@ export function ChatSidebar({
           </Button>
         </DialogActions>
       </Dialog>
+      <Snackbar
+        open={Boolean(documentWarning)}
+        autoHideDuration={7000}
+        onClose={() => setDocumentWarning(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          severity="warning"
+          variant="filled"
+          onClose={() => setDocumentWarning(null)}
+        >
+          {documentWarning}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

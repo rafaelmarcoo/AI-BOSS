@@ -216,3 +216,44 @@ export function extractCsvFinancialMetrics(params: {
     ]
   })
 }
+
+export interface CsvValueIssue {
+  rowNumber: number
+  label: string
+  rawValue: string
+}
+
+/**
+ * Finds rows where the label column was recognized as a known financial
+ * metric but the amount column couldn't be parsed as a number (e.g. an
+ * "Expenses" row with a value of "egg"). Distinct from rows that simply
+ * don't match any known metric at all — those are not errors, just
+ * unrecognized data.
+ */
+export function findCsvValueIssues(csvData: ParsedCsvData): CsvValueIssue[] {
+  const labelHeader = findHeader(csvData.headers, LABEL_COLUMN_CANDIDATES)
+  const amountHeader = findHeader(csvData.headers, AMOUNT_COLUMN_CANDIDATES)
+
+  if (!labelHeader || !amountHeader) {
+    return []
+  }
+
+  const issues: CsvValueIssue[] = []
+
+  for (const row of csvData.rows) {
+    const rawLabel = readCell(row, labelHeader)
+    const rawValue = readCell(row, amountHeader)
+
+    if (!rawValue) {
+      continue
+    }
+
+    const match = matchMetricLabel(rawLabel)
+
+    if (match && parseNumber(rawValue) === null) {
+      issues.push({ rowNumber: row.rowNumber, label: rawLabel, rawValue })
+    }
+  }
+
+  return issues
+}

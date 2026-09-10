@@ -5,7 +5,10 @@ import {
 } from '@/lib/documents/embeddings'
 import { logDocumentIngestion } from '@/lib/documents/log-document-ingestion'
 import { parseDocumentContent } from '@/lib/documents/parsing'
-import { extractCsvFinancialMetrics } from '@/lib/financial-data/extraction/csv'
+import {
+  extractCsvFinancialMetrics,
+  findCsvValueIssues,
+} from '@/lib/financial-data/extraction/csv'
 import { extractPdfFinancialMetrics } from '@/lib/financial-data/extraction/pdf'
 import {
   deleteFinancialMetricObservationsForDocument,
@@ -23,19 +26,19 @@ import type { ParsedDocumentResult } from '@/lib/documents/types'
 function addMetricObservationCount(
   metadata: unknown,
   metricObservationCount: number,
-  embeddingModel: string
+  embeddingModel: string,
+  valueIssues: ReturnType<typeof findCsvValueIssues> = []
 ) {
-  if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
-    return {
-      ...metadata,
-      metricObservationCount,
-      embeddingModel,
-    }
-  }
+  const base =
+    metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+      ? metadata
+      : {}
 
   return {
+    ...base,
     metricObservationCount,
     embeddingModel,
+    ...(valueIssues.length > 0 ? { valueIssues } : {}),
   }
 }
 
@@ -44,7 +47,7 @@ function getCsvMetrics(params: {
   parsedDocument: ParsedDocumentResult
 }) {
   if (params.document.file_type !== 'csv' || !params.parsedDocument.csvData) {
-    return []
+    return { metrics: [], issues: [] as ReturnType<typeof findCsvValueIssues> }
   }
 
   const extractedAt = new Date().toISOString()
@@ -54,8 +57,9 @@ function getCsvMetrics(params: {
     sourceLabel: params.document.file_name,
     extractedAt,
   })
+  const issues = findCsvValueIssues(params.parsedDocument.csvData)
 
-  return metrics
+  return { metrics, issues }
 }
 
 function getPdfMetrics(params: {
@@ -93,7 +97,7 @@ export async function processDocument(documentId: string, userId: string) {
     const embeddedChunks = await embedDocumentChunks(parsedDocument.chunks)
 
     await replaceDocumentChunks(document.id, document.user_id, embeddedChunks)
-    const csvMetrics = getCsvMetrics({
+    const { metrics: csvMetrics, issues: csvValueIssues } = getCsvMetrics({
       document,
       parsedDocument,
     })
@@ -123,7 +127,8 @@ export async function processDocument(documentId: string, userId: string) {
     const metadata = addMetricObservationCount(
       parsedDocument.metadata,
       metricObservationCount,
-      DOCUMENT_EMBEDDING_MODEL
+      DOCUMENT_EMBEDDING_MODEL,
+      csvValueIssues
     )
 
     await updateDocumentRecord(document.id, document.user_id, {

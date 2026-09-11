@@ -57,6 +57,10 @@ function detectDocumentType(file: File): SupportedDocumentType | null {
     return 'xlsx'
   }
 
+  if (extension === 'txt' || file.type.toLowerCase() === 'text/plain') {
+    return 'text'
+  }
+
   return null
 }
 
@@ -104,7 +108,7 @@ export function validateDocumentUpload(
     throw new ApiError(
       400,
       'BAD_REQUEST',
-      'Only PDF, CSV, XLSX, and image (JPEG, PNG, WebP) uploads are supported right now.'
+      'Only PDF, CSV, XLSX, plain text, and image (JPEG, PNG, WebP) uploads are supported right now.'
     )
   }
 

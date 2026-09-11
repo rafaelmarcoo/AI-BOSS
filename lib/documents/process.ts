@@ -70,7 +70,13 @@ function getPdfMetrics(params: {
   document: Awaited<ReturnType<typeof getDocumentById>>
   parsedDocument: ParsedDocumentResult
 }) {
-  if (params.document.file_type !== 'pdf' || !params.parsedDocument.pdfPages) {
+  // Plain text reuses PDF's page-based extraction (see parseTextDocument),
+  // so it shares this same line-matching logic and the same requirement for
+  // a recognizable reporting-date phrase somewhere in the text.
+  const usesPdfExtraction =
+    params.document.file_type === 'pdf' || params.document.file_type === 'text'
+
+  if (!usesPdfExtraction || !params.parsedDocument.pdfPages) {
     return []
   }
 

@@ -28,13 +28,13 @@ describe('document upload validation', () => {
   })
 
   it('rejects unsupported uploads', () => {
-    const file = new File(['hello'], 'notes.txt', {
-      type: 'text/plain',
+    const file = new File(['hello'], 'archive.zip', {
+      type: 'application/zip',
     })
 
     expect(() => validateDocumentUpload(file)).toThrow(ApiError)
     expect(() => validateDocumentUpload(file)).toThrow(
-      'Only PDF, CSV, XLSX, and image (JPEG, PNG, WebP) uploads are supported right now.'
+      'Only PDF, CSV, XLSX, plain text, and image (JPEG, PNG, WebP) uploads are supported right now.'
     )
   })
 

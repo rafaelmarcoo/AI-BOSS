@@ -236,6 +236,10 @@ export async function parseDocumentContent(
     return parseXlsxDocument(document, fileBytes)
   }
 
+  if (document.file_type === 'text') {
+    return parseTextDocument(document, fileBytes)
+  }
+
   throw new ApiError(400, 'BAD_REQUEST', 'Unsupported document type.')
 }
 
@@ -382,6 +386,53 @@ async function parsePdfDocument(
     )
   } finally {
     await loadingTask.destroy()
+  }
+}
+
+// Plain text has no columns to key off (unlike CSV/XLSX) and no PDF binary
+// to decode — but once decoded, it's free-form "label: value" lines exactly
+// like a PDF's extracted text, so this reuses the same page-based extraction
+// and chunking, treating the whole file as a single page.
+function parseTextDocument(
+  document: Pick<Document, 'id' | 'user_id' | 'file_name'>,
+  fileBytes: Uint8Array
+) {
+  try {
+    const decoded = normalizeWhitespace(Buffer.from(fileBytes).toString('utf8'))
+
+    if (!decoded) {
+      throw new ApiError(
+        400,
+        'BAD_REQUEST',
+        `No readable text was found in ${document.file_name}.`
+      )
+    }
+
+    const lines = decoded.split('\n')
+    const pages: ParsedPdfPage[] = [{ pageNumber: 1, text: decoded, lines }]
+
+    return {
+      rawText: decoded,
+      metadata: {},
+      chunks: createPdfChunks({
+        documentId: document.id,
+        userId: document.user_id,
+        pages,
+      }),
+      pdfPages: pages,
+    }
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error
+    }
+
+    console.error(`Failed to parse text file ${document.file_name}.`, error)
+
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      `Failed to parse text file ${document.file_name}.`
+    )
   }
 }
 

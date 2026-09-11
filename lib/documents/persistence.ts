@@ -79,6 +79,7 @@ async function ensureDocumentsBucketExists() {
         'application/csv',
         'application/vnd.ms-excel',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/plain',
         ...IMAGE_MIME_TYPES,
       ],
     }

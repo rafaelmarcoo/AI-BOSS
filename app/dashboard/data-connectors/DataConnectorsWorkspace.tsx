@@ -723,7 +723,13 @@ export function DataConnectorsWorkspace() {
                                 }}
                                 disabled={savingCell}
                                 error={Boolean(cellError)}
-                                sx={{ maxWidth: 120 }}
+                                sx={{
+                                  maxWidth: 120,
+                                  "& .MuiOutlinedInput-root": {
+                                    color: dashboardTokens.text,
+                                    bgcolor: "rgba(255,255,255,0.04)",
+                                  },
+                                }}
                                 inputProps={{ style: { textAlign: "right" } }}
                               />
                               {savingCell ? (

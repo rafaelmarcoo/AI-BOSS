@@ -90,7 +90,7 @@ export function ChatInput({
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,.csv,.jpg,.jpeg,.png,.webp,application/pdf,text/csv,image/jpeg,image/png,image/webp"
+        accept=".pdf,.csv,.jpg,.jpeg,.png,.webp,.xlsx,application/pdf,text/csv,image/jpeg,image/png,image/webp,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         hidden
         onChange={(event) => void handleFileChange(event)}
       />

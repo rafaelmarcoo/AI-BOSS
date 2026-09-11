@@ -232,6 +232,10 @@ export async function parseDocumentContent(
     return parseImageDocument(document, fileBytes)
   }
 
+  if (document.file_type === 'xlsx') {
+    return parseXlsxDocument(document, fileBytes)
+  }
+
   throw new ApiError(400, 'BAD_REQUEST', 'Unsupported document type.')
 }
 
@@ -381,6 +385,63 @@ async function parsePdfDocument(
   }
 }
 
+// Shared by anything that boils down to a grid of rows/columns — CSV text
+// parses directly into this shape, and XLSX sheets convert into the same
+// shape, so both can reuse identical header-detection/chunking logic.
+function buildTabularDocumentResult(
+  document: Pick<Document, 'id' | 'user_id' | 'file_name'>,
+  rows: string[][],
+  formatLabel: string
+) {
+  if (rows.length === 0) {
+    throw new ApiError(
+      400,
+      'BAD_REQUEST',
+      `No rows were found in ${document.file_name}.`
+    )
+  }
+
+  const headerRowIndex = findCsvHeaderRowIndex(rows)
+  const headers = normalizeHeaders(rows[headerRowIndex] ?? [])
+  const dataRows = rows.slice(headerRowIndex + 1)
+
+  if (dataRows.length === 0) {
+    throw new ApiError(
+      400,
+      'BAD_REQUEST',
+      `${formatLabel} ${document.file_name} must include at least one data row.`
+    )
+  }
+
+  const rowBlocks = dataRows.map((row, index) =>
+    createCsvRowBlock(headers, row, index + 1)
+  )
+  const structuredRows = createStructuredCsvRows(headers, dataRows)
+  const rawText = [
+    `Columns: ${headers.join(', ')}`,
+    ...rowBlocks,
+  ].join('\n\n')
+
+  return {
+    rawText,
+    metadata: {
+      headers,
+      rowCount: dataRows.length,
+      skippedRowCount: headerRowIndex,
+    },
+    csvData: {
+      headers,
+      rows: structuredRows,
+    },
+    chunks: createCsvChunks({
+      documentId: document.id,
+      userId: document.user_id,
+      rowBlocks,
+      headers,
+    }),
+  }
+}
+
 function parseCsvDocument(
   document: Pick<Document, 'id' | 'user_id' | 'file_type' | 'file_name'>,
   fileBytes: Uint8Array
@@ -389,53 +450,7 @@ function parseCsvDocument(
     const decoded = normalizeWhitespace(Buffer.from(fileBytes).toString('utf8'))
     const rows = parseCsvContent(decoded)
 
-    if (rows.length === 0) {
-      throw new ApiError(
-        400,
-        'BAD_REQUEST',
-        `No rows were found in ${document.file_name}.`
-      )
-    }
-
-    const headerRowIndex = findCsvHeaderRowIndex(rows)
-    const headers = normalizeHeaders(rows[headerRowIndex] ?? [])
-    const dataRows = rows.slice(headerRowIndex + 1)
-
-    if (dataRows.length === 0) {
-      throw new ApiError(
-        400,
-        'BAD_REQUEST',
-        `CSV ${document.file_name} must include at least one data row.`
-      )
-    }
-
-    const rowBlocks = dataRows.map((row, index) =>
-      createCsvRowBlock(headers, row, index + 1)
-    )
-    const structuredRows = createStructuredCsvRows(headers, dataRows)
-    const rawText = [
-      `Columns: ${headers.join(', ')}`,
-      ...rowBlocks,
-    ].join('\n\n')
-
-    return {
-      rawText,
-      metadata: {
-        headers,
-        rowCount: dataRows.length,
-        skippedRowCount: headerRowIndex,
-      },
-      csvData: {
-        headers,
-        rows: structuredRows,
-      },
-      chunks: createCsvChunks({
-        documentId: document.id,
-        userId: document.user_id,
-        rowBlocks,
-        headers,
-      }),
-    }
+    return buildTabularDocumentResult(document, rows, 'CSV')
   } catch (error) {
     if (error instanceof ApiError) {
       throw error
@@ -445,6 +460,47 @@ function parseCsvDocument(
       500,
       'INTERNAL_ERROR',
       `Failed to parse CSV ${document.file_name}.`
+    )
+  }
+}
+
+async function parseXlsxDocument(
+  document: Pick<Document, 'id' | 'user_id' | 'file_type' | 'file_name'>,
+  fileBytes: Uint8Array
+) {
+  try {
+    const XLSX = await import('xlsx')
+    const workbook = XLSX.read(fileBytes, { type: 'buffer' })
+    const firstSheetName = workbook.SheetNames[0]
+
+    if (!firstSheetName) {
+      throw new ApiError(
+        400,
+        'BAD_REQUEST',
+        `No sheets were found in ${document.file_name}.`
+      )
+    }
+
+    const sheet = workbook.Sheets[firstSheetName]
+    const rows = XLSX.utils.sheet_to_json<string[]>(sheet, {
+      header: 1,
+      defval: '',
+      raw: false,
+    })
+    const stringRows = rows.map((row) => row.map((cell) => String(cell ?? '').trim()))
+
+    return buildTabularDocumentResult(document, stringRows, 'Spreadsheet')
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error
+    }
+
+    console.error(`Failed to parse XLSX ${document.file_name}.`, error)
+
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      `Failed to parse spreadsheet ${document.file_name}.`
     )
   }
 }

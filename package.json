@@ -21,12 +21,14 @@
     "@mui/material": "^7.3.9",
     "@supabase/supabase-js": "^2.99.3",
     "langchain": "^1.2.39",
+    "mammoth": "^1.12.2",
     "next": "16.2.1",
     "pdfjs-dist": "^5.4.296",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-markdown": "^10.1.0",
     "recharts": "^3.8.1",
+    "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {

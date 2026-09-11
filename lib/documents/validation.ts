@@ -13,6 +13,10 @@ const CSV_MIME_TYPES = [
   'application/vnd.ms-excel',
 ]
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp']
+const XLSX_MIME_TYPES = [
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel.sheet.macroEnabled.12',
+]
 
 function getFileExtension(fileName: string) {
   const extension = fileName.split('.').pop()
@@ -44,6 +48,13 @@ function detectDocumentType(file: File): SupportedDocumentType | null {
     )
   ) {
     return 'image'
+  }
+
+  if (
+    extension === 'xlsx' ||
+    XLSX_MIME_TYPES.includes(file.type.toLowerCase())
+  ) {
+    return 'xlsx'
   }
 
   return null
@@ -93,7 +104,7 @@ export function validateDocumentUpload(
     throw new ApiError(
       400,
       'BAD_REQUEST',
-      'Only PDF, CSV, and image (JPEG, PNG, WebP) uploads are supported right now.'
+      'Only PDF, CSV, XLSX, and image (JPEG, PNG, WebP) uploads are supported right now.'
     )
   }
 

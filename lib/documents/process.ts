@@ -46,7 +46,11 @@ function getCsvMetrics(params: {
   document: Awaited<ReturnType<typeof getDocumentById>>
   parsedDocument: ParsedDocumentResult
 }) {
-  if (params.document.file_type !== 'csv' || !params.parsedDocument.csvData) {
+  // XLSX sheets convert into the same csvData shape as CSV, so they share
+  // this same deterministic label/amount matching logic.
+  const isTabular = params.document.file_type === 'csv' || params.document.file_type === 'xlsx'
+
+  if (!isTabular || !params.parsedDocument.csvData) {
     return { metrics: [], issues: [] as ReturnType<typeof findCsvValueIssues> }
   }
 

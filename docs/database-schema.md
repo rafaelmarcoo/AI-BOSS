@@ -211,7 +211,7 @@ Stores uploaded user files and their ingestion state.
 | user_id | UUID (FK) | References users(id) |
 | conversation_id | UUID (FK) | Optional link to the conversation that uploaded/used the file |
 | file_name | TEXT | Original file name |
-| file_type | TEXT | `pdf`, `csv`, or `image` |
+| file_type | TEXT | `pdf`, `csv`, `image`, `xlsx`, `text`, or `docx` |
 | mime_type | TEXT | Uploaded MIME type |
 | storage_path | TEXT | Path in Supabase Storage |
 | status | TEXT | `uploaded`, `processing`, `ready`, `failed` |
@@ -419,6 +419,7 @@ All schema changes are tracked in `db/migrations/`:
 - `009_conversation_message_ui_payload.sql` - Adds validated Gen UI payloads to assistant messages
 - `013_delete_document_and_derived_metrics.sql` - Adds atomic owner-only cleanup of a document and its document-derived financial observations
 - `014_document_image_support.sql` - Allows `image` as a document file_type alongside `pdf` and `csv`
+- `015_document_xlsx_text_docx_support.sql` - Allows `xlsx`, `text`, and `docx` as document file_types
 - `010_add_user_type.sql` - Adds admin/employee roles used by company signup and joining; existing company accounts are backfilled as admins
 - `011_company_chat_visibility.sql` - Adds company-scoped conversation history and message read access
 - `012_conversation_visibility_modes.sql` - Adds private, company, and admins-only conversation visibility

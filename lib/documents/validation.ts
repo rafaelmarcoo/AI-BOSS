@@ -17,6 +17,9 @@ const XLSX_MIME_TYPES = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.ms-excel.sheet.macroEnabled.12',
 ]
+const DOCX_MIME_TYPES = [
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+]
 
 function getFileExtension(fileName: string) {
   const extension = fileName.split('.').pop()
@@ -59,6 +62,13 @@ function detectDocumentType(file: File): SupportedDocumentType | null {
 
   if (extension === 'txt' || file.type.toLowerCase() === 'text/plain') {
     return 'text'
+  }
+
+  if (
+    extension === 'docx' ||
+    DOCX_MIME_TYPES.includes(file.type.toLowerCase())
+  ) {
+    return 'docx'
   }
 
   return null
@@ -108,7 +118,7 @@ export function validateDocumentUpload(
     throw new ApiError(
       400,
       'BAD_REQUEST',
-      'Only PDF, CSV, XLSX, plain text, and image (JPEG, PNG, WebP) uploads are supported right now.'
+      'Only PDF, CSV, XLSX, DOCX, plain text, and image (JPEG, PNG, WebP) uploads are supported right now.'
     )
   }
 

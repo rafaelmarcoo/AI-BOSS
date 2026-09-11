@@ -34,7 +34,7 @@ describe('document upload validation', () => {
 
     expect(() => validateDocumentUpload(file)).toThrow(ApiError)
     expect(() => validateDocumentUpload(file)).toThrow(
-      'Only PDF, CSV, XLSX, plain text, and image (JPEG, PNG, WebP) uploads are supported right now.'
+      'Only PDF, CSV, XLSX, DOCX, plain text, and image (JPEG, PNG, WebP) uploads are supported right now.'
     )
   })
 

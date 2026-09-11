@@ -240,6 +240,10 @@ export async function parseDocumentContent(
     return parseTextDocument(document, fileBytes)
   }
 
+  if (document.file_type === 'docx') {
+    return parseDocxDocument(document, fileBytes)
+  }
+
   throw new ApiError(400, 'BAD_REQUEST', 'Unsupported document type.')
 }
 
@@ -393,6 +397,37 @@ async function parsePdfDocument(
 // to decode — but once decoded, it's free-form "label: value" lines exactly
 // like a PDF's extracted text, so this reuses the same page-based extraction
 // and chunking, treating the whole file as a single page.
+// Shared by anything that boils down to "one blob of free-form text" — plain
+// text files use their raw content directly, DOCX converts to text via
+// mammoth first, but from here on both are treated as a single PDF-style
+// page so they share the same chunking and line-matching logic.
+function buildTextAsSinglePageResult(
+  document: Pick<Document, 'id' | 'user_id' | 'file_name'>,
+  decoded: string
+) {
+  if (!decoded) {
+    throw new ApiError(
+      400,
+      'BAD_REQUEST',
+      `No readable text was found in ${document.file_name}.`
+    )
+  }
+
+  const lines = decoded.split('\n')
+  const pages: ParsedPdfPage[] = [{ pageNumber: 1, text: decoded, lines }]
+
+  return {
+    rawText: decoded,
+    metadata: {},
+    chunks: createPdfChunks({
+      documentId: document.id,
+      userId: document.user_id,
+      pages,
+    }),
+    pdfPages: pages,
+  }
+}
+
 function parseTextDocument(
   document: Pick<Document, 'id' | 'user_id' | 'file_name'>,
   fileBytes: Uint8Array
@@ -400,27 +435,7 @@ function parseTextDocument(
   try {
     const decoded = normalizeWhitespace(Buffer.from(fileBytes).toString('utf8'))
 
-    if (!decoded) {
-      throw new ApiError(
-        400,
-        'BAD_REQUEST',
-        `No readable text was found in ${document.file_name}.`
-      )
-    }
-
-    const lines = decoded.split('\n')
-    const pages: ParsedPdfPage[] = [{ pageNumber: 1, text: decoded, lines }]
-
-    return {
-      rawText: decoded,
-      metadata: {},
-      chunks: createPdfChunks({
-        documentId: document.id,
-        userId: document.user_id,
-        pages,
-      }),
-      pdfPages: pages,
-    }
+    return buildTextAsSinglePageResult(document, decoded)
   } catch (error) {
     if (error instanceof ApiError) {
       throw error
@@ -432,6 +447,33 @@ function parseTextDocument(
       500,
       'INTERNAL_ERROR',
       `Failed to parse text file ${document.file_name}.`
+    )
+  }
+}
+
+async function parseDocxDocument(
+  document: Pick<Document, 'id' | 'user_id' | 'file_name'>,
+  fileBytes: Uint8Array
+) {
+  try {
+    const mammoth = await import('mammoth')
+    const result = await mammoth.extractRawText({
+      buffer: Buffer.from(fileBytes),
+    })
+    const decoded = normalizeWhitespace(result.value)
+
+    return buildTextAsSinglePageResult(document, decoded)
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error
+    }
+
+    console.error(`Failed to parse DOCX ${document.file_name}.`, error)
+
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      `Failed to parse DOCX ${document.file_name}.`
     )
   }
 }

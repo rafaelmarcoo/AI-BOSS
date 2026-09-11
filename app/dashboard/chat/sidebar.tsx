@@ -30,6 +30,7 @@ import { dashboardTokens } from "@/app/theme";
 import { ChatContainer } from "./ChatContainer";
 import { useChatConversation } from "./useChatConversation";
 import { useDocuments } from "./useDocuments";
+import { UploadReviewModal } from "./UploadReviewModal";
 import type { GenUiPlan } from "@/lib/gen-ui/types";
 import type { UserType } from "@/types/database";
 
@@ -123,6 +124,8 @@ export function ChatSidebar({
   const {
     uploading,
     uploadDocument,
+    activeUploadDocument,
+    clearActiveUpload,
   } = useDocuments(conversationId, {
     onDocumentsProcessed,
     onDocumentWarning: (warning) => setDocumentWarning(warning.message),
@@ -643,6 +646,11 @@ export function ChatSidebar({
           {documentWarning}
         </Alert>
       </Snackbar>
+      <UploadReviewModal
+        uploading={uploading}
+        document={activeUploadDocument}
+        onClose={clearActiveUpload}
+      />
     </Box>
   );
 }

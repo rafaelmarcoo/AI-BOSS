@@ -145,6 +145,12 @@ export function useDocuments(
   const [documentsLoading, setDocumentsLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [documentsError, setDocumentsError] = useState<string | null>(null);
+  // Tracks the single most recent upload so the review modal can show its
+  // live status — reuses the polling already happening for `documents`
+  // rather than running a second poll loop for just this one document.
+  const [activeUploadDocumentId, setActiveUploadDocumentId] = useState<
+    string | null
+  >(null);
   const pollingRef = useRef<number | null>(null);
   const onDocumentsProcessedRef = useRef(options.onDocumentsProcessed);
   const onDocumentWarningRef = useRef(options.onDocumentWarning);
@@ -244,6 +250,7 @@ export function useDocuments(
 
     setUploading(true);
     setDocumentsError(null);
+    setActiveUploadDocumentId(null);
 
     try {
       const response = await fetch("/api/documents", {
@@ -260,6 +267,7 @@ export function useDocuments(
         payload.data!.document,
         ...prev.filter((document) => document.id !== payload.data!.document.id),
       ]);
+      setActiveUploadDocumentId(payload.data.document.id);
     } catch (error) {
       setDocumentsError(
         error instanceof Error ? error.message : "Could not upload document."
@@ -269,6 +277,10 @@ export function useDocuments(
     }
   };
 
+  const activeUploadDocument =
+    documents.find((document) => document.id === activeUploadDocumentId) ??
+    null;
+
   return {
     documents,
     documentsLoading,
@@ -276,5 +288,7 @@ export function useDocuments(
     documentsError,
     uploadDocument,
     refreshDocuments: () => loadDocuments(false),
+    activeUploadDocument,
+    clearActiveUpload: () => setActiveUploadDocumentId(null),
   };
 }

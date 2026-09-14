@@ -47,13 +47,14 @@ import { calculateRunwayTool } from '@/lib/tools/financial/calculate-runway'
 const response = await runAgent(input, chatHistory, [calculateRunwayTool])
 ```
 
-The current app registry lives in `lib/ai/tool-registry.ts` and registers five app-owned tools. Retrieved document context is supplied separately to the agent:
+The current app registry lives in `lib/ai/tool-registry.ts` and registers six app-owned tools. Retrieved document context is supplied separately to the agent:
 
 | Tool | Purpose |
 |---|---|
 | `get_latest_snapshot` | Reads source-aware current metrics and confirms runway inputs. |
 | `calculate_runway` | Calculates primary cash runway and separately labelled working-capital-adjusted runway from confirmed inputs. |
 | `model_scenario` | Validates and calculates one to three source-aware what-if alternatives using the shared deterministic scenario engine. |
+| `get_runway_history` | Derives cash and working-capital-adjusted runway history from compatible confirmed observations. |
 | `get_financial_history` | Summarises deterministic historical movement for a supported metric. |
 | `get_financial_forecast` | Creates a deterministic 3- or 6-month trend-continuation forecast. |
 

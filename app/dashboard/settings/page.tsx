@@ -8,6 +8,8 @@ import { dashboardTokens } from "@/app/theme";
 import { DashboardHeader } from "../header";
 import { PasswordSettingsForm } from "./PasswordSettingsForm";
 import { CompanyJoinCodeCard } from "./CompanyJoinCodeCard";
+import { GenUiPreferencesForm } from "./GenUiPreferencesForm";
+import { getGenUiPersonalization } from "@/lib/gen-ui/preferences-persistence";
 
 export default async function SettingsPage() {
   const cookieStore = await cookies();
@@ -17,14 +19,15 @@ export default async function SettingsPage() {
   const currentUser = await getCurrentUserProfile(accessToken).catch(() => null);
   if (!currentUser) redirect("/sign-in");
 
-  const { profile } = currentUser;
+  const { profile, user } = currentUser;
   const companyJoinCode = profile.user_type === "admin"
-    ? await getCompanyJoinCodeForAdmin(currentUser.user.id).catch(() => null)
+    ? await getCompanyJoinCodeForAdmin(user.id).catch(() => null)
     : null;
+  const personalization = await getGenUiPersonalization(user.id);
   return (
     <Box component="main" sx={{ minHeight: "100vh", bgcolor: dashboardTokens.shell }}>
       <DashboardHeader />
-      <Stack spacing={3} sx={{ maxWidth: 720, mx: "auto", px: { xs: 2, sm: 4 }, py: { xs: 3, sm: 5 } }}>
+      <Stack spacing={3} sx={{ maxWidth: 860, mx: "auto", px: { xs: 2, sm: 4 }, py: { xs: 3, sm: 5 } }}>
         <Stack spacing={0.75}>
           <Typography variant="h5" fontWeight={700} color="common.white">Account settings</Typography>
           <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>Manage your AI-BOSS workspace account.</Typography>
@@ -53,6 +56,7 @@ export default async function SettingsPage() {
             </Alert>
           )
         ) : null}
+        <GenUiPreferencesForm initialPreferences={personalization} />
         <PasswordSettingsForm />
       </Stack>
     </Box>

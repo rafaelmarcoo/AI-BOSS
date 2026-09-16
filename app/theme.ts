@@ -1,5 +1,7 @@
 import { createTheme } from "@mui/material/styles";
 
+const fontFamily = 'var(--font-manrope), Manrope, "Segoe UI", sans-serif';
+
 export const dashboardTokens = {
   shell: "#090B10",
   sidebar: "#0C0F15",
@@ -56,7 +58,46 @@ export const theme = createTheme({
     borderRadius: dashboardTokens.radiusMd,
   },
   typography: {
-    fontFamily: 'Inter, "Avenir Next", "Segoe UI", sans-serif',
+    fontFamily,
+    allVariants: {
+      fontFamily,
+    },
+    h1: {
+      fontWeight: 650,
+      letterSpacing: "-0.03em",
+    },
+    h2: {
+      fontWeight: 650,
+      letterSpacing: "-0.027em",
+    },
+    h3: {
+      fontWeight: 650,
+      letterSpacing: "-0.024em",
+    },
+    h4: {
+      fontWeight: 650,
+      letterSpacing: "-0.02em",
+    },
+    h5: {
+      fontWeight: 650,
+      letterSpacing: "-0.016em",
+    },
+    h6: {
+      fontWeight: 650,
+      letterSpacing: "-0.012em",
+    },
+    body1: {
+      fontWeight: 400,
+      lineHeight: 1.55,
+    },
+    body2: {
+      fontWeight: 400,
+      lineHeight: 1.5,
+    },
+    button: {
+      fontWeight: 600,
+      letterSpacing: "-0.005em",
+    },
   },
   components: {
     MuiCssBaseline: {

@@ -4,6 +4,7 @@ import { readSourceAwareMetrics } from '@/lib/financial-data/read-service'
 import { readRunwayObservationHistory } from '@/lib/financial-data/runway-history'
 import { readFinancialMetricHistorySeries } from '@/lib/financial-data/metric-history'
 import { readFinancialMetricForecastSeries } from '@/lib/financial-data/metric-forecast'
+import { getGenUiPersonalization } from '@/lib/gen-ui/preferences-persistence'
 import { planGenUi } from '@/lib/gen-ui/plan-gen-ui'
 
 const mockPlannerInvoke = jest.fn()
@@ -32,6 +33,9 @@ jest.mock('@/lib/financial-data/metric-history', () => ({
 jest.mock('@/lib/financial-data/metric-forecast', () => ({
   readFinancialMetricForecastSeries: jest.fn(),
 }))
+jest.mock('@/lib/gen-ui/preferences-persistence', () => ({
+  getGenUiPersonalization: jest.fn(),
+}))
 
 const mockChatOpenAI = jest.mocked(ChatOpenAI)
 const mockReadSourceAwareMetrics = jest.mocked(readSourceAwareMetrics)
@@ -40,6 +44,7 @@ const mockReadRunwayObservationHistory = jest.mocked(
 )
 const mockReadFinancialMetricHistorySeries = jest.mocked(readFinancialMetricHistorySeries)
 const mockReadFinancialMetricForecastSeries = jest.mocked(readFinancialMetricForecastSeries)
+const mockGetGenUiPersonalization = jest.mocked(getGenUiPersonalization)
 const originalApiKey = process.env.OPENAI_API_KEY
 
 describe('planGenUi', () => {
@@ -94,6 +99,15 @@ describe('planGenUi', () => {
       metricKey: 'cash', label: 'Cash', range: 'all', horizon: 3,
       }],
     } as never)
+    mockGetGenUiPersonalization.mockResolvedValue({
+      businessSize: null,
+      canEditBusinessSize: false,
+      decisionRole: 'owner',
+      priorityTopics: [],
+      detailLevel: 'balanced',
+      planningHorizon: 6,
+      learnFromHistory: false,
+    })
   })
 
   afterAll(() => {
@@ -105,13 +119,56 @@ describe('planGenUi', () => {
   })
 
   it('lets the model select widgets for requests outside the keyword fallback', async () => {
+    const metrics = fillUnavailableMetrics({
+      cash: {
+        status: 'available',
+        key: 'cash',
+        value: 120000,
+        currency: 'NZD',
+        periodStart: null,
+        periodEnd: null,
+        asOfDate: '2026-08-31',
+        provenance: {
+          sourceType: 'document',
+          sourceLabel: 'cash-summary.csv',
+        },
+        confidence: 0.95,
+        updatedAt: '2026-08-31T00:00:00.000Z',
+      },
+      runway_months: {
+        status: 'available',
+        key: 'runway_months',
+        value: 8.4,
+        currency: null,
+        periodStart: null,
+        periodEnd: null,
+        asOfDate: '2026-08-31',
+        provenance: {
+          sourceType: 'document',
+          sourceLabel: 'cash-summary.csv',
+        },
+        confidence: 0.9,
+        updatedAt: '2026-08-31T00:00:00.000Z',
+      },
+    })
+    mockReadSourceAwareMetrics.mockResolvedValue({
+      metrics,
+      availableMetricCount: 2,
+      unavailableMetricCount: Object.keys(metrics).length - 2,
+      runwayInput: null,
+      workingCapitalAdjustedRunway: metrics.runway_months,
+    })
     mockPlannerInvoke.mockResolvedValue({
       widgets: [
         {
-          type: 'metric_snapshot',
-          title: 'Affordability signals',
-          reason: 'These metrics help assess affordability.',
-          metricKeys: ['cash', 'burn_rate'],
+          widgetId: 'current_cash_balance',
+          title: 'Available cash',
+          reason: 'Cash helps assess affordability.',
+        },
+        {
+          widgetId: 'cash_runway',
+          title: 'Current runway',
+          reason: 'Runway shows how much operating time remains.',
         },
       ],
     })
@@ -129,11 +186,24 @@ describe('planGenUi', () => {
       expect.objectContaining({ method: 'jsonSchema', strict: true })
     )
     expect(mockPlannerInvoke).toHaveBeenCalled()
-    expect(plan?.widgets).toHaveLength(1)
-    expect(plan?.widgets[0]).toMatchObject({
-      type: 'metric_snapshot',
-      title: 'Affordability signals',
-    })
+    const plannerMessages = mockPlannerInvoke.mock.calls[0][0]
+    expect(String(plannerMessages[1].content)).toContain('current_cash_balance')
+    expect(String(plannerMessages[1].content)).not.toContain('overdue_invoices')
+    expect(plan?.widgets).toHaveLength(2)
+    expect(plan?.widgets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'metric_snapshot',
+          title: 'Available cash',
+          data: { metrics: [expect.objectContaining({ key: 'cash' })] },
+        }),
+        expect.objectContaining({
+          type: 'metric_snapshot',
+          title: 'Current runway',
+          data: { metrics: [expect.objectContaining({ key: 'runway_months' })] },
+        }),
+      ])
+    )
   })
 
   it('respects an intentional empty widget selection from the model', async () => {
@@ -143,6 +213,71 @@ describe('planGenUi', () => {
       userId: 'user-123',
       userMessage: 'Tell me a joke about cash.',
       assistantMessage: 'Why did the cash cross the road?',
+      toolsUsed: [],
+    })
+
+    expect(plan).toBeNull()
+  })
+
+  it('uses explicit profile settings as tie-breakers without removing eligible widgets', async () => {
+    const metrics = fillUnavailableMetrics({
+      cash: {
+        status: 'available', key: 'cash', value: 120000, currency: 'NZD',
+        periodStart: null, periodEnd: null, asOfDate: '2026-08-31',
+        provenance: { sourceType: 'document', sourceLabel: 'cash-summary.csv' },
+        confidence: 0.95, updatedAt: '2026-08-31T00:00:00.000Z',
+      },
+    })
+    mockReadSourceAwareMetrics.mockResolvedValue({
+      metrics,
+      availableMetricCount: 1,
+      unavailableMetricCount: Object.keys(metrics).length - 1,
+      runwayInput: null,
+      workingCapitalAdjustedRunway: metrics.runway_months,
+    })
+    mockGetGenUiPersonalization.mockResolvedValue({
+      businessSize: 'large',
+      canEditBusinessSize: true,
+      decisionRole: 'finance',
+      priorityTopics: ['forecasting', 'cost_control'],
+      detailLevel: 'quick',
+      planningHorizon: 12,
+      learnFromHistory: false,
+    })
+    mockPlannerInvoke.mockResolvedValue({ widgets: [] })
+
+    await planGenUi({
+      userId: 'user-123',
+      userMessage: 'Give me a quick view of our cash position.',
+      assistantMessage: 'Here is the latest cash position.',
+      toolsUsed: [],
+    })
+
+    const plannerMessages = mockPlannerInvoke.mock.calls[0][0]
+    const systemPrompt = String(plannerMessages[0].content)
+    const plannerPayload = String(plannerMessages[1].content)
+    expect(systemPrompt).toContain('Choose 0 to 2 widgets')
+    expect(plannerPayload).toContain('"businessSize":"large"')
+    expect(plannerPayload).toContain('"decisionRole":"finance"')
+    expect(plannerPayload).toContain('"usualPlanningHorizonMonths":12')
+    expect(plannerPayload).toContain('current_cash_balance')
+  })
+
+  it('discards a model selection that was not in the eligible candidates', async () => {
+    mockPlannerInvoke.mockResolvedValue({
+      widgets: [
+        {
+          widgetId: 'overdue_invoices',
+          title: 'Overdue invoices',
+          reason: 'This would require invoice-level data.',
+        },
+      ],
+    })
+
+    const plan = await planGenUi({
+      userId: 'user-123',
+      userMessage: 'Show the source data for my invoices.',
+      assistantMessage: 'Invoice details are not currently available.',
       toolsUsed: [],
     })
 
@@ -220,16 +355,15 @@ describe('planGenUi', () => {
     })
     mockPlannerInvoke.mockResolvedValue({
       widgets: [{
-        type: 'metric_source_evidence',
+        widgetId: 'utility_metric_source_evidence',
         title: 'Source evidence',
         reason: 'Show the confirmed calculation source.',
-        metricKeys: null,
       }],
     })
 
     const plan = await planGenUi({
       userId: 'user-123',
-      userMessage: 'Show my current financial sources.',
+      userMessage: 'Show the source evidence for my current financial values.',
       assistantMessage: 'Current values are confirmed.',
       toolsUsed: [],
     })
@@ -323,21 +457,14 @@ describe('planGenUi', () => {
     mockPlannerInvoke.mockResolvedValue({
       widgets: [
         {
-          type: 'metric_snapshot',
+          widgetId: 'cash_runway',
           title: 'Runway values',
           reason: 'All of these values were used in the calculation.',
-          metricKeys: [
-            'cash',
-            'monthly_expenses',
-            'accounts_receivable',
-            'runway_months',
-          ],
         },
         {
-          type: 'metric_source_evidence',
+          widgetId: 'utility_metric_source_evidence',
           title: 'Source and dates',
           reason: 'All values were used.',
-          metricKeys: null,
         },
       ],
     })
@@ -345,7 +472,7 @@ describe('planGenUi', () => {
     const plan = await planGenUi({
       userId: 'user-123',
       userMessage:
-        'Calculate both my cash runway and working-capital-adjusted runway.',
+        'Calculate both my cash runway and working-capital-adjusted runway, and show the source evidence.',
       assistantMessage: 'Cash runway is 5.88 months; adjusted runway is unavailable.',
       toolsUsed: [],
     })
@@ -506,7 +633,7 @@ describe('planGenUi', () => {
 
   it('hydrates scenario UI from the exact validated tool result and ignores legacy model comparisons', async () => {
     mockPlannerInvoke.mockResolvedValue({
-      widgets: [{ type: 'scenario_comparison', title: 'Invented comparison', reason: 'Legacy selection' }],
+      widgets: [{ widgetId: 'scenario_comparison_table', title: 'Invented comparison', reason: 'Legacy selection' }],
     })
     const scenarioResult = {
       input: {

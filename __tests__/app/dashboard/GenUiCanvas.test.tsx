@@ -22,8 +22,6 @@ describe('GenUiCanvas document review mode', () => {
             },
           ],
         }}
-        baselineSummary="Current runway is unavailable."
-        missingMetricLabels={['Cash', 'Runway months']}
         onAskChatbot={jest.fn()}
       />
     )
@@ -71,8 +69,6 @@ describe('GenUiCanvas document review mode', () => {
             },
           ],
         }}
-        baselineSummary="Current runway is 4.82 months."
-        missingMetricLabels={[]}
         onAskChatbot={jest.fn()}
       />
     )
@@ -132,8 +128,6 @@ describe('GenUiCanvas document review mode', () => {
             },
           }],
         }}
-        baselineSummary="Cash runway is 5.88 months."
-        missingMetricLabels={[]}
         onAskChatbot={jest.fn()}
       />
     )
@@ -187,8 +181,6 @@ describe('GenUiCanvas document review mode', () => {
             data: { message: 'Review the extracted values before calculations.' },
           }],
         }}
-        baselineSummary="Current runway is 4.82 months."
-        missingMetricLabels={[]}
         onAskChatbot={jest.fn()}
       />
     )
@@ -200,5 +192,24 @@ describe('GenUiCanvas document review mode', () => {
     expect(screen.getByText(/before the document became User-confirmed/)).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith('/api/documents', { cache: 'no-store' })
     global.fetch = originalFetch
+  })
+})
+
+describe('GenUiCanvas right rail', () => {
+  it('shows only generated-widget context and follow-ups when no plan exists', () => {
+    render(
+      <GenUiCanvas
+        plan={null}
+        onAskChatbot={jest.fn()}
+      />
+    )
+
+    expect(screen.getByText('Generated workspace')).toBeInTheDocument()
+    expect(screen.getByText('Ask a follow-up')).toBeInTheDocument()
+    expect(screen.queryByText('Runway summary')).not.toBeInTheDocument()
+    expect(screen.queryByText('Financial metrics')).not.toBeInTheDocument()
+    expect(screen.queryByText('Why this matters')).not.toBeInTheDocument()
+    expect(screen.queryByText('Feature testing context')).not.toBeInTheDocument()
+    expect(screen.queryByText('Financial trend and forecast')).not.toBeInTheDocument()
   })
 })

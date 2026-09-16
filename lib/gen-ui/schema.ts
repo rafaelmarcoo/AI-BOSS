@@ -223,7 +223,7 @@ export const GenUiPlanSchema = z.object({
   source: z.enum(['chat', 'selection']),
   generatedAt: z.string(),
   summary: z.string(),
-  widgets: z.array(GenUiWidgetSchema).max(4),
+  widgets: z.array(GenUiWidgetSchema).max(5),
   workspaceMode: z.enum(['financial', 'document_review']).optional(),
   documentReviewSnapshot: z.object({
     documentIds: z.array(z.string().uuid()).min(1),

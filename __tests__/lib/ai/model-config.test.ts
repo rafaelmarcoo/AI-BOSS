@@ -28,7 +28,7 @@ describe('AI model configuration', () => {
     expect(config.UTILITY_MODEL).toBe('gpt-4o-mini-2024-07-18')
     expect(config.mainModelOptions()).toEqual({
       useResponsesApi: true,
-      reasoning: { effort: 'low' },
+      reasoning: { effort: 'none' },
     })
   })
 

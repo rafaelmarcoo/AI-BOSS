@@ -6,7 +6,6 @@ import { Box } from "@mui/material";
 import { dashboardTokens } from "@/app/theme";
 import { ChatSidebar } from "./chat/sidebar";
 import { RunwaySection } from "./runway";
-import type { CompleteFinancialMetricSet } from "@/lib/financial-data";
 import type { GenUiPlan } from "@/lib/gen-ui/types";
 import type { UserType } from "@/types/database";
 
@@ -14,7 +13,6 @@ interface ResizablePanelsProps {
   fullName: string | null;
   email: string;
   userType: UserType | null;
-  metrics: CompleteFinancialMetricSet;
   initialConversationId?: string | null;
   initialMessage?: string | null;
 }
@@ -27,21 +25,19 @@ interface SelectionChatPrompt {
 type AskChatbotMode = "selection" | "prompt";
 
 const MIN_CHAT_WIDTH = 300;
-const MAX_CHAT_WIDTH = 620;
-const DEFAULT_CHAT_WIDTH = 380;
 const RESIZER_WIDTH = 8;
+const MAX_CHAT_WIDTH_RATIO = 1 / 3;
 
 export function ResizablePanels({
   fullName,
   email,
   userType,
-  metrics,
   initialConversationId = null,
   initialMessage = null,
 }: ResizablePanelsProps) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [chatWidth, setChatWidth] = useState(DEFAULT_CHAT_WIDTH);
+  const [chatWidth, setChatWidth] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [pendingChatPrompt, setPendingChatPrompt] =
     useState<SelectionChatPrompt | null>(null);
@@ -74,9 +70,13 @@ export function ResizablePanels({
 
       const bounds = container.getBoundingClientRect();
       const nextWidth = event.clientX - bounds.left;
+      const maxChatWidth = Math.max(
+        MIN_CHAT_WIDTH,
+        (bounds.width - RESIZER_WIDTH) * MAX_CHAT_WIDTH_RATIO,
+      );
       const clampedWidth = Math.max(
         MIN_CHAT_WIDTH,
-        Math.min(MAX_CHAT_WIDTH, nextWidth),
+        Math.min(maxChatWidth, nextWidth),
       );
 
       setChatWidth(clampedWidth);
@@ -104,7 +104,10 @@ export function ResizablePanels({
         display: { xs: "flex", md: "grid" },
         flexDirection: { xs: "column", md: undefined },
         gridTemplateColumns: {
-          md: `${chatWidth}px ${RESIZER_WIDTH}px minmax(0, 1fr)`,
+          md:
+            chatWidth === null
+              ? `minmax(${MIN_CHAT_WIDTH}px, 1fr) ${RESIZER_WIDTH}px minmax(0, 2fr)`
+              : `${chatWidth}px ${RESIZER_WIDTH}px minmax(0, 1fr)`,
         },
         overflow: { md: "hidden" },
       }}
@@ -175,7 +178,6 @@ export function ResizablePanels({
         }}
       >
         <RunwaySection
-          metrics={metrics}
           genUiPlan={genUiPlan}
           onAskChatbot={handleAskChatbot}
         />

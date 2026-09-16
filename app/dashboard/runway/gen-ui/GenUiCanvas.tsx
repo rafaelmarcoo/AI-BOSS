@@ -38,7 +38,10 @@ import {
   isSupportedFinancialCurrency,
 } from "@/lib/financial-data/currency";
 import { DataSourcesPanel } from "@/components/data-sources-panel";
-import { GEN_UI_WIDGET_CATALOG } from "@/lib/gen-ui/catalog";
+import {
+  GEN_UI_WIDGET_CATALOG,
+  GEN_UI_WIDGET_SIZE_DIMENSIONS,
+} from "@/lib/gen-ui/catalog";
 import { MetricCard } from "../../MetricCard";
 import type {
   DataConnectionsWidget as DataConnectionsWidgetModel,
@@ -60,8 +63,6 @@ type AskChatbotMode = "selection" | "prompt";
 
 interface GenUiCanvasProps {
   plan: GenUiPlan | null;
-  baselineSummary: string;
-  missingMetricLabels: string[];
   onAskChatbot: (text: string, mode?: AskChatbotMode) => void;
 }
 
@@ -242,6 +243,7 @@ function WidgetFrame({
         borderColor: dashboardTokens.border,
         color: "common.white",
         minWidth: 0,
+        height: "100%",
       }}
     >
       <Stack spacing={1.75}>
@@ -1164,8 +1166,6 @@ export function GenUiWidgetRenderer({
 
 export function GenUiCanvas({
   plan,
-  baselineSummary,
-  missingMetricLabels,
   onAskChatbot,
 }: GenUiCanvasProps) {
   const hasPlan = Boolean(plan && plan.widgets.length > 0);
@@ -1279,24 +1279,48 @@ export function GenUiCanvas({
                 variant="body2"
                 sx={{ color: dashboardTokens.textMuted }}
               >
-                {workspaceSummary}
+                {historicalDocumentSnapshot || documentReviewMode
+                  ? workspaceSummary
+                  : hasPlan
+                    ? plan?.summary
+                    : "Choose a follow-up or ask AI Boss a question to generate relevant widgets."}
               </Typography>
             </Box>
           </Stack>
-          <Chip
-            label={historicalDocumentSnapshot ? "Historical snapshot" : documentReviewMode ? "Review required" : "Live"}
-            size="small"
-            sx={{
-              height: 24,
-              color: historicalDocumentSnapshot ? "#bae6fd" : documentReviewMode ? dashboardTokens.warning : dashboardTokens.positive,
-              bgcolor: historicalDocumentSnapshot ? "rgba(56, 189, 248, 0.10)" : documentReviewMode ? "rgba(201, 129, 116, 0.10)" : "rgba(62, 180, 137, 0.10)",
-              borderColor: historicalDocumentSnapshot ? "rgba(56, 189, 248, 0.22)" : documentReviewMode ? "rgba(201, 129, 116, 0.22)" : "rgba(62, 180, 137, 0.22)",
-              borderRadius: `${dashboardTokens.radiusSm}px`,
-              fontSize: 12,
-              alignSelf: { xs: "flex-start", sm: "center" },
-            }}
-            variant="outlined"
-          />
+          {hasPlan ? (
+            <Chip
+              label={
+                historicalDocumentSnapshot
+                  ? "Historical snapshot"
+                  : documentReviewMode
+                    ? "Review required"
+                    : "Live"
+              }
+              size="small"
+              sx={{
+                height: 24,
+                color: historicalDocumentSnapshot
+                  ? "#bae6fd"
+                  : documentReviewMode
+                    ? dashboardTokens.warning
+                    : dashboardTokens.positive,
+                bgcolor: historicalDocumentSnapshot
+                  ? "rgba(56, 189, 248, 0.10)"
+                  : documentReviewMode
+                    ? "rgba(201, 129, 116, 0.10)"
+                    : "rgba(62, 180, 137, 0.10)",
+                borderColor: historicalDocumentSnapshot
+                  ? "rgba(56, 189, 248, 0.22)"
+                  : documentReviewMode
+                    ? "rgba(201, 129, 116, 0.22)"
+                    : "rgba(62, 180, 137, 0.22)",
+                borderRadius: `${dashboardTokens.radiusSm}px`,
+                fontSize: 12,
+                alignSelf: { xs: "flex-start", sm: "center" },
+              }}
+              variant="outlined"
+            />
+          ) : null}
         </Stack>
 
         {historicalDocumentSnapshot ? (
@@ -1304,70 +1328,6 @@ export function GenUiCanvas({
             This saved workspace reflects the review state at the time of the answer. It does not override the document&apos;s current status.
           </Alert>
         ) : null}
-
-        {!documentReviewMode ? <>
-        <Paper
-          elevation={0}
-          sx={{
-            py: 3,
-            borderRadius: 0,
-            bgcolor: "transparent",
-            borderTop: "1px solid",
-            borderColor: dashboardTokens.border,
-          }}
-        >
-          <Typography component="h2" sx={{ fontSize: 16, fontWeight: 600 }}>
-            Runway summary
-          </Typography>
-          <Stack spacing={1}>
-            <Typography
-              variant="body2"
-              sx={{ mt: 1, color: dashboardTokens.textMuted, lineHeight: 1.65, userSelect: "text" }}
-            >
-              {baselineSummary}
-            </Typography>
-          </Stack>
-        </Paper>
-
-        <Box sx={{ py: 3, borderTop: "1px solid", borderColor: dashboardTokens.border }}>
-          <Typography component="h2" sx={{ fontSize: 16, fontWeight: 600 }}>
-            {missingMetricLabels.length > 0 ? "Missing financial metrics" : "Financial metrics"}
-          </Typography>
-          <Typography sx={{ mt: 0.75, color: dashboardTokens.textMuted, fontSize: 14, lineHeight: 1.55 }}>
-            {missingMetricLabels.length > 0
-              ? "Upload current records and confirm extracted values to complete the runway view."
-              : "The core metrics required for runway analysis are available."}
-          </Typography>
-          {missingMetricLabels.length > 0 ? (
-            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 2 }}>
-              {missingMetricLabels.map((label) => (
-                <Chip
-                  key={label}
-                  label={label}
-                  size="small"
-                  sx={{
-                    height: 26,
-                    borderRadius: `${dashboardTokens.radiusSm}px`,
-                    color: "#D9AAA3",
-                    bgcolor: "rgba(201, 129, 116, 0.09)",
-                    border: "1px solid rgba(201, 129, 116, 0.18)",
-                    fontSize: 12,
-                  }}
-                />
-              ))}
-            </Stack>
-          ) : null}
-        </Box>
-
-        <Box sx={{ py: 3, borderTop: "1px solid", borderColor: dashboardTokens.border }}>
-          <Typography component="h2" sx={{ fontSize: 16, fontWeight: 600 }}>
-            Why this matters
-          </Typography>
-          <Typography sx={{ mt: 0.75, maxWidth: 760, color: dashboardTokens.textMuted, fontSize: 14, lineHeight: 1.6 }}>
-            Reliable cash, burn, revenue, and liability data helps AI-BOSS explain how long the business can operate and where finance teams should focus next.
-          </Typography>
-        </Box>
-        </> : null}
 
         {hasPlan ? (
           <Box
@@ -1377,48 +1337,40 @@ export function GenUiCanvas({
               borderColor: dashboardTokens.border,
               display: "grid",
               gridTemplateColumns: { xs: "1fr", xl: "repeat(2, minmax(0, 1fr))" },
+              gridAutoRows: { xs: "auto", xl: "minmax(240px, auto)" },
               gap: 2,
             }}
           >
-            {plan?.widgets.map((widget) => (
-              <Box
-                key={widget.id}
-                sx={{
-                  minWidth: 0,
-                  gridColumn: {
-                    xs: "span 1",
-                    xl: `span ${GEN_UI_WIDGET_CATALOG[widget.type].defaultColumnSpan}`,
-                  },
-                }}
-              >
-                <GenUiWidgetRenderer
-                  widget={widget}
-                  onAskChatbot={onAskChatbot}
-                />
-              </Box>
-            ))}
+            {plan?.widgets.map((widget) => {
+              const size = GEN_UI_WIDGET_CATALOG[widget.type].defaultSize;
+              const dimensions = GEN_UI_WIDGET_SIZE_DIMENSIONS[size];
+
+              return (
+                <Box
+                  key={widget.id}
+                  data-widget-size={size}
+                  sx={{
+                    minWidth: 0,
+                    height: "100%",
+                    gridColumn: {
+                      xs: "span 1",
+                      xl: `span ${dimensions.columnSpan}`,
+                    },
+                    gridRow: {
+                      xs: "auto",
+                      xl: `span ${dimensions.rowSpan}`,
+                    },
+                  }}
+                >
+                  <GenUiWidgetRenderer
+                    widget={widget}
+                    onAskChatbot={onAskChatbot}
+                  />
+                </Box>
+              );
+            })}
           </Box>
-        ) : (
-          <Paper
-            elevation={0}
-            sx={{
-              py: 3,
-              borderRadius: 0,
-              bgcolor: "transparent",
-              borderTop: "1px solid",
-              borderColor: dashboardTokens.border,
-            }}
-          >
-            <Stack spacing={0.75}>
-              <Typography sx={{ fontSize: 16, fontWeight: 600 }}>
-                Feature testing context
-              </Typography>
-              <Typography sx={{ color: dashboardTokens.textMuted, fontSize: 14, lineHeight: 1.55 }}>
-                Highlight dashboard text to ask AI-BOSS for an explanation, or use a follow-up below.
-              </Typography>
-            </Stack>
-          </Paper>
-        )}
+        ) : null}
 
         <Stack spacing={1.25}>
           <Typography sx={{ fontSize: 16, fontWeight: 600 }}>

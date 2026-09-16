@@ -2,14 +2,15 @@
 
 **Database:** Supabase (PostgreSQL)  
 **Created:** March 22, 2025  
-**Last Updated:** August 26, 2026
+**Last Updated:** September 16, 2026
 
 ---
 
 ## Overview
 
-The database now consists of 15 main tables:
+The database now consists of 16 main tables:
 - **companies** - Company identities used as shared-data access boundaries
+- **company_join_codes** - Server-only daily credentials for employee signup
 - **users** - User profiles (extends Supabase Auth)
 - **conversations** - User-owned chat threads
 - **conversation_messages** - Individual chat messages inside a thread
@@ -51,6 +52,26 @@ Canonical company records used to scope shared conversation access.
 
 **Integrity rules:**
 - Company names are unique after trimming and case normalization, so a company cannot be duplicated with different casing.
+- Employee accounts can join a company only by submitting its current unexpired join code through the server-side signup route.
+
+### Company join codes
+
+Stores the current employee signup credential for each company. Codes rotate at
+midnight UTC through Supabase Cron and are never queried directly by browser clients.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| company_id | UUID (PK, FK) | References companies(id); one current code per company |
+| join_code | TEXT | Unique 16-character code displayed as four groups |
+| expires_at | TIMESTAMP | Time the current code expires and rotates |
+| created_at | TIMESTAMP | Code record creation time |
+| updated_at | TIMESTAMP | Last successful rotation time |
+
+**Security:**
+- RLS is enabled with no browser-facing policies.
+- `anon` and `authenticated` have no table privileges.
+- Application server routes use the service role and must separately authorize admins.
+- The `rotate-company-join-codes-daily` Cron job replaces every code at midnight UTC.
 
 ### 1. users
 
@@ -511,6 +532,7 @@ decision analysis.
 ```
 users (1) ──< (many) conversations
 companies (1) ──< (many) conversations
+companies (1) ── (one) company_join_codes
 conversations (1) ──< (many) conversation_messages
 users (1) ──< (many) policy_rules
 users (1) ──< (many) decision_log
@@ -549,6 +571,7 @@ All schema changes are tracked in `db/migrations/`:
 - `014_saved_scenarios.sql` - Adds private drafts, company-visible calculated scenarios, result snapshots, and stale-data fingerprints
 - `015_document_extraction_review.sql` - Adds XLSX document support, separate financial review state, versioned extraction runs/candidates, owner-protected review evidence, and transactional publication of user-confirmed observations
 - `016_runway_currency_unit.sql` - Enforces currency-free `runway_months` candidates during transactional confirmation while retaining source currency in original audit evidence
+- `017_daily_company_join_codes.sql` - Adds protected stored company join codes and a daily UTC rotation job
 
 ---
 
@@ -603,4 +626,4 @@ Planned for Sprint 2+:
 
 ---
 
-**Last Updated:** August 19, 2026 by Rafael Manubay
+**Last Updated:** September 16, 2026 by Rafael Manubay

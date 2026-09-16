@@ -1,12 +1,13 @@
+import type { User } from '@supabase/supabase-js'
 import { ApiError } from '@/lib/api/errors'
 import { handleRouteError, successResponse } from '@/lib/api/responses'
+import { applyPendingSignUpCookie, applySessionCookies } from '@/lib/auth'
 import {
   assertValid,
   readJsonBody,
   validateSignUpPayload,
 } from '@/lib/api/validation'
-import { applySessionCookies } from '@/lib/auth'
-import { findCompanyName, getJoinableCompanyNames } from '@/lib/companies'
+import { findCompanyByJoinCode, findCompanyByName } from '@/lib/companies'
 import {
   createAdminSupabaseClient,
   createServerSupabaseClient,
@@ -14,12 +15,19 @@ import {
 
 export async function POST(request: Request) {
   try {
+    const bypassEmail = request.headers.get('x-ai-boss-test-bypass') === 'true'
+    if (bypassEmail && process.env.NODE_ENV === 'production') {
+      throw new ApiError(404, 'NOT_FOUND', 'Not found.')
+    }
+
     const payload = assertValid(validateSignUpPayload(await readJsonBody(request)))
     const admin = createAdminSupabaseClient()
-    const companies = await getJoinableCompanyNames()
-    const existingCompanyName = findCompanyName(companies, payload.companyName)
+    const company =
+      payload.userType === 'admin'
+        ? await findCompanyByName(payload.companyName)
+        : await findCompanyByJoinCode(payload.companyCode)
 
-    if (payload.userType === 'admin' && existingCompanyName) {
+    if (payload.userType === 'admin' && company) {
       throw new ApiError(
         400,
         'VALIDATION_ERROR',
@@ -28,35 +36,63 @@ export async function POST(request: Request) {
       )
     }
 
-    if (payload.userType === 'employee' && !existingCompanyName) {
+    if (payload.userType === 'employee' && !company) {
       throw new ApiError(
         400,
         'VALIDATION_ERROR',
-        'Select an existing company to join.',
-        { companyName: 'Select an existing company.' }
+        'The company code is invalid or has expired.',
+        { companyCode: 'Enter the current code provided by your company admin.' }
       )
     }
 
-    const companyName = existingCompanyName ?? payload.companyName
+    const companyName =
+      payload.userType === 'admin' ? payload.companyName : company!.name
 
-    const { data: createdUser, error: createUserError } =
-      await admin.auth.admin.createUser({
+    const supabase = createServerSupabaseClient()
+    let createdUser: User
+
+    if (bypassEmail) {
+      const { data, error } = await admin.auth.admin.createUser({
         email: payload.email,
         password: payload.password,
         email_confirm: true,
       })
 
-    if (createUserError || !createdUser.user) {
-      throw new ApiError(
-        400,
-        'BAD_REQUEST',
-        createUserError?.message ?? 'Unable to create user.'
-      )
+      if (error || !data.user) {
+        throw new ApiError(400, 'BAD_REQUEST', error?.message ?? 'Unable to create user.')
+      }
+
+      createdUser = data.user
+    } else {
+      const callbackUrl = new URL('/auth/callback', request.url)
+      callbackUrl.searchParams.set('flow', 'signup')
+      const { data, error } = await supabase.auth.signUp({
+        email: payload.email,
+        password: payload.password,
+        options: {
+          emailRedirectTo: callbackUrl.toString(),
+        },
+      })
+
+      if (error || !data.user || data.user.identities?.length === 0) {
+        throw new ApiError(400, 'BAD_REQUEST', error?.message ?? 'Unable to create user.')
+      }
+
+      createdUser = data.user
+
+      if (data.session) {
+        await admin.auth.admin.deleteUser(createdUser.id)
+        throw new ApiError(
+          500,
+          'INTERNAL_ERROR',
+          'Email confirmation must be enabled in Supabase before users can sign up.'
+        )
+      }
     }
 
     const { error: profileError } = await admin.from('users').upsert(
       {
-        id: createdUser.user.id,
+        id: createdUser.id,
         email: payload.email,
         full_name: payload.fullName ?? null,
         company_name: companyName,
@@ -68,56 +104,70 @@ export async function POST(request: Request) {
     )
 
     if (profileError) {
+      await admin.auth.admin.deleteUser(createdUser.id)
       throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to create user profile.')
     }
 
     if (payload.userType === 'admin') {
       const { error: companyError } = await admin.from('companies').insert({
         name: companyName,
-        created_by: createdUser.user.id,
+        created_by: createdUser.id,
       })
 
       if (companyError) {
-        await admin.from('users').delete().eq('id', createdUser.user.id)
-        await admin.auth.admin.deleteUser(createdUser.user.id)
+        await admin.from('users').delete().eq('id', createdUser.id)
+        await admin.auth.admin.deleteUser(createdUser.id)
         throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to create company.')
       }
     }
 
-    const supabase = createServerSupabaseClient()
-    const { data: signInData, error: signInError } =
-      await supabase.auth.signInWithPassword({
+    if (bypassEmail) {
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: payload.email,
         password: payload.password,
       })
 
-    if (signInError || !signInData.session || !signInData.user?.email) {
-      throw new ApiError(
-        500,
-        'INTERNAL_ERROR',
-        signInError?.message ?? 'User created, but automatic sign in failed.'
+      if (error || !data.session || !data.user?.email) {
+        if (payload.userType === 'admin') {
+          await admin.from('companies').delete().eq('created_by', createdUser.id)
+        }
+        await admin.from('users').delete().eq('id', createdUser.id)
+        await admin.auth.admin.deleteUser(createdUser.id)
+        throw new ApiError(500, 'INTERNAL_ERROR', 'Unable to start the test session.')
+      }
+
+      const response = successResponse(
+        {
+          user: {
+            id: createdUser.id,
+            email: payload.email,
+            companyName,
+            userType: payload.userType,
+          },
+          nextStep: 'complete' as const,
+        },
+        { status: 201 },
+        'Test account created and signed in without email verification.'
       )
+      await applySessionCookies(response, data.session)
+
+      return response
     }
 
     const response = successResponse(
       {
         user: {
-          id: signInData.user.id,
-          email: signInData.user.email,
+          id: createdUser.id,
+          email: payload.email,
           companyName,
           userType: payload.userType,
         },
-        session: {
-          accessToken: signInData.session.access_token,
-          refreshToken: signInData.session.refresh_token,
-          expiresIn: signInData.session.expires_in,
-        },
+        nextStep: 'verify-email' as const,
       },
       { status: 201 },
-      'Account created successfully.'
+      'Account created. Check your email for the verification link.'
     )
-
-    await applySessionCookies(response, signInData.session)
+    applyPendingSignUpCookie(response, payload.email)
 
     return response
   } catch (error) {

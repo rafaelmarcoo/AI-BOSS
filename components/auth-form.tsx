@@ -2,7 +2,7 @@
 
 import NextLink from 'next/link'
 import { useRouter } from 'next/navigation'
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useState } from 'react'
 import {
   Alert,
   Button,
@@ -12,7 +12,6 @@ import {
   IconButton,
   InputAdornment,
   Link as MuiLink,
-  MenuItem,
   Paper,
   Stack,
   SvgIcon,
@@ -29,6 +28,7 @@ type Mode = 'sign-in' | 'sign-up'
 
 interface AuthFormProps {
   mode: Mode
+  showTestBypass?: boolean
 }
 
 interface ApiErrorPayload {
@@ -37,11 +37,6 @@ interface ApiErrorPayload {
     message?: string
     details?: Record<string, string>
   }
-}
-
-interface CompaniesPayload {
-  success: true
-  data: { companies: string[] }
 }
 
 function PasswordVisibilityIcon({ crossed }: { crossed: boolean }) {
@@ -76,61 +71,29 @@ function PasswordVisibilityIcon({ crossed }: { crossed: boolean }) {
   )
 }
 
-export function AuthForm({ mode }: AuthFormProps) {
+export function AuthForm({ mode, showTestBypass = false }: AuthFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [userType, setUserType] = useState<UserType | null>(null)
-  const [companies, setCompanies] = useState<string[]>([])
-  const [isLoadingCompanies, setIsLoadingCompanies] = useState(false)
-  const [companiesError, setCompaniesError] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
-  useEffect(() => {
-    if (mode !== 'sign-up' || userType !== 'employee') return
-
-    const controller = new AbortController()
-
-    async function loadCompanies() {
-      setIsLoadingCompanies(true)
-      setCompaniesError(null)
-
-      try {
-        const response = await fetch('/api/auth/companies', {
-          credentials: 'include',
-          signal: controller.signal,
-        })
-        const payload = (await response.json().catch(() => null)) as
-          | CompaniesPayload
-          | null
-
-        if (!response.ok || !payload?.success) {
-          throw new Error('Unable to load companies.')
-        }
-
-        setCompanies(payload.data.companies)
-      } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') return
-        setCompaniesError('Companies could not be loaded. Please try again.')
-      } finally {
-        if (!controller.signal.aborted) setIsLoadingCompanies(false)
-      }
-    }
-
-    void loadCompanies()
-    return () => controller.abort()
-  }, [mode, userType])
-
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as
+      | HTMLButtonElement
+      | null
+    const isTestBypass = submitter?.value === 'test-bypass'
+
     setIsSubmitting(true)
     setErrorMessage(null)
     setFieldErrors({})
 
     const formData = new FormData(event.currentTarget)
     const password = String(formData.get('password') ?? '')
+    const email = String(formData.get('email') ?? '')
 
     if (
       mode === 'sign-up' &&
@@ -144,28 +107,43 @@ export function AuthForm({ mode }: AuthFormProps) {
     const payload =
       mode === 'sign-up'
         ? {
-            email: String(formData.get('email') ?? ''),
+            email,
             password,
             fullName: String(formData.get('fullName') ?? ''),
-            companyName: String(formData.get('companyName') ?? ''),
             userType: userType ?? '',
+            ...(userType === 'admin'
+              ? { companyName: String(formData.get('companyName') ?? '') }
+              : { companyCode: String(formData.get('companyCode') ?? '') }),
           }
         : {
-            email: String(formData.get('email') ?? ''),
+            email,
             password,
           }
 
-    const response = await fetch(`/api/auth/${mode === 'sign-up' ? 'signup' : 'signin'}`, {
+    const endpoint = isTestBypass
+      ? mode === 'sign-in'
+        ? '/api/auth/test-bypass'
+        : '/api/auth/signup'
+      : `/api/auth/${mode === 'sign-up' ? 'signup' : 'signin'}`
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(isTestBypass && mode === 'sign-up'
+          ? { 'x-ai-boss-test-bypass': 'true' }
+          : {}),
       },
       credentials: 'include',
       body: JSON.stringify(payload),
     })
 
-    if (!response.ok) {
-      const errorPayload = (await response.json().catch(() => null)) as ApiErrorPayload | null
+    const responsePayload = (await response.json().catch(() => null)) as
+      | ApiErrorPayload
+      | { success: true }
+      | null
+
+    if (!response.ok || !responsePayload?.success) {
+      const errorPayload = responsePayload as ApiErrorPayload | null
       setErrorMessage(
         errorPayload?.error?.message ?? 'We could not complete that request.'
       )
@@ -174,7 +152,16 @@ export function AuthForm({ mode }: AuthFormProps) {
       return
     }
 
-    router.replace('/landing')
+    if (isTestBypass) {
+      window.sessionStorage.removeItem('pending-signin-email')
+      router.replace('/landing')
+    } else if (mode === 'sign-up') {
+      window.sessionStorage.setItem('pending-signup-email', email.trim().toLowerCase())
+      router.replace('/verify-email')
+    } else {
+      window.sessionStorage.setItem('pending-signin-email', email.trim().toLowerCase())
+      router.replace('/check-email')
+    }
     router.refresh()
   }
 
@@ -187,6 +174,43 @@ export function AuthForm({ mode }: AuthFormProps) {
       elevation={0}
       sx={authCardStyles}
     >
+      {showTestBypass ? (
+        <Paper
+          elevation={0}
+          sx={{
+            position: 'fixed',
+            top: 20,
+            right: 20,
+            zIndex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.25,
+            p: 1.25,
+            border: `1px solid ${dashboardTokens.border}`,
+            borderRadius: `${dashboardTokens.radiusMd}px`,
+            bgcolor: dashboardTokens.surface,
+          }}
+        >
+          <Typography sx={{ color: dashboardTokens.textMuted, fontSize: 12 }}>
+            Development testing only
+          </Typography>
+          <Button
+            type="submit"
+            name="intent"
+            value="test-bypass"
+            variant="outlined"
+            disabled={isSubmitting}
+            sx={{
+              borderColor: dashboardTokens.borderInput,
+              color: dashboardTokens.text,
+              textTransform: 'none',
+            }}
+          >
+            {mode === 'sign-up' ? 'Bypass signup email' : 'Bypass email check'}
+          </Button>
+        </Paper>
+      ) : null}
+
       <Stack spacing={0}>
         <Stack spacing={0.25}>
           <Typography
@@ -308,35 +332,27 @@ export function AuthForm({ mode }: AuthFormProps) {
             ) : null}
 
             {userType === 'employee' ? (
-              <Stack spacing={1}>
-                {companiesError ? <Alert severity="error">{companiesError}</Alert> : null}
-                {!isLoadingCompanies && !companiesError && companies.length === 0 ? (
-                  <Alert severity="info">
-                    No companies are available yet. An admin must create one first.
-                  </Alert>
-                ) : null}
-                <TextField
-                  name="companyName"
-                  label="Company"
-                  select
-                  defaultValue=""
-                  fullWidth
-                  required
-                  disabled={isLoadingCompanies || Boolean(companiesError)}
-                  error={Boolean(fieldErrors.companyName)}
-                  helperText={
-                    fieldErrors.companyName ??
-                    (isLoadingCompanies ? 'Loading companies...' : 'Choose the company you work for.')
-                  }
-                  sx={authFieldStyles}
-                >
-                  {companies.map((companyName) => (
-                    <MenuItem key={companyName} value={companyName}>
-                      {companyName}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Stack>
+              <TextField
+                name="companyCode"
+                label="Company code"
+                type="text"
+                placeholder="A3F9-7C21-D84B-6E10"
+                autoComplete="off"
+                fullWidth
+                required
+                error={Boolean(fieldErrors.companyCode)}
+                helperText={
+                  fieldErrors.companyCode ??
+                  'Enter the current code provided by your company admin.'
+                }
+                slotProps={{
+                  htmlInput: {
+                    maxLength: 19,
+                    style: { textTransform: 'uppercase' },
+                  },
+                }}
+                sx={authFieldStyles}
+              />
             ) : null}
           </Stack>
         ) : null}
@@ -443,7 +459,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           variant="contained"
           disabled={
             isSubmitting ||
-            (isSignUp && (!userType || isLoadingCompanies || Boolean(companiesError)))
+            (isSignUp && !userType)
           }
           fullWidth
           sx={{
@@ -466,7 +482,7 @@ export function AuthForm({ mode }: AuthFormProps) {
             ? 'Working...'
             : isSignUp
               ? 'Create account'
-              : 'Sign in'}
+              : 'Continue'}
         </Button>
 
         <Typography

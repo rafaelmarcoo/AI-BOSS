@@ -1,5 +1,5 @@
 import { ApiError } from '@/lib/api/errors'
-import type { ConversationVisibility, UserType } from '@/types/database'
+import type { ConversationVisibility } from '@/types/database'
 
 export type ValidationResult<T> =
   | { success: true; data: T }
@@ -46,17 +46,30 @@ function readTrimmedString(
   return trimmed
 }
 
-export interface SignUpPayload {
+interface SignUpPayloadBase {
   email: string
   password: string
   fullName?: string
-  companyName: string
-  userType: UserType
 }
+
+export type SignUpPayload = SignUpPayloadBase & (
+  | { userType: 'admin'; companyName: string }
+  | { userType: 'employee'; companyCode: string }
+)
 
 export interface SignInPayload {
   email: string
   password: string
+}
+
+export interface EmailPayload {
+  email: string
+}
+
+export interface MagicLinkSessionPayload {
+  accessToken: string
+  refreshToken: string
+  flow: 'signin' | 'signup'
 }
 
 // Keep the accepted chat roles narrow so the API contract stays predictable.
@@ -88,12 +101,32 @@ export function validateSignUpPayload(payload: unknown): ValidationResult<SignUp
     details
   )
   const fullName = Reflect.get(input, 'fullName')
-  const companyName = readTrimmedString(
-    Reflect.get(input, 'companyName'),
-    'companyName',
-    details
-  )
   const userType = Reflect.get(input, 'userType')
+  let companyName: string | null = null
+  let companyCode: string | null = null
+
+  if (userType === 'admin') {
+    companyName = readTrimmedString(
+      Reflect.get(input, 'companyName'),
+      'companyName',
+      details
+    )
+  } else if (userType === 'employee') {
+    const rawCompanyCode = readTrimmedString(
+      Reflect.get(input, 'companyCode'),
+      'companyCode',
+      details
+    )
+
+    if (rawCompanyCode) {
+      const compactCode = rawCompanyCode.toUpperCase().replace(/[\s-]/g, '')
+      if (!/^[A-F0-9]{16}$/.test(compactCode)) {
+        details.companyCode = 'companyCode must be a valid company code.'
+      } else {
+        companyCode = compactCode.match(/.{4}/g)?.join('-') ?? null
+      }
+    }
+  }
 
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     details.email = 'email must be a valid email address.'
@@ -115,7 +148,6 @@ export function validateSignUpPayload(payload: unknown): ValidationResult<SignUp
     Object.keys(details).length > 0 ||
     !email ||
     !password ||
-    !companyName ||
     (userType !== 'admin' && userType !== 'employee')
   ) {
     return {
@@ -126,15 +158,26 @@ export function validateSignUpPayload(payload: unknown): ValidationResult<SignUp
 
   return {
     success: true,
-    data: {
-      email: email.toLowerCase(),
-      password,
-      companyName,
-      userType,
-      ...(typeof fullName === 'string' && fullName.trim()
-        ? { fullName: fullName.trim() }
-        : {}),
-    },
+    data:
+      userType === 'admin'
+        ? {
+            email: email.toLowerCase(),
+            password,
+            userType,
+            companyName: companyName!,
+            ...(typeof fullName === 'string' && fullName.trim()
+              ? { fullName: fullName.trim() }
+              : {}),
+          }
+        : {
+            email: email.toLowerCase(),
+            password,
+            userType,
+            companyCode: companyCode!,
+            ...(typeof fullName === 'string' && fullName.trim()
+              ? { fullName: fullName.trim() }
+              : {}),
+          },
   }
 }
 
@@ -170,6 +213,57 @@ export function validateSignInPayload(payload: unknown): ValidationResult<SignIn
       email: email.toLowerCase(),
       password,
     },
+  }
+}
+
+export function validateEmailPayload(payload: unknown): ValidationResult<EmailPayload> {
+  const details: Record<string, string> = {}
+  const input = typeof payload === 'object' && payload !== null ? payload : {}
+  const email = readTrimmedString(Reflect.get(input, 'email'), 'email', details)
+
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    details.email = 'email must be a valid email address.'
+  }
+
+  if (Object.keys(details).length > 0 || !email) {
+    return { success: false, details }
+  }
+
+  return { success: true, data: { email: email.toLowerCase() } }
+}
+
+export function validateMagicLinkSessionPayload(
+  payload: unknown
+): ValidationResult<MagicLinkSessionPayload> {
+  const details: Record<string, string> = {}
+  const input = typeof payload === 'object' && payload !== null ? payload : {}
+  const accessToken = readTrimmedString(
+    Reflect.get(input, 'accessToken'),
+    'accessToken',
+    details
+  )
+  const refreshToken = readTrimmedString(
+    Reflect.get(input, 'refreshToken'),
+    'refreshToken',
+    details
+  )
+  const flow = readTrimmedString(Reflect.get(input, 'flow'), 'flow', details)
+  const validatedFlow = flow === 'signin' || flow === 'signup' ? flow : null
+  if (flow && !validatedFlow) {
+    details.flow = 'flow must be either signin or signup.'
+  }
+  if (
+    Object.keys(details).length > 0 ||
+    !accessToken ||
+    !refreshToken ||
+    !validatedFlow
+  ) {
+    return { success: false, details }
+  }
+
+  return {
+    success: true,
+    data: { accessToken, refreshToken, flow: validatedFlow },
   }
 }
 

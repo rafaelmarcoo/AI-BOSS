@@ -1,64 +1,52 @@
 "use client";
 
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
-import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
-import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
-import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
+import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
-import RouteRoundedIcon from "@mui/icons-material/RouteRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import {
   Avatar,
   Box,
+  ButtonBase,
   Divider,
   Drawer,
   IconButton,
   List,
   ListItemButton,
-  ListItemIcon,
   ListItemText,
+  Menu,
+  MenuItem,
   Stack,
   Typography,
 } from "@mui/material";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { dashboardTokens } from "@/app/theme";
 import { SignOutButton } from "@/components/sign-out-button";
 
 export const LANDING_BACKGROUND = "#102A43";
-const HEADER_BACKGROUND = LANDING_BACKGROUND;
-const HEADER_SURFACE = "#193B5A";
+export const LANDING_SECONDARY = "#F28C5B";
+
 const HEADER_TEXT = "#FAF9FC";
 const HEADER_MUTED_TEXT = "#B8C7D9";
-const HEADER_ACCENT = "#E98761";
 const LANDING_FONT_FAMILY =
   'var(--font-poppins), Poppins, "Segoe UI", sans-serif';
 
 const navigation = [
-  { label: "Home", href: "/landing", icon: HomeRoundedIcon, exact: true },
-  {
-    label: "Dashboard",
-    href: "/dashboard",
-    icon: DashboardRoundedIcon,
-    exact: true,
-  },
-  { label: "Scenarios", href: "/dashboard/scenarios", icon: RouteRoundedIcon },
-  {
-    label: "Documents",
-    href: "/dashboard/documents",
-    icon: DescriptionRoundedIcon,
-  },
-  { label: "Settings", href: "/dashboard/settings", icon: SettingsRoundedIcon },
+  { label: "Home", href: "/landing", exact: true },
+  { label: "Dashboard", href: "/dashboard", exact: true },
+  { label: "Scenarios", href: "/dashboard/scenarios" },
+  { label: "Documents", href: "/dashboard/documents" },
 ];
 
 interface LandingWelcomeHeaderProps {
   fullName: string | null;
   email: string;
+  companyName: string | null;
 }
 
 function getDisplayName(fullName: string | null, email: string) {
-  return fullName?.trim() || email.split("@")[0] || "there";
+  return fullName?.trim() || email.split("@")[0] || "AI-BOSS user";
 }
 
 function getInitials(displayName: string) {
@@ -74,112 +62,181 @@ function getInitials(displayName: string) {
 export function LandingWelcomeHeader({
   fullName,
   email,
+  companyName,
 }: LandingWelcomeHeaderProps) {
   const pathname = usePathname();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profileAnchor, setProfileAnchor] = useState<HTMLElement | null>(null);
   const displayName = getDisplayName(fullName, email);
-  const firstName = displayName.split(/\s+/)[0];
   const initials = getInitials(displayName);
+  const organisationLabel = companyName?.trim() || email;
+
+  const isActive = (item: (typeof navigation)[number]) =>
+    item.exact ? pathname === item.href : pathname.startsWith(item.href);
 
   return (
-    <>
-      <Box
-        component="header"
+    <Box
+      component="header"
+      sx={{
+        height: 68,
+        display: "flex",
+        alignItems: "center",
+        flex: "0 0 auto",
+        bgcolor: LANDING_BACKGROUND,
+        color: HEADER_TEXT,
+        "& .MuiTypography-root, & .MuiButtonBase-root": {
+          fontFamily: LANDING_FONT_FAMILY,
+        },
+      }}
+    >
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
         sx={{
-          height: { xs: 68, sm: 72 },
-          display: "flex",
-          alignItems: "center",
-          bgcolor: HEADER_BACKGROUND,
-          color: HEADER_TEXT,
-          "& .MuiTypography-root, & .MuiButtonBase-root": {
-            fontFamily: LANDING_FONT_FAMILY,
-          },
+          width: { xs: "100%", md: "75%" },
+          minWidth: 0,
+          mx: "auto",
+          px: { xs: 2, sm: 4, lg: 6 },
         }}
       >
-        <Stack
-          direction="row"
-          alignItems="center"
-          justifyContent="space-between"
-          sx={{
-            width: "100%",
-            maxWidth: dashboardTokens.contentMaxWidth,
-            minWidth: 0,
-            mx: "auto",
-            px: { xs: 2, sm: 4, lg: 6 },
-          }}
-        >
-          <Stack direction="row" spacing={1.25} alignItems="center" minWidth={0}>
+        <Stack direction="row" alignItems="center" spacing={{ xs: 1.5, md: 3.5 }}>
+          <Typography
+            component={Link}
+            href="/landing"
+            aria-label="AI-BOSS home"
+            sx={{
+              color: HEADER_TEXT,
+              fontSize: 16,
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+              textDecoration: "none",
+            }}
+          >
+            AI-BOSS
+          </Typography>
+
+          <Stack
+            component="nav"
+            aria-label="Primary navigation"
+            direction="row"
+            alignItems="stretch"
+            sx={{ display: { xs: "none", md: "flex" }, height: 68 }}
+          >
+            {navigation.map((item) => {
+              const active = isActive(item);
+
+              return (
+                <ButtonBase
+                  key={item.href}
+                  component={Link}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  sx={{
+                    position: "relative",
+                    px: 1.75,
+                    color: active ? HEADER_TEXT : HEADER_MUTED_TEXT,
+                    fontSize: 13,
+                    fontWeight: 500,
+                    textDecoration: "none",
+                    "&::after": {
+                      content: '""',
+                      position: "absolute",
+                      right: 14,
+                      bottom: 3,
+                      left: 14,
+                      height: 2,
+                      borderRadius: 999,
+                      bgcolor: active ? LANDING_SECONDARY : "transparent",
+                    },
+                    "&:hover": { color: HEADER_TEXT },
+                    "&:focus-visible": {
+                      outline: `2px solid ${LANDING_SECONDARY}`,
+                      outlineOffset: -4,
+                    },
+                  }}
+                >
+                  {item.label}
+                </ButtonBase>
+              );
+            })}
+          </Stack>
+        </Stack>
+
+        <Stack direction="row" alignItems="center" spacing={{ xs: 0.5, sm: 1.25 }}>
+          <ButtonBase
+            aria-label="Open profile menu"
+            aria-expanded={Boolean(profileAnchor)}
+            onClick={(event) => setProfileAnchor(event.currentTarget)}
+            sx={{
+              minHeight: 44,
+              gap: 1,
+              px: { xs: 0.25, sm: 0.75 },
+              borderRadius: "10px",
+              color: HEADER_TEXT,
+              "&:hover": { bgcolor: "rgba(255,255,255,0.07)" },
+              "&:focus-visible": {
+                outline: `2px solid ${LANDING_SECONDARY}`,
+                outlineOffset: 2,
+              },
+            }}
+          >
             <Avatar
-              aria-label={`${displayName} profile`}
               sx={{
-                width: 40,
-                height: 40,
-                bgcolor: HEADER_ACCENT,
-                color: "#272333",
-                border: "3px solid #B978D0",
-                fontSize: 13,
-                fontWeight: 600,
-                letterSpacing: "0.02em",
+                width: 34,
+                height: 34,
+                bgcolor: "#FFD1C3",
+                color: LANDING_BACKGROUND,
+                fontSize: 11,
+                fontWeight: 500,
               }}
             >
               {initials}
             </Avatar>
-            <Typography
-              component="p"
-              sx={{
-                color: HEADER_TEXT,
-                fontSize: { xs: 15, sm: 16 },
-                fontWeight: 500,
-                lineHeight: 1.2,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              Hello, {firstName}!
-            </Typography>
-          </Stack>
+            <Box sx={{ display: { xs: "none", sm: "block" }, minWidth: 0, textAlign: "left" }}>
+              <Typography sx={{ maxWidth: 150, fontSize: 12, fontWeight: 500 }} noWrap>
+                {displayName}
+              </Typography>
+              <Typography
+                sx={{ maxWidth: 150, color: HEADER_MUTED_TEXT, fontSize: 11, fontWeight: 400 }}
+                noWrap
+              >
+                {organisationLabel}
+              </Typography>
+            </Box>
+            <KeyboardArrowDownRoundedIcon
+              sx={{ display: { xs: "none", sm: "block" }, color: HEADER_MUTED_TEXT, fontSize: 18 }}
+            />
+          </ButtonBase>
 
           <IconButton
-            type="button"
             aria-label="Open navigation menu"
-            aria-expanded={menuOpen}
-            aria-controls={menuOpen ? "landing-navigation-drawer" : undefined}
-            onClick={() => setMenuOpen(true)}
+            onClick={() => setMobileMenuOpen(true)}
             sx={{
-              width: 40,
-              height: 40,
-              ml: 2,
-              flex: "0 0 auto",
-              borderRadius: "12px",
+              display: { xs: "inline-flex", md: "none" },
               color: HEADER_TEXT,
-              bgcolor: HEADER_SURFACE,
-              border: "1px solid rgba(255, 255, 255, 0.08)",
-              "&:hover": { bgcolor: "#244B6A" },
-              "&:focus-visible": {
-                outline: `3px solid ${HEADER_ACCENT}`,
-                outlineOffset: 2,
-              },
+              "&:hover": { bgcolor: "rgba(255,255,255,0.08)" },
             }}
           >
             <MenuRoundedIcon />
           </IconButton>
         </Stack>
-      </Box>
+      </Stack>
 
-      <Drawer
-        id="landing-navigation-drawer"
-        anchor="right"
-        open={menuOpen}
-        onClose={() => setMenuOpen(false)}
+      <Menu
+        anchorEl={profileAnchor}
+        open={Boolean(profileAnchor)}
+        onClose={() => setProfileAnchor(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
         slotProps={{
           paper: {
             sx: {
-              width: { xs: "min(88vw, 320px)", sm: 340 },
-              bgcolor: HEADER_BACKGROUND,
+              mt: 0.75,
+              minWidth: 210,
+              bgcolor: "#173953",
               color: HEADER_TEXT,
-              backgroundImage: "none",
-              borderLeft: "1px solid rgba(255, 255, 255, 0.1)",
+              border: "1px solid rgba(255,255,255,0.1)",
               "& .MuiTypography-root, & .MuiButtonBase-root": {
                 fontFamily: LANDING_FONT_FAMILY,
               },
@@ -187,67 +244,53 @@ export function LandingWelcomeHeader({
           },
         }}
       >
-        <Stack sx={{ height: "100%" }}>
-          <Stack
-            direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-            sx={{ minHeight: 72, px: 2.25 }}
-          >
-            <Typography
-              sx={{ fontSize: 17, fontWeight: 600, letterSpacing: "-0.02em" }}
-            >
-              AI-BOSS
-            </Typography>
+        <MenuItem
+          component={Link}
+          href="/dashboard/settings"
+          onClick={() => setProfileAnchor(null)}
+          sx={{ gap: 1.25, fontSize: 13, fontWeight: 500, color: HEADER_TEXT }}
+        >
+          <SettingsRoundedIcon fontSize="small" />
+          Settings
+        </MenuItem>
+        <Divider sx={{ borderColor: "rgba(255,255,255,0.1)" }} />
+        <Box sx={{ px: 0.75 }}>
+          <SignOutButton />
+        </Box>
+      </Menu>
+
+      <Drawer
+        anchor="right"
+        open={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+        slotProps={{
+          paper: {
+            sx: {
+              width: "min(86vw, 320px)",
+              bgcolor: LANDING_BACKGROUND,
+              color: HEADER_TEXT,
+              backgroundImage: "none",
+              "& .MuiTypography-root, & .MuiButtonBase-root": {
+                fontFamily: LANDING_FONT_FAMILY,
+              },
+            },
+          },
+        }}
+      >
+        <Stack sx={{ height: "100%", p: 1.5 }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+            <Typography sx={{ px: 1, fontSize: 16, fontWeight: 600 }}>AI-BOSS</Typography>
             <IconButton
               aria-label="Close navigation menu"
-              onClick={() => setMenuOpen(false)}
+              onClick={() => setMobileMenuOpen(false)}
               sx={{ color: HEADER_MUTED_TEXT }}
             >
               <CloseRoundedIcon />
             </IconButton>
           </Stack>
-
-          <Divider sx={{ borderColor: "rgba(255, 255, 255, 0.1)" }} />
-
-          <Stack
-            direction="row"
-            spacing={1.5}
-            alignItems="center"
-            sx={{ px: 2.25, py: 2 }}
-          >
-            <Avatar
-              sx={{
-                width: 46,
-                height: 46,
-                bgcolor: HEADER_ACCENT,
-                color: "#272333",
-                fontSize: 14,
-                fontWeight: 600,
-              }}
-            >
-              {initials}
-            </Avatar>
-            <Box sx={{ minWidth: 0 }}>
-              <Typography fontWeight={500} noWrap>
-                {displayName}
-              </Typography>
-              <Typography sx={{ color: HEADER_MUTED_TEXT, fontSize: 12 }} noWrap>
-                {email}
-              </Typography>
-            </Box>
-          </Stack>
-
-          <List
-            component="nav"
-            aria-label="Main navigation"
-            sx={{ px: 1.25, py: 0.5 }}
-          >
+          <List component="nav" aria-label="Mobile navigation" disablePadding>
             {navigation.map((item) => {
-              const active = item.exact
-                ? pathname === item.href
-                : pathname.startsWith(item.href);
-              const Icon = item.icon;
+              const active = isActive(item);
 
               return (
                 <ListItemButton
@@ -255,48 +298,33 @@ export function LandingWelcomeHeader({
                   component={Link}
                   href={item.href}
                   selected={active}
-                  onClick={() => setMenuOpen(false)}
+                  onClick={() => setMobileMenuOpen(false)}
                   sx={{
-                    minHeight: 48,
+                    minHeight: 46,
                     mb: 0.5,
-                    borderRadius: "12px",
+                    borderRadius: "10px",
                     color: active ? HEADER_TEXT : HEADER_MUTED_TEXT,
-                    "&.Mui-selected": { bgcolor: HEADER_SURFACE },
-                    "&.Mui-selected:hover, &:hover": {
-                      bgcolor: "#244B6A",
-                      color: HEADER_TEXT,
-                    },
-                    "&:focus-visible": {
-                      outline: `3px solid ${HEADER_ACCENT}`,
-                      outlineOffset: -2,
+                    borderLeft: "3px solid",
+                    borderLeftColor: active ? LANDING_SECONDARY : "transparent",
+                    "&.Mui-selected, &.Mui-selected:hover, &:hover": {
+                      bgcolor: "rgba(255,255,255,0.07)",
                     },
                   }}
                 >
-                  <ListItemIcon sx={{ minWidth: 38, color: "inherit" }}>
-                    <Icon fontSize="small" />
-                  </ListItemIcon>
                   <ListItemText
                     primary={item.label}
-                    slotProps={{
-                      primary: {
-                        fontSize: 14,
-                        fontWeight: 400,
-                      },
-                    }}
+                    slotProps={{ primary: { fontSize: 13, fontWeight: 500 } }}
                   />
                 </ListItemButton>
               );
             })}
           </List>
-
-          <Box sx={{ mt: "auto", px: 1.25, pb: 2 }}>
-            <Divider
-              sx={{ mb: 1, borderColor: "rgba(255, 255, 255, 0.1)" }}
-            />
+          <Box sx={{ mt: "auto", px: 0.5 }}>
+            <Divider sx={{ mb: 1, borderColor: "rgba(255,255,255,0.1)" }} />
             <SignOutButton />
           </Box>
         </Stack>
       </Drawer>
-    </>
+    </Box>
   );
 }

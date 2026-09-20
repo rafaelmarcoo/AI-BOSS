@@ -44,11 +44,16 @@ function ActivityIcon({ kind }: { kind: RecentActivityKind }) {
   return <RouteRoundedIcon fontSize="small" />;
 }
 
-export function RecentActivity() {
+interface RecentActivityProps {
+  tone?: "dark" | "light";
+}
+
+export function RecentActivity({ tone = "dark" }: RecentActivityProps) {
   const router = useRouter();
   const [activities, setActivities] = useState<RecentActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const light = tone === "light";
 
   useEffect(() => {
     let active = true;
@@ -87,18 +92,25 @@ export function RecentActivity() {
       sx={{
         p: { xs: 2, sm: 2.5 },
         borderRadius: 2.5,
-        bgcolor: dashboardTokens.surface,
-        color: dashboardTokens.text,
+        bgcolor: light ? "#FFFFFF" : dashboardTokens.surface,
+        color: light ? "#163A5A" : dashboardTokens.text,
         border: "1px solid",
-        borderColor: dashboardTokens.border,
+        borderColor: light ? "#D8E3EC" : dashboardTokens.border,
       }}
     >
       <Stack spacing={1.5}>
         <Stack>
-          <Typography component="h2" variant="h6" fontWeight={700}>
+          <Typography
+            component="h2"
+            variant="h6"
+            fontWeight={light ? 600 : 700}
+          >
             Recent activity
           </Typography>
-          <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
+          <Typography
+            variant="body2"
+            sx={{ color: light ? "#5F7890" : dashboardTokens.textMuted }}
+          >
             Your latest accessible documents, conversations, and scenarios.
           </Typography>
         </Stack>
@@ -106,14 +118,20 @@ export function RecentActivity() {
         {loading ? (
           <Stack direction="row" spacing={1} alignItems="center">
             <CircularProgress size={18} />
-            <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
+            <Typography
+              variant="body2"
+              sx={{ color: light ? "#5F7890" : dashboardTokens.textMuted }}
+            >
               Loading activity…
             </Typography>
           </Stack>
         ) : null}
         {error ? <Alert severity="error">{error}</Alert> : null}
         {!loading && !error && activities.length === 0 ? (
-          <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
+          <Typography
+            variant="body2"
+            sx={{ color: light ? "#5F7890" : dashboardTokens.textMuted }}
+          >
             No activity yet. Upload a document, start a conversation, or save a scenario.
           </Typography>
         ) : null}
@@ -132,15 +150,15 @@ export function RecentActivity() {
                 alignItems: "flex-start",
                 p: 1.25,
                 border: "1px solid",
-                borderColor: dashboardTokens.border,
+                borderColor: light ? "#D8E3EC" : dashboardTokens.border,
                 borderRadius: 1.75,
-                bgcolor: "rgba(255,255,255,0.025)",
+                bgcolor: light ? "#F7FAFC" : "rgba(255,255,255,0.025)",
                 color: "inherit",
                 textAlign: "left",
                 cursor: "pointer",
                 "&:hover": {
-                  bgcolor: "rgba(255,255,255,0.055)",
-                  borderColor: dashboardTokens.borderSoft,
+                  bgcolor: light ? "#EAF2F8" : "rgba(255,255,255,0.055)",
+                  borderColor: light ? "#9DB6CA" : dashboardTokens.borderSoft,
                 },
                 "&:focus-visible": {
                   outline: `2px solid ${dashboardTokens.accent}`,
@@ -156,26 +174,32 @@ export function RecentActivity() {
                   height: 32,
                   flex: "0 0 auto",
                   borderRadius: 1.5,
-                  bgcolor: "rgba(79,125,243,0.14)",
-                  color: "#93c5fd",
+                  bgcolor: light ? "#E2EEF6" : "rgba(79,125,243,0.14)",
+                  color: light ? "#2B6A9B" : "#93c5fd",
                 }}
               >
                 <ActivityIcon kind={activity.kind} />
               </Box>
               <Stack sx={{ minWidth: 0, flex: 1 }}>
-                <Typography variant="body2" fontWeight={700}>
+                <Typography variant="body2" fontWeight={light ? 500 : 700}>
                   {activity.title}
                 </Typography>
                 <Typography
                   variant="caption"
-                  sx={{ color: dashboardTokens.textMuted, overflowWrap: "anywhere" }}
+                  sx={{
+                    color: light ? "#5F7890" : dashboardTokens.textMuted,
+                    overflowWrap: "anywhere",
+                  }}
                 >
                   {activity.description}
                 </Typography>
               </Stack>
               <Typography
                 variant="caption"
-                sx={{ color: dashboardTokens.textSubtle, whiteSpace: "nowrap" }}
+                sx={{
+                  color: light ? "#7890A5" : dashboardTokens.textSubtle,
+                  whiteSpace: "nowrap",
+                }}
               >
                 {formatTimeAgo(activity.timestamp)}
               </Typography>

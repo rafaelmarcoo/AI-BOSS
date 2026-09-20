@@ -101,6 +101,28 @@ describe('LandingPage quick actions', () => {
     expect(clickSpy).toHaveBeenCalledTimes(2)
   })
 
+  it('shows the welcome header and opens the navigation menu', async () => {
+    const user = userEvent.setup()
+    renderLandingPage()
+
+    expect(screen.getByText('Hello, Rafael!')).toBeInTheDocument()
+    expect(screen.getByLabelText('Rafael Marco profile')).toHaveTextContent('RM')
+
+    await user.click(screen.getByRole('button', { name: 'Open navigation menu' }))
+
+    expect(
+      screen.getByRole('navigation', { name: 'Main navigation' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute(
+      'href',
+      '/landing',
+    )
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
+      'href',
+      '/dashboard',
+    )
+  })
+
   it('opens the document workspace from Manage documents', async () => {
     renderLandingPage()
 

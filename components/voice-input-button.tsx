@@ -21,6 +21,7 @@ const RECORDING_WARNING_SECONDS = MAX_RECORDING_SECONDS - 60;
 interface VoiceInputButtonProps {
   disabled?: boolean;
   onTranscript: (transcript: string) => void;
+  tone?: "dark" | "light";
 }
 
 interface TranscriptionResponse {
@@ -54,6 +55,7 @@ function recordingFileName(mimeType: string) {
 export function VoiceInputButton({
   disabled = false,
   onTranscript,
+  tone = "dark",
 }: VoiceInputButtonProps) {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -271,10 +273,10 @@ export function VoiceInputButton({
                 width: 36,
                 height: 36,
                 borderRadius: `${dashboardTokens.radiusSm}px`,
-                color: dashboardTokens.textMuted,
+                color: tone === "light" ? "#2B6A9B" : dashboardTokens.textMuted,
                 "&:hover": {
-                  color: dashboardTokens.text,
-                  bgcolor: dashboardTokens.surfaceAlt,
+                  color: tone === "light" ? "#163A5A" : dashboardTokens.text,
+                  bgcolor: tone === "light" ? "#EAF2F8" : dashboardTokens.surfaceAlt,
                 },
               }}
             >

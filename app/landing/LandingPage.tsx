@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Alert,
@@ -24,16 +24,27 @@ import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 import FolderRoundedIcon from "@mui/icons-material/FolderRounded";
 import RouteRoundedIcon from "@mui/icons-material/RouteRounded";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
-import { DashboardHeader } from "@/app/dashboard/header";
 import { dashboardTokens } from "@/app/theme";
 import { VoiceInputButton } from "@/components/voice-input-button";
 import type { Conversation } from "@/types/database";
-import { RecentActivity } from "@/app/dashboard/RecentActivity";
+import {
+  LANDING_BACKGROUND,
+  LandingWelcomeHeader,
+} from "./LandingWelcomeHeader";
 
 type ChatConversationSummary = Pick<
   Conversation,
   "id" | "title" | "created_at" | "updated_at"
 >;
+
+const LANDING_CARD = "#FFFFFF";
+const LANDING_CARD_HOVER = "#F2F7FB";
+const LANDING_CARD_TEXT = "#163A5A";
+const LANDING_CARD_MUTED = "#5F7890";
+const LANDING_CARD_BORDER = "#D8E3EC";
+const LANDING_ACTION = "#2B6A9B";
+const LANDING_FONT_FAMILY =
+  'var(--font-poppins), Poppins, "Segoe UI", sans-serif';
 
 interface ConversationsApiResponse {
   success: boolean;
@@ -70,13 +81,6 @@ const QUICK_ACTIONS = [
   },
 ];
 
-function getFirstName(fullName: string | null, email: string) {
-  const trimmedName = fullName?.trim();
-
-  if (trimmedName) return trimmedName.split(/\s+/)[0];
-  return email.split("@")[0] || "there";
-}
-
 function formatConversationDate(value: string) {
   return new Date(value).toLocaleString(undefined, {
     month: "short",
@@ -102,8 +106,6 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
   );
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState<string | null>(null);
-  const firstName = useMemo(() => getFirstName(fullName, email), [email, fullName]);
-
   useEffect(() => {
     let isMounted = true;
 
@@ -222,11 +224,15 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
       component="main"
       sx={{
         minHeight: "100vh",
-        bgcolor: dashboardTokens.shell,
+        bgcolor: LANDING_BACKGROUND,
         color: dashboardTokens.text,
+        fontFamily: LANDING_FONT_FAMILY,
+        "& .MuiTypography-root, & .MuiButtonBase-root, & .MuiInputBase-root": {
+          fontFamily: LANDING_FONT_FAMILY,
+        },
       }}
     >
-      <DashboardHeader onOpenPastChats={() => setHistoryOpen(true)} />
+      <LandingWelcomeHeader fullName={fullName} email={email} />
 
       <Stack
         sx={{
@@ -237,31 +243,18 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
           py: { xs: 4, sm: 5, lg: 6 },
         }}
       >
-        <Box>
-          <Typography
-            component="h1"
-            sx={{
-              fontSize: { xs: 28, sm: 34 },
-              lineHeight: 1.2,
-              fontWeight: 600,
-              letterSpacing: "-0.025em",
-            }}
-          >
-            Hello, {firstName}
-          </Typography>
-          <Typography
-            component="p"
-            sx={{
-              mt: 0.75,
-              color: dashboardTokens.textMuted,
-              fontSize: { xs: 18, sm: 20 },
-              lineHeight: 1.4,
-              fontWeight: 400,
-            }}
-          >
-            What would you like to work on?
-          </Typography>
-        </Box>
+        <Typography
+          component="h1"
+          sx={{
+            color: dashboardTokens.text,
+            fontSize: { xs: 24, sm: 28 },
+            lineHeight: 1.25,
+            fontWeight: 600,
+            letterSpacing: "-0.025em",
+          }}
+        >
+          What would you like to work on?
+        </Typography>
 
         <Box sx={{ mt: 3 }}>
           <input
@@ -282,12 +275,12 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
               px: { xs: 1.25, sm: 1.5 },
               borderRadius: `${dashboardTokens.radiusMd}px`,
               border: "1px solid",
-              borderColor: dashboardTokens.borderInput,
-              bgcolor: dashboardTokens.surface,
+              borderColor: LANDING_CARD_BORDER,
+              bgcolor: LANDING_CARD,
               transition: "border-color 140ms ease, box-shadow 140ms ease",
               "&:focus-within": {
-                borderColor: dashboardTokens.accent,
-                boxShadow: "0 0 0 3px rgba(79, 125, 243, 0.12)",
+                borderColor: LANDING_ACTION,
+                boxShadow: "0 0 0 3px rgba(43, 106, 155, 0.2)",
               },
             }}
           >
@@ -299,10 +292,10 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
               sx={{
                 flex: "1 1 auto",
                 minWidth: 0,
-                color: dashboardTokens.text,
+                color: LANDING_CARD_TEXT,
                 fontSize: 14,
                 "& input::placeholder": {
-                  color: dashboardTokens.textSubtle,
+                  color: LANDING_CARD_MUTED,
                   opacity: 1,
                 },
               }}
@@ -317,6 +310,7 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
               <AttachFileRoundedIcon fontSize="small" />
             </IconButton>
             <VoiceInputButton
+              tone="light"
               onTranscript={(transcript) =>
                 setMessage((current) =>
                   [current.trimEnd(), transcript.trim()].filter(Boolean).join(" "),
@@ -331,23 +325,19 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
                 width: 36,
                 height: 36,
                 borderRadius: `${dashboardTokens.radiusSm}px`,
-                color: dashboardTokens.text,
-                bgcolor: message.trim()
-                  ? dashboardTokens.accent
-                  : dashboardTokens.surfaceAlt,
+                color: message.trim() ? "#FFFFFF" : LANDING_CARD_MUTED,
+                bgcolor: message.trim() ? LANDING_ACTION : "#EAF2F8",
                 "&:hover": {
-                  bgcolor: message.trim()
-                    ? dashboardTokens.accentHover
-                    : dashboardTokens.surfaceAlt,
+                  bgcolor: message.trim() ? "#21577F" : "#DCE9F2",
                 },
-                "&.Mui-disabled": { color: dashboardTokens.textSubtle },
+                "&.Mui-disabled": { color: LANDING_CARD_MUTED },
               }}
             >
               <SendRoundedIcon fontSize="small" />
             </IconButton>
           </Box>
           <Typography
-            sx={{ mt: 1, color: dashboardTokens.textSubtle, fontSize: 12 }}
+            sx={{ mt: 1, color: "#B8C7D9", fontSize: 12 }}
           >
             AI-BOSS provides financial insights. Review important decisions before acting.
           </Typography>
@@ -430,26 +420,27 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
                     textAlign: "left",
                     borderRadius: `${dashboardTokens.radiusMd}px`,
                     border: "1px solid",
-                    borderColor: dashboardTokens.border,
-                    bgcolor: dashboardTokens.surface,
+                    borderColor: LANDING_CARD_BORDER,
+                    bgcolor: LANDING_CARD,
+                    color: LANDING_CARD_TEXT,
                     transition: "background-color 140ms ease, border-color 140ms ease, transform 140ms ease",
                     "&:hover": {
-                      bgcolor: dashboardTokens.surfaceAlt,
-                      borderColor: dashboardTokens.borderMuted,
+                      bgcolor: LANDING_CARD_HOVER,
+                      borderColor: "#9DB6CA",
                       transform: "translateY(-1px)",
                     },
                   }}
                 >
-                  <Icon sx={{ fontSize: 22, color: dashboardTokens.textMuted }} />
-                  <Typography sx={{ mt: 1.75, fontSize: 16, fontWeight: 600 }}>
+                  <Icon sx={{ fontSize: 22, color: LANDING_ACTION }} />
+                  <Typography sx={{ mt: 1.75, fontSize: 16, fontWeight: 500 }}>
                     {action.title}
                   </Typography>
                   <Typography
-                    sx={{ mt: 0.5, color: dashboardTokens.textMuted, fontSize: 14, lineHeight: 1.45 }}
+                    sx={{ mt: 0.5, color: LANDING_CARD_MUTED, fontSize: 14, lineHeight: 1.45 }}
                   >
                     {action.description}
                   </Typography>
-                  <Typography sx={{ mt: 1, color: dashboardTokens.textSubtle, fontSize: 12 }}>
+                  <Typography sx={{ mt: 1, color: "#7890A5", fontSize: 12 }}>
                     {action.meta}
                   </Typography>
                 </ButtonBase>
@@ -458,12 +449,19 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
           </Box>
         </Box>
 
-        <Box component="section" sx={{ mt: 4 }}>
-          <RecentActivity />
-        </Box>
-
         {!historyLoading && recentConversations.length > 0 ? (
-          <Box component="section" sx={{ mt: 4 }}>
+          <Box
+            component="section"
+            sx={{
+              mt: 4,
+              p: { xs: 2, sm: 2.5 },
+              borderRadius: 2.5,
+              bgcolor: LANDING_CARD,
+              color: LANDING_CARD_TEXT,
+              border: "1px solid",
+              borderColor: LANDING_CARD_BORDER,
+            }}
+          >
             <Stack direction="row" alignItems="center" justifyContent="space-between">
               <Typography component="h2" sx={{ fontSize: 15, fontWeight: 600 }}>
                 Recent conversations
@@ -471,14 +469,14 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
               <Button
                 size="small"
                 onClick={() => setHistoryOpen(true)}
-                sx={{ color: dashboardTokens.textMuted, textTransform: "none", fontSize: 13 }}
+                sx={{ color: LANDING_ACTION, textTransform: "none", fontSize: 13 }}
               >
                 View all
               </Button>
             </Stack>
             <List
               disablePadding
-              sx={{ mt: 1, borderTop: "1px solid", borderColor: dashboardTokens.border }}
+              sx={{ mt: 1, borderTop: "1px solid", borderColor: LANDING_CARD_BORDER }}
             >
               {recentConversations.map((conversation) => (
                 <ListItem key={conversation.id} disablePadding>
@@ -488,9 +486,9 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
                       px: 0,
                       py: 1.25,
                       borderBottom: "1px solid",
-                      borderColor: dashboardTokens.border,
-                      "&:hover": { bgcolor: "transparent" },
-                      "&:hover .conversation-title": { color: dashboardTokens.accentHover },
+                      borderColor: LANDING_CARD_BORDER,
+                      "&:hover": { bgcolor: LANDING_CARD_HOVER },
+                      "&:hover .conversation-title": { color: LANDING_ACTION },
                     }}
                   >
                     <ListItemText
@@ -498,12 +496,12 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
                       secondary={formatConversationDate(conversation.updated_at)}
                       primaryTypographyProps={{
                         className: "conversation-title",
-                        color: dashboardTokens.textSoft,
+                        color: LANDING_CARD_TEXT,
                         fontSize: 14,
                         fontWeight: 500,
                       }}
                       secondaryTypographyProps={{
-                        color: dashboardTokens.textSubtle,
+                        color: LANDING_CARD_MUTED,
                         fontSize: 12,
                       }}
                     />
@@ -622,9 +620,9 @@ const composerControlSx = {
   width: 36,
   height: 36,
   borderRadius: `${dashboardTokens.radiusSm}px`,
-  color: dashboardTokens.textMuted,
+  color: LANDING_ACTION,
   "&:hover": {
-    color: dashboardTokens.text,
-    bgcolor: dashboardTokens.surfaceAlt,
+    color: LANDING_CARD_TEXT,
+    bgcolor: "#EAF2F8",
   },
 };

@@ -292,6 +292,8 @@ export function LandingPage({ fullName, email, companyName }: LandingPageProps) 
       >
         <Stack direction="row" spacing={1.5} alignItems="center">
           <Avatar
+            src="/profile-avatar.png"
+            alt={`${displayName} profile picture`}
             sx={{
               width: { xs: 42, sm: 46 },
               height: { xs: 42, sm: 46 },
@@ -299,6 +301,10 @@ export function LandingPage({ fullName, email, companyName }: LandingPageProps) 
               color: LANDING_BACKGROUND,
               fontSize: 12,
               fontWeight: 500,
+              "& .MuiAvatar-img": {
+                objectFit: "cover",
+                transform: "scale(1.55)",
+              },
             }}
           >
             {initials}
@@ -629,20 +635,6 @@ export function LandingPage({ fullName, email, companyName }: LandingPageProps) 
                     "&:hover": { bgcolor: "#F7F7F4" },
                   }}
                 >
-                  <Box
-                    sx={{
-                      width: 42,
-                      height: 42,
-                      flex: "0 0 auto",
-                      display: "grid",
-                      placeItems: "center",
-                      borderRadius: "50%",
-                      bgcolor: index === 0 ? "#FFE1D5" : "#F0EFEC",
-                      color: index === 0 ? LANDING_SECONDARY : "#66788C",
-                    }}
-                  >
-                    <ChatBubbleOutlineRoundedIcon fontSize="small" />
-                  </Box>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography
                       sx={{ fontSize: { xs: 13, sm: 14 }, fontWeight: 600 }}

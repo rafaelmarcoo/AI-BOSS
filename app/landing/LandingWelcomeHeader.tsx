@@ -182,6 +182,8 @@ export function LandingWelcomeHeader({
             }}
           >
             <Avatar
+              src="/profile-avatar.png"
+              alt={`${displayName} profile picture`}
               sx={{
                 width: 34,
                 height: 34,
@@ -189,6 +191,10 @@ export function LandingWelcomeHeader({
                 color: LANDING_BACKGROUND,
                 fontSize: 11,
                 fontWeight: 500,
+                "& .MuiAvatar-img": {
+                  objectFit: "cover",
+                  transform: "scale(1.55)",
+                },
               }}
             >
               {initials}

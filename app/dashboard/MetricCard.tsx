@@ -1,4 +1,4 @@
-import { Box, Chip, Paper, Stack, Typography, Skeleton } from "@mui/material";
+import { Box, Chip, Stack, Typography, Skeleton } from "@mui/material";
 import { dashboardTokens } from "@/app/theme";
 
 interface MetricCardProps {
@@ -32,19 +32,16 @@ export function MetricCard({
         : dashboardTokens.textMuted;
 
   return (
-    <Paper
-      elevation={0}
+    <Box
       sx={{
-        p: 2,
-        borderRadius: `${dashboardTokens.radiusMd}px`,
-        bgcolor: dashboardTokens.surface,
+        py: 1.5,
+        px: { xs: 0, sm: 1 },
+        bgcolor: "transparent",
         color: dashboardTokens.text,
-        border: "1px solid",
-        borderColor: dashboardTokens.border,
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
-        minHeight: 148,
+        minHeight: 128,
       }}
     >
       <Stack spacing={1.5} sx={{ minWidth: 0 }}>
@@ -169,6 +166,6 @@ export function MetricCard({
           ) : null}
         </Stack>
       </Stack>
-    </Paper>
+    </Box>
   );
 }

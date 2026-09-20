@@ -233,14 +233,9 @@ function WidgetFrame({
   children: ReactNode;
 }) {
   return (
-    <Paper
-      elevation={0}
+    <Box
       sx={{
-        p: 2,
-        borderRadius: `${dashboardTokens.radiusMd}px`,
-        bgcolor: dashboardTokens.surface,
-        border: "1px solid",
-        borderColor: dashboardTokens.border,
+        py: { xs: 2.5, sm: 3 },
         color: "common.white",
         minWidth: 0,
         height: "100%",
@@ -271,7 +266,7 @@ function WidgetFrame({
           </Typography>
         </Box>
       </Stack>
-    </Paper>
+    </Box>
   );
 }
 
@@ -1338,7 +1333,12 @@ export function GenUiCanvas({
               display: "grid",
               gridTemplateColumns: { xs: "1fr", xl: "repeat(2, minmax(0, 1fr))" },
               gridAutoRows: { xs: "auto", xl: "minmax(240px, auto)" },
-              gap: 2,
+              columnGap: { xs: 0, xl: 4 },
+              rowGap: 0,
+              "& > *": {
+                borderBottom: "1px solid",
+                borderColor: dashboardTokens.border,
+              },
             }}
           >
             {plan?.widgets.map((widget) => {

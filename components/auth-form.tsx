@@ -22,7 +22,11 @@ import {
 } from '@mui/material'
 import { dashboardTokens } from '@/app/theme'
 import type { UserType } from '@/types/database'
-import { authCardStyles, authFieldStyles } from '@/components/auth-ui'
+import {
+  authEntryCardStyles,
+  authEntryColors,
+  authEntryFieldStyles,
+} from '@/components/auth-ui'
 
 type Mode = 'sign-in' | 'sign-up'
 
@@ -172,7 +176,7 @@ export function AuthForm({ mode, showTestBypass = false }: AuthFormProps) {
       component="form"
       onSubmit={handleSubmit}
       elevation={0}
-      sx={authCardStyles}
+      sx={authEntryCardStyles}
     >
       {showTestBypass ? (
         <Paper
@@ -186,12 +190,12 @@ export function AuthForm({ mode, showTestBypass = false }: AuthFormProps) {
             alignItems: 'center',
             gap: 1.25,
             p: 1.25,
-            border: `1px solid ${dashboardTokens.border}`,
+            border: `1px solid ${authEntryColors.border}`,
             borderRadius: `${dashboardTokens.radiusMd}px`,
-            bgcolor: dashboardTokens.surface,
+            bgcolor: authEntryColors.card,
           }}
         >
-          <Typography sx={{ color: dashboardTokens.textMuted, fontSize: 12 }}>
+          <Typography sx={{ color: authEntryColors.muted, fontSize: 12 }}>
             Development testing only
           </Typography>
           <Button
@@ -201,8 +205,8 @@ export function AuthForm({ mode, showTestBypass = false }: AuthFormProps) {
             variant="outlined"
             disabled={isSubmitting}
             sx={{
-              borderColor: dashboardTokens.borderInput,
-              color: dashboardTokens.text,
+              borderColor: authEntryColors.accent,
+              color: authEntryColors.text,
               textTransform: 'none',
             }}
           >
@@ -216,15 +220,15 @@ export function AuthForm({ mode, showTestBypass = false }: AuthFormProps) {
           <Typography
             component="p"
             sx={{
-              color: dashboardTokens.text,
+              color: authEntryColors.text,
               fontSize: 22,
-              fontWeight: 650,
+              fontWeight: 600,
               letterSpacing: '-0.025em',
             }}
           >
             AI-BOSS
           </Typography>
-          <Typography sx={{ color: dashboardTokens.textSubtle, fontSize: 13 }}>
+          <Typography sx={{ color: authEntryColors.muted, fontSize: 12 }}>
             Financial intelligence for SME teams
           </Typography>
         </Stack>
@@ -233,7 +237,7 @@ export function AuthForm({ mode, showTestBypass = false }: AuthFormProps) {
           <Typography
             component="h1"
             sx={{
-              color: dashboardTokens.text,
+              color: authEntryColors.text,
               fontSize: { xs: 32, sm: 38 },
               lineHeight: 1.2,
               fontWeight: 600,
@@ -242,7 +246,7 @@ export function AuthForm({ mode, showTestBypass = false }: AuthFormProps) {
           >
             {isSignUp ? 'Create your account' : 'Welcome back'}
           </Typography>
-          <Typography sx={{ color: dashboardTokens.textMuted, fontSize: 16 }}>
+          <Typography sx={{ color: authEntryColors.muted, fontSize: 15 }}>
             {isSignUp
               ? 'Get started with your AI-BOSS workspace.'
               : 'Sign in to your workspace.'}
@@ -266,13 +270,13 @@ export function AuthForm({ mode, showTestBypass = false }: AuthFormProps) {
               fullWidth
               error={Boolean(fieldErrors.fullName)}
               helperText={fieldErrors.fullName}
-              sx={authFieldStyles}
+              sx={authEntryFieldStyles}
             />
 
             <FormControl error={Boolean(fieldErrors.userType)}>
               <FormLabel
                 id="user-type-label"
-                sx={{ color: dashboardTokens.textMuted, fontSize: 13, fontWeight: 500 }}
+                sx={{ color: authEntryColors.text, fontSize: 13, fontWeight: 500 }}
               >
                 How will you use AI-BOSS?
               </FormLabel>
@@ -288,9 +292,9 @@ export function AuthForm({ mode, showTestBypass = false }: AuthFormProps) {
                   mt: 1,
                   "& .MuiToggleButton-root": {
                     minHeight: 42,
-                    color: dashboardTokens.textMuted,
-                    borderColor: dashboardTokens.borderInput,
-                    bgcolor: dashboardTokens.surfaceAlt,
+                    color: authEntryColors.muted,
+                    borderColor: authEntryColors.border,
+                    bgcolor: authEntryColors.input,
                     fontSize: 13,
                     textTransform: 'none',
                   },
@@ -301,8 +305,8 @@ export function AuthForm({ mode, showTestBypass = false }: AuthFormProps) {
                     borderRadius: `0 ${dashboardTokens.radiusSm}px ${dashboardTokens.radiusSm}px 0`,
                   },
                   "& .Mui-selected": {
-                    color: `${dashboardTokens.text} !important`,
-                    bgcolor: 'rgba(79, 125, 243, 0.16) !important',
+                    color: `${authEntryColors.text} !important`,
+                    bgcolor: 'rgba(242, 140, 91, 0.18) !important',
                   },
                 }}
               >
@@ -327,7 +331,7 @@ export function AuthForm({ mode, showTestBypass = false }: AuthFormProps) {
                 helperText={
                   fieldErrors.companyName ?? 'This creates a company employees can join.'
                 }
-                sx={authFieldStyles}
+                sx={authEntryFieldStyles}
               />
             ) : null}
 
@@ -351,7 +355,7 @@ export function AuthForm({ mode, showTestBypass = false }: AuthFormProps) {
                     style: { textTransform: 'uppercase' },
                   },
                 }}
-                sx={authFieldStyles}
+                sx={authEntryFieldStyles}
               />
             ) : null}
           </Stack>
@@ -367,7 +371,7 @@ export function AuthForm({ mode, showTestBypass = false }: AuthFormProps) {
           required
           error={Boolean(fieldErrors.email)}
           helperText={fieldErrors.email}
-          sx={{ ...authFieldStyles, mt: isSignUp ? 2 : 3 }}
+          sx={{ ...authEntryFieldStyles, mt: isSignUp ? 2 : 3 }}
         />
 
         <TextField
@@ -390,7 +394,7 @@ export function AuthForm({ mode, showTestBypass = false }: AuthFormProps) {
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                     onClick={() => setShowPassword((visible) => !visible)}
                     edge="end"
-                    sx={{ color: dashboardTokens.textSubtle }}
+                    sx={{ color: authEntryColors.subtle }}
                   >
                     <PasswordVisibilityIcon crossed={showPassword} />
                   </IconButton>
@@ -398,7 +402,7 @@ export function AuthForm({ mode, showTestBypass = false }: AuthFormProps) {
               ),
             },
           }}
-          sx={{ ...authFieldStyles, mt: 2 }}
+          sx={{ ...authEntryFieldStyles, mt: 2 }}
         />
 
         {isSignUp ? (
@@ -426,7 +430,7 @@ export function AuthForm({ mode, showTestBypass = false }: AuthFormProps) {
                         setShowConfirmPassword((visible) => !visible)
                       }
                       edge="end"
-                      sx={{ color: dashboardTokens.textSubtle }}
+                      sx={{ color: authEntryColors.subtle }}
                     >
                       <PasswordVisibilityIcon crossed={showConfirmPassword} />
                     </IconButton>
@@ -434,7 +438,7 @@ export function AuthForm({ mode, showTestBypass = false }: AuthFormProps) {
                 ),
               },
             }}
-            sx={{ ...authFieldStyles, mt: 2 }}
+            sx={{ ...authEntryFieldStyles, mt: 2 }}
           />
         ) : null}
 
@@ -447,7 +451,7 @@ export function AuthForm({ mode, showTestBypass = false }: AuthFormProps) {
               mt: 1,
               alignSelf: 'flex-end',
               fontSize: 14,
-              color: dashboardTokens.accentHover,
+              color: authEntryColors.link,
             }}
           >
             Forgot password?
@@ -466,14 +470,14 @@ export function AuthForm({ mode, showTestBypass = false }: AuthFormProps) {
             mt: 2.5,
             minHeight: 50,
             borderRadius: `${dashboardTokens.radiusMd}px`,
-            bgcolor: dashboardTokens.accent,
-            color: dashboardTokens.text,
+            bgcolor: authEntryColors.accent,
+            color: authEntryColors.text,
             fontSize: 15,
             fontWeight: 600,
             textTransform: 'none',
             boxShadow: 'none',
             '&:hover': {
-              bgcolor: dashboardTokens.accentHover,
+              bgcolor: authEntryColors.accentHover,
               boxShadow: 'none',
             },
           }}
@@ -486,14 +490,14 @@ export function AuthForm({ mode, showTestBypass = false }: AuthFormProps) {
         </Button>
 
         <Typography
-          sx={{ mt: 2.5, color: dashboardTokens.textMuted, fontSize: 14 }}
+          sx={{ mt: 2.5, color: authEntryColors.muted, fontSize: 13 }}
         >
           {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
           <MuiLink
             component={NextLink}
             href={isSignUp ? '/sign-in' : '/sign-up'}
             underline="hover"
-            sx={{ fontWeight: 600, color: dashboardTokens.accentHover }}
+            sx={{ fontWeight: 500, color: authEntryColors.link }}
           >
             {isSignUp ? 'Sign in' : 'Sign up'}
           </MuiLink>

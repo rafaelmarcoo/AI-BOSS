@@ -24,7 +24,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { SignOutButton } from "@/components/sign-out-button";
 
-export const LANDING_BACKGROUND = "#102A43";
+export const LANDING_BACKGROUND = "#29465F";
 export const LANDING_SECONDARY = "#F28C5B";
 
 const HEADER_TEXT = "#FAF9FC";
@@ -240,7 +240,7 @@ export function LandingWelcomeHeader({
             sx: {
               mt: 0.75,
               minWidth: 210,
-              bgcolor: "#173953",
+              bgcolor: "#354F66",
               color: HEADER_TEXT,
               border: "1px solid rgba(255,255,255,0.1)",
               "& .MuiTypography-root, & .MuiButtonBase-root": {

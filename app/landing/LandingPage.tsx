@@ -4,7 +4,6 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Alert,
-  Avatar,
   Box,
   Button,
   ButtonBase,
@@ -36,8 +35,8 @@ const LANDING_CARD = "#FBFAF7";
 const LANDING_CARD_TEXT = "#163A5A";
 const LANDING_CARD_MUTED = "#66788C";
 const LANDING_CARD_BORDER = "#D8E3EC";
-const LANDING_ACTION_SURFACE = "#193B5A";
-const LANDING_ACTION_SURFACE_HOVER = "#214967";
+const LANDING_ACTION_SURFACE = "#354F66";
+const LANDING_ACTION_SURFACE_HOVER = "#415D74";
 const LANDING_FONT_FAMILY =
   'var(--font-poppins), Poppins, "Segoe UI", sans-serif';
 
@@ -93,12 +92,6 @@ function getDisplayName(fullName: string | null, email: string) {
   return fullName?.trim() || email.split("@")[0] || "there";
 }
 
-function getInitials(displayName: string) {
-  const parts = displayName.split(/\s+/).filter(Boolean);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0]}${parts.at(-1)?.[0] ?? ""}`.toUpperCase();
-}
-
 function formatToday() {
   return new Intl.DateTimeFormat("en-NZ", {
     weekday: "long",
@@ -149,7 +142,6 @@ export function LandingPage({ fullName, email, companyName }: LandingPageProps) 
   const [conversationsError, setConversationsError] = useState<string | null>(null);
   const displayName = getDisplayName(fullName, email);
   const firstName = displayName.split(/\s+/)[0];
-  const initials = getInitials(displayName);
 
   useEffect(() => {
     let active = true;
@@ -290,44 +282,24 @@ export function LandingPage({ fullName, email, companyName }: LandingPageProps) 
           pb: { xs: 4, sm: 6 },
         }}
       >
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <Avatar
-            src="/profile-avatar.png"
-            alt={`${displayName} profile picture`}
+        <Box>
+          <Typography sx={{ color: "#B8C7D9", fontSize: 12, fontWeight: 400 }}>
+            {formatToday()}
+          </Typography>
+          <Typography
+            component="h1"
             sx={{
-              width: { xs: 42, sm: 46 },
-              height: { xs: 42, sm: 46 },
-              bgcolor: "#FFD1C3",
-              color: LANDING_BACKGROUND,
-              fontSize: 12,
-              fontWeight: 500,
-              "& .MuiAvatar-img": {
-                objectFit: "cover",
-                transform: "scale(1.55)",
-              },
+              mt: 0.15,
+              color: "#FFFFFF",
+              fontSize: { xs: 30, sm: 36 },
+              lineHeight: 1.08,
+              fontWeight: 600,
+              letterSpacing: "-0.03em",
             }}
           >
-            {initials}
-          </Avatar>
-          <Box>
-            <Typography sx={{ color: "#B8C7D9", fontSize: 12, fontWeight: 400 }}>
-              {formatToday()}
-            </Typography>
-            <Typography
-              component="h1"
-              sx={{
-                mt: 0.15,
-                color: "#FFFFFF",
-                fontSize: { xs: 30, sm: 36 },
-                lineHeight: 1.08,
-                fontWeight: 600,
-                letterSpacing: "-0.03em",
-              }}
-            >
-              Hello, {firstName}
-            </Typography>
-          </Box>
-        </Stack>
+            Hello, {firstName}
+          </Typography>
+        </Box>
 
         <Typography
           component="h2"

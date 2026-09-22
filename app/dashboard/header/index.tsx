@@ -9,6 +9,7 @@ import { dashboardTokens } from "@/app/theme";
 
 const navigation = [
   { label: "Dashboard", href: "/dashboard", exact: true },
+  { label: "Analysis", href: "/dashboard/analysis" },
   { label: "Scenarios", href: "/dashboard/scenarios" },
   { label: "Documents", href: "/dashboard/documents" },
   { label: "Settings", href: "/dashboard/settings" },

@@ -3,6 +3,7 @@ import { selectLatestFinancialMetricObservations } from '@/lib/financial-data/la
 import { listFinancialMetricObservations } from '@/lib/financial-data/persistence'
 import { isSupportedFinancialCurrency } from '@/lib/financial-data/currency'
 import { summarizeMetricForecast } from '@/lib/financial-data/metric-forecast'
+import { getFinancialObservationSourceKey } from '@/lib/financial-data/source-key'
 import { calculateScenarioAnalysis } from '@/lib/scenarios/calculation'
 import type {
   ScenarioBaselineInputs,
@@ -52,10 +53,7 @@ function effectiveDate(row: FinancialMetricObservation) {
 }
 
 export function getScenarioSourceKey(row: FinancialMetricObservation) {
-  const id = row.connection_id ?? row.document_id
-  return id
-    ? `${row.source_type}:${id}`
-    : `${row.source_type}:label:${row.source_label}`
+  return getFinancialObservationSourceKey(row)
 }
 
 function sourceCurrencyKey(row: FinancialMetricObservation) {

@@ -3,6 +3,15 @@ import type { FinancialMetricSourceType } from '@/lib/financial-data/types'
 import type { GenUiPlan } from '@/lib/gen-ui/types'
 import type { ScenarioAnalysisInput } from '@/lib/scenarios/schema'
 import type { ScenarioAnalysisResult } from '@/lib/scenarios/calculation'
+import type {
+  FinancialAnalysisAgentTrace,
+  FinancialAnalysisReadinessStatus,
+  FinancialAnalysisResult,
+  FinancialAnalysisRunStatus,
+  FinancialDecisionPolicyResult,
+  FinancialDecisionOutcome,
+  FinancialDecisionTestInput,
+} from '@/lib/financial-analysis/types'
 
 export type UserType = 'admin' | 'employee'
 export type ConversationVisibility = 'private' | 'company' | 'admins'
@@ -280,6 +289,35 @@ export interface SavedScenario {
   calculated_at: string | null
   created_at: string
   updated_at: string
+}
+
+export interface FinancialAnalysisRun {
+  id: string
+  user_id: string
+  selected_source_key: string
+  selected_source_label: string
+  selected_currency: 'NZD' | 'AUD'
+  run_status: FinancialAnalysisRunStatus
+  data_readiness: FinancialAnalysisReadinessStatus
+  baseline_fingerprint: Array<{ id: string; updatedAt: string }>
+  result_payload: FinancialAnalysisResult
+  agent_trace: FinancialAnalysisAgentTrace
+  policy_version: 'mvp-v1'
+  model_metadata: Record<string, unknown>
+  token_metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface FinancialDecisionTest {
+  id: string
+  analysis_run_id: string
+  user_id: string
+  normalized_input: FinancialDecisionTestInput
+  scenario_result: ScenarioAnalysisResult
+  policy_result: FinancialDecisionPolicyResult
+  outcome: FinancialDecisionOutcome
+  override_reason: string | null
+  created_at: string
 }
 
 export interface DecisionLog {

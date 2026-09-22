@@ -531,7 +531,7 @@ decision analysis.
 
 ---
 
-### 13. user_gen_ui_preferences
+### 15. user_gen_ui_preferences
 
 Stores explicit, user-controlled signals that help AI-BOSS choose useful Gen UI
 widgets. Business size is stored on `companies` because it is shared; these
@@ -551,6 +551,72 @@ data still take priority over these preferences.
 **RLS Policies:**
 - Users can view, insert, and update only their own preferences
 - Company business size is changed server-side only after verifying the user is a company admin
+
+---
+
+### 16. financial_analysis_runs
+
+Stores immutable, owner-private snapshots of completed full financial analyses.
+The selected source and currency are recorded explicitly so NZD and AUD are
+never combined and a later source refresh cannot silently rewrite an earlier
+report. The versioned result payload contains the report facts and output shape;
+the separate trace and metadata fields keep execution evidence queryable.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID (PK) | Financial analysis run identifier |
+| user_id | UUID (FK) | Report owner |
+| selected_source_key | TEXT | Stable source selection key used for this run |
+| selected_source_label | TEXT | User-facing label captured at run time |
+| selected_currency | TEXT | Explicitly selected `NZD` or `AUD` baseline |
+| run_status | TEXT | `complete` or `completed_with_fallback` |
+| data_readiness | TEXT | `ready`, `limited`, or `action_required` |
+| baseline_fingerprint | JSONB | Observation IDs and update timestamps used by this run |
+| result_payload | JSONB | Immutable versioned `FinancialAnalysisResult` snapshot |
+| agent_trace | JSONB | Ordered deterministic/model workflow trace and fallback evidence |
+| policy_version | TEXT | Version of the deterministic policy set, initially `mvp-v1` |
+| model_metadata | JSONB | Model identifiers and non-secret generation metadata |
+| token_metadata | JSONB | Token usage metadata for model-backed workflow steps |
+| created_at | TIMESTAMP | Snapshot creation time |
+
+**RLS and immutability:**
+- Owners can select and insert only their own report snapshots.
+- Authenticated browser clients have no update or delete privilege or policy.
+- `(id, user_id)` is unique so child decision tests can enforce the same owner.
+
+**Indexes:**
+- `idx_financial_analysis_runs_owner_created` on (user_id, created_at DESC)
+
+---
+
+### 17. financial_decision_tests
+
+Stores each decision test as a new append-only record linked to one immutable
+analysis snapshot. The six-month scenario output and `mvp-v1` policy evaluation
+are preserved separately so a later review can distinguish calculations from
+the allow/block/override decision.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID (PK) | Decision-test identifier |
+| analysis_run_id | UUID (FK) | Parent financial analysis snapshot |
+| user_id | UUID (FK) | Owner; must match the parent analysis owner |
+| normalized_input | JSONB | Validated baseline and decision adjustments |
+| scenario_result | JSONB | Existing deterministic six-month scenario result |
+| policy_result | JSONB | Versioned deterministic policy evaluation |
+| outcome | TEXT | `allowed`, `blocked`, or `overridden` |
+| override_reason | TEXT | Required 10–500 character owner reason only when overridden |
+| created_at | TIMESTAMP | Test creation time |
+
+**RLS and integrity:**
+- Owners can select and insert only their own decision tests.
+- Authenticated browser clients have no update or delete privilege or policy.
+- A composite foreign key prevents linking a test to another owner's report.
+- An override reason is present if and only if the outcome is `overridden`.
+
+**Indexes:**
+- `idx_financial_decision_tests_owner_created` on (user_id, created_at DESC)
+- `idx_financial_decision_tests_analysis_created` on (analysis_run_id, created_at ASC)
 
 ---
 
@@ -575,6 +641,9 @@ documents (1) ──< (many) financial_metric_observations
 users (1) ──< (many) scenarios
 companies (1) ──< (many) scenarios
 users (1) ──< (one) user_gen_ui_preferences
+users (1) ──< (many) financial_analysis_runs
+financial_analysis_runs (1) ──< (many) financial_decision_tests
+users (1) ──< (many) financial_decision_tests
 ```
 
 ---
@@ -601,6 +670,7 @@ All schema changes are tracked in `db/migrations/`:
 - `017_daily_company_join_codes.sql` - Adds protected stored company join codes and a daily UTC rotation job
 - `018_gen_ui_personalization.sql` - Adds shared company size and per-user Gen UI personalization preferences
 - `019_company_gen_ui_controls.sql` - Moves planning horizon to the admin-controlled company profile and adds worker-specific roles
+- `020_financial_analysis_runs.sql` - Adds immutable owner-private financial analysis snapshots and append-only owner-bound decision tests
 
 ---
 
@@ -655,4 +725,4 @@ Planned for Sprint 2+:
 
 ---
 
-**Last Updated:** September 16, 2026 by Rafael Manubay
+**Last Updated:** September 22, 2026 by Rafael Manubay

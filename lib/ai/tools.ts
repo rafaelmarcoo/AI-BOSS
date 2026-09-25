@@ -15,7 +15,24 @@ const KEYWORDS_GOOGLE_REJECTS = [
   'default',
 ] as const
 
-function stripUnsupportedKeywords(node: unknown): unknown {
+function rewriteConst(node: Record<string, unknown>): Record<string, unknown> {
+  if (!('const' in node)) return node
+
+  const { const: value, ...rest } = node
+
+  if (typeof value === 'string') {
+    return { ...rest, enum: [value] }
+  }
+
+  const note = `Must be exactly ${JSON.stringify(value)}.`
+  return {
+    ...rest,
+    description:
+      typeof rest.description === 'string' ? `${rest.description} ${note}` : note,
+  }
+}
+
+export function stripUnsupportedKeywords(node: unknown): unknown {
   if (Array.isArray(node)) {
     return node.map(stripUnsupportedKeywords)
   }
@@ -26,7 +43,7 @@ function stripUnsupportedKeywords(node: unknown): unknown {
 
   const result: Record<string, unknown> = {}
 
-  for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+  for (const [key, value] of Object.entries(rewriteConst(node as Record<string, unknown>))) {
     if ((KEYWORDS_GOOGLE_REJECTS as readonly string[]).includes(key)) continue
     result[key] = stripUnsupportedKeywords(value)
   }

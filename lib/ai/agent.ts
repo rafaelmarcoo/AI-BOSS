@@ -88,12 +88,14 @@ export function requiresUnavailableAdjustedRunwayCorrection(params: {
 
   if (!adjustedRunwayIsUnavailable) return false
 
+  // Runway is displayed in days with months alongside, so a leaked figure can
+  // appear in either unit. Matching only one would let the other slip through.
   const directlyLabelledNumericResult =
-    /working-capital-adjusted runway\s*(?::|is|-)?\s*\*{0,2}\s*\d+(?:\.\d+)?\s*months/i.test(
+    /working-capital-adjusted runway\s*(?::|is|-)?\s*\*{0,2}\s*-?\d+(?:\.\d+)?\s*(?:months?|days?)\b/i.test(
       params.response
     )
   const substitutedAdjustedFormula =
-    /\([^()\n]*\d[^()\n]*[+-][^()\n]*\d[^()\n]*\)\s*(?:÷|\/)\s*[^=\n]+?=\s*\d+(?:\.\d+)?\s*months/i.test(
+    /\([^()\n]*\d[^()\n]*[+-][^()\n]*\d[^()\n]*\)\s*(?:÷|\/)\s*[^=\n]+?=\s*-?\d+(?:\.\d+)?\s*(?:months?|days?)\b/i.test(
       params.response
     )
 

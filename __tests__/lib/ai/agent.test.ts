@@ -131,6 +131,34 @@ describe('requiresUnavailableAdjustedRunwayCorrection', () => {
       })
     ).toBe(false)
   })
+  it.each([
+    'Working-capital-adjusted runway: 183 days (≈6.1 months).',
+    'Working-capital-adjusted runway is **183 days**.',
+    'Working-capital-adjusted runway:\n`(NZD 100,000 + NZD 18,000 - NZD 14,000) / NZD 17,000 × 30 = 183 days`',
+  ])('rejects a leaked adjusted runway stated in days: %p', (response) => {
+    expect(
+      requiresUnavailableAdjustedRunwayCorrection({ response, evidence })
+    ).toBe(true)
+  })
+
+  it('rejects a leaked negative adjusted runway', () => {
+    expect(
+      requiresUnavailableAdjustedRunwayCorrection({
+        response: 'Working-capital-adjusted runway: -45 days.',
+        evidence,
+      })
+    ).toBe(true)
+  })
+
+  it('still allows the cash runway in days alongside a symbolic adjusted formula', () => {
+    expect(
+      requiresUnavailableAdjustedRunwayCorrection({
+        response:
+          'Cash runway: 176 days (≈5.9 months).\n\nWorking-capital-adjusted runway is unavailable. Formula: `(cash + accounts receivable - accounts payable) / monthly burn`.',
+        evidence,
+      })
+    ).toBe(false)
+  })
 })
 
 describe('toolInputRepairResult', () => {

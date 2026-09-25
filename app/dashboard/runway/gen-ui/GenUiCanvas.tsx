@@ -471,7 +471,13 @@ function ScenarioAnalysisWidgetView({
                   <Chip
                     size="small"
                     color={metric?.origin === "manual" ? "warning" : metric ? "success" : "default"}
-                    label={metric?.origin === "manual" ? "Manual — unreviewed" : metric ? "Stored observation" : "Missing"}
+                    label={metric?.origin === "manual"
+                      ? "Manual — unreviewed"
+                      : metric?.origin === "analysis_snapshot"
+                        ? "Frozen report snapshot"
+                        : metric
+                          ? "Stored observation"
+                          : "Missing"}
                   />
                 </Stack>
                 {metric ? (

@@ -512,7 +512,7 @@ decision analysis.
 | description | TEXT | Optional description, maximum 500 characters |
 | status | TEXT | `draft` or `calculated` |
 | visibility | TEXT | `private` or `company`; drafts must remain private |
-| input_payload | JSONB | Structured scenario assumptions |
+| input_payload | JSONB | Structured scenario assumptions. Legacy payloads reference a source directly; `scenario-analysis-v2` payloads reference either a source or an immutable owner-bound `financial_analysis_runs` snapshot |
 | result_payload | JSONB | Latest deterministic result snapshot, or null for a draft |
 | baseline_fingerprint | JSONB | Observation IDs and update timestamps used by the latest result |
 | calculated_at | TIMESTAMP | Time of the latest successful calculation |
@@ -524,6 +524,7 @@ decision analysis.
 - Company members can view company-visible calculated scenarios
 - Company members cannot edit shared originals; duplication creates a new private owner copy
 - Incomplete drafts cannot be company-visible
+- Analysis-run baselines remain frozen to the saved report snapshot; later source-observation changes do not mark them stale or rewrite their result
 
 **Indexes:**
 - `idx_scenarios_owner_updated` on (user_id, updated_at DESC)
@@ -557,10 +558,12 @@ data still take priority over these preferences.
 ### 16. financial_analysis_runs
 
 Stores immutable, owner-private snapshots of completed full financial analyses.
-The selected source and currency are recorded explicitly so NZD and AUD are
-never combined and a later source refresh cannot silently rewrite an earlier
-report. The versioned result payload contains the report facts and output shape;
-the separate trace and metadata fields keep execution evidence queryable.
+The selected source set, selection mode, reporting period, and currency are
+recorded explicitly so NZD and AUD are never combined and a later source refresh
+cannot silently rewrite an earlier report. The singular source columns remain
+for backward compatibility. The versioned result payload contains the report
+facts and output shape; the separate trace and metadata fields keep execution
+evidence queryable.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -569,6 +572,10 @@ the separate trace and metadata fields keep execution evidence queryable.
 | selected_source_key | TEXT | Stable source selection key used for this run |
 | selected_source_label | TEXT | User-facing label captured at run time |
 | selected_currency | TEXT | Explicitly selected `NZD` or `AUD` baseline |
+| selection_mode | TEXT | `single` for one statement or `timeline` for 2–12 compatible sources |
+| selected_sources | JSONB | Ordered source snapshots, including stable keys and provenance metadata for v2 runs |
+| reporting_period_start | DATE | Earliest reporting date retained in the six-month analysis window |
+| reporting_period_end | DATE | Latest selected reporting date and report date |
 | run_status | TEXT | `complete` or `completed_with_fallback` |
 | data_readiness | TEXT | `ready`, `limited`, or `action_required` |
 | baseline_fingerprint | JSONB | Observation IDs and update timestamps used by this run |
@@ -671,6 +678,7 @@ All schema changes are tracked in `db/migrations/`:
 - `018_gen_ui_personalization.sql` - Adds shared company size and per-user Gen UI personalization preferences
 - `019_company_gen_ui_controls.sql` - Moves planning horizon to the admin-controlled company profile and adds worker-specific roles
 - `020_financial_analysis_runs.sql` - Adds immutable owner-private financial analysis snapshots and append-only owner-bound decision tests
+- `021_financial_analysis_timeline.sql` - Adds single/timeline selection metadata, selected source snapshots, and immutable reporting-period bounds to analysis runs
 
 ---
 

@@ -3,7 +3,11 @@ import { ApiError } from '@/lib/api/errors'
 import { createAdminSupabaseClient } from '@/lib/supabase'
 import { listFinancialMetricObservations } from '@/lib/financial-data/persistence'
 import { isScenarioAnalysisResult } from '@/lib/scenarios/calculation'
-import { ScenarioAnalysisInputSchema } from '@/lib/scenarios/schema'
+import {
+  getScenarioBaselineReference,
+  ScenarioAnalysisInputSchema,
+  toScenarioAnalysisInputV2,
+} from '@/lib/scenarios/schema'
 import {
   analyseScenario,
   getScenarioSourceKey,
@@ -81,10 +85,14 @@ function sameFingerprint(
 async function currentFingerprint(userId: string, scenario: SavedScenario) {
   const parsed = ScenarioAnalysisInputSchema.safeParse(scenario.input_payload)
   if (!parsed.success) return []
+  const baselineReference = getScenarioBaselineReference(parsed.data)
+  if (baselineReference.kind === 'analysis_run') {
+    return scenario.baseline_fingerprint
+  }
   const observations = await listFinancialMetricObservations(userId)
   return observations
     .filter((row) =>
-      getScenarioSourceKey(row) === parsed.data.sourceKey &&
+      getScenarioSourceKey(row) === baselineReference.sourceKey &&
       row.currency === parsed.data.currency &&
       isScenarioBaselineMetricKey(row.metric_key)
     )
@@ -254,11 +262,12 @@ export async function duplicateSavedScenario(scenarioId: string, userId: string)
   const source = await assertAccessibleScenario(scenarioId, userId)
   const input = ScenarioAnalysisInputSchema.safeParse(source.input_payload)
   const safeInput = input.success
-    ? {
-        ...input.data,
-        sourceKey: source.user_id === userId ? input.data.sourceKey : '',
-        scenarios: input.data.scenarios,
-      }
+    ? source.user_id === userId
+      ? input.data
+      : {
+          ...toScenarioAnalysisInputV2(input.data),
+          baseline: { kind: 'source' as const, sourceKey: '' },
+        }
     : source.input_payload
 
   return createSavedScenario(userId, {

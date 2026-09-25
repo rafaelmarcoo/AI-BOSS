@@ -1,10 +1,10 @@
 import { z } from 'zod'
 import type { StructuredTool } from '@/lib/tools/contracts'
-import { ScenarioAnalysisInputSchema } from '@/lib/scenarios/schema'
+import { LegacyScenarioAnalysisInputSchema } from '@/lib/scenarios/schema'
 import { analyseScenario, listScenarioBaselineOptions } from '@/lib/scenarios/service'
 import type { ScenarioAnalysisResult } from '@/lib/scenarios/calculation'
 
-const ModelScenarioInputSchema = ScenarioAnalysisInputSchema.extend({
+const ModelScenarioInputSchema = LegacyScenarioAnalysisInputSchema.extend({
   sourceKey: z.string().min(1).optional().describe(
     'Exact source key when already confirmed. Omit it when the user has not selected a source; the tool will use a unique valid source or request clarification.'
   ),

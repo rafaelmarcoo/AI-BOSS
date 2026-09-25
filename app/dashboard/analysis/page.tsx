@@ -16,8 +16,8 @@ export default async function AnalysisPage() {
   if (!currentUser) redirect('/sign-in')
 
   return (
-    <Box component="main" sx={{ minHeight: '100vh', bgcolor: dashboardTokens.shell }}>
-      <DashboardHeader />
+    <Box className="analysis-page-shell" component="main" sx={{ minHeight: '100vh', bgcolor: dashboardTokens.shell }}>
+      <Box className="analysis-screen-only"><DashboardHeader /></Box>
       <Box sx={{ maxWidth: 1440, mx: 'auto', px: { xs: 2, sm: 4 }, py: { xs: 3, sm: 5 } }}>
         <AnalysisWorkspace />
       </Box>

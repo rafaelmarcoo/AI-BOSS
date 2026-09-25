@@ -32,7 +32,18 @@ import type {
   ScenarioAnalysisInput,
   ScenarioDefinition,
 } from '@/lib/scenarios/schema'
+import {
+  getScenarioBaselineReference,
+  SCENARIO_ANALYSIS_INPUT_VERSION,
+  toScenarioAnalysisInputV2,
+} from '@/lib/scenarios/schema'
 import type { ScenarioBaselineOption } from '@/lib/scenarios/service'
+import {
+  buildScenarioBaselineOptionFromAnalysisRun,
+  type AnalysisRunScenarioBaselineOption,
+} from '@/lib/scenarios/analysis-run-baseline'
+import type { FinancialAnalysisRunView } from '@/lib/financial-analysis/persistence'
+import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
 import type { SavedScenario, ScenarioVisibility } from '@/types/database'
 
 interface BaselineResponse {
@@ -44,6 +55,12 @@ interface BaselineResponse {
 interface AnalysisResponse {
   success: boolean
   data?: { result: ScenarioAnalysisResult }
+  error?: { message?: string }
+}
+
+interface FinancialAnalysisReportResponse {
+  success: boolean
+  data?: { report: FinancialAnalysisRunView }
   error?: { message?: string }
 }
 
@@ -92,8 +109,85 @@ function scenarioMonths(startMonth: string, horizon: number) {
   return Array.from({ length: horizon }, (_, index) => addScenarioMonths(startMonth, index))
 }
 
+type WorkspaceBaselineOption =
+  | ScenarioBaselineOption
+  | AnalysisRunScenarioBaselineOption
+
+function baselineOptionKey(option: WorkspaceBaselineOption) {
+  return option.sourceType === 'analysis_run'
+    ? option.sourceKey
+    : `${option.sourceKey}|${option.currency}`
+}
+
+function inputBaselineKey(input: ScenarioAnalysisInput) {
+  const baseline = getScenarioBaselineReference(input)
+  return baseline.kind === 'analysis_run'
+    ? `analysis-run:${baseline.analysisRunId}`
+    : `${baseline.sourceKey}|${input.currency}`
+}
+
+const BASELINE_FIELD_LABELS = [
+  ['cash', 'Cash'],
+  ['accounts_receivable', 'Accounts receivable'],
+  ['accounts_payable', 'Accounts payable'],
+  ['burn_rate', 'Monthly burn'],
+  ['monthly_revenue', 'Monthly revenue'],
+  ['monthly_expenses', 'Monthly expenses'],
+] as const
+
+async function loadAnalysisRunBaseline(analysisRunId: string) {
+  const response = await fetch(`/api/financial-analysis/${analysisRunId}`)
+  const payload = await response.json() as FinancialAnalysisReportResponse
+  if (!response.ok || !payload.success || !payload.data?.report) {
+    throw new Error(
+      payload.error?.message ?? 'Could not load the frozen financial analysis report.'
+    )
+  }
+  return buildScenarioBaselineOptionFromAnalysisRun(payload.data.report)
+}
+
+function baselineOptionFromScenarioResult(
+  analysisRunId: string,
+  result: ScenarioAnalysisResult
+): AnalysisRunScenarioBaselineOption {
+  const entries = [
+    ['cash', result.metricInputs.cash],
+    ['accounts_receivable', result.metricInputs.accountsReceivable],
+    ['accounts_payable', result.metricInputs.accountsPayable],
+    ['burn_rate', result.metricInputs.burnRate],
+    ['monthly_revenue', result.metricInputs.monthlyRevenue],
+    ['monthly_expenses', result.metricInputs.monthlyExpenses],
+  ] as const
+  const metrics = Object.fromEntries(entries.flatMap(([metricKey, metric]) =>
+    metric
+      ? [[metricKey, {
+          value: metric.value,
+          reportingDate: metric.reportingDate,
+          confidence: metric.confidence ?? 1,
+        }]]
+      : []
+  )) as AnalysisRunScenarioBaselineOption['metrics']
+  const latestReportingDate = entries
+    .flatMap(([, metric]) => metric ? [metric.reportingDate] : [])
+    .sort()
+    .at(-1) ?? result.calculatedAt.slice(0, 10)
+
+  return {
+    sourceKey: `analysis-run:${analysisRunId}`,
+    sourceLabel: result.sourceLabel,
+    sourceType: 'analysis_run',
+    analysisRunId,
+    currency: result.currency,
+    availableMetrics: Object.keys(metrics) as FinancialMetricKey[],
+    latestReportingDate,
+    cashObservationCount: result.metricInputs.historicalObservationCount,
+    metrics,
+  }
+}
+
 export function ScenariosWorkspace() {
   const [baselines, setBaselines] = useState<ScenarioBaselineOption[]>([])
+  const [analysisBaseline, setAnalysisBaseline] = useState<AnalysisRunScenarioBaselineOption | null>(null)
   const [baselinesLoading, setBaselinesLoading] = useState(true)
   const [selectedKey, setSelectedKey] = useState('')
   const [input, setInput] = useState<ScenarioAnalysisInput | null>(null)
@@ -125,11 +219,43 @@ export function ScenariosWorkspace() {
         const saved = window.sessionStorage.getItem('ai-boss-scenario-draft')
         if (saved) {
           window.sessionStorage.removeItem('ai-boss-scenario-draft')
-          const draft = JSON.parse(saved) as { input?: ScenarioAnalysisInput; result?: ScenarioAnalysisResult }
+          const draft = JSON.parse(saved) as {
+            analysisRunId?: string
+            input?: ScenarioAnalysisInput
+            result?: ScenarioAnalysisResult
+          }
+          if (draft.analysisRunId) {
+            const option = await loadAnalysisRunBaseline(draft.analysisRunId)
+            if (!mounted) return
+            const startMonth = nextMonthFromDate(option.latestReportingDate)
+            setAnalysisBaseline(option)
+            setSelectedKey(baselineOptionKey(option))
+            setInput({
+              version: SCENARIO_ANALYSIS_INPUT_VERSION,
+              baseline: {
+                kind: 'analysis_run',
+                analysisRunId: draft.analysisRunId,
+              },
+              currency: option.currency,
+              horizon: 6,
+              trendRange: '6m',
+              manualBaseline: {},
+              scenarios: [emptyScenario(startMonth, 1)],
+            })
+            setSavedName(`Decision test — ${option.latestReportingDate}`)
+            setDirty(true)
+            return
+          }
           if (draft.input) {
             setInput(draft.input)
             setResult(draft.result ?? null)
-            setSelectedKey(`${draft.input.sourceKey}|${draft.input.currency}`)
+            const baseline = getScenarioBaselineReference(draft.input)
+            if (baseline.kind === 'analysis_run') {
+              const option = await loadAnalysisRunBaseline(baseline.analysisRunId)
+              if (!mounted) return
+              setAnalysisBaseline(option)
+            }
+            setSelectedKey(inputBaselineKey(draft.input))
             return
           }
         }
@@ -163,9 +289,18 @@ export function ScenariosWorkspace() {
     return () => { mounted = false }
   }, [])
 
-  const selectedBaseline = baselines.find((option) =>
-    `${option.sourceKey}|${option.currency}` === selectedKey
-  ) ?? null
+  const selectedBaseline: WorkspaceBaselineOption | null =
+    analysisBaseline && baselineOptionKey(analysisBaseline) === selectedKey
+      ? analysisBaseline
+      : baselines.find((option) => baselineOptionKey(option) === selectedKey) ?? null
+  const selectedReference = input
+    ? getScenarioBaselineReference(input)
+    : null
+  const missingBaselineMetrics = selectedBaseline
+    ? BASELINE_FIELD_LABELS.filter(
+        ([metricKey]) => !selectedBaseline.metrics[metricKey]
+      ).map(([, label]) => label)
+    : []
   const projectionStartMonth = nextMonthFromDate(
     input?.manualBaseline.asOfMonth
       ? `${input.manualBaseline.asOfMonth}-01`
@@ -178,22 +313,45 @@ export function ScenariosWorkspace() {
 
   function selectBaseline(option: ScenarioBaselineOption, resetAssumptions = false) {
     const startMonth = nextMonthFromDate(option.metrics.cash?.reportingDate ?? option.latestReportingDate)
-    setSelectedKey(`${option.sourceKey}|${option.currency}`)
+    setAnalysisBaseline(null)
+    setSelectedKey(baselineOptionKey(option))
     setInput((current) => current && !resetAssumptions
       ? {
-          ...current,
-          sourceKey: option.sourceKey,
+          ...toScenarioAnalysisInputV2(current),
+          baseline: { kind: 'source', sourceKey: option.sourceKey },
           currency: option.currency,
           manualBaseline: current.currency === option.currency ? current.manualBaseline : {},
         }
       : {
-          sourceKey: option.sourceKey,
+          version: SCENARIO_ANALYSIS_INPUT_VERSION,
+          baseline: { kind: 'source', sourceKey: option.sourceKey },
           currency: option.currency,
           horizon: 6,
           trendRange: '6m',
           manualBaseline: {},
           scenarios: [emptyScenario(startMonth, 1)],
         })
+    setResult(null)
+    setDirty(true)
+    setResultChanged(false)
+  }
+
+  function resetAnalysisBaseline(option: AnalysisRunScenarioBaselineOption) {
+    const startMonth = nextMonthFromDate(option.latestReportingDate)
+    setAnalysisBaseline(option)
+    setSelectedKey(baselineOptionKey(option))
+    setInput({
+      version: SCENARIO_ANALYSIS_INPUT_VERSION,
+      baseline: {
+        kind: 'analysis_run',
+        analysisRunId: option.analysisRunId,
+      },
+      currency: option.currency,
+      horizon: 6,
+      trendRange: '6m',
+      manualBaseline: {},
+      scenarios: [emptyScenario(startMonth, 1)],
+    })
     setResult(null)
     setDirty(true)
     setResultChanged(false)
@@ -242,11 +400,25 @@ export function ScenariosWorkspace() {
     }
   }
 
-  function openSavedScenario(scenario: SavedScenarioView) {
+  async function openSavedScenario(scenario: SavedScenarioView) {
     const savedInput = scenario.input_payload as ScenarioAnalysisInput
+    const baselineReference = getScenarioBaselineReference(savedInput)
+    if (baselineReference.kind === 'analysis_run') {
+      const option = scenario.isOwner
+        ? await loadAnalysisRunBaseline(baselineReference.analysisRunId)
+        : scenario.result_payload
+          ? baselineOptionFromScenarioResult(
+              baselineReference.analysisRunId,
+              scenario.result_payload
+            )
+          : null
+      setAnalysisBaseline(option)
+    } else {
+      setAnalysisBaseline(null)
+    }
     setInput(savedInput)
     setResult(scenario.result_payload)
-    setSelectedKey(savedInput.sourceKey ? `${savedInput.sourceKey}|${savedInput.currency}` : '')
+    setSelectedKey(inputBaselineKey(savedInput))
     setEditingScenarioId(scenario.id)
     setSavedName(scenario.name)
     setSavedDescription(scenario.description ?? '')
@@ -299,7 +471,7 @@ export function ScenariosWorkspace() {
       const payload = await response.json() as SavedScenarioResponse
       const saved = payload.data?.scenario
       if (!response.ok || !payload.success || !saved) throw new Error(payload.error?.message ?? 'Could not save the scenario.')
-      openSavedScenario(saved)
+      await openSavedScenario(saved)
       await refreshLibrary()
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Could not save the scenario.')
@@ -316,7 +488,7 @@ export function ScenariosWorkspace() {
       const payload = await response.json() as SavedScenarioResponse
       const duplicate = payload.data?.scenario
       if (!response.ok || !payload.success || !duplicate) throw new Error(payload.error?.message ?? 'Could not duplicate the scenario.')
-      openSavedScenario(duplicate)
+      await openSavedScenario(duplicate)
       await refreshLibrary()
     } catch (duplicateError) {
       setError(duplicateError instanceof Error ? duplicateError.message : 'Could not duplicate the scenario.')
@@ -379,7 +551,11 @@ export function ScenariosWorkspace() {
             <Button
               onClick={() => {
                 resetSavedDetails()
-                if (selectedBaseline) selectBaseline(selectedBaseline, true)
+                if (selectedBaseline?.sourceType === 'analysis_run') {
+                  resetAnalysisBaseline(selectedBaseline)
+                } else if (selectedBaseline) {
+                  selectBaseline(selectedBaseline, true)
+                }
               }}
             >
               New comparison
@@ -402,7 +578,7 @@ export function ScenariosWorkspace() {
                     {scenario.description ? <Typography variant="body2" sx={{ color: dashboardTokens.textMuted, mt: 0.5 }}>{scenario.description}</Typography> : null}
                   </Box>
                   <Stack direction="row" spacing={1}>
-                    <Button size="small" onClick={() => openSavedScenario(scenario)}>Open</Button>
+                    <Button size="small" onClick={() => void openSavedScenario(scenario)}>Open</Button>
                     <Button size="small" disabled={saving} onClick={() => void duplicateScenario(scenario.id)}>Duplicate</Button>
                     {scenario.isOwner ? <Button size="small" color="error" disabled={saving} onClick={() => void deleteScenario(scenario.id)}>Delete</Button> : null}
                   </Stack>
@@ -416,17 +592,19 @@ export function ScenariosWorkspace() {
       <Paper variant="outlined" sx={{ p: 2.5, bgcolor: dashboardTokens.surface, borderColor: dashboardTokens.border }}>
         <Stack spacing={2.5}>
           <Typography variant="h6" fontWeight={700}>Baseline and timing</Typography>
-          {baselinesLoading ? <CircularProgress size={24} /> : baselines.length === 0 ? (
+          {baselinesLoading ? <CircularProgress size={24} /> : baselines.length === 0 && !analysisBaseline ? (
             <Alert severity="info">Upload and confirm a dated NZD or AUD statement before building a source-backed scenario.</Alert>
           ) : (
             <FormControl fullWidth>
-              <InputLabel id="scenario-source-label">Source / statement and currency</InputLabel>
+              <InputLabel id="scenario-source-label">Baseline and currency</InputLabel>
               <Select
                 labelId="scenario-source-label"
-                label="Source / statement and currency"
+                label="Baseline and currency"
                 value={selectedKey}
                 onChange={(event) => {
-                  const option = baselines.find((item) => `${item.sourceKey}|${item.currency}` === event.target.value)
+                  const option = baselines.find(
+                    (item) => baselineOptionKey(item) === event.target.value
+                  )
                   if (
                     option &&
                     loadedScenario?.status === 'calculated' &&
@@ -436,8 +614,13 @@ export function ScenariosWorkspace() {
                   if (option) selectBaseline(option)
                 }}
               >
+                {analysisBaseline ? (
+                  <MenuItem value={baselineOptionKey(analysisBaseline)}>
+                    {analysisBaseline.sourceLabel} · {analysisBaseline.currency} · immutable report
+                  </MenuItem>
+                ) : null}
                 {baselines.map((option) => (
-                  <MenuItem key={`${option.sourceKey}-${option.currency}`} value={`${option.sourceKey}|${option.currency}`}>
+                  <MenuItem key={`${option.sourceKey}-${option.currency}`} value={baselineOptionKey(option)}>
                     {option.sourceLabel} · {option.currency} · latest {option.latestReportingDate ?? 'undated'}
                   </MenuItem>
                 ))}
@@ -445,12 +628,33 @@ export function ScenariosWorkspace() {
             </FormControl>
           )}
 
+          {selectedReference?.kind === 'analysis_run' && analysisBaseline ? (
+            <Alert severity="info">
+              This baseline comes from an immutable financial analysis report. Later document changes will not alter it. Any values you enter below are clearly recorded as manual scenario assumptions.
+            </Alert>
+          ) : null}
+
+          {selectedBaseline && missingBaselineMetrics.length > 0 ? (
+            <Alert severity="warning">
+              Missing from this baseline: {missingBaselineMetrics.join(', ')}. Supply any values required by your decision as manual assumptions before running the comparison.
+            </Alert>
+          ) : null}
+
           {input ? (
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 2 }}>
               <TextField select label="Planning horizon" value={input.horizon} onChange={(event) => updateInput((current) => ({ ...current, horizon: Number(event.target.value) as ScenarioAnalysisInput['horizon'] }))}>
                 {[3, 6, 12, 24].map((value) => <MenuItem key={value} value={value}>{value} months</MenuItem>)}
               </TextField>
-              <TextField select label="Historical trend lookback" value={input.trendRange} onChange={(event) => updateInput((current) => ({ ...current, trendRange: event.target.value as ScenarioAnalysisInput['trendRange'] }))}>
+              <TextField
+                select
+                label="Historical trend lookback"
+                value={input.trendRange}
+                disabled={selectedReference?.kind === 'analysis_run'}
+                helperText={selectedReference?.kind === 'analysis_run'
+                  ? 'The cash-trend slope is frozen in the selected report snapshot.'
+                  : undefined}
+                onChange={(event) => updateInput((current) => ({ ...current, trendRange: event.target.value as ScenarioAnalysisInput['trendRange'] }))}
+              >
                 <MenuItem value="3m">Last 3 months</MenuItem><MenuItem value="6m">Last 6 months</MenuItem><MenuItem value="all">All history</MenuItem>
               </TextField>
             </Box>

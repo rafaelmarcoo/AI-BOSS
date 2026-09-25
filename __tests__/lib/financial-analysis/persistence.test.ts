@@ -4,8 +4,11 @@ import {
   listFinancialAnalysisRuns,
   saveFinancialAnalysisRun,
 } from '@/lib/financial-analysis/persistence'
-import { FINANCIAL_ANALYSIS_SECTION_IDS } from '@/lib/financial-analysis/types'
-import type { FinancialAnalysisResult } from '@/lib/financial-analysis/types'
+import {
+  FINANCIAL_ANALYSIS_SECTION_IDS,
+  normalizeFinancialAnalysisResult,
+} from '@/lib/financial-analysis/types'
+import type { FinancialAnalysisResultV1 } from '@/lib/financial-analysis/types'
 
 jest.mock('@/lib/supabase', () => ({
   createAdminSupabaseClient: jest.fn(),
@@ -13,7 +16,7 @@ jest.mock('@/lib/supabase', () => ({
 
 const mockCreateAdminClient = jest.mocked(createAdminSupabaseClient)
 
-const result: FinancialAnalysisResult = {
+const legacyResult: FinancialAnalysisResultV1 = {
   version: 'financial-analysis-v1',
   runStatus: 'complete',
   generatedAt: '2026-09-22T00:00:00.000Z',
@@ -80,6 +83,7 @@ const result: FinancialAnalysisResult = {
   },
   recommendations: [],
 }
+const result = normalizeFinancialAnalysisResult(legacyResult)
 
 function queryResponse(data: unknown, error: unknown = null) {
   return {
@@ -115,6 +119,10 @@ describe('financial analysis persistence', () => {
       user_id: 'owner-1',
       selected_source_key: 'document:document-1',
       selected_currency: 'NZD',
+      selection_mode: 'single',
+      selected_sources: result.selectedBaseline.sources,
+      reporting_period_start: '2026-09-22',
+      reporting_period_end: '2026-09-22',
       run_status: 'complete',
       data_readiness: 'limited',
       result_payload: result,
@@ -180,6 +188,13 @@ describe('financial analysis persistence', () => {
       selectedSourceKey: 'document:document-1',
       selectedSourceLabel: 'statement.csv',
       selectedCurrency: 'NZD',
+      selectionMode: 'single',
+      selectedSources: [{
+        sourceKey: 'document:document-1',
+        sourceLabel: 'statement.csv',
+      }],
+      reportingPeriodStart: '2026-09-22',
+      reportingPeriodEnd: '2026-09-22',
       runStatus: 'complete',
       dataReadiness: 'limited',
       createdAt: '2026-09-22T00:00:00.000Z',
@@ -214,6 +229,37 @@ describe('financial analysis persistence', () => {
     })
     expect(query.eq).toHaveBeenNthCalledWith(1, 'id', 'analysis-1')
     expect(query.eq).toHaveBeenNthCalledWith(2, 'user_id', 'owner-1')
+  })
+
+  it('normalizes a saved v1 result for current report display', async () => {
+    const row = {
+      id: 'analysis-legacy',
+      selected_source_key: 'document:document-1',
+      selected_source_label: 'statement.csv',
+      selected_currency: 'NZD',
+      selection_mode: 'single',
+      selected_sources: [{
+        sourceKey: 'document:document-1',
+        sourceLabel: 'statement.csv',
+      }],
+      reporting_period_start: '2026-09-22',
+      reporting_period_end: '2026-09-22',
+      run_status: 'complete',
+      data_readiness: 'limited',
+      result_payload: legacyResult,
+      created_at: '2026-09-22T00:00:00.000Z',
+    }
+    const query = {
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data: row, error: null }),
+    }
+    mockCreateAdminClient.mockReturnValue({ from: jest.fn().mockReturnValue(query) } as never)
+
+    const loaded = await getFinancialAnalysisRun('analysis-legacy', 'owner-1')
+    expect(loaded.result.version).toBe('financial-analysis-v2')
+    expect(loaded.result.selectedBaseline.mode).toBe('single')
+    expect(loaded.result.facts.periodComparisons).toHaveLength(8)
   })
 
   it('rejects a saved report whose versioned result payload is invalid', async () => {

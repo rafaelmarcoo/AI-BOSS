@@ -23,6 +23,23 @@ const saved: SavedScenario = {
   calculated_at: '2026-06-01T00:00:00Z', created_at: '2026-06-01T00:00:00Z', updated_at: '2026-06-01T00:00:00Z',
 }
 
+const frozenAnalysisSaved: SavedScenario = {
+  ...saved,
+  input_payload: {
+    version: 'scenario-analysis-v2',
+    baseline: { kind: 'analysis_run', analysisRunId: 'analysis-1' },
+    currency: 'NZD',
+    horizon: 3,
+    trendRange: '6m',
+    manualBaseline: {},
+    scenarios: saved.input_payload.scenarios,
+  },
+  baseline_fingerprint: [{
+    id: 'analysis-1',
+    updatedAt: '2026-06-01T00:00:00Z',
+  }],
+}
+
 function observation(metric_key: FinancialMetricObservation['metric_key'], id: string, updated_at: string): FinancialMetricObservation {
   return {
     id, user_id: 'owner-1', connection_id: null, document_id: 'doc-1', metric_key, value: 100000,
@@ -70,5 +87,29 @@ describe('saved scenario persistence authorization and staleness', () => {
     await expect(updateSavedScenario('scenario-1', 'viewer-1', {
       name: 'Changed', status: 'calculated', visibility: 'company', input: saved.input_payload,
     })).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' })
+  })
+
+  it('keeps an immutable analysis-run baseline current without rereading observations', async () => {
+    installDatabase(frozenAnalysisSaved)
+
+    await expect(getSavedScenario('scenario-1', 'owner-1')).resolves.toMatchObject({
+      isOwner: true,
+      isStale: false,
+      input_payload: expect.objectContaining({
+        baseline: { kind: 'analysis_run', analysisRunId: 'analysis-1' },
+      }),
+    })
+    expect(mockListObservations).not.toHaveBeenCalled()
+  })
+
+  it('allows a company member to read the frozen calculated result without report access', async () => {
+    installDatabase(frozenAnalysisSaved)
+
+    await expect(getSavedScenario('scenario-1', 'viewer-1')).resolves.toMatchObject({
+      isOwner: false,
+      isStale: null,
+      result_payload: frozenAnalysisSaved.result_payload,
+    })
+    expect(mockListObservations).not.toHaveBeenCalled()
   })
 })

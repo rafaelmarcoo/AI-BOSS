@@ -6,8 +6,10 @@ import type { ScenarioAnalysisResult } from '@/lib/scenarios/calculation'
 import type {
   FinancialAnalysisAgentTrace,
   FinancialAnalysisReadinessStatus,
-  FinancialAnalysisResult,
+  PersistedFinancialAnalysisResult,
   FinancialAnalysisRunStatus,
+  FinancialAnalysisSelectedSource,
+  FinancialAnalysisSelectionMode,
   FinancialDecisionPolicyResult,
   FinancialDecisionOutcome,
   FinancialDecisionTestInput,
@@ -297,10 +299,17 @@ export interface FinancialAnalysisRun {
   selected_source_key: string
   selected_source_label: string
   selected_currency: 'NZD' | 'AUD'
+  selection_mode: FinancialAnalysisSelectionMode
+  selected_sources: Array<
+    Pick<FinancialAnalysisSelectedSource, 'sourceKey' | 'sourceLabel'> &
+    Partial<Omit<FinancialAnalysisSelectedSource, 'sourceKey' | 'sourceLabel'>>
+  >
+  reporting_period_start: string
+  reporting_period_end: string
   run_status: FinancialAnalysisRunStatus
   data_readiness: FinancialAnalysisReadinessStatus
   baseline_fingerprint: Array<{ id: string; updatedAt: string }>
-  result_payload: FinancialAnalysisResult
+  result_payload: PersistedFinancialAnalysisResult
   agent_trace: FinancialAnalysisAgentTrace
   policy_version: 'mvp-v1'
   model_metadata: Record<string, unknown>

@@ -1,7 +1,10 @@
 import {
+  FINANCIAL_ANALYSIS_COMPARISON_METRIC_KEYS,
   FINANCIAL_ANALYSIS_SECTION_IDS,
   FinancialAnalysisResultSchema,
   FinancialDecisionTestResultSchema,
+  PersistedFinancialAnalysisResultSchema,
+  normalizeFinancialAnalysisResult,
 } from '@/lib/financial-analysis/types'
 
 const policy = {
@@ -19,8 +22,8 @@ const policy = {
 }
 
 describe('financial analysis domain schemas', () => {
-  it('accepts the versioned immutable report shape', () => {
-    const result = FinancialAnalysisResultSchema.safeParse({
+  it('accepts and normalizes the legacy immutable report shape', () => {
+    const legacyResult = PersistedFinancialAnalysisResultSchema.parse({
       version: 'financial-analysis-v1',
       runStatus: 'complete',
       generatedAt: '2026-09-22T00:00:00.000Z',
@@ -60,6 +63,75 @@ describe('financial analysis domain schemas', () => {
       agentTrace: { fallbackUsed: false, entries: [] },
       policy,
       recommendations: [],
+    })
+
+    const result = normalizeFinancialAnalysisResult(legacyResult)
+    expect(result.version).toBe('financial-analysis-v2')
+    expect(result.selectedBaseline.mode).toBe('single')
+    expect(result.facts.periodComparisons).toHaveLength(8)
+  })
+
+  it('accepts the current report shape and requires every comparison metric', () => {
+    const result = FinancialAnalysisResultSchema.safeParse({
+      ...normalizeFinancialAnalysisResult(PersistedFinancialAnalysisResultSchema.parse({
+        version: 'financial-analysis-v1',
+        runStatus: 'complete',
+        generatedAt: '2026-09-22T00:00:00.000Z',
+        selectedBaseline: {
+          sourceKey: 'document:statement-1',
+          sourceLabel: 'statement.csv',
+          currency: 'NZD',
+        },
+        readiness: {
+          status: 'ready',
+          availableMetricKeys: ['cash'],
+          missingMetricKeys: [],
+          historicalObservationCount: 1,
+          reasons: [],
+        },
+        sections: FINANCIAL_ANALYSIS_SECTION_IDS.map((sectionId) => ({
+          sectionId,
+          status: 'available',
+          reason: null,
+        })),
+        facts: {
+          operatingBalance: null,
+          receivablesPayables: null,
+          runway: null,
+          history: [],
+          forecasts: [],
+        },
+        narrative: {
+          executiveSummary: 'Summary.',
+          financialPosition: 'Position.',
+          trendAndForecast: 'Trend.',
+          risks: [],
+          limitations: [],
+        },
+        evidence: [],
+        assumptions: ['No conversion.'],
+        agentTrace: { fallbackUsed: false, entries: [] },
+        policy,
+        recommendations: [],
+      })),
+      facts: {
+        operatingBalance: null,
+        receivablesPayables: null,
+        runway: null,
+        history: [],
+        forecasts: [],
+        periodComparisons: FINANCIAL_ANALYSIS_COMPARISON_METRIC_KEYS.map(
+          (metricKey) => ({
+            metricKey,
+            earliest: null,
+            previous: null,
+            latest: null,
+            startToLatestChange: null,
+            previousToLatestChange: null,
+            unavailableReason: 'Unavailable.',
+          })
+        ),
+      },
     })
 
     expect(result.success).toBe(true)

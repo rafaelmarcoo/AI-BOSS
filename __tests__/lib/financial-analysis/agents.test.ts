@@ -7,7 +7,10 @@ import {
   runFinancialPositionAgent,
 } from '@/lib/financial-analysis/agents'
 import type { FinancialAnalysisCollection } from '@/lib/financial-analysis/collector'
-import { FINANCIAL_ANALYSIS_SECTION_IDS } from '@/lib/financial-analysis/types'
+import {
+  FINANCIAL_ANALYSIS_COMPARISON_METRIC_KEYS,
+  FINANCIAL_ANALYSIS_SECTION_IDS,
+} from '@/lib/financial-analysis/types'
 
 const mockInvoke = jest.fn()
 const mockWithStructuredOutput = jest.fn(() => ({ invoke: mockInvoke }))
@@ -22,9 +25,21 @@ const mockChatOpenAI = jest.mocked(ChatOpenAI)
 
 const collection: FinancialAnalysisCollection = {
   selection: {
+    mode: 'single',
     sourceKey: 'document:document-1',
     sourceLabel: 'statement.csv',
+    sourceKeys: ['document:document-1'],
+    sources: [{
+      sourceKey: 'document:document-1',
+      sourceLabel: 'statement.csv',
+      sourceType: 'document',
+      documentId: 'document-1',
+      connectionId: null,
+    }],
     currency: 'NZD',
+    reportingPeriodStart: '2026-06-30',
+    reportingPeriodEnd: '2026-06-30',
+    reportDate: '2026-06-30',
   },
   readiness: {
     status: 'limited',
@@ -58,6 +73,15 @@ const collection: FinancialAnalysisCollection = {
     },
     history: [],
     forecasts: [],
+    periodComparisons: FINANCIAL_ANALYSIS_COMPARISON_METRIC_KEYS.map((metricKey) => ({
+      metricKey,
+      earliest: null,
+      previous: null,
+      latest: null,
+      startToLatestChange: null,
+      previousToLatestChange: null,
+      unavailableReason: 'Comparison unavailable.',
+    })),
   },
   evidence: [],
   assumptions: ['No currency conversion was performed.'],

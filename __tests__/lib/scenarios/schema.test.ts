@@ -28,6 +28,41 @@ describe('ScenarioAnalysisInputSchema', () => {
     expect(parsed.trendRange).toBe('6m')
   })
 
+  it('accepts a versioned immutable analysis-run baseline reference', () => {
+    const parsed = ScenarioAnalysisInputSchema.parse({
+      version: 'scenario-analysis-v2',
+      baseline: { kind: 'analysis_run', analysisRunId: 'analysis-1' },
+      currency: 'NZD',
+      manualBaseline: {},
+      scenarios: [{
+        id: 'scenario-1',
+        label: 'Growth',
+        adjustments: [percentage(10)],
+      }],
+    })
+
+    expect(parsed).toMatchObject({
+      version: 'scenario-analysis-v2',
+      baseline: { kind: 'analysis_run', analysisRunId: 'analysis-1' },
+      horizon: 6,
+      trendRange: '6m',
+    })
+  })
+
+  it('rejects malformed versioned baseline references', () => {
+    expect(ScenarioAnalysisInputSchema.safeParse({
+      version: 'scenario-analysis-v2',
+      baseline: { kind: 'analysis_run', analysisRunId: '' },
+      currency: 'NZD',
+      manualBaseline: {},
+      scenarios: [{
+        id: 'scenario-1',
+        label: 'Growth',
+        adjustments: [percentage(10)],
+      }],
+    }).success).toBe(false)
+  })
+
   it('accepts the inclusive percentage limits and rejects values outside them', () => {
     expect(ScenarioAnalysisInputSchema.safeParse(input([percentage(-100)])).success).toBe(true)
     expect(ScenarioAnalysisInputSchema.safeParse(input([percentage(1000)])).success).toBe(true)

@@ -37,3 +37,113 @@ textarea,
 select {
   font: inherit;
 }
+
+.analysis-report-anchor {
+  scroll-margin-top: 76px;
+}
+
+.analysis-evidence-filtered-out {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
+  :root {
+    color-scheme: light;
+  }
+
+  html,
+  body,
+  .analysis-page-shell {
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  .analysis-screen-only {
+    display: none !important;
+  }
+
+  .analysis-page-shell > .MuiBox-root {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .analysis-report-layout {
+    display: block !important;
+  }
+
+  .analysis-report {
+    width: 100% !important;
+  }
+
+  .analysis-report,
+  .analysis-report .MuiPaper-root,
+  .analysis-report .MuiAccordion-root,
+  .analysis-report .MuiTableCell-root {
+    background: #ffffff !important;
+    background-image: none !important;
+    color: #111827 !important;
+    border-color: #cbd5e1 !important;
+    box-shadow: none !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .analysis-report .MuiTypography-root,
+  .analysis-report .MuiChip-label,
+  .analysis-report .MuiTableCell-root {
+    color: #111827 !important;
+  }
+
+  .analysis-report-section {
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
+
+  .analysis-metric-forecast {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .analysis-print-expand .MuiCollapse-root {
+    height: auto !important;
+    min-height: initial !important;
+    visibility: visible !important;
+  }
+
+  .analysis-print-expand .MuiCollapse-wrapper,
+  .analysis-print-expand .MuiCollapse-wrapperInner {
+    display: block !important;
+  }
+
+  .analysis-print-expand .MuiAccordionSummary-expandIconWrapper {
+    display: none !important;
+  }
+
+  .analysis-evidence-filtered-out {
+    display: table-row !important;
+  }
+
+  .analysis-evidence-highlighted {
+    background: #ffffff !important;
+  }
+
+  .analysis-wide-table {
+    table-layout: fixed;
+    width: 100% !important;
+  }
+
+  .analysis-wide-table .MuiTableCell-root {
+    padding: 4px !important;
+    font-size: 0.65rem !important;
+    overflow-wrap: anywhere;
+  }
+
+  .analysis-report svg text {
+    fill: #475569 !important;
+  }
+}

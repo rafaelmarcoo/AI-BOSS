@@ -4,14 +4,17 @@ import type {
   ScenarioAnalysisInput,
   ScenarioPercentageMetric,
 } from '@/lib/scenarios/schema'
-import { ScenarioAnalysisInputSchema } from '@/lib/scenarios/schema'
+import {
+  getScenarioBaselineReference,
+  ScenarioAnalysisInputSchema,
+} from '@/lib/scenarios/schema'
 
 export interface ScenarioMetricInput {
   value: number
   sourceLabel: string
   reportingDate: string
   confidence: number | null
-  origin: 'verified' | 'manual'
+  origin: 'verified' | 'analysis_snapshot' | 'manual'
   observationId: string | null
 }
 
@@ -347,6 +350,7 @@ export function calculateScenarioAnalysis(params: {
   now?: string
 }): ScenarioAnalysisResult {
   const { input, baselineInputs } = params
+  const baselineReference = getScenarioBaselineReference(input)
   const cash = baselineInputs.cash?.value
   const ar = baselineInputs.accountsReceivable?.value
   const ap = baselineInputs.accountsPayable?.value
@@ -398,7 +402,9 @@ export function calculateScenarioAnalysis(params: {
   return {
     input,
     currency: input.currency,
-    sourceKey: input.sourceKey,
+    sourceKey: baselineReference.kind === 'source'
+      ? baselineReference.sourceKey
+      : `analysis-run:${baselineReference.analysisRunId}`,
     sourceLabel: baselineInputs.sourceLabel,
     projectionStartMonth,
     openingLiquidity,
@@ -433,7 +439,9 @@ export function calculateScenarioAnalysis(params: {
     assumptions: [
       'Opening available liquidity assumes all current accounts receivable is collected and all current accounts payable is paid before Month 1.',
       'Current run rate continues the selected monthly burn without an automatic growth assumption.',
-      'Historical trend continues the date-aware cash slope from the selected observation range.',
+      baselineReference.kind === 'analysis_run'
+        ? 'Baseline values and the historical cash slope come from the immutable saved financial analysis report.'
+        : 'Historical trend continues the date-aware cash slope from the selected observation range.',
       'Taxes, GST, depreciation, interest, payroll overheads, and legal consequences are excluded unless entered as explicit cash adjustments.',
     ],
     warnings: [

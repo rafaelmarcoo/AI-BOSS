@@ -11,10 +11,13 @@ import type {
   ScenarioAnalysisResult,
 } from '@/lib/scenarios/calculation'
 import {
+  getScenarioBaselineReference,
   ScenarioAnalysisInputSchema,
   type ManualScenarioBaseline,
   type ScenarioAnalysisInput,
 } from '@/lib/scenarios/schema'
+import { getFinancialAnalysisRun } from '@/lib/financial-analysis/persistence'
+import { buildScenarioBaselineInputsFromAnalysisRun } from '@/lib/scenarios/analysis-run-baseline'
 import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
 import type { FinancialMetricObservation } from '@/types/database'
 
@@ -113,6 +116,7 @@ function manualMetric(params: {
   original: ScenarioMetricInput | null
   sourceLabel: string
   asOfMonth?: string
+  fallbackReportingDate?: string
 }) {
   if (params.value === undefined) return params.original
   const matchesStoredObservation = params.original &&
@@ -125,9 +129,9 @@ function manualMetric(params: {
 
   const reportingDate = params.asOfMonth
     ? `${params.asOfMonth}-01`
-    : params.original?.reportingDate ?? null
+    : params.original?.reportingDate ?? params.fallbackReportingDate ?? null
   if (!reportingDate) {
-    throw new Error('A baseline reporting month is required when cash is supplied manually.')
+    throw new Error('A baseline reporting month is required when a value is supplied manually.')
   }
   return {
     value: params.value,
@@ -139,15 +143,66 @@ function manualMetric(params: {
   }
 }
 
-function applyManualBaseline(params: {
-  rows: FinancialMetricObservation[]
+function applyManualValues(params: {
+  baseline: ScenarioBaselineInputs
   manual: ManualScenarioBaseline
+}) : ScenarioBaselineInputs {
+  const { baseline, manual } = params
+  const fallbackReportingDate = baseline.cash?.reportingDate
+  return {
+    ...baseline,
+    cash: manualMetric({
+      value: manual.cash,
+      original: baseline.cash,
+      sourceLabel: baseline.sourceLabel,
+      asOfMonth: manual.asOfMonth,
+    }),
+    accountsReceivable: manualMetric({
+      value: manual.accountsReceivable,
+      original: baseline.accountsReceivable,
+      sourceLabel: baseline.sourceLabel,
+      asOfMonth: manual.asOfMonth,
+      fallbackReportingDate,
+    }),
+    accountsPayable: manualMetric({
+      value: manual.accountsPayable,
+      original: baseline.accountsPayable,
+      sourceLabel: baseline.sourceLabel,
+      asOfMonth: manual.asOfMonth,
+      fallbackReportingDate,
+    }),
+    burnRate: manualMetric({
+      value: manual.burnRate,
+      original: baseline.burnRate,
+      sourceLabel: baseline.sourceLabel,
+      asOfMonth: manual.asOfMonth,
+      fallbackReportingDate,
+    }),
+    monthlyRevenue: manualMetric({
+      value: manual.monthlyRevenue,
+      original: baseline.monthlyRevenue,
+      sourceLabel: baseline.sourceLabel,
+      asOfMonth: manual.asOfMonth,
+      fallbackReportingDate,
+    }),
+    monthlyExpenses: manualMetric({
+      value: manual.monthlyExpenses,
+      original: baseline.monthlyExpenses,
+      sourceLabel: baseline.sourceLabel,
+      asOfMonth: manual.asOfMonth,
+      fallbackReportingDate,
+    }),
+  }
+}
+
+function buildSourceBaseline(params: {
+  rows: FinancialMetricObservation[]
   sourceKey: string
   sourceLabel: string
   currency: 'NZD' | 'AUD'
   trendRange: ScenarioAnalysisInput['trendRange']
 }) : ScenarioBaselineInputs {
-  const { rows, manual, sourceLabel, trendRange } = params
+  const { rows, sourceLabel, trendRange } = params
   const latestRows = selectLatestFinancialMetricObservations(rows)
   const latestByMetric = new Map(
     latestRows.map((row) => [row.metric_key, metricInputFromRow(row)])
@@ -167,42 +222,12 @@ function applyManualBaseline(params: {
     sourceKey: params.sourceKey,
     sourceLabel,
     currency: params.currency,
-    cash: manualMetric({
-      value: manual.cash,
-      original: latestByMetric.get('cash') ?? null,
-      sourceLabel,
-      asOfMonth: manual.asOfMonth,
-    }),
-    accountsReceivable: manualMetric({
-      value: manual.accountsReceivable,
-      original: latestByMetric.get('accounts_receivable') ?? null,
-      sourceLabel,
-      asOfMonth: manual.asOfMonth,
-    }),
-    accountsPayable: manualMetric({
-      value: manual.accountsPayable,
-      original: latestByMetric.get('accounts_payable') ?? null,
-      sourceLabel,
-      asOfMonth: manual.asOfMonth,
-    }),
-    burnRate: manualMetric({
-      value: manual.burnRate,
-      original: latestByMetric.get('burn_rate') ?? null,
-      sourceLabel,
-      asOfMonth: manual.asOfMonth,
-    }),
-    monthlyRevenue: manualMetric({
-      value: manual.monthlyRevenue,
-      original: latestByMetric.get('monthly_revenue') ?? null,
-      sourceLabel,
-      asOfMonth: manual.asOfMonth,
-    }),
-    monthlyExpenses: manualMetric({
-      value: manual.monthlyExpenses,
-      original: latestByMetric.get('monthly_expenses') ?? null,
-      sourceLabel,
-      asOfMonth: manual.asOfMonth,
-    }),
+    cash: latestByMetric.get('cash') ?? null,
+    accountsReceivable: latestByMetric.get('accounts_receivable') ?? null,
+    accountsPayable: latestByMetric.get('accounts_payable') ?? null,
+    burnRate: latestByMetric.get('burn_rate') ?? null,
+    monthlyRevenue: latestByMetric.get('monthly_revenue') ?? null,
+    monthlyExpenses: latestByMetric.get('monthly_expenses') ?? null,
     historicalMonthlyCashSlope: forecast.monthlySlope,
     historicalObservationCount: forecast.history.points.length,
     historicalSourceLabels: forecast.history.sourceLabels,
@@ -219,22 +244,42 @@ export async function analyseScenario(
   rawInput: unknown
 ): Promise<ScenarioAnalysisResult> {
   const input = ScenarioAnalysisInputSchema.parse(rawInput)
-  const observations = await listFinancialMetricObservations(userId)
-  const selected = observations.filter(
-    (row) => getScenarioSourceKey(row) === input.sourceKey && row.currency === input.currency
-  )
+  const baselineReference = getScenarioBaselineReference(input)
+  let baseline: ScenarioBaselineInputs
 
-  if (selected.length === 0) {
-    throw new Error('The selected source and currency are unavailable or do not belong to this user.')
+  if (baselineReference.kind === 'analysis_run') {
+    const report = await getFinancialAnalysisRun(
+      baselineReference.analysisRunId,
+      userId
+    )
+    if (report.result.selectedBaseline.currency !== input.currency) {
+      throw new Error('The scenario currency must match the frozen financial analysis report.')
+    }
+    baseline = buildScenarioBaselineInputsFromAnalysisRun(report)
+  } else {
+    const observations = await listFinancialMetricObservations(userId)
+    const selected = observations.filter(
+      (row) =>
+        getScenarioSourceKey(row) === baselineReference.sourceKey &&
+        row.currency === input.currency
+    )
+
+    if (selected.length === 0) {
+      throw new Error('The selected source and currency are unavailable or do not belong to this user.')
+    }
+
+    baseline = buildSourceBaseline({
+      rows: selected,
+      sourceKey: baselineReference.sourceKey,
+      sourceLabel: selected[0].source_label,
+      currency: input.currency,
+      trendRange: input.trendRange,
+    })
   }
 
-  const inputs = applyManualBaseline({
-    rows: selected,
+  const inputs = applyManualValues({
+    baseline,
     manual: input.manualBaseline,
-    sourceKey: input.sourceKey,
-    sourceLabel: selected[0].source_label,
-    currency: input.currency,
-    trendRange: input.trendRange,
   })
 
   return calculateScenarioAnalysis({ input, baselineInputs: inputs })

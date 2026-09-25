@@ -63,8 +63,7 @@ export const ManualScenarioBaselineSchema = z.object({
   asOfMonth: MonthSchema.optional(),
 }).default({})
 
-export const ScenarioAnalysisInputSchema = z.object({
-  sourceKey: z.string().min(1),
+const ScenarioAnalysisInputBodySchema = z.object({
   currency: z.enum(SUPPORTED_FINANCIAL_CURRENCIES),
   horizon: z.union([
     z.literal(3),
@@ -77,6 +76,33 @@ export const ScenarioAnalysisInputSchema = z.object({
   scenarios: z.array(ScenarioDefinitionSchema).min(1).max(3),
 })
 
+export const LegacyScenarioAnalysisInputSchema = ScenarioAnalysisInputBodySchema.extend({
+  sourceKey: z.string().min(1),
+})
+
+export const SCENARIO_ANALYSIS_INPUT_VERSION = 'scenario-analysis-v2' as const
+
+export const ScenarioBaselineReferenceSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('source'),
+    sourceKey: z.string().min(1),
+  }).strict(),
+  z.object({
+    kind: z.literal('analysis_run'),
+    analysisRunId: z.string().min(1),
+  }).strict(),
+])
+
+export const ScenarioAnalysisInputV2Schema = ScenarioAnalysisInputBodySchema.extend({
+  version: z.literal(SCENARIO_ANALYSIS_INPUT_VERSION),
+  baseline: ScenarioBaselineReferenceSchema,
+})
+
+export const ScenarioAnalysisInputSchema = z.union([
+  LegacyScenarioAnalysisInputSchema,
+  ScenarioAnalysisInputV2Schema,
+])
+
 export type ScenarioHorizon = (typeof SCENARIO_HORIZONS)[number]
 export type ScenarioTrendRange = (typeof SCENARIO_TREND_RANGES)[number]
 export type ScenarioPercentageMetric =
@@ -84,5 +110,38 @@ export type ScenarioPercentageMetric =
 export type ScenarioAdjustment = z.infer<typeof ScenarioAdjustmentSchema>
 export type ScenarioDefinition = z.infer<typeof ScenarioDefinitionSchema>
 export type ManualScenarioBaseline = z.infer<typeof ManualScenarioBaselineSchema>
+export type ScenarioBaselineReference = z.infer<
+  typeof ScenarioBaselineReferenceSchema
+>
 export type ScenarioAnalysisInput = z.infer<typeof ScenarioAnalysisInputSchema>
+export type ScenarioAnalysisInputV2 = z.infer<
+  typeof ScenarioAnalysisInputV2Schema
+>
 
+export function getScenarioBaselineReference(
+  input: ScenarioAnalysisInput
+): ScenarioBaselineReference {
+  return 'baseline' in input
+    ? input.baseline
+    : { kind: 'source', sourceKey: input.sourceKey }
+}
+
+export function getScenarioInputSourceKey(input: ScenarioAnalysisInput) {
+  const baseline = getScenarioBaselineReference(input)
+  return baseline.kind === 'source' ? baseline.sourceKey : null
+}
+
+export function toScenarioAnalysisInputV2(
+  input: ScenarioAnalysisInput
+): ScenarioAnalysisInputV2 {
+  if ('baseline' in input) return input
+  return {
+    version: SCENARIO_ANALYSIS_INPUT_VERSION,
+    baseline: { kind: 'source', sourceKey: input.sourceKey },
+    currency: input.currency,
+    horizon: input.horizon,
+    trendRange: input.trendRange,
+    manualBaseline: input.manualBaseline,
+    scenarios: input.scenarios,
+  }
+}

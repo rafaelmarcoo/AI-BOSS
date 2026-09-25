@@ -84,9 +84,21 @@ describe('financial analysis collector', () => {
     })
 
     expect(collection.selection).toEqual({
+      mode: 'single',
       sourceKey: 'document:document-1',
       sourceLabel: 'statement.csv',
+      sourceKeys: ['document:document-1'],
+      sources: [{
+        sourceKey: 'document:document-1',
+        sourceLabel: 'statement.csv',
+        sourceType: 'document',
+        documentId: 'document-1',
+        connectionId: null,
+      }],
       currency: 'NZD',
+      reportingPeriodStart: '2026-03-31',
+      reportingPeriodEnd: '2026-06-30',
+      reportDate: '2026-06-30',
     })
     expect(collection.readiness.status).toBe('ready')
     expect(collection.facts.runway).toMatchObject({
@@ -101,6 +113,7 @@ describe('financial analysis collector', () => {
       .toMatchObject({ observationCount: 4, direction: 'worsening' })
     expect(collection.facts.forecasts.find((fact) => fact.metricKey === 'cash')?.values)
       .toHaveLength(6)
+    expect(collection.facts.periodComparisons).toHaveLength(8)
     expect(collection.evidence.some((item) => item.value === 999999)).toBe(false)
     expect(collection.evidence.some((item) => item.value === 777777)).toBe(false)
     expect(collection.evidence.some((item) => item.metricKey === 'runway_months')).toBe(false)

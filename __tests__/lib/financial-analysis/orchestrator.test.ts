@@ -2,15 +2,30 @@ import {
   runFinancialAnalysis,
   type FinancialAnalysisOrchestratorDependencies,
 } from '@/lib/financial-analysis/orchestrator'
-import { FINANCIAL_ANALYSIS_SECTION_IDS } from '@/lib/financial-analysis/types'
+import {
+  FINANCIAL_ANALYSIS_COMPARISON_METRIC_KEYS,
+  FINANCIAL_ANALYSIS_SECTION_IDS,
+} from '@/lib/financial-analysis/types'
 import type { FinancialAnalysisCollection } from '@/lib/financial-analysis/collector'
 import type { FinancialAnalysisRun } from '@/types/database'
 
 const collection: FinancialAnalysisCollection = {
   selection: {
+    mode: 'single',
     sourceKey: 'document:document-1',
     sourceLabel: 'statement.csv',
+    sourceKeys: ['document:document-1'],
+    sources: [{
+      sourceKey: 'document:document-1',
+      sourceLabel: 'statement.csv',
+      sourceType: 'document',
+      documentId: 'document-1',
+      connectionId: null,
+    }],
     currency: 'NZD',
+    reportingPeriodStart: '2026-04-30',
+    reportingPeriodEnd: '2026-06-30',
+    reportDate: '2026-06-30',
   },
   readiness: {
     status: 'ready',
@@ -81,6 +96,15 @@ const collection: FinancialAnalysisCollection = {
         value: 76000 - index * 9000,
       })),
     }],
+    periodComparisons: FINANCIAL_ANALYSIS_COMPARISON_METRIC_KEYS.map((metricKey) => ({
+      metricKey,
+      earliest: null,
+      previous: null,
+      latest: null,
+      startToLatestChange: null,
+      previousToLatestChange: null,
+      unavailableReason: 'Comparison unavailable.',
+    })),
   },
   evidence: [{
     observationId: 'cash-current',
@@ -89,6 +113,13 @@ const collection: FinancialAnalysisCollection = {
     currency: 'NZD',
     reportingDate: '2026-06-30',
     sourceLabel: 'statement.csv',
+    sourceType: 'document',
+    sourceKey: 'document:document-1',
+    documentId: 'document-1',
+    connectionId: null,
+    confidence: 0.95,
+    usedInCalculations: true,
+    resolution: 'uncontested',
   }],
   assumptions: ['No currency conversion was performed.'],
   baselineFingerprint: [{
@@ -124,6 +155,10 @@ function savedRun(
     selected_source_key: result.result.selectedBaseline.sourceKey,
     selected_source_label: result.result.selectedBaseline.sourceLabel,
     selected_currency: result.result.selectedBaseline.currency,
+    selection_mode: result.result.selectedBaseline.mode,
+    selected_sources: result.result.selectedBaseline.sources,
+    reporting_period_start: result.result.selectedBaseline.reportingPeriodStart,
+    reporting_period_end: result.result.selectedBaseline.reportingPeriodEnd,
     run_status: result.result.runStatus,
     data_readiness: result.result.readiness.status,
     baseline_fingerprint: result.baselineFingerprint,

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { FINANCIAL_METRIC_KEYS } from '@/lib/financial-data/metric-keys'
+import { STATEMENT_LINE_KEYS } from '@/lib/company-analysis/statement-lines'
 
 // Comments are stripped because 020 annotates its list, and a comment such as
 // "(original seven)" would otherwise close the list early.
@@ -55,14 +56,14 @@ describe('metric key migrations', () => {
     ).toEqual(APP_KEYS)
   })
 
-  it('lets competitor observations hold every metric the app supports', () => {
+  it('stores exactly the statement lines the app knows about', () => {
     expect(
       keyListAfter(
-        readMigration('022_competitor_benchmarks.sql'),
-        'competitor_metric_observations_metric_key_check',
-        'metric_key IN'
+        readMigration('022_analysed_companies.sql'),
+        'company_statement_lines_line_key_check',
+        'line_key IN'
       )
-    ).toEqual(APP_KEYS)
+    ).toEqual([...STATEMENT_LINE_KEYS].sort())
   })
 
   it('keeps the confirmation function identical to 016 apart from the key list', () => {

@@ -1,4 +1,5 @@
 import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
+import type { StatementLineKey } from '@/lib/company-analysis/statement-lines'
 import type { FinancialMetricSourceType } from '@/lib/financial-data/types'
 import type { GenUiPlan } from '@/lib/gen-ui/types'
 import type { ScenarioAnalysisInput } from '@/lib/scenarios/schema'
@@ -266,29 +267,30 @@ export interface FinancialMetricObservation {
   updated_at: string
 }
 
-/** A competitor whose figures the user keeps for comparison (migration 022). */
-export interface Competitor {
+/** A company analysed from its published annual statements (migration 022). */
+export interface AnalysedCompany {
   id: string
-  user_id: string
+  user_id: string | null
   name: string
   industry: string | null
+  peer_group: string | null
+  /** ISO code such as NZD, or a case-study currency such as D$. */
+  currency: string
+  amounts_in: 'units' | 'thousands' | 'millions'
+  description: string | null
+  source: string
   created_at: string
   updated_at: string
 }
 
-export interface CompetitorMetricObservation {
+export interface CompanyStatementLine {
   id: string
-  competitor_id: string
-  user_id: string
-  metric_key: FinancialMetricKey
+  company_id: string
+  fiscal_year_end: string
+  line_key: StatementLineKey
+  segment: string
   value: number
-  /** ISO code such as NZD, or a CIMA case-study currency such as L$. */
-  currency: string | null
-  period_start: string | null
-  period_end: string | null
-  as_of_date: string | null
-  source_label: string
-  evidence: unknown
+  source_page: number | null
   created_at: string
   updated_at: string
 }

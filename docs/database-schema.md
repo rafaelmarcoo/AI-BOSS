@@ -589,6 +589,10 @@ evidence queryable.
 **RLS and immutability:**
 - Owners can select and insert only their own report snapshots.
 - Authenticated browser clients have no update or delete privilege or policy.
+- The authenticated server API may permanently delete an owner-matched report
+  after explicit confirmation; the snapshot cannot be edited while retained.
+- Reports with protected decision-test children remain undeletable because the
+  owner-matched foreign key uses `ON DELETE RESTRICT`.
 - `(id, user_id)` is unique so child decision tests can enforce the same owner.
 
 **Indexes:**

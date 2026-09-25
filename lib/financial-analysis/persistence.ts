@@ -232,6 +232,40 @@ export async function getFinancialAnalysisRun(
   return toView(data as FinancialAnalysisRunViewRow)
 }
 
+export async function deleteFinancialAnalysisRun(
+  analysisRunId: string,
+  userId: string
+) {
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase
+    .from('financial_analysis_runs')
+    .delete()
+    .eq('id', analysisRunId)
+    .eq('user_id', userId)
+    .select('id')
+    .maybeSingle()
+
+  if (error?.code === '23503') {
+    throw new ApiError(
+      409,
+      'CONFLICT',
+      'This report has protected decision-test records and cannot be deleted.'
+    )
+  }
+  if (error) {
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to delete the financial analysis report.'
+    )
+  }
+  if (!data) {
+    throw new ApiError(404, 'NOT_FOUND', 'Financial analysis report not found.')
+  }
+
+  return { deleted: true as const }
+}
+
 export function toFinancialAnalysisRunView(
   run: FinancialAnalysisRun
 ): FinancialAnalysisRunView {

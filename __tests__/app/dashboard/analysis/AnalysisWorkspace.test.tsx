@@ -438,3 +438,78 @@ describe('financial analysis timeline selection', () => {
     )
   })
 })
+
+describe('saved financial analysis deletion', () => {
+  const originalFetch = global.fetch
+
+  afterEach(() => {
+    global.fetch = originalFetch
+    jest.restoreAllMocks()
+  })
+
+  it('confirms and permanently removes the active saved report', async () => {
+    const summary = {
+      id: report.id,
+      selectedSourceKey: report.selectedSourceKey,
+      selectedSourceLabel: report.selectedSourceLabel,
+      selectedCurrency: report.selectedCurrency,
+      selectionMode: report.selectionMode,
+      selectedSources: report.selectedSources,
+      reportingPeriodStart: report.reportingPeriodStart,
+      reportingPeriodEnd: report.reportingPeriodEnd,
+      runStatus: report.runStatus,
+      dataReadiness: report.dataReadiness,
+      createdAt: report.createdAt,
+    }
+    const fetchMock = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.endsWith('/baselines')) {
+        return {
+          ok: true,
+          json: async () => ({ success: true, data: { baselines: [] } }),
+        } as Response
+      }
+      if (url === '/api/financial-analysis') {
+        return {
+          ok: true,
+          json: async () => ({ success: true, data: { reports: [summary] } }),
+        } as Response
+      }
+      if (url.endsWith('/analysis-1') && init?.method === 'DELETE') {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: { deleted: true, analysisRunId: 'analysis-1' },
+          }),
+        } as Response
+      }
+      if (url.endsWith('/analysis-1')) {
+        return {
+          ok: true,
+          json: async () => ({ success: true, data: { report } }),
+        } as Response
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    global.fetch = fetchMock as typeof fetch
+    const confirmMock = jest.spyOn(window, 'confirm').mockReturnValue(true)
+
+    render(<AnalysisWorkspace />)
+    const deleteButton = await screen.findByRole('button', {
+      name: 'Delete saved report for statement.csv',
+    })
+    fireEvent.click(deleteButton)
+
+    await waitFor(() => expect(screen.getByText(
+      'No reports have been run yet.'
+    )).toBeInTheDocument())
+    expect(confirmMock).toHaveBeenCalledWith(
+      'Permanently delete the saved analysis for statement.csv? This cannot be undone, and draft Scenarios using this report may stop working.'
+    )
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/financial-analysis/analysis-1',
+      { method: 'DELETE' }
+    )
+  })
+})

@@ -1,5 +1,6 @@
 import { createAdminSupabaseClient } from '@/lib/supabase'
 import {
+  deleteFinancialAnalysisRun,
   getFinancialAnalysisRun,
   listFinancialAnalysisRuns,
   saveFinancialAnalysisRun,
@@ -287,5 +288,60 @@ describe('financial analysis persistence', () => {
       code: 'INTERNAL_ERROR',
       message: 'The saved financial analysis report is invalid.',
     })
+  })
+
+  it('permanently deletes only the owner-matched report', async () => {
+    const query = {
+      delete: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({
+        data: { id: 'analysis-1' }, error: null,
+      }),
+    }
+    mockCreateAdminClient.mockReturnValue({
+      from: jest.fn().mockReturnValue(query),
+    } as never)
+
+    await expect(
+      deleteFinancialAnalysisRun('analysis-1', 'owner-1')
+    ).resolves.toEqual({ deleted: true })
+    expect(query.eq).toHaveBeenNthCalledWith(1, 'id', 'analysis-1')
+    expect(query.eq).toHaveBeenNthCalledWith(2, 'user_id', 'owner-1')
+  })
+
+  it('does not reveal a report that is missing or belongs to another owner', async () => {
+    const query = {
+      delete: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+    }
+    mockCreateAdminClient.mockReturnValue({
+      from: jest.fn().mockReturnValue(query),
+    } as never)
+
+    await expect(
+      deleteFinancialAnalysisRun('analysis-private', 'viewer-1')
+    ).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' })
+  })
+
+  it('preserves reports that have protected decision-test records', async () => {
+    const query = {
+      delete: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      maybeSingle: jest.fn().mockResolvedValue({
+        data: null,
+        error: { code: '23503', message: 'foreign key violation' },
+      }),
+    }
+    mockCreateAdminClient.mockReturnValue({
+      from: jest.fn().mockReturnValue(query),
+    } as never)
+
+    await expect(
+      deleteFinancialAnalysisRun('analysis-1', 'owner-1')
+    ).rejects.toMatchObject({ status: 409, code: 'CONFLICT' })
   })
 })

@@ -13,6 +13,7 @@ import {
   CircularProgress,
   Divider,
   FormControl,
+  IconButton,
   InputLabel,
   MenuItem,
   Paper,
@@ -27,6 +28,7 @@ import {
   Typography,
 } from '@mui/material'
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded'
+import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
 import PictureAsPdfRoundedIcon from '@mui/icons-material/PictureAsPdfRounded'
 import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded'
 import { dashboardTokens } from '@/app/theme'
@@ -652,6 +654,7 @@ export function AnalysisWorkspace() {
   const [running, setRunning] = useState(false)
   const [previewing, setPreviewing] = useState(false)
   const [loadingReportId, setLoadingReportId] = useState<string | null>(null)
+  const [deletingReportId, setDeletingReportId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const selectedBaseline = useMemo(
     () => selectedIndex === '' ? null : baselines[Number(selectedIndex)] ?? null,
@@ -733,6 +736,40 @@ export function AnalysisWorkspace() {
       setError(loadError instanceof Error ? loadError.message : 'Could not load the saved report.')
     } finally {
       setLoadingReportId(null)
+    }
+  }
+
+  async function deleteReport(report: FinancialAnalysisRunSummary) {
+    if (!window.confirm(
+      `Permanently delete the saved analysis for ${report.selectedSourceLabel}? This cannot be undone, and draft Scenarios using this report may stop working.`
+    )) return
+
+    setDeletingReportId(report.id)
+    setError(null)
+    try {
+      const response = await fetch(`/api/financial-analysis/${report.id}`, {
+        method: 'DELETE',
+      })
+      const payload = await response.json() as ApiResponse<{
+        deleted: true
+        analysisRunId: string
+      }>
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error?.message ?? 'Could not delete the saved report.')
+      }
+
+      const remainingReports = reports.filter((item) => item.id !== report.id)
+      setReports(remainingReports)
+      if (activeReport?.id === report.id) {
+        setActiveReport(null)
+        if (remainingReports[0]) await loadReport(remainingReports[0].id)
+      }
+    } catch (deleteError) {
+      setError(deleteError instanceof Error
+        ? deleteError.message
+        : 'Could not delete the saved report.')
+    } finally {
+      setDeletingReportId(null)
     }
   }
 
@@ -1025,25 +1062,49 @@ export function AnalysisWorkspace() {
           ) : (
             <Stack spacing={0.5}>
               {reports.map((report) => (
-                <Button
+                <Stack
                   key={report.id}
-                  onClick={() => void loadReport(report.id)}
-                  disabled={loadingReportId === report.id}
+                  direction="row"
+                  alignItems="center"
                   sx={{
-                    display: 'block',
-                    textAlign: 'left',
-                    px: 1.25,
-                    py: 1,
-                    color: dashboardTokens.text,
-                    bgcolor: activeReport?.id === report.id ? dashboardTokens.surfaceAlt : 'transparent',
-                    textTransform: 'none',
+                    borderRadius: 1,
+                    bgcolor: activeReport?.id === report.id
+                      ? dashboardTokens.surfaceAlt
+                      : 'transparent',
                   }}
                 >
-                  <Typography variant="body2" fontWeight={650} noWrap>{report.selectedSourceLabel}</Typography>
-                  <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
-                    {report.selectedCurrency} · {formatDate(report.createdAt)}
-                  </Typography>
-                </Button>
+                  <Button
+                    onClick={() => void loadReport(report.id)}
+                    disabled={loadingReportId === report.id || deletingReportId === report.id}
+                    sx={{
+                      display: 'block',
+                      flex: 1,
+                      minWidth: 0,
+                      textAlign: 'left',
+                      px: 1.25,
+                      py: 1,
+                      color: dashboardTokens.text,
+                      textTransform: 'none',
+                    }}
+                  >
+                    <Typography variant="body2" fontWeight={650} noWrap>{report.selectedSourceLabel}</Typography>
+                    <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
+                      {report.selectedCurrency} · {formatDate(report.createdAt)}
+                    </Typography>
+                  </Button>
+                  <IconButton
+                    aria-label={`Delete saved report for ${report.selectedSourceLabel}`}
+                    color="error"
+                    size="small"
+                    disabled={deletingReportId === report.id}
+                    onClick={() => void deleteReport(report)}
+                    sx={{ mr: 0.5 }}
+                  >
+                    {deletingReportId === report.id
+                      ? <CircularProgress size={16} color="inherit" />
+                      : <DeleteOutlineRoundedIcon fontSize="small" />}
+                  </IconButton>
+                </Stack>
               ))}
             </Stack>
           )}

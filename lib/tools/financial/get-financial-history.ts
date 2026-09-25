@@ -7,6 +7,7 @@ import {
   type MetricHistorySummary,
 } from '@/lib/financial-data/metric-history'
 import type { StructuredTool } from '@/lib/tools/contracts'
+import { formatRunway } from '@/lib/calculations/runway-display'
 import {
   formatFinancialCurrency,
   isSupportedFinancialCurrency,
@@ -22,7 +23,7 @@ const inputSchema = z.object({
 
 function formatValue(value: number, summary: MetricHistorySummary) {
   if (summary.metricKey === 'runway_months') {
-    return `${value.toFixed(1)} months`
+    return formatRunway(value)
   }
 
   if (isSupportedFinancialCurrency(summary.currency)) {

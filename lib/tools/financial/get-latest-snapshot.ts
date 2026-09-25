@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { formatRunway } from '@/lib/calculations/runway-display'
 import { readSourceAwareMetrics } from '@/lib/financial-data/read-service'
 import type { StructuredTool } from '@/lib/tools/contracts'
 
@@ -25,9 +26,13 @@ export function createGetLatestSnapshotTool(
         if (metric.status !== 'available') {
           continue
         }
+        const value =
+          metric.key === 'runway_months'
+            ? formatRunway(metric.value)
+            : `${metric.value}${metric.currency ? ` ${metric.currency}` : ''}`
 
         lines.push(
-          `- ${metric.key}: ${metric.value}${metric.currency ? ` ${metric.currency}` : ''} ` +
+          `- ${metric.key}: ${value} ` +
             `(source: ${metric.provenance.sourceLabel}, confidence: ${Math.round(metric.confidence * 100)}%)`
         )
       }
@@ -42,7 +47,7 @@ export function createGetLatestSnapshotTool(
       if (adjustedRunway.status === 'available') {
         lines.push(
           `Working-capital-adjusted runway status: AVAILABLE.`,
-          `Working-capital-adjusted runway: ${adjustedRunway.value} months (${adjustedRunway.provenance.evidence?.excerpt ?? 'calculated from confirmed inputs'}).`
+          `Working-capital-adjusted runway: ${formatRunway(adjustedRunway.value)} (${adjustedRunway.provenance.evidence?.excerpt ?? 'calculated from confirmed inputs'}).`
         )
       } else {
         lines.push(

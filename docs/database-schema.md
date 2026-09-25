@@ -554,6 +554,57 @@ data still take priority over these preferences.
 
 ---
 
+### 15. competitors
+
+Companies the user compares their own business against. Kept apart from
+`financial_metric_observations` so a competitor's figures can never reach the
+user's own runway, snapshot, history, forecast or scenarios.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID (PK) | Primary key |
+| user_id | UUID (FK) | Owner; references users(id) |
+| name | TEXT | Competitor name, 1-120 characters, unique per user ignoring case and surrounding spaces |
+| industry | TEXT | Optional industry label |
+| created_at | TIMESTAMP | Creation time |
+| updated_at | TIMESTAMP | Last update |
+
+**RLS Policies:**
+- Users can view, insert, update, and delete only their own competitors
+
+---
+
+### 16. competitor_metric_observations
+
+One metric value for one competitor. Uses the same thirteen metric keys as
+`financial_metric_observations`, so the same ratio calculations apply to both
+companies.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID (PK) | Primary key |
+| competitor_id | UUID (FK) | Competitor; the composite key (competitor_id, user_id) must match the competitor's owner |
+| user_id | UUID (FK) | Owner; references users(id) |
+| metric_key | TEXT | Same thirteen keys as `financial_metric_observations` |
+| value | NUMERIC(18,4) | Metric value |
+| currency | TEXT | ISO code such as `NZD`, or a CIMA case-study currency such as `L$`; `NULL` for unit-based metrics |
+| period_start | DATE | Optional period start |
+| period_end | DATE | Optional period end |
+| as_of_date | DATE | Optional point-in-time date |
+| source_label | TEXT | Where the figures came from, for example the uploaded file name |
+| evidence | JSONB | Evidence reference such as the source row |
+| created_at | TIMESTAMP | Creation time |
+| updated_at | TIMESTAMP | Last update |
+
+Currency is deliberately looser than for the user's own figures because the
+CIMA case studies use fictional currencies. Ratios do not depend on currency;
+amounts are only compared when both companies report in the same currency.
+
+**RLS Policies:**
+- Users can view, insert, update, and delete only their own competitor observations
+
+---
+
 ## Relationships
 ```
 users (1) ──< (many) conversations
@@ -575,6 +626,8 @@ documents (1) ──< (many) financial_metric_observations
 users (1) ──< (many) scenarios
 companies (1) ──< (many) scenarios
 users (1) ──< (one) user_gen_ui_preferences
+users (1) ──< (many) competitors
+competitors (1) ──< (many) competitor_metric_observations
 ```
 
 ---
@@ -603,6 +656,7 @@ All schema changes are tracked in `db/migrations/`:
 - `019_company_gen_ui_controls.sql` - Moves planning horizon to the admin-controlled company profile and adds worker-specific roles
 - `020_extend_financial_metric_keys.sql` - Widens observation metric keys from seven to thirteen, adding cost of sales, operating profit, current assets and liabilities, total debt and total equity for CIMA ratio analysis. Originally numbered 014 on its feature branch; renumbered on merge because main had already used 014. Idempotent, so reapplying it to a database that ran the old 014 is safe
 - `021_extend_document_review_metric_keys.sql` - Widens the document review flow to the same thirteen keys: the candidate metric_key check and the key list inside `confirm_document_extraction`. The function is otherwise identical to 016's
+- `022_competitor_benchmarks.sql` - Adds `competitors` and `competitor_metric_observations`, kept separate from the user's own observations so competitor figures cannot affect runway or scenarios
 
 ---
 

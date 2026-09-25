@@ -266,6 +266,33 @@ export interface FinancialMetricObservation {
   updated_at: string
 }
 
+/** A competitor whose figures the user keeps for comparison (migration 022). */
+export interface Competitor {
+  id: string
+  user_id: string
+  name: string
+  industry: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CompetitorMetricObservation {
+  id: string
+  competitor_id: string
+  user_id: string
+  metric_key: FinancialMetricKey
+  value: number
+  /** ISO code such as NZD, or a CIMA case-study currency such as L$. */
+  currency: string | null
+  period_start: string | null
+  period_end: string | null
+  as_of_date: string | null
+  source_label: string
+  evidence: unknown
+  created_at: string
+  updated_at: string
+}
+
 export interface SavedScenario {
   id: string
   user_id: string

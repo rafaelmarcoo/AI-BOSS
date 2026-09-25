@@ -55,6 +55,16 @@ describe('metric key migrations', () => {
     ).toEqual(APP_KEYS)
   })
 
+  it('lets competitor observations hold every metric the app supports', () => {
+    expect(
+      keyListAfter(
+        readMigration('022_competitor_benchmarks.sql'),
+        'competitor_metric_observations_metric_key_check',
+        'metric_key IN'
+      )
+    ).toEqual(APP_KEYS)
+  })
+
   it('keeps the confirmation function identical to 016 apart from the key list', () => {
     const functionOf = (sql: string) =>
       sql

@@ -12,6 +12,7 @@ import type {
   ConversationsApiResponse,
 } from "./types";
 import { createConversationTitle } from "@/lib/chat/conversation-title";
+import type { ModelName } from "@/lib/ai/models";
 import type { GenUiPlan } from "@/lib/gen-ui/types";
 import type { ConversationVisibility } from "@/types/database";
 
@@ -38,12 +39,14 @@ function getLatestGenUiPlan(messages: ChatApiMessage[]) {
 
 interface UseChatConversationOptions {
   initialConversationId?: string | null;
+  initialModel?: ModelName | null;
   startEmpty?: boolean;
   onGenUiPlan?: (plan: GenUiPlan | null) => void;
 }
 
 export function useChatConversation({
   initialConversationId = null,
+  initialModel = null,
   startEmpty = false,
   onGenUiPlan,
 }: UseChatConversationOptions = {}) {
@@ -54,6 +57,9 @@ export function useChatConversation({
   const [isReadOnly, setIsReadOnly] = useState(false);
   const [visibility, setVisibility] =
     useState<ConversationVisibility>("company");
+  const [model, setModel] = useState<ModelName | undefined>(
+    initialModel ?? undefined
+  );
   const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -162,6 +168,7 @@ export function useChatConversation({
         },
         body: JSON.stringify({
           ...(conversationId ? { conversationId } : {}),
+          ...(model ? { model } : {}),
           visibility,
           messages: nextConversation.map(({ role, content }) => ({
             role,
@@ -375,6 +382,8 @@ export function useChatConversation({
     isReadOnly,
     visibility,
     changeVisibility,
+    model,
+    changeModel: setModel,
     conversationMessages,
     activeGenUiPlan,
     conversations,

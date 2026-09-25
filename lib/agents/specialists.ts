@@ -1,5 +1,6 @@
 import type { BaseMessage } from '@langchain/core/messages'
 import { runAgent, type AgentRunResult } from '@/lib/ai/agent'
+import { DEFAULT_MODEL, isModelName, type ModelName } from '@/lib/ai/models'
 import { AGENT_SYSTEM_PROMPT } from '@/lib/chat/system-prompt'
 import {
   getScenarioPreflightClarification,
@@ -7,6 +8,7 @@ import {
   type FinancialSpecialist,
 } from '@/lib/agents/router'
 import { calculateRunwayTool } from '@/lib/tools/financial/calculate-runway'
+import { createCalculateRatiosTool } from '@/lib/tools/financial/calculate-ratios'
 import { createGetFinancialForecastTool } from '@/lib/tools/financial/get-financial-forecast'
 import { createGetFinancialHistoryTool } from '@/lib/tools/financial/get-financial-history'
 import { createGetLatestSnapshotTool } from '@/lib/tools/financial/get-latest-snapshot'
@@ -19,7 +21,14 @@ const SPECIALIST_PROMPTS: Record<FinancialSpecialist, string> = {
   financial_position: `${AGENT_SYSTEM_PROMPT}
 
 ## Assigned specialist
-You are handling current financial position and runway only. Use get_latest_snapshot for current values. Use calculate_runway only from confirmed snapshot values. If the request is about history, forecasting, or a scenario, explain that this request needs the appropriate analysis instead of inventing an answer.`,
+You are handling current financial position, runway and financial ratios. Use get_latest_snapshot for current values. Use calculate_runway only from confirmed snapshot values. Use calculate_ratios for any question about margins, profitability, liquidity or leverage — never work a ratio out yourself, and never substitute a near-enough input such as treating cash plus receivables as current assets. If calculate_ratios reports a ratio as unavailable, state exactly which figures are missing. If the request is about history, forecasting, or a scenario, explain that this request needs the appropriate analysis instead of inventing an answer.
+
+### Reporting ratios
+Always carry through the status the tool assigned and the threshold it used. Never restate a ratio without its band, and never upgrade, soften or re-judge a status the tool has set.
+
+When the tool returns more than one ratio, read them together instead of listing them one by one. Say what the combination means for the business, and name the tension explicitly whenever one ratio is strong and another is weak — for example, healthy margins alongside a current ratio below 1 mean the business is profitable but may not be able to meet its short-term obligations, while strong liquidity alongside a weak operating margin means it can pay its bills but is not converting revenue into profit. Where two ratios point the same way, say so plainly rather than repeating the same conclusion twice.
+
+Do not introduce benchmarks the tool did not supply, and do not compare the business to an industry average — no industry data is available to you.`,
   historical_forecast: `${AGENT_SYSTEM_PROMPT}
 
 ## Assigned specialist
@@ -78,9 +87,37 @@ function scenarioToolOutcome(result: AgentRunResult) {
   return null
 }
 
+const SPECIALIST_MODELS: Record<FinancialSpecialist, ModelName> = {
+  financial_position: DEFAULT_MODEL,
+  historical_forecast: DEFAULT_MODEL,
+  scenario: DEFAULT_MODEL,
+}
+
+export function modelForSpecialist(specialist: FinancialSpecialist): ModelName {
+  const override = process.env[`AI_MODEL_${specialist.toUpperCase()}`]
+
+  if (!override) {
+    return SPECIALIST_MODELS[specialist]
+  }
+
+  if (!isModelName(override)) {
+    console.warn(
+      `Unknown model "${override}" in AI_MODEL_${specialist.toUpperCase()}; ` +
+        `using ${SPECIALIST_MODELS[specialist]} instead.`
+    )
+    return SPECIALIST_MODELS[specialist]
+  }
+
+  return override
+}
+
 function specialistTools(userId: string, specialist: FinancialSpecialist): AppTool[] {
   if (specialist === 'financial_position') {
-    return [createGetLatestSnapshotTool(userId), calculateRunwayTool]
+    return [
+      createGetLatestSnapshotTool(userId),
+      calculateRunwayTool,
+      createCalculateRatiosTool(userId),
+    ]
   }
 
   if (specialist === 'historical_forecast') {
@@ -95,13 +132,15 @@ function specialistTools(userId: string, specialist: FinancialSpecialist): AppTo
 
 export interface MultiAgentRunResult extends AgentRunResult {
   specialist: FinancialSpecialist
+  modelName: ModelName
 }
 
 export async function runMultiAgent(
   userId: string,
   input: string,
   chatHistory: BaseMessage[] = [],
-  contextMessages: BaseMessage[] = []
+  contextMessages: BaseMessage[] = [],
+  modelOverride?: ModelName
 ): Promise<MultiAgentRunResult> {
   const routingHistory = chatHistory.flatMap((message) => {
     const role = message._getType()
@@ -120,8 +159,11 @@ export async function runMultiAgent(
       toolsUsed: [],
       toolExecutions: [],
       specialist,
+      modelName: modelOverride ?? modelForSpecialist(specialist),
     }
   }
+
+  const modelName = modelOverride ?? modelForSpecialist(specialist)
 
   if (specialist === 'scenario' && missingStaffReductionStartMonth(input, chatHistory)) {
     return {
@@ -130,6 +172,7 @@ export async function runMultiAgent(
       toolsUsed: [],
       toolExecutions: [],
       specialist,
+      modelName,
     }
   }
 
@@ -139,7 +182,8 @@ export async function runMultiAgent(
     chatHistory,
     tools,
     contextMessages,
-    SPECIALIST_PROMPTS[specialist]
+    SPECIALIST_PROMPTS[specialist],
+    modelName
   )
 
   if (specialist === 'scenario') {
@@ -150,12 +194,15 @@ export async function runMultiAgent(
       !usedScenarioTool &&
       (questionCount !== 1 || appearsReadyForScenarioTool(input))
     ) {
+      // The retry runs on the same model as the first attempt, so a user who
+      // picked a model is not silently switched to the default mid-answer.
       result = await runAgent(
         input,
         chatHistory,
         tools,
         contextMessages,
-        `${SPECIALIST_PROMPTS.scenario}${SCENARIO_RETRY_INSTRUCTION}`
+        `${SPECIALIST_PROMPTS.scenario}${SCENARIO_RETRY_INSTRUCTION}`,
+        modelName
       )
     }
 
@@ -184,5 +231,5 @@ export async function runMultiAgent(
     }
   }
 
-  return { ...result, specialist }
+  return { ...result, specialist, modelName }
 }

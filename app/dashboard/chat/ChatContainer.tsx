@@ -14,11 +14,13 @@ import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
 import { ChatInput } from "./ChatInput";
 import { ChatMessage } from "./ChatMessage";
+import { ModelSelector } from "./ModelSelector";
 import type {
   ChatErrorState,
   ChatRecord,
 } from "./types";
 import { dashboardTokens } from "@/app/theme";
+import type { ModelName } from "@/lib/ai/models";
 import type {
   ConversationVisibility,
   UserType,
@@ -34,6 +36,8 @@ interface ChatContainerProps {
   visibility: ConversationVisibility;
   visibilityLocked: boolean;
   onVisibilityChange: (visibility: ConversationVisibility) => void;
+  model?: ModelName | undefined;
+  onModelChange?: (model: ModelName | undefined) => void;
   conversationMessages: ChatRecord[];
   historyLoading: boolean;
   loading: boolean;
@@ -66,6 +70,8 @@ export function ChatContainer({
   visibility,
   visibilityLocked,
   onVisibilityChange,
+  model,
+  onModelChange,
   conversationMessages,
   historyLoading,
   loading,
@@ -124,6 +130,13 @@ export function ChatContainer({
             >
               <MenuRoundedIcon />
             </IconButton>
+
+            <ModelSelector
+              model={model}
+              onModelChange={onModelChange}
+              disabled={loading || readOnly}
+            />
+
             <Stack
               spacing={0.15}
               sx={{ flex: 1, minWidth: 0, alignItems: "flex-end", px: 0.5 }}

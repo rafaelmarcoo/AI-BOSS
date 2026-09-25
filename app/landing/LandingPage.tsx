@@ -26,6 +26,8 @@ import RouteRoundedIcon from "@mui/icons-material/RouteRounded";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import { DashboardHeader } from "@/app/dashboard/header";
 import { dashboardTokens } from "@/app/theme";
+import { ModelSelector } from "@/app/dashboard/chat/ModelSelector";
+import type { ModelName } from "@/lib/ai/models";
 import { VoiceInputButton } from "@/components/voice-input-button";
 import type { Conversation } from "@/types/database";
 import { RecentActivity } from "@/app/dashboard/RecentActivity";
@@ -91,6 +93,7 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [message, setMessage] = useState("");
+  const [model, setModel] = useState<ModelName | undefined>(undefined);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadedDocument, setUploadedDocument] = useState<{
@@ -151,7 +154,10 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
     const trimmed = message.trim();
 
     if (trimmed) {
-      router.push(`/dashboard?initialMessage=${encodeURIComponent(trimmed)}`);
+      const params = new URLSearchParams({ initialMessage: trimmed });
+      if (model) params.set("model", model);
+
+      router.push(`/dashboard?${params.toString()}`);
     }
   };
 
@@ -346,11 +352,24 @@ export function LandingPage({ fullName, email }: LandingPageProps) {
               <SendRoundedIcon fontSize="small" />
             </IconButton>
           </Box>
-          <Typography
-            sx={{ mt: 1, color: dashboardTokens.textSubtle, fontSize: 12 }}
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            alignItems={{ xs: "flex-start", sm: "center" }}
+            justifyContent="space-between"
+            spacing={1}
+            sx={{ mt: 1 }}
           >
-            AI-BOSS provides financial insights. Review important decisions before acting.
-          </Typography>
+            <ModelSelector model={model} onModelChange={setModel} />
+            <Typography
+              sx={{
+                color: dashboardTokens.textSubtle,
+                fontSize: 12,
+                textAlign: { sm: "right" },
+              }}
+            >
+              AI-BOSS provides financial insights. Review important decisions before acting.
+            </Typography>
+          </Stack>
           {uploading ? (
             <Alert
               severity="info"

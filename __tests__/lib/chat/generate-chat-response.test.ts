@@ -1,5 +1,6 @@
 import { SystemMessage } from '@langchain/core/messages'
 import { generateChatResponse } from '@/lib/chat/generate-chat-response'
+import { DEFAULT_MODEL } from '@/lib/ai/models'
 import { buildChatContext } from '@/lib/chat/build-chat-context'
 import { runAgent } from '@/lib/ai/agent'
 import { runMultiAgent } from '@/lib/agents/specialists'
@@ -132,7 +133,9 @@ describe('generateChatResponse', () => {
       'What is my runway?',
       [],
       [{ name: 'calculate_runway' }],
-      contextMessages
+      contextMessages,
+      undefined,
+      DEFAULT_MODEL
     )
     expect(mockPlanGenUi).toHaveBeenCalledWith(
       expect.objectContaining({ hasUnreviewedDocumentEvidence: false })
@@ -158,14 +161,16 @@ describe('generateChatResponse', () => {
     })
     mockListConversationMessages.mockResolvedValue([])
     mockBuildChatContext.mockResolvedValue({ messages: contextMessages, metricKeys: ['cash'], retrievedChunks: [], hasUnreviewedDocumentEvidence: false })
-    mockRunMultiAgent.mockResolvedValue({ content: 'Forecast result', tokensUsed: 88, toolsUsed: [], specialist: 'historical_forecast' })
+    // Deliberately not the default model, so a hardcoded modelUsed would fail.
+    mockRunMultiAgent.mockResolvedValue({ content: 'Forecast result', tokensUsed: 88, toolsUsed: [], specialist: 'historical_forecast', modelName: 'gpt-4o' })
     mockPlanGenUi.mockResolvedValue(null)
 
     await generateChatResponse('user-123', [{ role: 'user', content: 'Forecast cash' }], 'conversation-1')
 
-    expect(mockRunMultiAgent).toHaveBeenCalledWith('user-123', 'Forecast cash', [], contextMessages)
+    expect(mockRunMultiAgent).toHaveBeenCalledWith('user-123', 'Forecast cash', [], contextMessages, undefined)
     expect(mockRunAgent).not.toHaveBeenCalled()
     expect(mockLogChatDecision).toHaveBeenCalledWith(expect.objectContaining({ specialist: 'historical_forecast' }))
+    expect(mockLogChatDecision).toHaveBeenCalledWith(expect.objectContaining({ modelUsed: 'gpt-4o' }))
   })
 
   it('always applies the trusted scenario path even when multi-agent mode is disabled', async () => {
@@ -189,13 +194,14 @@ describe('generateChatResponse', () => {
     mockListConversationMessages.mockResolvedValue([])
     mockBuildChatContext.mockResolvedValue({ messages: contextMessages, metricKeys: ['cash'], retrievedChunks: [], hasUnreviewedDocumentEvidence: false })
     mockRunMultiAgent.mockResolvedValue({
-      content: 'Trusted scenario result', tokensUsed: 88, toolsUsed: [], toolExecutions: [], specialist: 'scenario',
+      content: 'Trusted scenario result', tokensUsed: 88, toolsUsed: [], toolExecutions: [], specialist: 'scenario', modelName: 'gpt-5.6-luna',
     })
     mockPlanGenUi.mockResolvedValue(null)
 
     await generateChatResponse('user-123', [{ role: 'user', content: prompt }], conversation.id)
 
-    expect(mockRunMultiAgent).toHaveBeenCalledWith('user-123', prompt, [], contextMessages)
+    // The fifth argument is the user's chosen model; none was chosen here.
+    expect(mockRunMultiAgent).toHaveBeenCalledWith('user-123', prompt, [], contextMessages, undefined)
     expect(mockRunAgent).not.toHaveBeenCalled()
     expect(mockPlanGenUi).toHaveBeenCalledWith(expect.objectContaining({
       scenarioMode: true,

@@ -13,7 +13,7 @@ import {
   type FinancialSpecialist,
 } from '@/lib/agents/router'
 import { runMultiAgent } from '@/lib/agents/specialists'
-import { CHAT_MODEL } from '@/lib/ai/model-config'
+import { DEFAULT_MODEL, MODEL_CATALOG, type ModelName } from '@/lib/ai/models'
 import { logChatDecision } from '@/lib/chat/log-chat-decision'
 import { buildChatContext } from '@/lib/chat/build-chat-context'
 import { planGenUi } from '@/lib/gen-ui/plan-gen-ui'
@@ -30,7 +30,8 @@ export async function generateChatResponse(
   userId: string,
   messages: ChatMessagePayload[],
   conversationId?: string,
-  visibility: ConversationVisibility = 'company'
+  visibility: ConversationVisibility = 'company',
+  model?: ModelName
 ) {
   const startedAt = Date.now()
   const latestUserMessage = [...messages]
@@ -70,6 +71,9 @@ export async function generateChatResponse(
     const multiAgentEnabled = process.env.MULTI_AGENT_MODE === 'true'
     let agentResponse: AgentRunResult
     let specialist: FinancialSpecialist | undefined
+    // Logged with the decision, so the audit trail records the model that
+    // actually answered rather than assuming the default.
+    let modelUsed: string = MODEL_CATALOG[model ?? DEFAULT_MODEL].model
     const resolvedSpecialist = routeFinancialConversation(
       latestUserMessage.content,
       persistedChatHistory
@@ -89,17 +93,23 @@ export async function generateChatResponse(
         userId,
         latestUserMessage.content,
         chatHistory,
-        chatContext.messages
+        chatContext.messages,
+        model
       )
       agentResponse = multiAgentResponse
       specialist = multiAgentResponse.specialist
+      modelUsed = MODEL_CATALOG[multiAgentResponse.modelName].model
     } else {
+      const singleAgentModel = model ?? DEFAULT_MODEL
       agentResponse = await runAgent(
         latestUserMessage.content,
         chatHistory,
         getAgentTools(userId),
-        chatContext.messages
+        chatContext.messages,
+        undefined,
+        singleAgentModel
       )
+      modelUsed = MODEL_CATALOG[singleAgentModel].model
     }
     const uiPlan = await planGenUi({
       userId,
@@ -136,7 +146,7 @@ export async function generateChatResponse(
       assistantMessageId: savedAssistantMessage.id,
       messages: mapConversationMessagesToPayload(updatedConversationMessages),
       aiResponse: agentResponse.content,
-      modelUsed: CHAT_MODEL,
+      modelUsed,
       tokensUsed: agentResponse.tokensUsed,
       toolsUsed: agentResponse.toolsUsed,
       calculations: agentResponse.toolExecutions ?? [],

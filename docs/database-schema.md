@@ -341,7 +341,7 @@ owner's corrections and include/exclude decision.
 | user_id | UUID (FK) | Document owner |
 | original_payload | JSONB | Original extracted fields and values |
 | reviewed_payload | JSONB | Submitted corrections and final decision |
-| metric_key | TEXT | Canonical supported metric, nullable while pending |
+| metric_key | TEXT | Canonical supported metric, nullable while pending. Same thirteen keys as `financial_metric_observations` (from 021) |
 | value | NUMERIC(18,4) | Canonical reviewed value |
 | currency | TEXT | Canonical `NZD` or `AUD` for monetary metrics; `NULL` for unit-based `runway_months` |
 | reporting_date | DATE | Canonical reviewed reporting date |
@@ -470,7 +470,7 @@ are published only from included candidates through `confirm_document_extraction
 | user_id | UUID (FK) | References users(id) |
 | connection_id | UUID (FK) | Optional source connection from data_connections |
 | document_id | UUID (FK) | Optional uploaded document source |
-| metric_key | TEXT | Canonical key: `cash`, `accounts_receivable`, `accounts_payable`, `monthly_revenue`, `monthly_expenses`, `burn_rate`, or `runway_months` |
+| metric_key | TEXT | Canonical key, constrained by a CHECK. Cash position: `cash`, `accounts_receivable`, `accounts_payable`, `monthly_revenue`, `monthly_expenses`, `burn_rate`, `runway_months`. Income statement: `cost_of_sales`, `operating_profit`. Balance sheet: `current_assets`, `current_liabilities`, `total_debt`, `total_equity` |
 | value | NUMERIC(18,4) | Normalized metric value |
 | currency | TEXT | `NZD` or `AUD` for monetary metrics; `NULL` for unit-based `runway_months` |
 | period_start | DATE | Optional period start for period-based metrics |
@@ -601,6 +601,8 @@ All schema changes are tracked in `db/migrations/`:
 - `017_daily_company_join_codes.sql` - Adds protected stored company join codes and a daily UTC rotation job
 - `018_gen_ui_personalization.sql` - Adds shared company size and per-user Gen UI personalization preferences
 - `019_company_gen_ui_controls.sql` - Moves planning horizon to the admin-controlled company profile and adds worker-specific roles
+- `020_extend_financial_metric_keys.sql` - Widens observation metric keys from seven to thirteen, adding cost of sales, operating profit, current assets and liabilities, total debt and total equity for CIMA ratio analysis. Originally numbered 014 on its feature branch; renumbered on merge because main had already used 014. Idempotent, so reapplying it to a database that ran the old 014 is safe
+- `021_extend_document_review_metric_keys.sql` - Widens the document review flow to the same thirteen keys: the candidate metric_key check and the key list inside `confirm_document_extraction`. The function is otherwise identical to 016's
 
 ---
 

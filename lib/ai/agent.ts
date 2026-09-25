@@ -1,4 +1,3 @@
-import { ChatOpenAI } from '@langchain/openai'
 import {
   AIMessage,
   BaseMessage,
@@ -7,9 +6,14 @@ import {
   ToolMessage,
 } from '@langchain/core/messages'
 import { ToolInputParsingException } from '@langchain/core/tools'
-import { ApiError } from '@/lib/api/errors'
+import {
+  createChatModel,
+  resolveModel,
+  usesResponsesApi,
+  DEFAULT_MODEL,
+  type ModelName,
+} from '@/lib/ai/models'
 import { AGENT_SYSTEM_PROMPT } from '@/lib/chat/system-prompt'
-import { CHAT_MODEL, mainModelOptions } from '@/lib/ai/model-config'
 import { adaptToolsToLangChain } from '@/lib/ai/tools'
 import type { AppTool } from '@/lib/tools/contracts'
 
@@ -119,22 +123,46 @@ function safeUnavailableAdjustedRunwayResponse(evidence: string[]) {
   ].join('\n')
 }
 
-function createAgentModel() {
-  const apiKey = process.env.OPENAI_API_KEY
+function createAgentModel(model: ModelName = DEFAULT_MODEL) {
+  return createChatModel(model, { temperature: 0 })
+}
 
-  if (!apiKey) {
-    throw new ApiError(
-      500,
-      'INTERNAL_ERROR',
-      'Missing required environment variable: OPENAI_API_KEY.'
+/**
+ * Past replies are rebuilt as typed text blocks by createAssistantHistoryMessage
+ * because the Responses API needs that shape. Chat Completions providers (GLM,
+ * DeepSeek, Grok, Gemini) expect plain text, so the blocks are flattened back
+ * for them here rather than changing how history is stored.
+ */
+export function toChatCompletionsHistory(messages: BaseMessage[]): BaseMessage[] {
+  return messages.map((message) =>
+    AIMessage.isInstance(message) && Array.isArray(message.content)
+      ? new AIMessage(message.text)
+      : message
+  )
+}
+
+export function mergeSystemMessages(messages: BaseMessage[]): BaseMessage[] {
+  const systemBlocks: string[] = []
+  const conversation: BaseMessage[] = []
+
+  for (const message of messages) {
+    if (!SystemMessage.isInstance(message)) {
+      conversation.push(message)
+      continue
+    }
+
+    systemBlocks.push(
+      typeof message.content === 'string'
+        ? message.content
+        : JSON.stringify(message.content)
     )
   }
 
-  return new ChatOpenAI({
-    model: CHAT_MODEL,
-    ...mainModelOptions(),
-    apiKey,
-  })
+  if (systemBlocks.length === 0) {
+    return conversation
+  }
+
+  return [new SystemMessage(systemBlocks.join('\n\n')), ...conversation]
 }
 
 function readTotalTokens(message: BaseMessage) {
@@ -173,18 +201,36 @@ export async function runAgent(
   chatHistory: BaseMessage[] = [],
   tools: AppTool[] = [],
   contextMessages: BaseMessage[] = [],
-  systemPrompt: string = AGENT_SYSTEM_PROMPT
+  systemPrompt: string = AGENT_SYSTEM_PROMPT,
+  modelName: ModelName = DEFAULT_MODEL
 ): Promise<AgentRunResult> {
-  const model = createAgentModel()
-  const langChainTools = adaptToolsToLangChain(tools)
-  const llm = langChainTools.length > 0 ? model.bindTools(langChainTools) : model
+  const model = createAgentModel(modelName)
+  const dialect =
+    resolveModel(modelName).provider.sdk === 'google' ? 'google' : 'json-schema'
+  const langChainTools = adaptToolsToLangChain(tools, dialect)
 
-  const messages = buildAgentMessages({
+  if (langChainTools.length > 0 && typeof model.bindTools !== 'function') {
+    throw new Error(
+      `Model "${modelName}" does not support tool calling, which this agent requires.`
+    )
+  }
+
+  const llm =
+    langChainTools.length > 0 && model.bindTools
+      ? model.bindTools(langChainTools)
+      : model
+
+  const builtMessages = buildAgentMessages({
     input,
-    chatHistory,
+    chatHistory: usesResponsesApi(modelName)
+      ? chatHistory
+      : toChatCompletionsHistory(chatHistory),
     contextMessages,
     systemPrompt,
   })
+
+  const messages =
+    dialect === 'google' ? mergeSystemMessages(builtMessages) : builtMessages
 
   const MAX_ITERATIONS = 10
   let totalTokensUsed = 0

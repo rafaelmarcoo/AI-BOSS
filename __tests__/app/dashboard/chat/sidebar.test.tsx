@@ -34,6 +34,8 @@ function setupConversation(overrides: Record<string, unknown> = {}) {
     isReadOnly: false,
     visibility: 'company',
     changeVisibility: jest.fn().mockResolvedValue(undefined),
+    model: undefined,
+    changeModel: jest.fn(),
     conversationMessages: [],
     activeGenUiPlan: null,
     conversations: [ownedConversation],

@@ -123,7 +123,7 @@ describe('deriveRunwayHistoryObservations', () => {
       asOfDate: '2026-03-31',
       provenance: {
         evidence: {
-          excerpt: '(100000 + 20000 - 5000) / 10000 = 11.5 months',
+          excerpt: '(100000 + 20000 - 5000) / 10000 = 11.5 months × 30 = 345 days',
         },
       },
     })

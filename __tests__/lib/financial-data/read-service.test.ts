@@ -204,7 +204,7 @@ describe('financial data read service helpers', () => {
       provenance: {
         sourceLabel: 'summary.csv (cash runway calculated)',
         evidence: {
-          excerpt: '80000 / 17000 = 4.71 months',
+          excerpt: '80000 / 17000 = 4.71 months × 30 = 141 days',
         },
       },
     })
@@ -224,7 +224,7 @@ describe('financial data read service helpers', () => {
         sourceLabel:
           'summary.csv (working-capital-adjusted runway calculated)',
         evidence: {
-          excerpt: '(80000 + 16000 - 14000) / 17000 = 4.82 months',
+          excerpt: '(80000 + 16000 - 14000) / 17000 = 4.82 months × 30 = 144 days',
         },
       },
     })

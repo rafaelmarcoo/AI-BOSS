@@ -59,11 +59,40 @@ describe('calculateRunway', () => {
       const result = calculateRunway({ cash: 100000, ar: 0, ap: 0, burn: 10000 })
 
       expect(result.calculation_breakdown.formula).toBe(
-        '100000 / 10000 = 10 months'
+        '100000 / 10000 = 10 months × 30 = 300 days'
       )
       expect(result.calculation_breakdown.workingCapitalAdjustedFormula).toBe(
-        '(100000 + 0 - 0) / 10000 = 10 months'
+        '(100000 + 0 - 0) / 10000 = 10 months × 30 = 300 days'
       )
+    })
+  })
+
+  describe('days', () => {
+    it('reports both runways in whole days alongside the month values', () => {
+      const result = calculateRunway({
+        cash: 500000,
+        ar: 50000,
+        ap: 20000,
+        burn: 30000,
+      })
+
+      // 16.67 × 30 = 500.1 and 17.67 × 30 = 530.1, both rounded down.
+      expect(result.cash_runway_days).toBe(500)
+      expect(result.working_capital_adjusted_runway_days).toBe(530)
+    })
+
+    it('derives days from the rounded month value so every surface agrees', () => {
+      // 30000 / 3300 is 9.0909… months; stored as 9.09, which is 272.7 days.
+      const result = calculateRunway({ cash: 30000, ar: 0, ap: 0, burn: 3300 })
+
+      expect(result.cash_runway_months).toBe(9.09)
+      expect(result.cash_runway_days).toBe(272)
+    })
+
+    it('keeps a negative adjusted runway negative in days', () => {
+      const result = calculateRunway({ cash: 10000, ar: 0, ap: 50000, burn: 10000 })
+
+      expect(result.working_capital_adjusted_runway_days).toBe(-120)
     })
   })
 

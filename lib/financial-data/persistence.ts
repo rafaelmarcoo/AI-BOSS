@@ -2,6 +2,7 @@ import { ApiError } from '@/lib/api/errors'
 import { mapObservationRowToMetric } from '@/lib/financial-data/observation-mapping'
 import { selectLatestFinancialMetricObservations } from '@/lib/financial-data/latest-observation'
 import { createAdminSupabaseClient } from '@/lib/supabase'
+import { requireCompanyAdmin } from '@/lib/companies'
 import type {
   AvailableFinancialMetricValue,
   FinancialMetricSet,
@@ -12,6 +13,7 @@ import type { FinancialMetricObservation } from '@/types/database'
 const FINANCIAL_METRIC_OBSERVATION_SELECT = `
   id,
   user_id,
+  company_id,
   connection_id,
   document_id,
   metric_key,
@@ -49,12 +51,13 @@ export async function deleteFinancialMetricObservationsForDocument(
   documentId: string,
   userId: string
 ) {
+  const company = await requireCompanyAdmin(userId)
   const supabase = createAdminSupabaseClient()
   const { error } = await supabase
     .from('financial_metric_observations')
     .delete()
     .eq('document_id', documentId)
-    .eq('user_id', userId)
+    .eq('company_id', company.id)
 
   if (error) {
     console.error('Failed to remove document-derived financial metrics.', error)
@@ -76,12 +79,14 @@ export async function saveFinancialMetricObservations({
 }: SaveFinancialMetricObservationsParams) {
   if (metrics.length === 0) return []
 
+  const company = await requireCompanyAdmin(userId)
   const supabase = createAdminSupabaseClient()
   const { data, error } = await supabase
     .from('financial_metric_observations')
     .insert(
       metrics.map((metric) => ({
         user_id: userId,
+        company_id: company.id,
         connection_id: connectionId,
         document_id: documentId,
         metric_key: metric.key,
@@ -132,11 +137,12 @@ export async function saveFinancialMetricObservation({
 }
 
 export async function listLatestFinancialMetricValues(userId: string) {
+  const company = await requireCompanyAdmin(userId)
   const supabase = createAdminSupabaseClient()
   const { data, error } = await supabase
     .from('financial_metric_observations')
     .select(FINANCIAL_METRIC_OBSERVATION_SELECT)
-    .eq('user_id', userId)
+    .eq('company_id', company.id)
     .order('metric_key', { ascending: true })
     .order('updated_at', { ascending: false })
 
@@ -160,6 +166,7 @@ export async function listLatestFinancialMetricValues(userId: string) {
 }
 
 export async function listFinancialMetricObservations(userId: string) {
+  const company = await requireCompanyAdmin(userId)
   const supabase = createAdminSupabaseClient()
   const rows: FinancialMetricObservation[] = []
   const pageSize = 1000
@@ -169,7 +176,7 @@ export async function listFinancialMetricObservations(userId: string) {
     const { data, error } = await supabase
       .from('financial_metric_observations')
       .select(FINANCIAL_METRIC_OBSERVATION_SELECT)
-      .eq('user_id', userId)
+      .eq('company_id', company.id)
       .order('updated_at', { ascending: false })
       .range(offset, offset + pageSize - 1)
 
@@ -198,11 +205,12 @@ export async function listFinancialMetricObservationsForDocuments(params: {
   const documentIds = [...new Set(params.documentIds)]
   if (documentIds.length === 0) return []
 
+  const company = await requireCompanyAdmin(params.userId)
   const supabase = createAdminSupabaseClient()
   const { data, error } = await supabase
     .from('financial_metric_observations')
     .select(FINANCIAL_METRIC_OBSERVATION_SELECT)
-    .eq('user_id', params.userId)
+    .eq('company_id', company.id)
     .in('document_id', documentIds)
     .order('as_of_date', { ascending: false, nullsFirst: false })
     .order('period_end', { ascending: false, nullsFirst: false })
@@ -225,6 +233,7 @@ export async function listFinancialMetricObservationHistory(params: {
   metricKey: FinancialMetricKey
   limit?: number | 'all'
 }) {
+  const company = await requireCompanyAdmin(params.userId)
   const supabase = createAdminSupabaseClient()
   const rows: FinancialMetricObservation[] = []
   const requestedLimit = params.limit ?? 6
@@ -235,7 +244,7 @@ export async function listFinancialMetricObservationHistory(params: {
     const baseQuery = supabase
       .from('financial_metric_observations')
       .select(FINANCIAL_METRIC_OBSERVATION_SELECT)
-      .eq('user_id', params.userId)
+      .eq('company_id', company.id)
       .eq('metric_key', params.metricKey)
       .order('as_of_date', { ascending: false, nullsFirst: false })
       .order('period_end', { ascending: false, nullsFirst: false })

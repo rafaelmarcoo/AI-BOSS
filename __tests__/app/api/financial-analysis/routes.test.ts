@@ -9,6 +9,7 @@ import {
   GET as getReport,
 } from '@/app/api/financial-analysis/[analysisRunId]/route'
 import { requireAuthenticatedUser } from '@/lib/auth'
+import { requireCompanyAdmin } from '@/lib/companies'
 import { listFinancialAnalysisBaselineOptions } from '@/lib/financial-analysis/baselines'
 import { runFinancialAnalysis } from '@/lib/financial-analysis/orchestrator'
 import { previewFinancialAnalysis } from '@/lib/financial-analysis/timeline'
@@ -20,6 +21,7 @@ import {
 } from '@/lib/financial-analysis/persistence'
 
 jest.mock('@/lib/auth', () => ({ requireAuthenticatedUser: jest.fn() }))
+jest.mock('@/lib/companies', () => ({ requireCompanyAdmin: jest.fn() }))
 jest.mock('@/lib/financial-analysis/baselines', () => ({
   listFinancialAnalysisBaselineOptions: jest.fn(),
 }))
@@ -38,6 +40,7 @@ jest.mock('@/lib/financial-analysis/persistence', () => ({
 }))
 
 const mockAuth = jest.mocked(requireAuthenticatedUser)
+const mockRequireCompanyAdmin = jest.mocked(requireCompanyAdmin)
 const mockBaselines = jest.mocked(listFinancialAnalysisBaselineOptions)
 const mockRun = jest.mocked(runFinancialAnalysis)
 const mockPreview = jest.mocked(previewFinancialAnalysis)
@@ -52,6 +55,11 @@ describe('financial analysis API routes', () => {
     mockAuth.mockResolvedValue({
       accessToken: 'token',
       user: { id: 'owner-1', email: 'owner@example.com' },
+    })
+    mockRequireCompanyAdmin.mockResolvedValue({
+      id: 'company-1',
+      name: 'Example Ltd',
+      userType: 'admin',
     })
   })
 

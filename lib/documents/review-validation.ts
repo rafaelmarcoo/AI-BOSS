@@ -1,5 +1,6 @@
 import { isFinancialMetricKey } from '@/lib/financial-data'
 import type {
+  DraftDocumentCandidateInput,
   ReviewedDocumentCandidateInput,
 } from '@/lib/documents/types'
 import type { ValidationResult } from '@/lib/api/validation'
@@ -69,6 +70,101 @@ export function validateReprocessDocumentPayload(
 export interface ConfirmDocumentPayload {
   extractionRunId: string
   candidates: ReviewedDocumentCandidateInput[]
+}
+
+export interface SaveDocumentReviewDraftPayload {
+  extractionRunId: string
+  candidates: DraftDocumentCandidateInput[]
+}
+
+export function validateSaveDocumentReviewDraftPayload(
+  payload: unknown
+): ValidationResult<SaveDocumentReviewDraftPayload> {
+  const details: Record<string, string> = {}
+  const input = isObject(payload) ? payload : {}
+  const extractionRunId = input.extractionRunId
+  const rawCandidates = input.candidates
+
+  if (typeof extractionRunId !== 'string' || !extractionRunId.trim()) {
+    details.extractionRunId = 'extractionRunId is required.'
+  }
+
+  if (!Array.isArray(rawCandidates) || rawCandidates.length === 0) {
+    details.candidates = 'candidates must contain every extracted candidate.'
+    return { success: false, details }
+  }
+
+  const candidates = rawCandidates.flatMap((rawCandidate, index) => {
+    const field = (name: string) => `candidates.${index}.${name}`
+    if (!isObject(rawCandidate)) {
+      details[`candidates.${index}`] = 'Each candidate review must be an object.'
+      return []
+    }
+
+    const candidateId = rawCandidate.candidateId
+    const decision = rawCandidate.decision
+    const metricKey = rawCandidate.metricKey ?? null
+    const value = rawCandidate.value ?? null
+    const currency = rawCandidate.currency ?? null
+    const reportingDate = rawCandidate.reportingDate ?? null
+
+    if (typeof candidateId !== 'string' || !candidateId.trim()) {
+      details[field('candidateId')] = 'candidateId is required.'
+    }
+    if (decision !== 'pending' && decision !== 'included' && decision !== 'excluded') {
+      details[field('decision')] = 'decision must be pending, included, or excluded.'
+    }
+    if (metricKey !== null && (typeof metricKey !== 'string' || !isFinancialMetricKey(metricKey))) {
+      details[field('metricKey')] = 'metricKey is not supported.'
+    }
+    if (value !== null && (typeof value !== 'number' || !Number.isFinite(value))) {
+      details[field('value')] = 'value must be a finite number.'
+    }
+    if (currency !== null && currency !== 'NZD' && currency !== 'AUD') {
+      details[field('currency')] = 'currency must be NZD or AUD.'
+    }
+    if (reportingDate !== null && (typeof reportingDate !== 'string' || !isIsoDate(reportingDate))) {
+      details[field('reportingDate')] = 'reportingDate must be a valid YYYY-MM-DD date.'
+    }
+
+    if (
+      typeof candidateId !== 'string' ||
+      !candidateId.trim() ||
+      (decision !== 'pending' && decision !== 'included' && decision !== 'excluded')
+    ) {
+      return []
+    }
+
+    return [{
+      candidateId: candidateId.trim(),
+      decision,
+      metricKey: typeof metricKey === 'string' && isFinancialMetricKey(metricKey) ? metricKey : null,
+      value: typeof value === 'number' && Number.isFinite(value) ? value : null,
+      currency: metricKey === 'runway_months'
+        ? null
+        : currency === 'NZD' || currency === 'AUD' ? currency : null,
+      reportingDate: typeof reportingDate === 'string' && isIsoDate(reportingDate) ? reportingDate : null,
+    } satisfies DraftDocumentCandidateInput]
+  })
+
+  const ids = candidates.map((candidate) => candidate.candidateId)
+  if (new Set(ids).size !== ids.length) {
+    details.candidates = 'Each candidate may be saved only once.'
+  }
+
+  if (
+    Object.keys(details).length > 0 ||
+    candidates.length !== rawCandidates.length ||
+    typeof extractionRunId !== 'string' ||
+    !extractionRunId.trim()
+  ) {
+    return { success: false, details }
+  }
+
+  return {
+    success: true,
+    data: { extractionRunId: extractionRunId.trim(), candidates },
+  }
 }
 
 export function validateConfirmDocumentPayload(

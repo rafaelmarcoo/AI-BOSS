@@ -19,7 +19,7 @@ export type UserType = 'admin' | 'employee'
 export type ConversationVisibility = 'private' | 'company' | 'admins'
 export type ScenarioVisibility = 'private' | 'company'
 export type ScenarioStatus = 'draft' | 'calculated'
-export type DocumentFileType = 'pdf' | 'csv' | 'xlsx'
+export type DocumentFileType = 'pdf' | 'csv' | 'xlsx' | 'image'
 export type DocumentProcessingStatus =
   | 'uploaded'
   | 'processing'
@@ -130,6 +130,7 @@ export interface ConversationMessage {
 export interface Document {
   id: string
   user_id: string
+  company_id: string | null
   conversation_id: string | null
   file_name: string
   file_type: DocumentFileType
@@ -259,6 +260,7 @@ export interface OAuthToken {
 export interface FinancialMetricObservation {
   id: string
   user_id: string
+  company_id: string | null
   connection_id: string | null
   document_id: string | null
   metric_key: FinancialMetricKey

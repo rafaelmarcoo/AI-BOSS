@@ -27,7 +27,7 @@ import type { DocumentSummary } from "@/lib/documents/types";
 import { getDocumentStatusPresentation } from "@/lib/documents/presentation";
 import { dashboardTokens } from "@/app/theme";
 
-type FileFilter = "all" | "pdf" | "csv" | "xlsx";
+type FileFilter = "all" | "pdf" | "csv" | "xlsx" | "image";
 type StatusFilter = "all" | DocumentSummary["status"];
 type SortOption = "newest" | "oldest" | "name";
 
@@ -136,7 +136,7 @@ export function DocumentsWorkspace() {
         <Stack spacing={0.5}>
           <Typography variant="h5" fontWeight={700} color="common.white">Documents</Typography>
           <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
-            Manage uploaded PDF, CSV and XLSX files and their calculation-ready data.
+            Manage uploaded PDF, CSV, XLSX and invoice image files and their calculation-ready data.
           </Typography>
         </Stack>
       </Stack>
@@ -151,7 +151,7 @@ export function DocumentsWorkspace() {
           slotProps={{ input: { startAdornment: <SearchRoundedIcon fontSize="small" sx={{ mr: 1, color: dashboardTokens.textMuted }} /> } }}
           sx={{ flex: 1, minWidth: 200, ...fieldStyles }}
         />
-        <FilterSelect label="File type" value={fileFilter} onChange={(value) => setFileFilter(value as FileFilter)} options={[["all", "All files"], ["pdf", "PDF"], ["csv", "CSV"], ["xlsx", "XLSX"]]} />
+        <FilterSelect label="File type" value={fileFilter} onChange={(value) => setFileFilter(value as FileFilter)} options={[["all", "All files"], ["pdf", "PDF"], ["csv", "CSV"], ["xlsx", "XLSX"], ["image", "Image"]]} />
         <FilterSelect label="Status" value={statusFilter} onChange={(value) => setStatusFilter(value as StatusFilter)} options={[["all", "All statuses"], ["uploaded", "Uploaded"], ["processing", "Processing"], ["ready", "Ready"], ["failed", "Failed"]]} />
         <FilterSelect label="Sort" value={sort} onChange={(value) => setSort(value as SortOption)} options={[["newest", "Newest first"], ["oldest", "Oldest first"], ["name", "Name A–Z"]]} />
       </Stack>
@@ -168,7 +168,7 @@ export function DocumentsWorkspace() {
             {documents.length === 0 ? "No documents uploaded yet" : "No documents match these filters"}
           </Typography>
           <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
-            Upload a PDF, CSV or XLSX from chat to add it to your workspace.
+            Upload a PDF, CSV, XLSX or invoice image from chat to add it to your workspace.
           </Typography>
         </Box>
       ) : (
@@ -198,7 +198,8 @@ export function DocumentsWorkspace() {
                         </Typography>
                       </Stack>
                       <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
-                        {document.conversation_id ? "Linked to a chat conversation" : "Workspace upload"}
+                        {document.access.isOwner ? "Uploaded by you" : `Uploaded by ${document.uploadedBy.label}`}
+                        {document.conversation_id ? " · Linked to a chat conversation" : " · Workspace upload"}
                       </Typography>
                       {document.error_message ? <Alert severity="error">{document.error_message}</Alert> : null}
                     </Stack>
@@ -209,11 +210,17 @@ export function DocumentsWorkspace() {
                       href={`/dashboard/documents/${encodeURIComponent(document.id)}`}
                       sx={{ borderRadius: 2, whiteSpace: "nowrap" }}
                     >
-                      {document.financial_review_status === "pending" ? "Review extracted data" : "View details"}
+                      {document.financial_review_status === "pending" && document.access.canConfirm
+                        ? "Review for approval"
+                        : document.financial_review_status === "pending"
+                          ? "Prepare review"
+                          : "View details"}
                     </Button>
-                    <Button color="error" startIcon={<DeleteOutlineRoundedIcon />} onClick={() => setDocumentToDelete(document)} sx={{ borderRadius: 2, px: 1.25 }}>
-                      Delete
-                    </Button>
+                    {document.access.canDelete ? (
+                      <Button color="error" startIcon={<DeleteOutlineRoundedIcon />} onClick={() => setDocumentToDelete(document)} sx={{ borderRadius: 2, px: 1.25 }}>
+                        Delete
+                      </Button>
+                    ) : null}
                   </Stack>
                 </Stack>
               </Box>

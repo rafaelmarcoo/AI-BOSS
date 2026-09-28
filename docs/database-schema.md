@@ -2,7 +2,7 @@
 
 **Database:** Supabase (PostgreSQL)  
 **Created:** March 22, 2025  
-**Last Updated:** September 16, 2026
+**Last Updated:** September 29, 2026
 
 ---
 
@@ -31,7 +31,10 @@ The database now consists of 17 main tables:
 
 ## Security
 
-**Row Level Security (RLS)** is enabled on all tables. Users can ONLY access their own data.
+**Row Level Security (RLS)** is enabled on all tables. Private records remain
+owner-scoped. Company financial documents may also be read by same-company
+administrators, and trusted company financial observations are restricted to
+same-company administrators.
 
 **Authentication:** Handled by Supabase Auth (JWT tokens)
 
@@ -236,9 +239,10 @@ Stores uploaded user files and their ingestion state.
 |--------|------|-------------|
 | id | UUID (PK) | Primary key |
 | user_id | UUID (FK) | References users(id) |
+| company_id | UUID (FK) | Company authorization boundary; nullable only for unmapped legacy rows |
 | conversation_id | UUID (FK) | Optional link to the conversation that uploaded/used the file |
 | file_name | TEXT | Original file name |
-| file_type | TEXT | `pdf`, `csv`, or `xlsx` |
+| file_type | TEXT | `pdf`, `csv`, `xlsx`, or `image` |
 | mime_type | TEXT | Uploaded MIME type |
 | storage_path | TEXT | Path in Supabase Storage |
 | status | TEXT | `uploaded`, `processing`, `ready`, `failed` |
@@ -251,16 +255,20 @@ Stores uploaded user files and their ingestion state.
 | updated_at | TIMESTAMP | Last processing/update time |
 
 **RLS Policies:**
-- Users can view, insert, update, and delete their own documents only
+- Uploaders can view their own documents.
+- Same-company administrators can view company documents for the approval queue.
+- New uploads must use the authenticated uploader and their current company.
+- Server-side mutations enforce uploader draft permissions and administrator confirmation/deletion permissions.
 
 **Indexes:**
 - `idx_documents_user_id` on user_id
 - `idx_documents_conversation_id` on conversation_id
 - `idx_documents_status` on status
 - `idx_documents_created_at` on created_at (DESC)
+- `idx_documents_company_review_created` on (company_id, financial_review_status, created_at DESC)
 
 **Deletion behaviour:**
-- The server-only `delete_owned_document_and_derived_metrics(document_id, user_id)` function removes a user's document and every financial metric observation derived from it in one database transaction. Its RAG chunks, extraction runs, and extraction candidates are removed by document foreign-key cascades. The file itself is removed from private Supabase Storage immediately before this transaction.
+- The server-only `delete_company_document_and_derived_metrics(document_id, requester_id)` function removes the document and all derived financial observations in one transaction. An uploader may delete their own unconfirmed document; a same-company administrator may also delete confirmed company documents. RAG chunks, extraction runs, and candidates are removed by foreign-key cascades. The private Storage object is removed immediately before the database transaction.
 
 ---
 
@@ -316,8 +324,9 @@ to supply calculation truth.
 | updated_at | TIMESTAMP | Last state update |
 
 **RLS and mutation boundary:**
-- Owners can view only their own extraction runs.
+- Uploaders and same-company administrators can view extraction runs and candidates.
 - Inserts and updates are server-only so worksheet/extractor audit evidence cannot be rewritten directly by a browser client.
+- Uploaders can save review drafts, but only same-company administrators can publish confirmed observations.
 - At most one run per document may have `confirmed` status.
 
 **Indexes:**
@@ -468,6 +477,7 @@ are published only from included candidates through `confirm_document_extraction
 |--------|------|-------------|
 | id | UUID (PK) | Primary key |
 | user_id | UUID (FK) | References users(id) |
+| company_id | UUID (FK) | Company authorization and calculation boundary; nullable only for legacy rows that could not be mapped |
 | connection_id | UUID (FK) | Optional source connection from data_connections |
 | document_id | UUID (FK) | Optional uploaded document source |
 | metric_key | TEXT | Canonical key: `cash`, `accounts_receivable`, `accounts_payable`, `monthly_revenue`, `monthly_expenses`, `burn_rate`, or `runway_months` |
@@ -485,7 +495,9 @@ are published only from included candidates through `confirm_document_extraction
 | updated_at | TIMESTAMP | Last update time |
 
 **RLS Policies:**
-- Users can view, insert, update, and delete their own metric observations only
+- Same-company administrators can view and mutate company observations.
+- Legacy rows without a company remain readable only by their original owner.
+- Application financial analysis, chat finance tools, and scenarios require an administrator before loading company observations.
 
 **Indexes:**
 - `idx_financial_metric_observations_user_metric_updated` on (user_id, metric_key, updated_at DESC)
@@ -493,6 +505,7 @@ are published only from included candidates through `confirm_document_extraction
 - `idx_financial_metric_observations_connection_id` on connection_id
 - `idx_financial_metric_observations_document_id` on document_id
 - `idx_financial_metric_observations_as_of_date` on as_of_date (DESC)
+- `idx_financial_metric_observations_company_metric_updated` on (company_id, metric_key, updated_at DESC)
 
 ---
 
@@ -640,6 +653,7 @@ conversations (1) ──< (many) conversation_messages
 users (1) ──< (many) policy_rules
 users (1) ──< (many) decision_log
 users (1) ──< (many) documents
+companies (1) ──< (many) documents
 documents (1) ──< (many) document_chunks
 documents (1) ──< (many) document_extraction_runs
 document_extraction_runs (1) ──< (many) document_extraction_candidates
@@ -647,6 +661,7 @@ users (1) ──< (many) data_connections
 data_connections (1) ──< (one) oauth_tokens
 users (1) ──< (many) oauth_connection_states
 users (1) ──< (many) financial_metric_observations
+companies (1) ──< (many) financial_metric_observations
 data_connections (1) ──< (many) financial_metric_observations
 documents (1) ──< (many) financial_metric_observations
 users (1) ──< (many) scenarios
@@ -683,6 +698,8 @@ All schema changes are tracked in `db/migrations/`:
 - `019_company_gen_ui_controls.sql` - Moves planning horizon to the admin-controlled company profile and adds worker-specific roles
 - `020_financial_analysis_runs.sql` - Adds immutable owner-private financial analysis snapshots and append-only owner-bound decision tests
 - `021_financial_analysis_timeline.sql` - Adds single/timeline selection metadata, selected source snapshots, and immutable reporting-period bounds to analysis runs
+- `022_company_financial_review.sql` - Adds company ownership to documents and trusted observations, an employee-to-admin review queue, admin-only publication, and company-aware document deletion
+- `023_document_image_support.sql` - Allows JPEG, PNG, and WebP invoice images in the document pipeline
 
 ---
 

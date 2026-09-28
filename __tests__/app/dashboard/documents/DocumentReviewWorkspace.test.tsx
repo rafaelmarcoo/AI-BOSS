@@ -11,6 +11,8 @@ jest.mock('next/navigation', () => ({
 const details = {
   document: {
     id: 'document-1',
+    user_id: 'user-1',
+    company_id: 'company-1',
     conversation_id: null,
     file_name: 'financials.csv',
     file_type: 'csv' as const,
@@ -22,6 +24,13 @@ const details = {
     error_message: null,
     created_at: '2026-08-28T00:00:00.000Z',
     updated_at: '2026-08-28T00:00:00.000Z',
+    uploadedBy: { id: 'user-1', label: 'Owner' },
+    access: {
+      isOwner: true,
+      canSaveDraft: true,
+      canConfirm: true,
+      canDelete: true,
+    },
   },
   extractionRun: {
     id: 'run-1',
@@ -128,7 +137,7 @@ describe('DocumentReviewWorkspace', () => {
     render(<DocumentReviewWorkspace documentId="document-1" />)
 
     const approval = await screen.findByRole('button', {
-      name: 'Use these values in AI-BOSS.',
+      name: 'Approve for company calculations',
     })
     expect(approval).toBeDisabled()
     expect(screen.getByText('1 include · 0 exclude · 0 undecided')).toBeInTheDocument()
@@ -170,7 +179,7 @@ describe('DocumentReviewWorkspace', () => {
     const value = screen.getByLabelText('Corrected value')
     fireEvent.change(value, { target: { value: '' } })
 
-    expect(screen.getByRole('button', { name: 'Use these values in AI-BOSS.' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Approve for company calculations' })).toBeDisabled()
     expect(screen.getByText(/candidate needs a valid metric/i)).toBeInTheDocument()
   })
 
@@ -248,7 +257,7 @@ describe('DocumentReviewWorkspace', () => {
       name: 'I reviewed these values against the original document.',
     }))
     const approval = screen.getByRole('button', {
-      name: 'Use these values in AI-BOSS.',
+      name: 'Approve for company calculations',
     })
     expect(approval).toBeEnabled()
     await user.click(approval)

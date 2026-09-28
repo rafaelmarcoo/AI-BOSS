@@ -11,6 +11,7 @@ describe('routeFinancialQuestion', () => {
     ['How has cash changed over the last 3 months?', 'historical_forecast'],
     ['Forecast the next 6 months of runway.', 'historical_forecast'],
     ['What if I hire someone for 5000 per month?', 'scenario'],
+    ['What if I hire a new contractor for 5000 NZD monthly recurring? What happens to cash? They bring in 7000 NZD monthly and start in June.', 'scenario'],
     ['Nothing, just firing someone earning NZD 80,000 annually.', 'scenario'],
     ['Cut our burn by 20%.', 'scenario'],
     ['How are we doing?', 'financial_position'],

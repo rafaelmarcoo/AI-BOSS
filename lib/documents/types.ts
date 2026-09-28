@@ -8,6 +8,8 @@ import type {
 export type DocumentSummary = Pick<
   Document,
   | 'id'
+  | 'user_id'
+  | 'company_id'
   | 'conversation_id'
   | 'file_name'
   | 'file_type'
@@ -19,7 +21,18 @@ export type DocumentSummary = Pick<
   | 'error_message'
   | 'created_at'
   | 'updated_at'
->
+> & {
+  uploadedBy: {
+    id: string
+    label: string
+  }
+  access: {
+    isOwner: boolean
+    canSaveDraft: boolean
+    canConfirm: boolean
+    canDelete: boolean
+  }
+}
 
 export interface DocumentsListResponse {
   documents: DocumentSummary[]
@@ -56,6 +69,13 @@ export interface PdfDocumentPreviewResponse {
   expiresAt: string
 }
 
+export interface ImageDocumentPreviewResponse {
+  type: 'image'
+  url: string
+  expiresAt: string
+  alt: string
+}
+
 export interface TabularDocumentPreviewResponse {
   type: 'table'
   sheetName: string
@@ -78,6 +98,7 @@ export interface TabularDocumentPreviewResponse {
 
 export type DocumentPreviewResponse =
   | PdfDocumentPreviewResponse
+  | ImageDocumentPreviewResponse
   | TabularDocumentPreviewResponse
 
 export interface ReprocessDocumentResponse {
@@ -89,9 +110,22 @@ export interface ConfirmDocumentResponse {
   financialReviewStatus: 'confirmed'
 }
 
+export interface SaveDocumentReviewDraftResponse {
+  saved: boolean
+}
+
 export interface ReviewedDocumentCandidateInput {
   candidateId: string
   decision: 'included' | 'excluded'
+  metricKey: FinancialMetricKey | null
+  value: number | null
+  currency: 'NZD' | 'AUD' | null
+  reportingDate: string | null
+}
+
+export interface DraftDocumentCandidateInput {
+  candidateId: string
+  decision: 'pending' | 'included' | 'excluded'
   metricKey: FinancialMetricKey | null
   value: number | null
   currency: 'NZD' | 'AUD' | null
@@ -186,4 +220,25 @@ export interface ParsedDocumentResult {
   csvData?: ParsedCsvData
   tabularData?: ParsedTabularData
   pdfPages?: ParsedPdfPage[]
+  imageExtraction?: ParsedImageExtraction
+}
+
+export interface ParsedInvoiceLineItem {
+  description: string
+  quantity: number | null
+  unit: string | null
+  unitPrice: number | null
+  lineTotal: number | null
+}
+
+export interface ParsedImageExtraction {
+  documentType: 'invoice' | 'receipt' | 'statement' | 'other'
+  supplier: string | null
+  invoiceNumber: string | null
+  invoiceDate: string | null
+  dueDate: string | null
+  currency: string | null
+  totalAmount: number | null
+  lineItems: ParsedInvoiceLineItem[]
+  transcription: string
 }

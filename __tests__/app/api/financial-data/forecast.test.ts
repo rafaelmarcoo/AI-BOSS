@@ -3,9 +3,11 @@
 import { NextRequest } from 'next/server'
 import { GET } from '@/app/api/financial-data/forecast/route'
 import { requireAuthenticatedUser } from '@/lib/auth'
+import { requireCompanyAdmin } from '@/lib/companies'
 import { readFinancialMetricForecastSeries } from '@/lib/financial-data/metric-forecast'
 
 jest.mock('@/lib/auth', () => ({ requireAuthenticatedUser: jest.fn() }))
+jest.mock('@/lib/companies', () => ({ requireCompanyAdmin: jest.fn() }))
 jest.mock('@/lib/financial-data/metric-forecast', () => ({
   FORECAST_HORIZONS: [3, 6],
   isForecastHorizon: (value: number) => value === 3 || value === 6,
@@ -17,6 +19,7 @@ jest.mock('@/lib/financial-data/metric-history', () => ({
 }))
 
 const mockRequireAuthenticatedUser = jest.mocked(requireAuthenticatedUser)
+const mockRequireCompanyAdmin = jest.mocked(requireCompanyAdmin)
 const mockReadFinancialMetricForecastSeries = jest.mocked(readFinancialMetricForecastSeries)
 
 describe('/api/financial-data/forecast', () => {
@@ -25,6 +28,11 @@ describe('/api/financial-data/forecast', () => {
     mockRequireAuthenticatedUser.mockResolvedValue({
       accessToken: 'token',
       user: { id: 'user-1', email: 'owner@example.com' },
+    })
+    mockRequireCompanyAdmin.mockResolvedValue({
+      id: 'company-1',
+      name: 'Example Ltd',
+      userType: 'admin',
     })
   })
 

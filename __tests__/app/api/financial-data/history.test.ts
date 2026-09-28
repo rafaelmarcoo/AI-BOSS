@@ -3,9 +3,11 @@
 import { NextRequest } from 'next/server'
 import { GET } from '@/app/api/financial-data/history/route'
 import { requireAuthenticatedUser } from '@/lib/auth'
+import { requireCompanyAdmin } from '@/lib/companies'
 import { readFinancialMetricHistorySeries } from '@/lib/financial-data/metric-history'
 
 jest.mock('@/lib/auth', () => ({ requireAuthenticatedUser: jest.fn() }))
+jest.mock('@/lib/companies', () => ({ requireCompanyAdmin: jest.fn() }))
 jest.mock('@/lib/financial-data/metric-history', () => ({
   HISTORICAL_METRIC_KEYS: ['cash', 'monthly_revenue', 'monthly_expenses', 'burn_rate', 'runway_months'],
   METRIC_HISTORY_RECORD_LIMITS: [12, 25, 50, 'all'],
@@ -13,6 +15,7 @@ jest.mock('@/lib/financial-data/metric-history', () => ({
 }))
 
 const mockRequireAuthenticatedUser = jest.mocked(requireAuthenticatedUser)
+const mockRequireCompanyAdmin = jest.mocked(requireCompanyAdmin)
 const mockReadFinancialMetricHistorySeries = jest.mocked(readFinancialMetricHistorySeries)
 
 describe('/api/financial-data/history', () => {
@@ -21,6 +24,11 @@ describe('/api/financial-data/history', () => {
     mockRequireAuthenticatedUser.mockResolvedValue({
       accessToken: 'token',
       user: { id: 'user-1', email: 'owner@example.com' },
+    })
+    mockRequireCompanyAdmin.mockResolvedValue({
+      id: 'company-1',
+      name: 'Example Ltd',
+      userType: 'admin',
     })
   })
 

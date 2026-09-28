@@ -12,6 +12,7 @@ function observation(params: {
   return {
     id: params.id,
     user_id: 'owner-1',
+    company_id: 'company-1',
     connection_id: null,
     document_id: params.documentId,
     metric_key: params.metricKey,

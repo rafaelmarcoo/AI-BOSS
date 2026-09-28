@@ -4,7 +4,13 @@ export const DOCUMENTS_STORAGE_BUCKET = 'documents'
 // storage and metadata flow before supporting larger ingestion workloads.
 export const MAX_DOCUMENT_SIZE_BYTES = 15 * 1024 * 1024
 
-export const SUPPORTED_DOCUMENT_TYPES = ['pdf', 'csv', 'xlsx'] as const
+export const SUPPORTED_DOCUMENT_TYPES = ['pdf', 'csv', 'xlsx', 'image'] as const
+
+export const IMAGE_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+] as const
 
 export const MAX_XLSX_WORKSHEETS = 25
 export const MAX_SELECTED_TABULAR_ROWS = 50_000

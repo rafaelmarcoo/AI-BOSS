@@ -4,7 +4,7 @@ import { handleRouteError, successResponse } from '@/lib/api/responses'
 import { assertValid, readJsonBody } from '@/lib/api/validation'
 import { requireAuthenticatedUser } from '@/lib/auth'
 import {
-  getDocumentById,
+  getAccessibleDocumentById,
   updateDocumentRecord,
 } from '@/lib/documents/persistence'
 import { processDocument } from '@/lib/documents/process'
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const { user } = await requireAuthenticatedUser(request)
     const { documentId } = await context.params
-    const document = await getDocumentById(documentId, user.id)
+    const document = await getAccessibleDocumentById(documentId, user.id)
     const payload = assertValid(
       validateReprocessDocumentPayload(await readJsonBody(request))
     )
@@ -45,13 +45,18 @@ export async function POST(request: NextRequest, context: RouteContext) {
       )
     }
 
-    const processingDocument = await updateDocumentRecord(document.id, user.id, {
-      status: 'processing',
-      error_message: null,
-    })
+    const processingDocument = await updateDocumentRecord(
+      document.id,
+      document.user_id,
+      {
+        status: 'processing',
+        error_message: null,
+      },
+      user.id
+    )
 
     after(async () => {
-      await processDocument(document.id, user.id, {
+      await processDocument(document.id, document.user_id, {
         selectedWorksheetNames: payload.selectedWorksheetNames,
       })
     })

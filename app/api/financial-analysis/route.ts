@@ -1,6 +1,7 @@
 import { ZodError } from 'zod'
 import { NextRequest } from 'next/server'
 import { requireAuthenticatedUser } from '@/lib/auth'
+import { requireCompanyAdmin } from '@/lib/companies'
 import { ApiError } from '@/lib/api/errors'
 import { handleRouteError, successResponse } from '@/lib/api/responses'
 import { readJsonBody } from '@/lib/api/validation'
@@ -13,6 +14,7 @@ import {
 export async function GET(request: NextRequest) {
   try {
     const { user } = await requireAuthenticatedUser(request)
+    await requireCompanyAdmin(user.id)
     const reports = await listFinancialAnalysisRuns(user.id)
     return successResponse({ reports })
   } catch (error) {
@@ -23,6 +25,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { user } = await requireAuthenticatedUser(request)
+    await requireCompanyAdmin(user.id)
     const run = await runFinancialAnalysis({
       userId: user.id,
       request: await readJsonBody(request),

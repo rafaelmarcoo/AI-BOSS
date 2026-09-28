@@ -48,8 +48,8 @@ select {
 
 @media print {
   @page {
-    size: A4 portrait;
-    margin: 12mm;
+    size: A4 landscape;
+    margin: 10mm;
   }
 
   :root {
@@ -135,6 +135,17 @@ select {
   .analysis-wide-table {
     table-layout: fixed;
     width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .analysis-wide-table .MuiTableRow-root {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .analysis-wide-table .MuiTableContainer-root,
+  .analysis-report .MuiTableContainer-root {
+    overflow: visible !important;
   }
 
   .analysis-wide-table .MuiTableCell-root {

@@ -8,6 +8,54 @@ const emptyResult = {
 } satisfies ParsedDocumentResult
 
 describe('document extraction candidates', () => {
+  it('keeps an invoice total neutral until an admin chooses its metric', () => {
+    const [candidate] = extractDocumentCandidates({
+      document: {
+        id: 'document-1',
+        file_name: 'invoice.png',
+        file_type: 'image',
+      },
+      parsedDocument: {
+        ...emptyResult,
+        imageExtraction: {
+          documentType: 'invoice',
+          supplier: 'Example Supplies',
+          invoiceNumber: 'INV-1042',
+          invoiceDate: '2026-09-28',
+          dueDate: '2026-10-20',
+          currency: 'NZD',
+          totalAmount: 460,
+          lineItems: [
+            {
+              description: 'Paper boxes',
+              quantity: 4,
+              unit: 'box',
+              unitPrice: 100,
+              lineTotal: 400,
+            },
+          ],
+          transcription: 'Invoice INV-1042 Total NZD 460',
+        },
+      },
+      extractedAt: '2026-09-29T00:00:00.000Z',
+    })
+
+    expect(candidate).toMatchObject({
+      metricKey: null,
+      value: 460,
+      currency: 'NZD',
+      reportingDate: '2026-09-28',
+      extractorVersion: 'openai_image_invoice_v1',
+      originalPayload: {
+        totalAmount: 460,
+        lineItems: [expect.objectContaining({ quantity: 4, lineTotal: 400 })],
+      },
+      warnings: [
+        expect.objectContaining({ code: 'metric_selection_required' }),
+      ],
+    })
+  })
+
   it('creates XLSX candidates with worksheet and source-row evidence', () => {
     const candidates = extractDocumentCandidates({
       document: {

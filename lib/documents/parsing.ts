@@ -1,7 +1,12 @@
 import { join } from 'node:path'
 
 import { ApiError } from '@/lib/api/errors'
-import { createPdfChunks, createTabularChunks } from '@/lib/documents/chunking'
+import {
+  createImageChunks,
+  createPdfChunks,
+  createTabularChunks,
+} from '@/lib/documents/chunking'
+import { extractImageDocument } from '@/lib/documents/image-extraction'
 import {
   parseCsvTabularData,
   parseXlsxTabularData,
@@ -154,7 +159,8 @@ function createTabularDocumentResult(params: {
 }
 
 export async function parseDocumentContent(
-  document: Pick<Document, 'id' | 'user_id' | 'file_type' | 'file_name'>,
+  document: Pick<Document, 'id' | 'user_id' | 'file_type' | 'file_name'> &
+    Partial<Pick<Document, 'mime_type'>>,
   fileBytes: Uint8Array,
   options: ParseDocumentOptions = {}
 ): Promise<ParsedDocumentResult> {
@@ -179,7 +185,51 @@ export async function parseDocumentContent(
     return parsePdfDocument(document, fileBytes)
   }
 
+  if (document.file_type === 'image') {
+    if (!document.mime_type) {
+      throw new ApiError(
+        400,
+        'BAD_REQUEST',
+        'An image MIME type is required for image extraction.'
+      )
+    }
+    return parseImageDocument(
+      { ...document, mime_type: document.mime_type },
+      fileBytes
+    )
+  }
+
   throw new ApiError(400, 'BAD_REQUEST', 'Unsupported document type.')
+}
+
+async function parseImageDocument(
+  document: Pick<Document, 'id' | 'user_id' | 'file_name' | 'mime_type'>,
+  fileBytes: Uint8Array
+): Promise<ParsedDocumentResult> {
+  const extraction = await extractImageDocument(fileBytes, document.mime_type)
+  const rawText = normalizeWhitespace(extraction.transcription)
+
+  if (!rawText) {
+    throw new ApiError(
+      400,
+      'BAD_REQUEST',
+      `No readable content was found in ${document.file_name}.`
+    )
+  }
+
+  return {
+    rawText,
+    metadata: {
+      sourceType: 'image',
+      imageExtraction: extraction,
+    },
+    chunks: createImageChunks({
+      documentId: document.id,
+      userId: document.user_id,
+      text: rawText,
+    }),
+    imageExtraction: extraction,
+  }
 }
 
 async function parsePdfDocument(

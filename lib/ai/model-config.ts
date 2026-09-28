@@ -1,5 +1,6 @@
 export const DEFAULT_CHAT_MODEL = 'gpt-5.6-luna'
 export const DEFAULT_UTILITY_MODEL = 'gpt-4o-mini-2024-07-18'
+export const DEFAULT_DOCUMENT_MODEL = DEFAULT_UTILITY_MODEL
 
 function modelFromEnvironment(value: string | undefined, fallback: string) {
   const configuredModel = value?.trim()
@@ -20,6 +21,12 @@ export const CHAT_MODEL = modelFromEnvironment(
 export const UTILITY_MODEL = modelFromEnvironment(
   process.env.OPENAI_UTILITY_MODEL,
   DEFAULT_UTILITY_MODEL
+)
+
+/** Vision-capable model used only to extract review candidates from images. */
+export const DOCUMENT_MODEL = modelFromEnvironment(
+  process.env.OPENAI_DOCUMENT_MODEL,
+  DEFAULT_DOCUMENT_MODEL
 )
 
 /**

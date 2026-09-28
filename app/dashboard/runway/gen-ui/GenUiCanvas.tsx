@@ -37,6 +37,7 @@ import {
   formatFinancialCurrency,
   isSupportedFinancialCurrency,
 } from "@/lib/financial-data/currency";
+import { formatRunwayDuration } from "@/lib/financial-data/runway-format";
 import { DataSourcesPanel } from "@/components/data-sources-panel";
 import {
   GEN_UI_WIDGET_CATALOG,
@@ -99,14 +100,6 @@ function formatCurrency(
   }
 
   return formatFinancialCurrency(value, currency);
-}
-
-function formatNumber(value: number | null | undefined, decimals = 1) {
-  if (value === null || value === undefined) {
-    return "-";
-  }
-
-  return value.toFixed(decimals);
 }
 
 function formatDate(date: string) {
@@ -386,7 +379,7 @@ function ScenarioComparisonWidgetView({
                   variant="body2"
                   sx={{ width: 74, textAlign: "right", color: "common.white" }}
                 >
-                  {formatNumber(row.runwayMonths)} mo
+                  {row.runwayMonths == null ? "Unavailable" : formatRunwayDuration(row.runwayMonths)}
                 </Typography>
               </Stack>
             </Box>
@@ -711,7 +704,9 @@ function RiskThresholdTimelineWidgetView({
             Cash runway
           </Typography>
           <Typography variant="body2" fontWeight={700} sx={{ color }}>
-            {formatNumber(widget.data.currentRunway)} months
+            {widget.data.currentRunway === null
+              ? "Unavailable"
+              : formatRunwayDuration(widget.data.currentRunway)}
           </Typography>
         </Stack>
         <Box
@@ -739,7 +734,7 @@ function RiskThresholdTimelineWidgetView({
             {widget.data.workingCapitalAdjustedRunway === null ||
             widget.data.workingCapitalAdjustedRunway === undefined
               ? "Unavailable"
-              : `${formatNumber(widget.data.workingCapitalAdjustedRunway)} months`}
+              : formatRunwayDuration(widget.data.workingCapitalAdjustedRunway)}
           </Typography>
         </Stack>
         <Box

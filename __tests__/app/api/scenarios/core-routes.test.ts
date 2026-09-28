@@ -4,15 +4,18 @@ import { NextRequest } from 'next/server'
 import { GET as getBaselines } from '@/app/api/scenarios/baselines/route'
 import { POST as analyse } from '@/app/api/scenarios/analyse/route'
 import { requireAuthenticatedUser } from '@/lib/auth'
+import { requireCompanyAdmin } from '@/lib/companies'
 import { analyseScenario, listScenarioBaselineOptions } from '@/lib/scenarios/service'
 
 jest.mock('@/lib/auth', () => ({ requireAuthenticatedUser: jest.fn() }))
+jest.mock('@/lib/companies', () => ({ requireCompanyAdmin: jest.fn() }))
 jest.mock('@/lib/scenarios/service', () => ({
   analyseScenario: jest.fn(),
   listScenarioBaselineOptions: jest.fn(),
 }))
 
 const mockRequireAuthenticatedUser = jest.mocked(requireAuthenticatedUser)
+const mockRequireCompanyAdmin = jest.mocked(requireCompanyAdmin)
 const mockAnalyseScenario = jest.mocked(analyseScenario)
 const mockListBaselines = jest.mocked(listScenarioBaselineOptions)
 
@@ -22,6 +25,11 @@ describe('scenario core API routes', () => {
     mockRequireAuthenticatedUser.mockResolvedValue({
       accessToken: 'token',
       user: { id: 'user-1', email: 'owner@example.com' },
+    })
+    mockRequireCompanyAdmin.mockResolvedValue({
+      id: 'company-1',
+      name: 'Example Ltd',
+      userType: 'admin',
     })
   })
 

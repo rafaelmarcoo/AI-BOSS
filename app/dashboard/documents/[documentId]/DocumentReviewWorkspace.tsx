@@ -151,6 +151,7 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
   const [loading, setLoading] = useState(true);
   const [previewLoading, setPreviewLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -245,11 +246,18 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
 
   const canConfirm =
     reviewable &&
+    details?.document.access.canConfirm === true &&
     candidates.length > 0 &&
     summary.pending === 0 &&
     summary.invalid === 0 &&
     reviewAcknowledged &&
     !submitting;
+
+  const canSaveDraft =
+    reviewable &&
+    details?.document.access.canSaveDraft === true &&
+    candidates.length > 0 &&
+    !savingDraft;
 
   const updateEdit = (candidateId: string, updates: Partial<CandidateEdit>) => {
     setReviewAcknowledged(false);
@@ -322,6 +330,60 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
       setError(requestError instanceof Error ? requestError.message : "Could not confirm this review.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const saveDraft = async () => {
+    if (!details?.extractionRun || !canSaveDraft) return;
+    setSavingDraft(true);
+    setError(null);
+    setNotice(null);
+
+    const draftCandidates = candidates.map((candidate) => {
+      const edit = edits[candidate.id];
+      return {
+        candidateId: candidate.id,
+        decision: edit.decision,
+        metricKey: isFinancialMetricKey(edit.metricKey) ? edit.metricKey : null,
+        value:
+          edit.value.trim() !== "" && Number.isFinite(Number(edit.value))
+            ? Number(edit.value)
+            : null,
+        currency:
+          edit.metricKey !== "runway_months" &&
+          (edit.currency === "NZD" || edit.currency === "AUD")
+            ? edit.currency
+            : null,
+        reportingDate: isValidIsoDate(edit.reportingDate) ? edit.reportingDate : null,
+      };
+    });
+
+    try {
+      const response = await fetch(
+        `/api/documents/${encodeURIComponent(documentId)}/review`,
+        {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            extractionRunId: details.extractionRun.id,
+            candidates: draftCandidates,
+          }),
+        },
+      );
+      const payload = (await response.json()) as ApiEnvelope<{ saved: boolean }>;
+      if (!response.ok || !payload.success || !payload.data?.saved) {
+        throw new Error(payload.error?.message ?? "Could not save this review draft.");
+      }
+      setNotice(
+        details.document.access.canConfirm
+          ? "Review draft saved. It has not been published to company calculations."
+          : "Review draft saved for a company administrator to approve.",
+      );
+      await loadDetails(false);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Could not save this review draft.");
+    } finally {
+      setSavingDraft(false);
     }
   };
 
@@ -425,6 +487,11 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
           These included values are User-confirmed and available to dashboards, forecasts, scenarios, and deterministic tools.
         </Alert>
       ) : null}
+      {!confirmed && !details.document.access.canConfirm ? (
+        <Alert severity="info">
+          You can prepare and save this review. A company administrator must approve it before the values can be used in financial calculations.
+        </Alert>
+      ) : null}
 
       {details.document.file_type === "xlsx" && worksheets.length > 0 ? (
         <Paper variant="outlined" sx={panelStyles}>
@@ -477,7 +544,7 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
                   Valid candidates are preselected for convenience but remain unreviewed. Compare them with the original, correct any value, and explicitly confirm the final selection.
                 </Typography>
               </Stack>
-              {reviewable && candidates.length > 0 ? (
+              {reviewable && details.document.access.canSaveDraft && candidates.length > 0 ? (
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                   <Button variant="outlined" size="small" onClick={() => setAllCandidateDecisions("included_valid")}>
                     Include all valid
@@ -509,7 +576,7 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
                 candidate={candidate}
                 index={index}
                 edit={edits[candidate.id]}
-                readOnly={!reviewable}
+                readOnly={!reviewable || !details.document.access.canSaveDraft}
                 onChange={(updates) => updateEdit(candidate.id, updates)}
               />
             ))
@@ -536,7 +603,7 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
                 {summary.pending > 0 && reviewable ? (
                   <Alert severity="info">Choose Include or Exclude for every candidate.</Alert>
                 ) : null}
-                {reviewable ? (
+                {reviewable && details.document.access.canConfirm ? (
                   <FormControlLabel
                     control={(
                       <Checkbox
@@ -547,15 +614,27 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
                     label="I reviewed these values against the original document."
                   />
                 ) : null}
-                <Button
-                  fullWidth
-                  variant="contained"
-                  size="large"
-                  disabled={!canConfirm}
-                  onClick={() => void confirmReview()}
-                >
-                  {submitting ? "Confirming…" : confirmed ? "Values are User-confirmed" : "Use these values in AI-BOSS."}
-                </Button>
+                {reviewable && details.document.access.canSaveDraft ? (
+                  <Button
+                    fullWidth
+                    variant={details.document.access.canConfirm ? "outlined" : "contained"}
+                    disabled={!canSaveDraft}
+                    onClick={() => void saveDraft()}
+                  >
+                    {savingDraft ? "Saving…" : "Save review draft"}
+                  </Button>
+                ) : null}
+                {details.document.access.canConfirm ? (
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    size="large"
+                    disabled={!canConfirm}
+                    onClick={() => void confirmReview()}
+                  >
+                    {submitting ? "Confirming…" : confirmed ? "Values are User-confirmed" : "Approve for company calculations"}
+                  </Button>
+                ) : null}
                 <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
                   Until approval, extracted candidates are unreviewed evidence and cannot be used in calculations.
                 </Typography>
@@ -640,6 +719,22 @@ function OriginalPreview({
             src={preview.url}
             title="Original PDF preview"
             sx={{ width: "100%", minHeight: { xs: 520, md: 720 }, border: "1px solid", borderColor: dashboardTokens.border, borderRadius: 1.5, bgcolor: "white" }}
+          />
+        ) : preview?.type === "image" ? (
+          <Box
+            component="img"
+            src={preview.url}
+            alt={preview.alt}
+            sx={{
+              display: "block",
+              width: "100%",
+              maxHeight: { xs: 620, lg: "calc(100vh - 220px)" },
+              objectFit: "contain",
+              border: "1px solid",
+              borderColor: dashboardTokens.border,
+              borderRadius: 1.5,
+              bgcolor: "white",
+            }}
           />
         ) : preview?.type === "table" ? (
           <>

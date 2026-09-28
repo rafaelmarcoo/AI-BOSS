@@ -4,6 +4,8 @@ import type { DocumentSummary } from '@/lib/documents/types'
 function document(overrides: Partial<DocumentSummary> = {}): DocumentSummary {
   return {
     id: 'document-1',
+    user_id: 'user-1',
+    company_id: 'company-1',
     conversation_id: null,
     file_name: 'statement.pdf',
     file_type: 'pdf',
@@ -15,6 +17,13 @@ function document(overrides: Partial<DocumentSummary> = {}): DocumentSummary {
     error_message: null,
     created_at: '2026-08-28T00:00:00.000Z',
     updated_at: '2026-08-28T00:00:00.000Z',
+    uploadedBy: { id: 'user-1', label: 'Owner' },
+    access: {
+      isOwner: true,
+      canSaveDraft: true,
+      canConfirm: true,
+      canDelete: true,
+    },
     ...overrides,
   }
 }

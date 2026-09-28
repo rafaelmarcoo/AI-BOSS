@@ -10,6 +10,7 @@ function observation(
   return {
     id,
     user_id: 'user-1',
+    company_id: 'company-1',
     connection_id: null,
     document_id: 'document-1',
     metric_key: metricKey,

@@ -4,10 +4,13 @@ import {
 } from '@/lib/documents/review'
 import { getLatestDocumentExtractionReview } from '@/lib/documents/extraction-review-persistence'
 import {
-  createPdfDocumentPreviewUrl,
+  createDocumentPreviewUrl,
   downloadDocumentFile,
-  getDocumentById,
+  getAccessibleDocumentById,
+  toDocumentSummary,
 } from '@/lib/documents/persistence'
+import { getUserCompany } from '@/lib/companies'
+import { createAdminSupabaseClient } from '@/lib/supabase'
 import type { Document } from '@/types/database'
 
 jest.mock('@/lib/documents/extraction-review-persistence', () => ({
@@ -15,24 +18,32 @@ jest.mock('@/lib/documents/extraction-review-persistence', () => ({
 }))
 
 jest.mock('@/lib/documents/persistence', () => ({
-  createPdfDocumentPreviewUrl: jest.fn(),
+  createDocumentPreviewUrl: jest.fn(),
   downloadDocumentFile: jest.fn(),
-  getDocumentById: jest.fn(),
+  getAccessibleDocumentById: jest.fn(),
+  toDocumentSummary: jest.fn(),
 }))
+
+jest.mock('@/lib/companies', () => ({ getUserCompany: jest.fn() }))
+jest.mock('@/lib/supabase', () => ({ createAdminSupabaseClient: jest.fn() }))
 
 const mockGetLatestDocumentExtractionReview = jest.mocked(
   getLatestDocumentExtractionReview
 )
-const mockCreatePdfDocumentPreviewUrl = jest.mocked(
-  createPdfDocumentPreviewUrl
+const mockCreateDocumentPreviewUrl = jest.mocked(
+  createDocumentPreviewUrl
 )
 const mockDownloadDocumentFile = jest.mocked(downloadDocumentFile)
-const mockGetDocumentById = jest.mocked(getDocumentById)
+const mockGetAccessibleDocumentById = jest.mocked(getAccessibleDocumentById)
+const mockToDocumentSummary = jest.mocked(toDocumentSummary)
+const mockGetUserCompany = jest.mocked(getUserCompany)
+const mockCreateAdminSupabaseClient = jest.mocked(createAdminSupabaseClient)
 
 function document(overrides: Partial<Document> = {}): Document {
   return {
     id: 'document-1',
     user_id: 'user-1',
+    company_id: 'company-1',
     conversation_id: null,
     file_name: 'financials.csv',
     file_type: 'csv',
@@ -53,7 +64,45 @@ function document(overrides: Partial<Document> = {}): Document {
 describe('document review service', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    mockGetDocumentById.mockResolvedValue(document())
+    mockGetAccessibleDocumentById.mockResolvedValue(document())
+    mockGetUserCompany.mockResolvedValue({
+      id: 'company-1',
+      name: 'Example Ltd',
+      userType: 'admin',
+    })
+    mockCreateAdminSupabaseClient.mockReturnValue({
+      from: jest.fn(() => ({
+        select: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        maybeSingle: jest.fn().mockResolvedValue({
+          data: { full_name: 'Owner', email: 'owner@example.com' },
+          error: null,
+        }),
+      })),
+    } as never)
+    mockToDocumentSummary.mockImplementation((value) => ({
+      id: value.id,
+      user_id: value.user_id,
+      company_id: value.company_id,
+      conversation_id: value.conversation_id,
+      file_name: value.file_name,
+      file_type: value.file_type,
+      mime_type: value.mime_type,
+      status: value.status,
+      financial_review_status: value.financial_review_status,
+      document_type: value.document_type,
+      metadata: value.metadata,
+      error_message: value.error_message,
+      created_at: value.created_at,
+      updated_at: value.updated_at,
+      uploadedBy: { id: value.user_id, label: 'Owner' },
+      access: {
+        isOwner: true,
+        canSaveDraft: true,
+        canConfirm: true,
+        canDelete: true,
+      },
+    }))
     mockGetLatestDocumentExtractionReview.mockResolvedValue({
       extractionRun: null,
       candidates: [],
@@ -63,7 +112,7 @@ describe('document review service', () => {
   it('returns owner-scoped details without storage paths or raw text', async () => {
     const details = await getDocumentDetails('document-1', 'user-1')
 
-    expect(mockGetDocumentById).toHaveBeenCalledWith('document-1', 'user-1')
+    expect(mockGetAccessibleDocumentById).toHaveBeenCalledWith('document-1', 'user-1')
     expect(details.document).not.toHaveProperty('storage_path')
     expect(details.document).not.toHaveProperty('raw_text')
     expect(JSON.stringify(details)).not.toContain('private-file.csv')
@@ -99,10 +148,10 @@ describe('document review service', () => {
   })
 
   it('returns only a short-lived signed URL for PDF preview', async () => {
-    mockGetDocumentById.mockResolvedValue(
+    mockGetAccessibleDocumentById.mockResolvedValue(
       document({ file_name: 'statement.pdf', file_type: 'pdf', mime_type: 'application/pdf' })
     )
-    mockCreatePdfDocumentPreviewUrl.mockResolvedValue({
+    mockCreateDocumentPreviewUrl.mockResolvedValue({
       url: 'https://example.test/signed-preview',
       expiresAt: '2026-08-28T00:05:00.000Z',
     })
@@ -119,7 +168,7 @@ describe('document review service', () => {
       url: 'https://example.test/signed-preview',
       expiresAt: '2026-08-28T00:05:00.000Z',
     })
-    expect(mockCreatePdfDocumentPreviewUrl).toHaveBeenCalledWith(
+    expect(mockCreateDocumentPreviewUrl).toHaveBeenCalledWith(
       'document-1',
       'user-1'
     )

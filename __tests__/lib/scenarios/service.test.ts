@@ -16,7 +16,7 @@ const mockGetFinancialAnalysisRun = jest.mocked(getFinancialAnalysisRun)
 
 function row(params: Partial<FinancialMetricObservation> & Pick<FinancialMetricObservation, 'id' | 'metric_key' | 'value'>): FinancialMetricObservation {
   return {
-    user_id: 'user-1', connection_id: null, document_id: 'doc-1', currency: 'NZD',
+    user_id: 'user-1', company_id: 'company-1', connection_id: null, document_id: 'doc-1', currency: 'NZD',
     period_start: null, period_end: null, as_of_date: '2026-05-31', source_type: 'document',
     source_label: 'statement.csv', confidence: 0.95, evidence: {}, raw_data: {},
     created_at: '2026-05-31T00:00:00Z', updated_at: '2026-05-31T00:00:00Z',

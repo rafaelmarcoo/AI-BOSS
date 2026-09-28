@@ -41,6 +41,10 @@ import {
   type CurrentRunwayResult,
 } from '@/lib/financial-analysis/report-presentation'
 import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
+import {
+  formatRunwayChange,
+  formatRunwayDuration,
+} from '@/lib/financial-data/runway-format'
 import type {
   FinancialAnalysisRunSummary,
   FinancialAnalysisRunView,
@@ -141,7 +145,7 @@ function formatComparisonValue(
   currency: 'NZD' | 'AUD'
 ) {
   return metricKey.endsWith('runway_months')
-    ? `${value.toFixed(1)} months`
+    ? formatRunwayDuration(value)
     : formatAmount(value, currency)
 }
 
@@ -152,7 +156,7 @@ function formatComparisonChange(
 ) {
   if (!change) return 'Unavailable'
   const value = metricKey.endsWith('runway_months')
-    ? `${change.absolute >= 0 ? '+' : ''}${change.absolute.toFixed(1)} months`
+    ? formatRunwayChange(change.absolute)
     : `${change.absolute >= 0 ? '+' : ''}${formatAmount(change.absolute, currency)}`
   return change.percentage === null
     ? `${value} · percentage unavailable`
@@ -167,6 +171,13 @@ function statusColor(status: string) {
     return dashboardTokens.warning
   }
   return dashboardTokens.textMuted
+}
+
+function formatEvidenceResolution(value: string) {
+  if (value === 'uncontested') return 'No conflicting values'
+  if (value === 'identical_duplicate') return 'Matching duplicate values'
+  if (value === 'user_selected') return 'Selected during review'
+  return value.replaceAll('_', ' ')
 }
 
 function Panel(props: { title: string; children: React.ReactNode }) {
@@ -351,8 +362,8 @@ export function ReportView({ report }: { report: FinancialAnalysisRunView }) {
       <Box id="analysis-position" className="analysis-report-section analysis-report-anchor" sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 2 }}>
         <MetricCard
           label="Current cash runway"
-          value={runway ? `${runway.cashRunwayMonths.toFixed(1)} months` : 'Unavailable'}
-          detail={runway ? `${formatAmount(runway.cash, currency)} cash at ${formatAmount(runway.monthlyBurnRate, currency)} monthly burn` : 'Compatible cash and burn-rate observations are required.'}
+          value={runway ? formatRunwayDuration(runway.cashRunwayMonths) : 'Unavailable'}
+          detail={runway ? `${formatAmount(runway.cash, currency)} cash at ${formatAmount(runway.monthlyBurnRate, currency)} monthly burn` : 'Compatible confirmed cash and burn-rate values are required.'}
           onViewEvidence={() => showEvidence({
             label: 'Current cash runway',
             metricKeys: ['cash', 'burn_rate'],
@@ -361,7 +372,7 @@ export function ReportView({ report }: { report: FinancialAnalysisRunView }) {
         <MetricCard
           label="Monthly operating balance"
           value={operatingBalance ? formatAmount(operatingBalance.operatingBalance, currency) : 'Unavailable'}
-          detail={operatingBalance ? `${formatAmount(operatingBalance.monthlyRevenue, currency)} revenue less ${formatAmount(operatingBalance.monthlyExpenses, currency)} expenses` : 'Compatible revenue and expense observations are required.'}
+          detail={operatingBalance ? `${formatAmount(operatingBalance.monthlyRevenue, currency)} revenue less ${formatAmount(operatingBalance.monthlyExpenses, currency)} expenses` : 'Compatible confirmed revenue and expense values are required.'}
           onViewEvidence={() => showEvidence({
             label: 'Monthly operating balance',
             metricKeys: ['monthly_revenue', 'monthly_expenses'],
@@ -370,7 +381,7 @@ export function ReportView({ report }: { report: FinancialAnalysisRunView }) {
         <MetricCard
           label="Receivables less payables"
           value={workingCapital ? formatAmount(workingCapital.netPosition, currency) : 'Unavailable'}
-          detail={workingCapital ? `${formatAmount(workingCapital.accountsReceivable, currency)} receivable and ${formatAmount(workingCapital.accountsPayable, currency)} payable` : 'Compatible receivable and payable observations are required.'}
+          detail={workingCapital ? `${formatAmount(workingCapital.accountsReceivable, currency)} receivable and ${formatAmount(workingCapital.accountsPayable, currency)} payable` : 'Compatible confirmed receivable and payable values are required.'}
           onViewEvidence={() => showEvidence({
             label: 'Receivables less payables',
             metricKeys: ['accounts_receivable', 'accounts_payable'],
@@ -616,7 +627,7 @@ export function ReportView({ report }: { report: FinancialAnalysisRunView }) {
                         <Chip
                           size="small"
                           variant="outlined"
-                          label={item.resolution.replaceAll('_', ' ')}
+                          label={formatEvidenceResolution(item.resolution)}
                           color={item.usedInCalculations ? 'default' : 'warning'}
                         />
                       </TableCell>
@@ -1043,12 +1054,12 @@ export function AnalysisWorkspace() {
         </Stack>
         {selectionMode === 'single' && selectedBaseline ? (
           <Typography variant="caption" sx={{ display: 'block', mt: 1.25, color: dashboardTokens.textSubtle }}>
-            {selectedBaseline.observationCount} observations · {selectedBaseline.availableMetricKeys.map((key) => METRIC_LABELS[key]).join(', ')}
+            {selectedBaseline.observationCount} confirmed financial records · {selectedBaseline.availableMetricKeys.map((key) => METRIC_LABELS[key]).join(', ')}
           </Typography>
         ) : null}
         {baselines.length === 0 ? (
           <Alert severity="info" sx={{ mt: 2 }}>
-            No verified financial observations are available. <Link href="/dashboard/documents">Review a financial document</Link> first.
+            No confirmed financial records are available. <Link href="/dashboard/documents">Review a financial document</Link> first.
           </Alert>
         ) : null}
       </Paper>

@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { ApiError } from '@/lib/api/errors'
 import { handleRouteError, successResponse } from '@/lib/api/responses'
 import { requireAuthenticatedUser } from '@/lib/auth'
+import { requireCompanyAdmin } from '@/lib/companies'
 import {
   HISTORICAL_METRIC_KEYS,
   METRIC_HISTORY_RECORD_LIMITS,
@@ -35,6 +36,7 @@ function parseRecordLimit(value: string | null): MetricHistoryRecordLimit | null
 export async function GET(request: NextRequest) {
   try {
     const { user } = await requireAuthenticatedUser(request)
+    await requireCompanyAdmin(user.id)
     const metricKey = request.nextUrl.searchParams.get('metricKey')
     const range = request.nextUrl.searchParams.get('range') ?? 'all'
     const currencyValue = request.nextUrl.searchParams.get('currency')

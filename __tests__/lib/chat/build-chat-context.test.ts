@@ -189,6 +189,7 @@ describe('buildChatContext', () => {
       {
         id: 'observation-march',
         user_id: 'user-123',
+        company_id: 'company-1',
         connection_id: null,
         document_id: 'document-1',
         metric_key: 'cash',
@@ -208,6 +209,7 @@ describe('buildChatContext', () => {
       {
         id: 'observation-april',
         user_id: 'user-123',
+        company_id: 'company-1',
         connection_id: null,
         document_id: 'document-1',
         metric_key: 'cash',
@@ -227,6 +229,7 @@ describe('buildChatContext', () => {
       {
         id: 'observation-may',
         user_id: 'user-123',
+        company_id: 'company-1',
         connection_id: null,
         document_id: 'document-1',
         metric_key: 'cash',

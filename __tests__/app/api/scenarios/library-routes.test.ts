@@ -5,6 +5,7 @@ import { GET as listScenarios, POST as createScenario } from '@/app/api/scenario
 import { DELETE, GET, PATCH } from '@/app/api/scenarios/[scenarioId]/route'
 import { POST as duplicateScenario } from '@/app/api/scenarios/[scenarioId]/duplicate/route'
 import { requireAuthenticatedUser } from '@/lib/auth'
+import { requireCompanyAdmin } from '@/lib/companies'
 import {
   createSavedScenario,
   deleteSavedScenario,
@@ -15,6 +16,7 @@ import {
 } from '@/lib/scenarios/persistence'
 
 jest.mock('@/lib/auth', () => ({ requireAuthenticatedUser: jest.fn() }))
+jest.mock('@/lib/companies', () => ({ requireCompanyAdmin: jest.fn() }))
 jest.mock('@/lib/scenarios/persistence', () => ({
   createSavedScenario: jest.fn(), deleteSavedScenario: jest.fn(),
   duplicateSavedScenario: jest.fn(), getSavedScenario: jest.fn(),
@@ -22,6 +24,7 @@ jest.mock('@/lib/scenarios/persistence', () => ({
 }))
 
 const mockAuth = jest.mocked(requireAuthenticatedUser)
+const mockRequireCompanyAdmin = jest.mocked(requireCompanyAdmin)
 const mocks = {
   create: jest.mocked(createSavedScenario), delete: jest.mocked(deleteSavedScenario),
   duplicate: jest.mocked(duplicateSavedScenario), get: jest.mocked(getSavedScenario),
@@ -33,6 +36,7 @@ describe('saved scenario API routes', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockAuth.mockResolvedValue({ accessToken: 'token', user: { id: 'user-1', email: 'owner@example.com' } })
+    mockRequireCompanyAdmin.mockResolvedValue({ id: 'company-1', name: 'Example Ltd', userType: 'admin' })
   })
 
   it('lists and creates scenarios for the authenticated user', async () => {

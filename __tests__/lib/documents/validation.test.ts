@@ -38,6 +38,21 @@ describe('document upload validation', () => {
     })
   })
 
+  it('accepts a supported invoice image and rejects a mismatched image type', () => {
+    const image = new File(['invoice'], 'invoice.png', { type: 'image/png' })
+    const mismatch = new File(['invoice'], 'invoice.png', {
+      type: 'image/jpeg',
+    })
+
+    expect(validateDocumentUpload(image)).toMatchObject({
+      file: image,
+      fileType: 'image',
+    })
+    expect(() => validateDocumentUpload(mismatch)).toThrow(
+      'Only PDF, CSV, XLSX, JPEG, PNG, and WebP uploads are supported.'
+    )
+  })
+
   it('does not treat legacy xls files as csv based on a broad MIME type', () => {
     const file = new File(['legacy'], 'forecast.xls', {
       type: 'application/vnd.ms-excel',
@@ -53,7 +68,7 @@ describe('document upload validation', () => {
 
     expect(() => validateDocumentUpload(file)).toThrow(ApiError)
     expect(() => validateDocumentUpload(file)).toThrow(
-      'Only PDF, CSV, and XLSX uploads are supported.'
+      'Only PDF, CSV, XLSX, JPEG, PNG, and WebP uploads are supported.'
     )
   })
 

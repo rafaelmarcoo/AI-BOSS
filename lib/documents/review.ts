@@ -3,10 +3,13 @@ import {
   getLatestDocumentExtractionReview,
 } from '@/lib/documents/extraction-review-persistence'
 import {
-  createPdfDocumentPreviewUrl,
+  createDocumentPreviewUrl,
   downloadDocumentFile,
-  getDocumentById,
+  getAccessibleDocumentById,
+  toDocumentSummary,
 } from '@/lib/documents/persistence'
+import { getUserCompany } from '@/lib/companies'
+import { createAdminSupabaseClient } from '@/lib/supabase'
 import {
   parseCsvTabularData,
   parseXlsxTabularData,
@@ -15,30 +18,11 @@ import type {
   DocumentDetailsResponse,
   DocumentPreviewResponse,
   DocumentReviewExtractionRun,
-  DocumentSummary,
 } from '@/lib/documents/types'
-import type { Document } from '@/types/database'
 
 export const DOCUMENT_PREVIEW_DEFAULT_PAGE_SIZE = 100
 export const DOCUMENT_PREVIEW_MAX_PAGE_SIZE = 100
 export const DOCUMENT_PREVIEW_MAX_COLUMNS = 50
-
-function toDocumentSummary(document: Document): DocumentSummary {
-  return {
-    id: document.id,
-    conversation_id: document.conversation_id,
-    file_name: document.file_name,
-    file_type: document.file_type,
-    mime_type: document.mime_type,
-    status: document.status,
-    financial_review_status: document.financial_review_status,
-    document_type: document.document_type,
-    metadata: document.metadata,
-    error_message: document.error_message,
-    created_at: document.created_at,
-    updated_at: document.updated_at,
-  }
-}
 
 function toReviewExtractionRun(
   run: Awaited<ReturnType<typeof getLatestDocumentExtractionReview>>['extractionRun']
@@ -67,11 +51,27 @@ export async function getDocumentDetails(
   documentId: string,
   userId: string
 ): Promise<DocumentDetailsResponse> {
-  const document = await getDocumentById(documentId, userId)
-  const review = await getLatestDocumentExtractionReview({ documentId, userId })
+  const document = await getAccessibleDocumentById(documentId, userId)
+  const company = await getUserCompany(userId)
+  const review = await getLatestDocumentExtractionReview({
+    documentId,
+    userId: document.user_id,
+  })
+
+  const supabase = createAdminSupabaseClient()
+  const { data: uploader } = await supabase
+    .from('users')
+    .select('full_name, email')
+    .eq('id', document.user_id)
+    .maybeSingle()
 
   return {
-    document: toDocumentSummary(document),
+    document: toDocumentSummary(
+      document,
+      userId,
+      company.userType,
+      uploader?.full_name?.trim() || uploader?.email || 'Company member'
+    ),
     extractionRun: toReviewExtractionRun(review.extractionRun),
     candidates: review.candidates,
   }
@@ -84,14 +84,19 @@ export async function getDocumentPreview(params: {
   pageSize: number
   sheetName?: string
 }): Promise<DocumentPreviewResponse> {
-  const document = await getDocumentById(params.documentId, params.userId)
+  const document = await getAccessibleDocumentById(
+    params.documentId,
+    params.userId
+  )
 
-  if (document.file_type === 'pdf') {
-    const preview = await createPdfDocumentPreviewUrl(
+  if (document.file_type === 'pdf' || document.file_type === 'image') {
+    const preview = await createDocumentPreviewUrl(
       params.documentId,
       params.userId
     )
-    return { type: 'pdf', ...preview }
+    return document.file_type === 'pdf'
+      ? { type: 'pdf', ...preview }
+      : { type: 'image', ...preview, alt: document.file_name }
   }
 
   const fileBytes = await downloadDocumentFile(document.storage_path)
@@ -99,7 +104,7 @@ export async function getDocumentPreview(params: {
     document.file_type === 'xlsx'
       ? await getLatestDocumentExtractionReview({
           documentId: params.documentId,
-          userId: params.userId,
+          userId: document.user_id,
         })
       : null
   const selectedSheetName =
@@ -150,5 +155,3 @@ export async function getDocumentPreview(params: {
     warnings: sheet.warnings,
   }
 }
-
-export { toDocumentSummary }

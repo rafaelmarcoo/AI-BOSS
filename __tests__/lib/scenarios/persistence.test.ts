@@ -42,7 +42,7 @@ const frozenAnalysisSaved: SavedScenario = {
 
 function observation(metric_key: FinancialMetricObservation['metric_key'], id: string, updated_at: string): FinancialMetricObservation {
   return {
-    id, user_id: 'owner-1', connection_id: null, document_id: 'doc-1', metric_key, value: 100000,
+    id, user_id: 'owner-1', company_id: 'company-1', connection_id: null, document_id: 'doc-1', metric_key, value: 100000,
     currency: 'NZD', period_start: null, period_end: null, as_of_date: '2026-05-31', source_type: 'document',
     source_label: 'statement.csv', confidence: 0.95, evidence: {}, raw_data: {}, created_at: updated_at, updated_at,
   }

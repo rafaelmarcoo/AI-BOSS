@@ -59,6 +59,8 @@ describe('processDocument', () => {
     mockReplaceDocumentChunks.mockResolvedValue([])
     mockUpdateDocumentRecord.mockResolvedValue({
       id: 'document-123',
+      user_id: 'user-123',
+      company_id: 'company-1',
       conversation_id: null,
       file_name: 'summary.csv',
       file_type: 'csv',
@@ -70,6 +72,13 @@ describe('processDocument', () => {
       error_message: null,
       created_at: '2026-05-12T00:00:00.000Z',
       updated_at: '2026-05-12T00:00:00.000Z',
+      uploadedBy: { id: 'user-123', label: 'Owner' },
+      access: {
+        isOwner: true,
+        canSaveDraft: true,
+        canConfirm: true,
+        canDelete: true,
+      },
     })
     mockLogDocumentIngestion.mockResolvedValue(undefined)
     mockEmbedDocumentChunks.mockImplementation(async (chunks) =>
@@ -105,6 +114,7 @@ describe('processDocument', () => {
     mockGetDocumentById.mockResolvedValue({
       id: 'document-123',
       user_id: 'user-123',
+      company_id: 'company-1',
       conversation_id: null,
       file_name: 'summary.csv',
       file_type: 'csv',
@@ -170,6 +180,7 @@ describe('processDocument', () => {
   it('records failure without deleting previously approved observations or the original', async () => {
     mockGetDocumentById.mockResolvedValue({
       id: 'document-123', user_id: 'user-123', conversation_id: null,
+      company_id: 'company-1',
       file_name: 'summary.csv', file_type: 'csv', mime_type: 'text/csv',
       storage_path: 'user-123/summary.csv', status: 'processing', document_type: null,
       financial_review_status: 'legacy',
@@ -201,6 +212,7 @@ describe('processDocument', () => {
   it('marks a new document as not required when no financial candidates are found', async () => {
     mockGetDocumentById.mockResolvedValue({
       id: 'document-123', user_id: 'user-123', conversation_id: null,
+      company_id: 'company-1',
       file_name: 'notes.csv', file_type: 'csv', mime_type: 'text/csv',
       storage_path: 'user-123/notes.csv', status: 'processing', document_type: null,
       financial_review_status: 'pending',

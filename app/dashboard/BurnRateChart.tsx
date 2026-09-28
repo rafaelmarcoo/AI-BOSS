@@ -18,6 +18,7 @@ import {
   Typography,
 } from "@mui/material";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import { formatRunwayDuration } from "@/lib/financial-data/runway-format";
 import {
   CartesianGrid,
   Legend,
@@ -99,7 +100,7 @@ type CurrencyFilter = "all" | SupportedFinancialCurrency;
 type RunwayPlotSelection = "both" | "cash" | "working_capital_adjusted";
 
 function formatValue(value: number, metricKey: HistoricalMetricKey, currency: string | null) {
-  if (metricKey === "runway_months") return `${value.toFixed(1)} mo`;
+  if (metricKey === "runway_months") return formatRunwayDuration(value);
   return isSupportedFinancialCurrency(currency)
     ? formatFinancialCurrency(value, currency)
     : "Currency not provided";
@@ -351,7 +352,7 @@ function RunwayComparisonPanel({
               <XAxis dataKey="date" stroke={dashboardTokens.textMuted} style={{ fontSize: "0.75rem" }} tickFormatter={formatAxisDate} label={{ value: "Reporting date", position: "insideBottom", offset: -18 }} />
               <YAxis width={64} stroke={dashboardTokens.textMuted} style={{ fontSize: "0.75rem" }} tickFormatter={(value) => Number(value).toFixed(1)} />
               <Legend verticalAlign="top" formatter={(value) => ({ cashActual: "Cash runway", adjustedActual: "Working-capital-adjusted runway", cashForecast: "Cash runway forecast", adjustedForecast: "Adjusted runway forecast" }[String(value)] ?? value)} />
-              <Tooltip contentStyle={{ backgroundColor: dashboardTokens.surfaceAlt, border: `1px solid ${dashboardTokens.border}`, borderRadius: 4, color: "white" }} labelFormatter={(value) => formatDate(String(value))} formatter={(value, name) => [`${Number(value).toFixed(2)} months`, ({ cashActual: "Cash runway", adjustedActual: "Working-capital-adjusted runway", cashForecast: "Cash runway forecast", adjustedForecast: "Adjusted runway forecast" }[String(name)] ?? name)]} />
+              <Tooltip contentStyle={{ backgroundColor: dashboardTokens.surfaceAlt, border: `1px solid ${dashboardTokens.border}`, borderRadius: 4, color: "white" }} labelFormatter={(value) => formatDate(String(value))} formatter={(value, name) => [formatRunwayDuration(Number(value)), ({ cashActual: "Cash runway", adjustedActual: "Working-capital-adjusted runway", cashForecast: "Cash runway forecast", adjustedForecast: "Adjusted runway forecast" }[String(name)] ?? name)]} />
               {cash ? <Line type="monotone" dataKey="cashActual" stroke="#4da6ff" strokeWidth={2} dot={{ fill: "#4da6ff", r: 4 }} connectNulls={false} /> : null}
               {adjusted ? <Line type="monotone" dataKey="adjustedActual" stroke="#22d3ee" strokeWidth={2} dot={{ fill: "#22d3ee", r: 4 }} connectNulls={false} /> : null}
               {mode === "forecast" && cash ? <Line type="monotone" dataKey="cashForecast" stroke="#4da6ff" strokeDasharray="6 4" strokeWidth={2} connectNulls={false} /> : null}
@@ -360,8 +361,8 @@ function RunwayComparisonPanel({
           </ResponsiveContainer>
         </Box>
         <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" }, gap: 1 }}>
-          {cash ? <Paper variant="outlined" sx={{ p: 1.25, bgcolor: "rgba(77,166,255,0.08)", borderColor: "rgba(77,166,255,0.28)" }}><Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>Latest cash runway</Typography><Typography fontWeight={700}>{latest(cash)?.toFixed(2) ?? "-"} months</Typography></Paper> : null}
-          {adjusted ? <Paper variant="outlined" sx={{ p: 1.25, bgcolor: "rgba(34,211,238,0.08)", borderColor: "rgba(34,211,238,0.28)" }}><Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>Latest working-capital-adjusted runway</Typography><Typography fontWeight={700}>{latest(adjusted)?.toFixed(2) ?? "-"} months</Typography></Paper> : null}
+          {cash ? <Paper variant="outlined" sx={{ p: 1.25, bgcolor: "rgba(77,166,255,0.08)", borderColor: "rgba(77,166,255,0.28)" }}><Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>Latest cash runway</Typography><Typography fontWeight={700}>{latest(cash) == null ? "-" : formatRunwayDuration(latest(cash)!)}</Typography></Paper> : null}
+          {adjusted ? <Paper variant="outlined" sx={{ p: 1.25, bgcolor: "rgba(34,211,238,0.08)", borderColor: "rgba(34,211,238,0.28)" }}><Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>Latest working-capital-adjusted runway</Typography><Typography fontWeight={700}>{latest(adjusted) == null ? "-" : formatRunwayDuration(latest(adjusted)!)}</Typography></Paper> : null}
         </Box>
         {!adjusted ? <Alert severity="info">Working-capital-adjusted runway is unavailable for this selection because there are not enough same-source, same-currency, same-date confirmed inputs.</Alert> : null}
         <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>Cash runway uses cash ÷ burn. Adjusted runway uses (cash + receivables − payables) ÷ burn. Missing adjusted dates are left as gaps.</Typography>

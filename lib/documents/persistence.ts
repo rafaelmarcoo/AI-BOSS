@@ -2,12 +2,15 @@ import { randomUUID } from 'crypto'
 import { ApiError } from '@/lib/api/errors'
 import { createAdminSupabaseClient } from '@/lib/supabase'
 import { DOCUMENTS_STORAGE_BUCKET } from '@/lib/documents/constants'
+import { getUserCompany } from '@/lib/companies'
 import type { Document, DocumentChunk, DocumentDeletionResult } from '@/types/database'
 import type { DocumentChunkInsert, DocumentSummary } from '@/lib/documents/types'
 import type { SupportedDocumentType } from '@/lib/documents/constants'
 
 const DOCUMENT_SUMMARY_SELECT = `
   id,
+  user_id,
+  company_id,
   conversation_id,
   file_name,
   file_type,
@@ -24,6 +27,7 @@ const DOCUMENT_SUMMARY_SELECT = `
 const DOCUMENT_FULL_SELECT = `
   id,
   user_id,
+  company_id,
   conversation_id,
   file_name,
   file_type,
@@ -47,6 +51,53 @@ function createStoragePath(userId: string, fileName: string) {
   return `${userId}/${randomUUID()}-${sanitizeFileName(fileName)}`
 }
 
+type DocumentSummaryRow = Pick<
+  Document,
+  | 'id'
+  | 'user_id'
+  | 'company_id'
+  | 'conversation_id'
+  | 'file_name'
+  | 'file_type'
+  | 'mime_type'
+  | 'status'
+  | 'financial_review_status'
+  | 'document_type'
+  | 'metadata'
+  | 'error_message'
+  | 'created_at'
+  | 'updated_at'
+>
+
+export function documentAccess(
+  document: Pick<Document, 'user_id' | 'financial_review_status'>,
+  requesterId: string,
+  requesterType: 'admin' | 'employee' | null
+) {
+  const isOwner = document.user_id === requesterId
+  const isAdmin = requesterType === 'admin'
+
+  return {
+    isOwner,
+    canSaveDraft: isOwner || isAdmin,
+    canConfirm: isAdmin,
+    canDelete: isAdmin || (isOwner && document.financial_review_status !== 'confirmed'),
+  }
+}
+
+export function toDocumentSummary(
+  row: DocumentSummaryRow,
+  requesterId: string,
+  requesterType: 'admin' | 'employee' | null,
+  uploaderLabel: string
+): DocumentSummary {
+  return {
+    ...row,
+    uploadedBy: { id: row.user_id, label: uploaderLabel },
+    access: documentAccess(row, requesterId, requesterType),
+  }
+}
+
 async function ensureDocumentsBucketExists() {
   const supabase = createAdminSupabaseClient()
   const bucketOptions = {
@@ -58,6 +109,9 @@ async function ensureDocumentsBucketExists() {
       'application/csv',
       'application/vnd.ms-excel',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'image/jpeg',
+      'image/png',
+      'image/webp',
     ],
   }
   const { data, error } = await supabase.storage.listBuckets()
@@ -113,17 +167,50 @@ async function ensureDocumentsBucketExists() {
 
 export async function listUserDocuments(userId: string) {
   const supabase = createAdminSupabaseClient()
-  const { data, error } = await supabase
+  const company = await getUserCompany(userId)
+  let query = supabase
     .from('documents')
     .select(DOCUMENT_SUMMARY_SELECT)
-    .eq('user_id', userId)
     .order('created_at', { ascending: false })
+
+  query = company.userType === 'admin'
+    ? query.eq('company_id', company.id)
+    : query.eq('user_id', userId)
+
+  const { data, error } = await query
 
   if (error) {
     throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to load documents.')
   }
 
-  return (data ?? []) as DocumentSummary[]
+  const rows = (data ?? []) as DocumentSummaryRow[]
+  const uploaderIds = [...new Set(rows.map((row) => row.user_id))]
+  const { data: uploaders, error: uploaderError } = uploaderIds.length === 0
+    ? { data: [], error: null }
+    : await supabase
+        .from('users')
+        .select('id, full_name, email')
+        .in('id', uploaderIds)
+
+  if (uploaderError) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to load document uploaders.')
+  }
+
+  const labels = new Map(
+    (uploaders ?? []).map((uploader) => [
+      uploader.id,
+      uploader.full_name?.trim() || uploader.email,
+    ])
+  )
+
+  return rows.map((row) =>
+    toDocumentSummary(
+      row,
+      userId,
+      company.userType,
+      labels.get(row.user_id) ?? 'Company member'
+    )
+  )
 }
 
 export async function uploadDocumentFile(params: {
@@ -181,16 +268,26 @@ export async function deleteDocumentFile(storagePath: string) {
  * the document, its RAG chunks, and any deterministic metrics extracted from it.
  */
 export async function deleteUserDocument(documentId: string, userId: string) {
-  const document = await getDocumentById(documentId, userId)
+  const document = await getAccessibleDocumentById(documentId, userId)
+  const company = await getUserCompany(userId)
+  const access = documentAccess(document, userId, company.userType)
+
+  if (!access.canDelete) {
+    throw new ApiError(
+      403,
+      'FORBIDDEN',
+      'Only a company administrator can delete a confirmed document.'
+    )
+  }
 
   await deleteDocumentFile(document.storage_path)
 
   const supabase = createAdminSupabaseClient()
   const { data, error } = await supabase.rpc(
-    'delete_owned_document_and_derived_metrics',
+    'delete_company_document_and_derived_metrics',
     {
       p_document_id: documentId,
-      p_user_id: userId,
+      p_requester_id: userId,
     }
   )
 
@@ -208,6 +305,8 @@ export async function deleteUserDocument(documentId: string, userId: string) {
 
 export async function createDocumentRecord(params: {
   userId: string
+  companyId: string
+  userType: 'admin' | 'employee' | null
   fileName: string
   fileType: SupportedDocumentType
   mimeType: string
@@ -219,6 +318,7 @@ export async function createDocumentRecord(params: {
     .from('documents')
     .insert({
       user_id: params.userId,
+      company_id: params.companyId,
       conversation_id: params.conversationId,
       file_name: params.fileName,
       file_type: params.fileType,
@@ -241,7 +341,12 @@ export async function createDocumentRecord(params: {
     )
   }
 
-  return data as DocumentSummary
+  return toDocumentSummary(
+    data as DocumentSummaryRow,
+    params.userId,
+    params.userType,
+    'You'
+  )
 }
 
 export async function getDocumentById(documentId: string, userId: string) {
@@ -260,9 +365,37 @@ export async function getDocumentById(documentId: string, userId: string) {
   return data as Document
 }
 
+export async function getAccessibleDocumentById(
+  documentId: string,
+  requesterId: string
+) {
+  const company = await getUserCompany(requesterId)
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase
+    .from('documents')
+    .select(DOCUMENT_FULL_SELECT)
+    .eq('id', documentId)
+    .single()
+
+  if (error || !data) {
+    throw new ApiError(404, 'NOT_FOUND', 'Document not found.')
+  }
+
+  const document = data as Document
+  const isOwner = document.user_id === requesterId
+  const isCompanyAdmin =
+    company.userType === 'admin' && document.company_id === company.id
+
+  if (!isOwner && !isCompanyAdmin) {
+    throw new ApiError(404, 'NOT_FOUND', 'Document not found.')
+  }
+
+  return document
+}
+
 export async function updateDocumentRecord(
   documentId: string,
-  userId: string,
+  ownerUserId: string,
   updates: Partial<
     Pick<
       Document,
@@ -272,14 +405,15 @@ export async function updateDocumentRecord(
       | 'metadata'
       | 'error_message'
     >
-  >
+  >,
+  requesterId = ownerUserId
 ) {
   const supabase = createAdminSupabaseClient()
   const { data, error } = await supabase
     .from('documents')
     .update(updates)
     .eq('id', documentId)
-    .eq('user_id', userId)
+    .eq('user_id', ownerUserId)
     .select(DOCUMENT_SUMMARY_SELECT)
     .single()
 
@@ -293,7 +427,13 @@ export async function updateDocumentRecord(
     )
   }
 
-  return data as DocumentSummary
+  const company = await getUserCompany(requesterId)
+  return toDocumentSummary(
+    data as DocumentSummaryRow,
+    requesterId,
+    company.userType,
+    'You'
+  )
 }
 
 export async function downloadDocumentFile(storagePath: string) {
@@ -313,18 +453,18 @@ export async function downloadDocumentFile(storagePath: string) {
   return new Uint8Array(await data.arrayBuffer())
 }
 
-export async function createPdfDocumentPreviewUrl(
+export async function createDocumentPreviewUrl(
   documentId: string,
-  userId: string,
+  requesterId: string,
   expiresInSeconds = 300
 ) {
-  const document = await getDocumentById(documentId, userId)
+  const document = await getAccessibleDocumentById(documentId, requesterId)
 
-  if (document.file_type !== 'pdf') {
+  if (document.file_type !== 'pdf' && document.file_type !== 'image') {
     throw new ApiError(
       400,
       'BAD_REQUEST',
-      'Signed preview URLs are available only for PDF documents.'
+      'Signed preview URLs are available only for PDF and image documents.'
     )
   }
 

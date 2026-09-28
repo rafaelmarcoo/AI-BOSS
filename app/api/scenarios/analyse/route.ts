@@ -3,12 +3,14 @@ import { NextRequest } from 'next/server'
 import { ApiError } from '@/lib/api/errors'
 import { handleRouteError, successResponse } from '@/lib/api/responses'
 import { requireAuthenticatedUser } from '@/lib/auth'
+import { requireCompanyAdmin } from '@/lib/companies'
 import { readJsonBody } from '@/lib/api/validation'
 import { analyseScenario } from '@/lib/scenarios/service'
 
 export async function POST(request: NextRequest) {
   try {
     const { user } = await requireAuthenticatedUser(request)
+    await requireCompanyAdmin(user.id)
     const result = await analyseScenario(user.id, await readJsonBody(request))
     return successResponse({ result })
   } catch (error) {

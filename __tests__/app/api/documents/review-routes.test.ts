@@ -5,19 +5,28 @@ import { GET as getDocument } from '@/app/api/documents/[documentId]/route'
 import { GET as getPreview } from '@/app/api/documents/[documentId]/preview/route'
 import { POST as reprocessDocument } from '@/app/api/documents/[documentId]/reprocess/route'
 import { POST as confirmDocument } from '@/app/api/documents/[documentId]/confirm/route'
+import { PATCH as saveDocumentReview } from '@/app/api/documents/[documentId]/review/route'
 import { requireAuthenticatedUser } from '@/lib/auth'
+import { requireCompanyAdmin } from '@/lib/companies'
 import {
   getDocumentDetails,
   getDocumentPreview,
 } from '@/lib/documents/review'
 import {
-  getDocumentById,
+  getAccessibleDocumentById,
   updateDocumentRecord,
 } from '@/lib/documents/persistence'
-import { confirmDocumentExtraction } from '@/lib/documents/extraction-review-persistence'
+import {
+  confirmDocumentExtraction,
+  saveDocumentExtractionReviewDraft,
+} from '@/lib/documents/extraction-review-persistence'
 
 jest.mock('@/lib/auth', () => ({
   requireAuthenticatedUser: jest.fn(),
+}))
+
+jest.mock('@/lib/companies', () => ({
+  requireCompanyAdmin: jest.fn(),
 }))
 
 jest.mock('@/lib/documents/review', () => ({
@@ -29,7 +38,7 @@ jest.mock('@/lib/documents/review', () => ({
 
 jest.mock('@/lib/documents/persistence', () => ({
   deleteUserDocument: jest.fn(),
-  getDocumentById: jest.fn(),
+  getAccessibleDocumentById: jest.fn(),
   updateDocumentRecord: jest.fn(),
 }))
 
@@ -39,14 +48,19 @@ jest.mock('@/lib/documents/process', () => ({
 
 jest.mock('@/lib/documents/extraction-review-persistence', () => ({
   confirmDocumentExtraction: jest.fn(),
+  saveDocumentExtractionReviewDraft: jest.fn(),
 }))
 
 const mockRequireAuthenticatedUser = jest.mocked(requireAuthenticatedUser)
+const mockRequireCompanyAdmin = jest.mocked(requireCompanyAdmin)
 const mockGetDocumentDetails = jest.mocked(getDocumentDetails)
 const mockGetDocumentPreview = jest.mocked(getDocumentPreview)
-const mockGetDocumentById = jest.mocked(getDocumentById)
+const mockGetAccessibleDocumentById = jest.mocked(getAccessibleDocumentById)
 const mockUpdateDocumentRecord = jest.mocked(updateDocumentRecord)
 const mockConfirmDocumentExtraction = jest.mocked(confirmDocumentExtraction)
+const mockSaveDocumentExtractionReviewDraft = jest.mocked(
+  saveDocumentExtractionReviewDraft
+)
 
 const context = {
   params: Promise.resolve({ documentId: 'document-1' }),
@@ -54,6 +68,8 @@ const context = {
 
 const summary = {
   id: 'document-1',
+  user_id: 'user-1',
+  company_id: 'company-1',
   conversation_id: null,
   file_name: 'financials.xlsx',
   file_type: 'xlsx' as const,
@@ -65,11 +81,17 @@ const summary = {
   error_message: null,
   created_at: '2026-08-28T00:00:00.000Z',
   updated_at: '2026-08-28T00:00:00.000Z',
+  uploadedBy: { id: 'user-1', label: 'Owner' },
+  access: {
+    isOwner: true,
+    canSaveDraft: true,
+    canConfirm: true,
+    canDelete: true,
+  },
 }
 
 const fullDocument = {
   ...summary,
-  user_id: 'user-1',
   storage_path: 'user-1/private.xlsx',
   raw_text: null,
 }
@@ -81,8 +103,14 @@ describe('document review routes', () => {
       accessToken: 'access-token',
       user: { id: 'user-1', email: 'owner@example.com' },
     })
-    mockGetDocumentById.mockResolvedValue(fullDocument)
+    mockRequireCompanyAdmin.mockResolvedValue({
+      id: 'company-1',
+      name: 'Example Ltd',
+      userType: 'admin',
+    })
+    mockGetAccessibleDocumentById.mockResolvedValue(fullDocument)
     mockUpdateDocumentRecord.mockResolvedValue(summary)
+    mockSaveDocumentExtractionReviewDraft.mockResolvedValue(true)
   })
 
   it('loads document details through the authenticated owner boundary', async () => {
@@ -149,11 +177,14 @@ describe('document review routes', () => {
     )
 
     expect(response.status).toBe(409)
-    expect(mockGetDocumentById).toHaveBeenCalledWith('document-1', 'user-1')
+    expect(mockGetAccessibleDocumentById).toHaveBeenCalledWith(
+      'document-1',
+      'user-1'
+    )
     expect(mockUpdateDocumentRecord).not.toHaveBeenCalled()
   })
 
-  it('confirms only after an ownership check and validated review payload', async () => {
+  it('confirms only after an admin and company-access check', async () => {
     mockConfirmDocumentExtraction.mockResolvedValue(1)
     const response = await confirmDocument(
       new NextRequest('http://localhost/api/documents/document-1/confirm', {
@@ -177,13 +208,60 @@ describe('document review routes', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(mockGetDocumentById).toHaveBeenCalledWith('document-1', 'user-1')
+    expect(mockRequireCompanyAdmin).toHaveBeenCalledWith('user-1')
+    expect(mockGetAccessibleDocumentById).toHaveBeenCalledWith(
+      'document-1',
+      'user-1'
+    )
     expect(mockConfirmDocumentExtraction).toHaveBeenCalledWith(
       expect.objectContaining({
         documentId: 'document-1',
-        userId: 'user-1',
+        ownerUserId: 'user-1',
+        reviewerUserId: 'user-1',
         extractionRunId: 'run-1',
       })
     )
+  })
+
+  it('lets a company member save a pending draft without confirming it', async () => {
+    const response = await saveDocumentReview(
+      new NextRequest('http://localhost/api/documents/document-1/review', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          extractionRunId: 'run-1',
+          candidates: [
+            {
+              candidateId: 'candidate-1',
+              decision: 'pending',
+              metricKey: null,
+              value: 100000,
+              currency: 'NZD',
+              reportingDate: null,
+            },
+          ],
+        }),
+        headers: { 'content-type': 'application/json' },
+      }),
+      context
+    )
+
+    expect(response.status).toBe(200)
+    expect(mockRequireCompanyAdmin).not.toHaveBeenCalled()
+    expect(mockSaveDocumentExtractionReviewDraft).toHaveBeenCalledWith({
+      documentId: 'document-1',
+      ownerUserId: 'user-1',
+      reviewerUserId: 'user-1',
+      extractionRunId: 'run-1',
+      candidates: [
+        {
+          candidateId: 'candidate-1',
+          decision: 'pending',
+          metricKey: null,
+          value: 100000,
+          currency: 'NZD',
+          reportingDate: null,
+        },
+      ],
+    })
   })
 })

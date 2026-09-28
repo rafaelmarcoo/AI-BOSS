@@ -1,6 +1,7 @@
 import { ApiError } from '@/lib/api/errors'
 import {
   MAX_DOCUMENT_SIZE_BYTES,
+  IMAGE_MIME_TYPES,
   SUPPORTED_DOCUMENT_TYPES,
   SupportedDocumentType,
 } from '@/lib/documents/constants'
@@ -14,6 +15,13 @@ const CSV_MIME_TYPES = [
 const XLSX_MIME_TYPES = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ]
+const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp']
+const IMAGE_MIME_BY_EXTENSION: Record<string, (typeof IMAGE_MIME_TYPES)[number]> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+}
 
 function getFileExtension(fileName: string) {
   const extension = fileName.split('.').pop()
@@ -28,6 +36,10 @@ function detectDocumentType(file: File): SupportedDocumentType | null {
   if (extension === 'pdf') return 'pdf'
   if (extension === 'csv') return 'csv'
   if (extension === 'xlsx') return 'xlsx'
+  if (
+    IMAGE_EXTENSIONS.includes(extension) &&
+    IMAGE_MIME_BY_EXTENSION[extension] === mimeType
+  ) return 'image'
 
   // A named file with an unsupported extension must not become supported only
   // because the browser supplied a broad or incorrect MIME type.
@@ -36,6 +48,9 @@ function detectDocumentType(file: File): SupportedDocumentType | null {
   if (PDF_MIME_TYPES.includes(mimeType)) return 'pdf'
   if (CSV_MIME_TYPES.includes(mimeType)) return 'csv'
   if (XLSX_MIME_TYPES.includes(mimeType)) return 'xlsx'
+  if (IMAGE_MIME_TYPES.includes(mimeType as (typeof IMAGE_MIME_TYPES)[number])) {
+    return 'image'
+  }
 
   return null
 }
@@ -84,7 +99,7 @@ export function validateDocumentUpload(
     throw new ApiError(
       400,
       'BAD_REQUEST',
-      'Only PDF, CSV, and XLSX uploads are supported.'
+      'Only PDF, CSV, XLSX, JPEG, PNG, and WebP uploads are supported.'
     )
   }
 

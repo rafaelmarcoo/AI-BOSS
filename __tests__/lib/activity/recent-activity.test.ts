@@ -17,6 +17,8 @@ describe('listRecentActivity', () => {
     mockListUserDocuments.mockResolvedValue([
       {
         id: 'document-1',
+        user_id: 'user-1',
+        company_id: 'company-1',
         conversation_id: null,
         file_name: 'cash.xlsx',
         file_type: 'xlsx',
@@ -28,6 +30,13 @@ describe('listRecentActivity', () => {
         error_message: null,
         created_at: '2026-08-27T00:00:00.000Z',
         updated_at: '2026-08-28T03:00:00.000Z',
+        uploadedBy: { id: 'user-1', label: 'Owner' },
+        access: {
+          isOwner: true,
+          canSaveDraft: true,
+          canConfirm: true,
+          canDelete: true,
+        },
       },
     ])
     mockListUserConversations.mockResolvedValue([

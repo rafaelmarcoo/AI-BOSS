@@ -1,6 +1,7 @@
 import { ZodError } from 'zod'
 import { NextRequest } from 'next/server'
 import { requireAuthenticatedUser } from '@/lib/auth'
+import { requireCompanyAdmin } from '@/lib/companies'
 import { ApiError } from '@/lib/api/errors'
 import { handleRouteError, successResponse } from '@/lib/api/responses'
 import { readJsonBody } from '@/lib/api/validation'
@@ -12,6 +13,7 @@ import {
 export async function POST(request: NextRequest) {
   try {
     const { user } = await requireAuthenticatedUser(request)
+    await requireCompanyAdmin(user.id)
     const previewRequest = FinancialAnalysisPreviewRequestSchema.parse(
       await readJsonBody(request)
     )

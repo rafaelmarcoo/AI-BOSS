@@ -11,6 +11,7 @@ import {
   formatFinancialCurrency,
   isSupportedFinancialCurrency,
 } from '@/lib/financial-data/currency'
+import { formatRunwayDuration } from '@/lib/financial-data/runway-format'
 
 const inputSchema = z.object({
   metricKey: z.enum(HISTORICAL_METRIC_KEYS).optional(),
@@ -22,7 +23,7 @@ const inputSchema = z.object({
 
 function formatValue(value: number, summary: MetricHistorySummary) {
   if (summary.metricKey === 'runway_months') {
-    return `${value.toFixed(1)} months`
+    return formatRunwayDuration(value)
   }
 
   if (isSupportedFinancialCurrency(summary.currency)) {

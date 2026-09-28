@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { handleRouteError, successResponse } from '@/lib/api/responses'
 import { requireAuthenticatedUser } from '@/lib/auth'
+import { requireCompanyAdmin } from '@/lib/companies'
 import {
   deleteSavedScenario,
   getSavedScenario,
@@ -14,6 +15,7 @@ interface RouteContext {
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { user } = await requireAuthenticatedUser(request)
+    await requireCompanyAdmin(user.id)
     const { scenarioId } = await context.params
     return successResponse({ scenario: await getSavedScenario(scenarioId, user.id) })
   } catch (error) {
@@ -24,6 +26,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     const { user } = await requireAuthenticatedUser(request)
+    await requireCompanyAdmin(user.id)
     const { scenarioId } = await context.params
     return successResponse({ scenario: await updateSavedScenario(scenarioId, user.id, await request.json()) })
   } catch (error) {
@@ -34,6 +37,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
     const { user } = await requireAuthenticatedUser(request)
+    await requireCompanyAdmin(user.id)
     const { scenarioId } = await context.params
     await deleteSavedScenario(scenarioId, user.id)
     return successResponse({ deleted: true, scenarioId })
@@ -41,4 +45,3 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     return handleRouteError(error)
   }
 }
-

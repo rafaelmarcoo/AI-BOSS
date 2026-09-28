@@ -78,6 +78,22 @@ export function createPdfChunks(params: {
   return chunks
 }
 
+export function createImageChunks(params: {
+  documentId: string
+  userId: string
+  text: string
+}) {
+  return splitTextIntoWindows(params.text).map((content, chunkIndex) => ({
+    document_id: params.documentId,
+    user_id: params.userId,
+    chunk_index: chunkIndex,
+    content,
+    source_page: null,
+    metadata: { source: 'image' },
+    embedding: null,
+  })) satisfies DocumentChunkInsert[]
+}
+
 export function createCsvChunks(params: {
   documentId: string
   userId: string

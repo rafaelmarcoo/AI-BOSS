@@ -9,6 +9,7 @@ const EXTRACTOR_VERSIONS = {
   csv: 'deterministic_csv_v2',
   xlsx: 'deterministic_xlsx_v1',
   pdf: 'deterministic_pdf_v1',
+  image: 'openai_image_invoice_v1',
 } as const
 
 function candidateWarnings(metric: AvailableFinancialMetricValue) {
@@ -112,6 +113,64 @@ export function extractDocumentCandidates(params: {
   parsedDocument: ParsedDocumentResult
   extractedAt: string
 }) {
+  if (params.document.file_type === 'image') {
+    const extraction = params.parsedDocument.imageExtraction
+    if (!extraction || extraction.totalAmount === null) return []
+
+    const currency =
+      extraction.currency === 'NZD' || extraction.currency === 'AUD'
+        ? extraction.currency
+        : null
+    const warnings: DocumentExtractionCandidateDraft['warnings'] = [
+      {
+        code: 'metric_selection_required',
+        message:
+          'Choose whether this total represents accounts payable or monthly expenses before including it.',
+      },
+    ]
+
+    if (!currency) {
+      warnings.push({
+        code: 'currency_missing',
+        message: 'Choose NZD or AUD before including this invoice total.',
+      })
+    }
+    if (!extraction.invoiceDate) {
+      warnings.push({
+        code: 'reporting_date_missing',
+        message: 'Add the invoice reporting date before including this total.',
+      })
+    }
+
+    return [{
+      originalPayload: {
+        documentType: extraction.documentType,
+        supplier: extraction.supplier,
+        invoiceNumber: extraction.invoiceNumber,
+        invoiceDate: extraction.invoiceDate,
+        dueDate: extraction.dueDate,
+        currency: extraction.currency,
+        totalAmount: extraction.totalAmount,
+        lineItems: extraction.lineItems,
+      },
+      metricKey: null,
+      value: extraction.totalAmount,
+      currency,
+      reportingDate: extraction.invoiceDate,
+      confidence: 0.7,
+      evidence: {
+        documentId: params.document.id,
+        sourceType: 'image',
+        supplier: extraction.supplier,
+        invoiceNumber: extraction.invoiceNumber,
+        excerpt: extraction.transcription.slice(0, 500),
+        lineItems: extraction.lineItems,
+      },
+      warnings,
+      extractorVersion: EXTRACTOR_VERSIONS.image,
+    } satisfies DocumentExtractionCandidateDraft]
+  }
+
   if (params.document.file_type === 'pdf') {
     const metrics = params.parsedDocument.pdfPages
       ? extractPdfFinancialMetrics({

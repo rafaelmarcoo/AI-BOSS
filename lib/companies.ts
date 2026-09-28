@@ -104,3 +104,17 @@ export async function getUserCompany(userId: string) {
     userType: profile.user_type as 'admin' | 'employee' | null,
   }
 }
+
+export async function requireCompanyAdmin(userId: string) {
+  const company = await getUserCompany(userId)
+
+  if (company.userType !== 'admin') {
+    throw new ApiError(
+      403,
+      'FORBIDDEN',
+      'Only a company administrator can access trusted company financial data.'
+    )
+  }
+
+  return company
+}

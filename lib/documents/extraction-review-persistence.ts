@@ -1,10 +1,12 @@
 import { ApiError } from '@/lib/api/errors'
 import type {
+  DraftDocumentCandidateInput,
   DocumentExtractionCandidateDraft,
   DocumentReviewCandidate,
   ReviewedDocumentCandidateInput,
 } from '@/lib/documents/types'
 import { createAdminSupabaseClient } from '@/lib/supabase'
+import { requireCompanyAdmin } from '@/lib/companies'
 import type { DocumentExtractionRun } from '@/types/database'
 import type { DocumentExtractionCandidate } from '@/types/database'
 
@@ -77,11 +79,25 @@ export async function listConfirmedDocumentExcludedCandidates(params: {
   const documentIds = [...new Set(params.documentIds)]
   if (documentIds.length === 0) return []
 
+  const company = await requireCompanyAdmin(params.userId)
   const supabase = createAdminSupabaseClient()
+  const { data: documents, error: documentError } = await supabase
+    .from('documents')
+    .select('id')
+    .eq('company_id', company.id)
+    .in('id', documentIds)
+
+  if (documentError || (documents ?? []).length !== documentIds.length) {
+    throw new ApiError(
+      403,
+      'FORBIDDEN',
+      'One or more documents are outside your company.'
+    )
+  }
+
   const { data: runs, error: runError } = await supabase
     .from('document_extraction_runs')
     .select('id, document_id')
-    .eq('user_id', params.userId)
     .eq('status', 'confirmed')
     .in('document_id', documentIds)
 
@@ -99,7 +115,6 @@ export async function listConfirmedDocumentExcludedCandidates(params: {
   const { data, error } = await supabase
     .from('document_extraction_candidates')
     .select(EXCLUDED_EXTRACTION_CANDIDATE_SELECT)
-    .eq('user_id', params.userId)
     .eq('decision', 'excluded')
     .in('document_id', documentIds)
     .in('extraction_run_id', extractionRunIds)
@@ -171,16 +186,17 @@ export async function getLatestDocumentExtractionReview(params: {
 
 export async function confirmDocumentExtraction(params: {
   documentId: string
-  userId: string
+  ownerUserId: string
+  reviewerUserId: string
   extractionRunId: string
   candidates: ReviewedDocumentCandidateInput[]
 }) {
   const supabase = createAdminSupabaseClient()
   const { data, error } = await supabase.rpc('confirm_document_extraction', {
     p_document_id: params.documentId,
-    p_user_id: params.userId,
+    p_user_id: params.ownerUserId,
     p_extraction_run_id: params.extractionRunId,
-    p_reviewer_id: params.userId,
+    p_reviewer_id: params.reviewerUserId,
     p_reviewed_candidates: params.candidates.map((candidate) => ({
       candidate_id: candidate.candidateId,
       decision: candidate.decision,
@@ -201,6 +217,44 @@ export async function confirmDocumentExtraction(params: {
   }
 
   return data
+}
+
+export async function saveDocumentExtractionReviewDraft(params: {
+  documentId: string
+  ownerUserId: string
+  reviewerUserId: string
+  extractionRunId: string
+  candidates: DraftDocumentCandidateInput[]
+}) {
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase.rpc(
+    'save_document_extraction_review_draft',
+    {
+      p_document_id: params.documentId,
+      p_user_id: params.ownerUserId,
+      p_extraction_run_id: params.extractionRunId,
+      p_reviewer_id: params.reviewerUserId,
+      p_reviewed_candidates: params.candidates.map((candidate) => ({
+        candidate_id: candidate.candidateId,
+        decision: candidate.decision,
+        metric_key: candidate.metricKey,
+        value: candidate.value,
+        currency: candidate.currency,
+        reporting_date: candidate.reportingDate,
+      })),
+    }
+  )
+
+  if (error || data !== true) {
+    throw new ApiError(
+      400,
+      'VALIDATION_ERROR',
+      'The document review draft could not be saved.',
+      error?.message
+    )
+  }
+
+  return true
 }
 
 export async function createDocumentExtractionRun(params: {

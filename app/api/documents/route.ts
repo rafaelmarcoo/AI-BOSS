@@ -18,6 +18,7 @@ import type {
   CreateDocumentResponse,
   DocumentsListResponse,
 } from '@/lib/documents/types'
+import { getUserCompany } from '@/lib/companies'
 
 export const runtime = 'nodejs'
 
@@ -37,6 +38,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { user } = await requireAuthenticatedUser(request)
+    const company = await getUserCompany(user.id)
     const formData = await request.formData()
     const { file, fileType } = validateDocumentUpload(formData.get('file'))
     const conversationId = readOptionalConversationId(
@@ -52,6 +54,8 @@ export async function POST(request: NextRequest) {
     try {
       const document = await createDocumentRecord({
         userId: user.id,
+        companyId: company.id,
+        userType: company.userType,
         fileName: file.name,
         fileType,
         mimeType: file.type || 'application/octet-stream',

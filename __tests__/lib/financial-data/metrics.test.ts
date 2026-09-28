@@ -100,6 +100,7 @@ describe('financial metric domain model', () => {
     const row: FinancialMetricObservation = {
       id: 'observation-123',
       user_id: 'user-123',
+      company_id: 'company-1',
       connection_id: null,
       document_id: 'document-123',
       metric_key: 'monthly_expenses',

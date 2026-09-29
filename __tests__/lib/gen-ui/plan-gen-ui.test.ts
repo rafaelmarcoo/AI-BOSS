@@ -193,9 +193,9 @@ describe('planGenUi', () => {
     expect(plan?.widgets).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          type: 'metric_snapshot',
+          type: 'cash_balance',
           title: 'Available cash',
-          data: { metrics: [expect.objectContaining({ key: 'cash' })] },
+          data: expect.objectContaining({ metricKey: 'cash', value: 120000 }),
         }),
         expect.objectContaining({
           type: 'metric_snapshot',
@@ -629,6 +629,110 @@ describe('planGenUi', () => {
     expect(plan?.widgets).toContainEqual(
       expect.objectContaining({ type: 'metric_forecast_chart' })
     )
+  })
+
+  it('uses the latest distinct revenue periods for deterministic revenue growth', async () => {
+    const metrics = fillUnavailableMetrics({
+      monthly_revenue: {
+        status: 'available', key: 'monthly_revenue', value: 150, currency: 'NZD',
+        periodStart: '2026-08-01', periodEnd: '2026-08-31', asOfDate: null,
+        provenance: { sourceType: 'document', sourceLabel: 'August.csv' },
+        confidence: 0.95, updatedAt: '2026-09-01T00:00:00.000Z',
+      },
+    })
+    mockReadSourceAwareMetrics.mockResolvedValue({
+      metrics,
+      availableMetricCount: 1,
+      unavailableMetricCount: 6,
+      runwayInput: null,
+      workingCapitalAdjustedRunway: metrics.runway_months,
+    })
+    mockReadFinancialMetricHistorySeries.mockResolvedValue({
+      metricKey: 'monthly_revenue', label: 'Monthly revenue', range: 'all',
+      recordLimit: 'all', selectedCurrency: null, selectedSourceKey: null,
+      availableCurrencies: ['NZD'], availableSources: [],
+      excludedCurrencyObservationCount: 0, hasMissingCurrencyObservations: false,
+      unsupportedCurrencies: [],
+      series: [{
+        metricKey: 'monthly_revenue', label: 'Monthly revenue', range: 'all',
+        points: [
+          { date: '2026-06-30', dateSource: 'period_end', value: 100, currency: 'NZD', sourceLabel: 'June.csv', sourceType: 'document', confidence: 0.95, updatedAt: '2026-07-01T00:00:00.000Z' },
+          { date: '2026-07-31', dateSource: 'period_end', value: 120, currency: 'NZD', sourceLabel: 'July.csv', sourceType: 'document', confidence: 0.95, updatedAt: '2026-08-01T00:00:00.000Z' },
+          { date: '2026-08-31', dateSource: 'period_end', value: 150, currency: 'NZD', sourceLabel: 'August.csv', sourceType: 'document', confidence: 0.95, updatedAt: '2026-09-01T00:00:00.000Z' },
+        ],
+        movement: 'increased', direction: 'improving', firstValue: 100,
+        latestValue: 150, totalChange: 50, percentageChange: 50,
+        averageChange: 25, currency: 'NZD',
+        sourceLabels: ['June.csv', 'July.csv', 'August.csv'],
+        hasMixedSources: true, hasRecordedDateFallback: false,
+        hasIncompatibleCurrencies: false, excludedCurrencyObservationCount: 0,
+        hasMissingCurrencyObservations: false, unsupportedCurrencies: [],
+      }],
+    } as never)
+    mockPlannerInvoke.mockResolvedValue({ widgets: [] })
+
+    const plan = await planGenUi({
+      userId: 'user-123',
+      userMessage: 'What is our month-on-month revenue growth?',
+      assistantMessage: 'Revenue grew in the latest period.',
+      toolsUsed: [],
+    })
+
+    expect(mockReadFinancialMetricHistorySeries).toHaveBeenCalledWith({
+      userId: 'user-123', metricKey: 'monthly_revenue', range: 'all', recordLimit: 'all',
+    })
+    expect(plan?.widgets).toContainEqual(expect.objectContaining({
+      type: 'revenue_growth',
+      data: expect.objectContaining({ previousValue: 120, currentValue: 150, growthPercentage: 25 }),
+    }))
+  })
+
+  it('builds the AI financial brief from verified metric facts', async () => {
+    const metrics = fillUnavailableMetrics({
+      cash: {
+        status: 'available', key: 'cash', value: 120000, currency: 'NZD',
+        periodStart: null, periodEnd: null, asOfDate: '2026-08-31',
+        provenance: { sourceType: 'document', sourceLabel: 'verified.csv' },
+        confidence: 0.95, updatedAt: '2026-09-01T00:00:00.000Z',
+      },
+      monthly_revenue: {
+        status: 'available', key: 'monthly_revenue', value: 80000, currency: 'NZD',
+        periodStart: '2026-08-01', periodEnd: '2026-08-31', asOfDate: null,
+        provenance: { sourceType: 'document', sourceLabel: 'verified.csv' },
+        confidence: 0.95, updatedAt: '2026-09-01T00:00:00.000Z',
+      },
+    })
+    mockReadSourceAwareMetrics.mockResolvedValue({
+      metrics,
+      availableMetricCount: 2,
+      unavailableMetricCount: 5,
+      runwayInput: null,
+      workingCapitalAdjustedRunway: metrics.runway_months,
+    })
+    mockPlannerInvoke.mockResolvedValue({
+      widgets: [{
+        widgetId: 'existing_data_ai_financial_brief',
+        title: 'Financial brief',
+        reason: 'A concise verified overview.',
+      }],
+    })
+
+    const plan = await planGenUi({
+      userId: 'user-123',
+      userMessage: 'Give me a financial health overview',
+      assistantMessage: 'Here is the verified overview.',
+      toolsUsed: [],
+    })
+
+    expect(plan?.widgets).toContainEqual(expect.objectContaining({
+      type: 'ai_financial_brief',
+      data: expect.objectContaining({
+        facts: expect.arrayContaining([
+          expect.objectContaining({ label: 'Cash balance', sourceLabel: 'verified.csv' }),
+          expect.objectContaining({ label: 'Monthly revenue', sourceLabel: 'verified.csv' }),
+        ]),
+      }),
+    }))
   })
 
   it('hydrates scenario UI from the exact validated tool result and ignores legacy model comparisons', async () => {

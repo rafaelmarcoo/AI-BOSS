@@ -23,6 +23,17 @@ import {
   ScenarioAnalysisWidgetView,
   ScenarioComparisonWidgetView,
 } from "./widgets/existing/ScenarioWidgets";
+import {
+  AccountsPayableWidgetView,
+  AccountsReceivableWidgetView,
+  AiFinancialBriefWidgetView,
+  CashBalanceWidgetView,
+  ExpenseSummaryWidgetView,
+  ExpenseTrendWidgetView,
+  RevenueGrowthWidgetView,
+  RevenueSnapshotWidgetView,
+  RevenueTrendWidgetView,
+} from "./widgets/existing-data/ExistingDataWidgets";
 
 export type GenUiRendererProps<Type extends GenUiWidgetType> =
   GenUiWidgetInteractionProps & {
@@ -45,4 +56,13 @@ export const GEN_UI_RENDERER_REGISTRY = {
   metric_source_evidence: MetricSourceEvidenceWidgetView,
   missing_data_panel: MissingDataPanelWidgetView,
   highlight_explainer: HighlightExplainerWidgetView,
+  cash_balance: CashBalanceWidgetView,
+  revenue_snapshot: RevenueSnapshotWidgetView,
+  revenue_trend: RevenueTrendWidgetView,
+  revenue_growth: RevenueGrowthWidgetView,
+  expense_summary: ExpenseSummaryWidgetView,
+  expense_trend: ExpenseTrendWidgetView,
+  accounts_receivable: AccountsReceivableWidgetView,
+  accounts_payable: AccountsPayableWidgetView,
+  ai_financial_brief: AiFinancialBriefWidgetView,
 } satisfies GenUiRendererRegistry;

@@ -152,6 +152,89 @@ const widgets: GenUiWidget[] = [
     type: 'highlight_explainer',
     data: { selectedText: 'Runway', prompt: 'Explain runway.' },
   },
+  {
+    ...base,
+    type: 'cash_balance',
+    data: {
+      metricKey: 'cash', label: 'Cash', value: 120000, currency: 'NZD',
+      reportingDate: '2026-08-31', periodStart: null, periodEnd: null,
+      sourceLabel: 'verified.csv', sourceType: 'document', confidence: 0.95,
+    },
+  },
+  {
+    ...base,
+    type: 'revenue_snapshot',
+    data: {
+      metricKey: 'monthly_revenue', label: 'Monthly revenue', value: 80000, currency: 'NZD',
+      reportingDate: '2026-08-31', periodStart: '2026-08-01', periodEnd: '2026-08-31',
+      sourceLabel: 'verified.csv', sourceType: 'document', confidence: 0.95,
+    },
+  },
+  {
+    ...base,
+    type: 'revenue_trend',
+    data: {
+      metricKey: 'monthly_revenue', label: 'Monthly revenue', currency: 'NZD',
+      points: [], direction: 'insufficient_data', change: null, percentageChange: null,
+      periodStart: null, periodEnd: null, note: 'No history yet.',
+    },
+  },
+  {
+    ...base,
+    type: 'revenue_growth',
+    data: {
+      currentValue: 120, previousValue: 100, growthPercentage: 20, currency: 'NZD',
+      currentPeriod: '2026-08-31', previousPeriod: '2026-07-31', direction: 'up',
+      sourceLabels: ['verified.csv'],
+    },
+  },
+  {
+    ...base,
+    type: 'expense_summary',
+    data: {
+      metricKey: 'monthly_expenses', label: 'Monthly expenses', value: 65000, currency: 'NZD',
+      reportingDate: '2026-08-31', periodStart: '2026-08-01', periodEnd: '2026-08-31',
+      sourceLabel: 'verified.csv', sourceType: 'document', confidence: 0.95,
+    },
+  },
+  {
+    ...base,
+    type: 'expense_trend',
+    data: {
+      metricKey: 'monthly_expenses', label: 'Monthly expenses', currency: 'NZD',
+      points: [], direction: 'insufficient_data', change: null, percentageChange: null,
+      periodStart: null, periodEnd: null, note: 'No history yet.',
+    },
+  },
+  {
+    ...base,
+    type: 'accounts_receivable',
+    data: {
+      metricKey: 'accounts_receivable', label: 'Accounts receivable', value: 25000, currency: 'NZD',
+      reportingDate: '2026-08-31', periodStart: null, periodEnd: null,
+      sourceLabel: 'verified.csv', sourceType: 'document', confidence: 0.95,
+    },
+  },
+  {
+    ...base,
+    type: 'accounts_payable',
+    data: {
+      metricKey: 'accounts_payable', label: 'Accounts payable', value: 18000, currency: 'NZD',
+      reportingDate: '2026-08-31', periodStart: null, periodEnd: null,
+      sourceLabel: 'verified.csv', sourceType: 'document', confidence: 0.95,
+    },
+  },
+  {
+    ...base,
+    type: 'ai_financial_brief',
+    data: {
+      summary: 'Based on one verified fact.',
+      facts: [{
+        label: 'Cash balance', value: 'NZD 120,000', detail: 'Latest trusted cash.',
+        tone: 'neutral', sourceLabel: 'verified.csv',
+      }],
+    },
+  },
 ]
 
 describe('Gen UI registries', () => {

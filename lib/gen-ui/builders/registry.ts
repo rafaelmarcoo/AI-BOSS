@@ -13,6 +13,17 @@ import {
   buildRiskThresholdTimelineWidget,
 } from "./existing/planning-builders";
 import { buildScenarioAnalysisWidget } from "./existing/scenario-builders";
+import {
+  buildAccountsPayableWidget,
+  buildAccountsReceivableWidget,
+  buildAiFinancialBriefWidget,
+  buildCashBalanceWidget,
+  buildExpenseSummaryWidget,
+  buildExpenseTrendWidgets,
+  buildRevenueGrowthWidget,
+  buildRevenueSnapshotWidget,
+  buildRevenueTrendWidgets,
+} from "./existing-data/existing-data-builders";
 import type { GenUiDataContext, PlannerWidget } from "./types";
 
 export type GenUiWidgetBuilder = (
@@ -70,6 +81,29 @@ export const GEN_UI_BUILDER_REGISTRY = {
   highlight_explainer: (spec, index, context) => [
     buildHighlightExplainerWidget(spec, index, context),
   ],
+  cash_balance: (spec, index, context) => [
+    buildCashBalanceWidget(spec, index, context),
+  ],
+  revenue_snapshot: (spec, index, context) => [
+    buildRevenueSnapshotWidget(spec, index, context),
+  ],
+  revenue_trend: buildRevenueTrendWidgets,
+  revenue_growth: (spec, index, context) => [
+    buildRevenueGrowthWidget(spec, index, context),
+  ],
+  expense_summary: (spec, index, context) => [
+    buildExpenseSummaryWidget(spec, index, context),
+  ],
+  expense_trend: buildExpenseTrendWidgets,
+  accounts_receivable: (spec, index, context) => [
+    buildAccountsReceivableWidget(spec, index, context),
+  ],
+  accounts_payable: (spec, index, context) => [
+    buildAccountsPayableWidget(spec, index, context),
+  ],
+  ai_financial_brief: (spec, index, context) => [
+    buildAiFinancialBriefWidget(spec, index, context),
+  ],
 } satisfies GenUiBuilderRegistry;
 
 export function buildGenUiWidgets(
@@ -79,4 +113,3 @@ export function buildGenUiWidgets(
 ) {
   return GEN_UI_BUILDER_REGISTRY[spec.type](spec, index, context);
 }
-

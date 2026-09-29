@@ -19,6 +19,100 @@ const WidgetBaseSchema = z.object({
   ]).optional(),
 })
 
+const FinancialKpiDataSchema = z.object({
+  metricKey: z.enum(FINANCIAL_METRIC_KEYS),
+  label: z.string(),
+  value: z.number().nullable(),
+  currency: z.string().nullable(),
+  reportingDate: z.string().nullable(),
+  periodStart: z.string().nullable(),
+  periodEnd: z.string().nullable(),
+  sourceLabel: z.string(),
+  sourceType: z.string(),
+  confidence: z.number().nullable(),
+})
+
+const FinancialTrendDataSchema = z.object({
+  metricKey: z.enum(['monthly_revenue', 'monthly_expenses']),
+  label: z.string(),
+  currency: z.string().nullable(),
+  points: z.array(z.object({
+    date: z.string(),
+    value: z.number(),
+    sourceLabel: z.string(),
+    confidence: z.number(),
+  })),
+  direction: z.enum(['improving', 'worsening', 'stable', 'insufficient_data']),
+  change: z.number().nullable(),
+  percentageChange: z.number().nullable(),
+  periodStart: z.string().nullable(),
+  periodEnd: z.string().nullable(),
+  note: z.string(),
+})
+
+const CashBalanceWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('cash_balance'),
+  data: FinancialKpiDataSchema.extend({ metricKey: z.literal('cash') }),
+})
+
+const RevenueSnapshotWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('revenue_snapshot'),
+  data: FinancialKpiDataSchema.extend({ metricKey: z.literal('monthly_revenue') }),
+})
+
+const ExpenseSummaryWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('expense_summary'),
+  data: FinancialKpiDataSchema.extend({ metricKey: z.literal('monthly_expenses') }),
+})
+
+const AccountsReceivableWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('accounts_receivable'),
+  data: FinancialKpiDataSchema.extend({ metricKey: z.literal('accounts_receivable') }),
+})
+
+const AccountsPayableWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('accounts_payable'),
+  data: FinancialKpiDataSchema.extend({ metricKey: z.literal('accounts_payable') }),
+})
+
+const RevenueTrendWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('revenue_trend'),
+  data: FinancialTrendDataSchema.extend({ metricKey: z.literal('monthly_revenue') }),
+})
+
+const ExpenseTrendWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('expense_trend'),
+  data: FinancialTrendDataSchema.extend({ metricKey: z.literal('monthly_expenses') }),
+})
+
+const RevenueGrowthWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('revenue_growth'),
+  data: z.object({
+    currentValue: z.number().nullable(),
+    previousValue: z.number().nullable(),
+    growthPercentage: z.number().nullable(),
+    currency: z.string().nullable(),
+    currentPeriod: z.string().nullable(),
+    previousPeriod: z.string().nullable(),
+    direction: z.enum(['up', 'down', 'stable', 'unavailable']),
+    sourceLabels: z.array(z.string()),
+  }),
+})
+
+const AiFinancialBriefWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('ai_financial_brief'),
+  data: z.object({
+    summary: z.string(),
+    facts: z.array(z.object({
+      label: z.string(),
+      value: z.string(),
+      detail: z.string(),
+      tone: z.enum(['positive', 'warning', 'neutral']),
+      sourceLabel: z.string(),
+    })).max(5),
+  }),
+})
+
 const MetricSnapshotWidgetSchema = WidgetBaseSchema.extend({
   type: z.literal('metric_snapshot'),
   data: z.object({
@@ -223,6 +317,15 @@ export const GenUiWidgetSchema = z.discriminatedUnion('type', [
   MetricSourceEvidenceWidgetSchema,
   MissingDataPanelWidgetSchema,
   HighlightExplainerWidgetSchema,
+  CashBalanceWidgetSchema,
+  RevenueSnapshotWidgetSchema,
+  RevenueTrendWidgetSchema,
+  RevenueGrowthWidgetSchema,
+  ExpenseSummaryWidgetSchema,
+  ExpenseTrendWidgetSchema,
+  AccountsReceivableWidgetSchema,
+  AccountsPayableWidgetSchema,
+  AiFinancialBriefWidgetSchema,
 ])
 
 export const GenUiPlanSchema = z.object({

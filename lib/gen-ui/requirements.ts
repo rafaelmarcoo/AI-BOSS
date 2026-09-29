@@ -9,6 +9,12 @@ export const GEN_UI_WIDGET_CATEGORIES = [
   'evidence',
   'data_quality',
   'explanation',
+  'cash',
+  'revenue',
+  'expenses',
+  'receivables',
+  'payables',
+  'brief',
 ] as const
 
 export type GenUiWidgetCategory = (typeof GEN_UI_WIDGET_CATEGORIES)[number]

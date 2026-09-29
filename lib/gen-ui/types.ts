@@ -15,6 +15,15 @@ export const GEN_UI_WIDGET_TYPES = [
   'metric_source_evidence',
   'missing_data_panel',
   'highlight_explainer',
+  'cash_balance',
+  'revenue_snapshot',
+  'revenue_trend',
+  'revenue_growth',
+  'expense_summary',
+  'expense_trend',
+  'accounts_receivable',
+  'accounts_payable',
+  'ai_financial_brief',
 ] as const
 
 export type GenUiWidgetType = (typeof GEN_UI_WIDGET_TYPES)[number]
@@ -48,6 +57,102 @@ export type GenUiWidgetState =
   | { status: 'partial'; message: string }
   | { status: 'unavailable'; message: string }
   | { status: 'error'; message: string }
+
+export interface FinancialKpiData {
+  metricKey: FinancialMetricKey
+  label: string
+  value: number | null
+  currency: string | null
+  reportingDate: string | null
+  periodStart: string | null
+  periodEnd: string | null
+  sourceLabel: string
+  sourceType: string
+  confidence: number | null
+}
+
+export interface FinancialTrendPoint {
+  date: string
+  value: number
+  sourceLabel: string
+  confidence: number
+}
+
+export interface FinancialTrendData {
+  metricKey: 'monthly_revenue' | 'monthly_expenses'
+  label: string
+  currency: string | null
+  points: FinancialTrendPoint[]
+  direction: 'improving' | 'worsening' | 'stable' | 'insufficient_data'
+  change: number | null
+  percentageChange: number | null
+  periodStart: string | null
+  periodEnd: string | null
+  note: string
+}
+
+export interface CashBalanceWidget extends GenUiWidgetBase {
+  type: 'cash_balance'
+  data: FinancialKpiData & { metricKey: 'cash' }
+}
+
+export interface RevenueSnapshotWidget extends GenUiWidgetBase {
+  type: 'revenue_snapshot'
+  data: FinancialKpiData & { metricKey: 'monthly_revenue' }
+}
+
+export interface ExpenseSummaryWidget extends GenUiWidgetBase {
+  type: 'expense_summary'
+  data: FinancialKpiData & { metricKey: 'monthly_expenses' }
+}
+
+export interface AccountsReceivableWidget extends GenUiWidgetBase {
+  type: 'accounts_receivable'
+  data: FinancialKpiData & { metricKey: 'accounts_receivable' }
+}
+
+export interface AccountsPayableWidget extends GenUiWidgetBase {
+  type: 'accounts_payable'
+  data: FinancialKpiData & { metricKey: 'accounts_payable' }
+}
+
+export interface RevenueTrendWidget extends GenUiWidgetBase {
+  type: 'revenue_trend'
+  data: FinancialTrendData & { metricKey: 'monthly_revenue' }
+}
+
+export interface ExpenseTrendWidget extends GenUiWidgetBase {
+  type: 'expense_trend'
+  data: FinancialTrendData & { metricKey: 'monthly_expenses' }
+}
+
+export interface RevenueGrowthWidget extends GenUiWidgetBase {
+  type: 'revenue_growth'
+  data: {
+    currentValue: number | null
+    previousValue: number | null
+    growthPercentage: number | null
+    currency: string | null
+    currentPeriod: string | null
+    previousPeriod: string | null
+    direction: 'up' | 'down' | 'stable' | 'unavailable'
+    sourceLabels: string[]
+  }
+}
+
+export interface AiFinancialBriefWidget extends GenUiWidgetBase {
+  type: 'ai_financial_brief'
+  data: {
+    summary: string
+    facts: Array<{
+      label: string
+      value: string
+      detail: string
+      tone: 'positive' | 'warning' | 'neutral'
+      sourceLabel: string
+    }>
+  }
+}
 
 export interface MetricSnapshotWidget extends GenUiWidgetBase {
   type: 'metric_snapshot'
@@ -236,6 +341,15 @@ export type GenUiWidget =
   | MetricSourceEvidenceWidget
   | MissingDataPanelWidget
   | HighlightExplainerWidget
+  | CashBalanceWidget
+  | RevenueSnapshotWidget
+  | RevenueTrendWidget
+  | RevenueGrowthWidget
+  | ExpenseSummaryWidget
+  | ExpenseTrendWidget
+  | AccountsReceivableWidget
+  | AccountsPayableWidget
+  | AiFinancialBriefWidget
 
 export type GenUiWidgetByType = {
   [Type in GenUiWidgetType]: Extract<GenUiWidget, { type: Type }>

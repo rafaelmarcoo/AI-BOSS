@@ -49,6 +49,10 @@ import type {
   GenUiDataContext,
   PlannerWidget,
 } from '@/lib/gen-ui/builders/types'
+import {
+  listExistingDataWidgetCandidates,
+  selectExistingDataFallbackSpecs,
+} from '@/lib/gen-ui/existing-data-selection'
 
 const MAX_WIDGETS = 4
 
@@ -91,7 +95,7 @@ interface PlanGenUiParams {
 
 function historicalMetricKeyForMessage(userMessage: string): HistoricalMetricKey | null {
   const normalized = userMessage.toLowerCase()
-  const isHistorical = /\b(history|historical|changed?|increase|decrease|improv|worsen|declin|past|over time|trend)\b/.test(normalized)
+  const isHistorical = /\b(history|historical|changed?|increase|decrease|growth|improv|worsen|declin|past|over time|trend)\b/.test(normalized)
 
   if (!isHistorical) return null
   if (/\brunway\b/.test(normalized)) return 'runway_months'
@@ -148,6 +152,22 @@ function defaultWidgetSpecs(
   const normalized = userMessage.toLowerCase()
   const widgets: PlannerWidget[] = []
   const missingMetrics = listMissingMetrics(snapshot)
+  const existingDataSpecs = selectExistingDataFallbackSpecs(userMessage)
+  widgets.push(...existingDataSpecs)
+  const dedicatedMetricKeys = new Set<FinancialMetricKey>(
+    existingDataSpecs.flatMap((spec) => {
+      if (spec.type === 'cash_balance') return ['cash']
+      if (spec.type === 'revenue_snapshot' || spec.type === 'revenue_trend' || spec.type === 'revenue_growth') {
+        return ['monthly_revenue']
+      }
+      if (spec.type === 'expense_summary' || spec.type === 'expense_trend') {
+        return ['monthly_expenses']
+      }
+      if (spec.type === 'accounts_receivable') return ['accounts_receivable']
+      if (spec.type === 'accounts_payable') return ['accounts_payable']
+      return []
+    })
+  )
 
   if (source === 'selection') {
     widgets.push({
@@ -161,7 +181,7 @@ function defaultWidgetSpecs(
   const historicalMetricKey = historicalMetricKeyForMessage(userMessage)
   const forecastMetricKey = forecastMetricKeyForMessage(userMessage)
 
-  if (historicalMetricKey) {
+  if (historicalMetricKey && !dedicatedMetricKeys.has(historicalMetricKey)) {
     widgets.push({
       type: 'metric_trend_chart',
       title: `Historical ${FINANCIAL_METRIC_LABELS[historicalMetricKey]} trend`,
@@ -177,9 +197,10 @@ function defaultWidgetSpecs(
     })
   }
 
-  if (metricKeys.length > 0) {
+  const genericMetricKeys = metricKeys.filter((key) => !dedicatedMetricKeys.has(key))
+  if (genericMetricKeys.length > 0) {
     widgets.push(
-      ...metricKeys.map((metricKey) => ({
+      ...genericMetricKeys.map((metricKey) => ({
         type: 'metric_snapshot' as const,
         title: FINANCIAL_METRIC_LABELS[metricKey],
         reason: 'This live metric directly supports the user question.',
@@ -379,6 +400,23 @@ function buildPlannerCandidates(params: {
         : {}),
     }]
   })
+
+  candidates.push(
+    ...listExistingDataWidgetCandidates({
+      userMessage: params.userMessage,
+      availableMetricKeys,
+      historicalMetricKey: params.historicalMetricKey,
+      hasHistoricalSeries: params.hasHistoricalSeries,
+    }).map((candidate) => ({
+      ...candidate,
+      personalizationFit: describePersonalizationFit(
+        candidate.id,
+        candidate.label,
+        [],
+        params.personalization,
+      ),
+    })),
+  )
 
   const requestedMetricKeys = selectMetricKeysForMessage(params.userMessage)
   candidates.push(
@@ -709,7 +747,9 @@ export async function planGenUi({
   }
 
   // A valid empty model response is intentional; fall back only when planning failed.
-  const historySpec = fallbackSpecs.find((spec) => spec.type === 'metric_trend_chart')
+  const historySpecs = fallbackSpecs.filter((spec) =>
+    ['metric_trend_chart', 'revenue_trend', 'revenue_growth', 'expense_trend'].includes(spec.type)
+  )
   const forecastSpec = fallbackSpecs.find((spec) => spec.type === 'metric_forecast_chart')
   const scenarioSpec: PlannerWidget | null = scenarioResult
     ? {
@@ -719,7 +759,7 @@ export async function planGenUi({
       }
     : null
   const specs = dedupeWidgetSpecs([
-    ...(historySpec ? [historySpec] : []),
+    ...historySpecs,
     ...(forecastSpec ? [forecastSpec] : []),
     ...(scenarioSpec ? [scenarioSpec] : []),
     ...(modelSpecs ?? fallbackSpecs).filter(

@@ -72,14 +72,26 @@ export function routeFinancialConversation(
     return 'company_analysis'
   }
 
+  const isScenarioClarification = Boolean(
+    latestAssistant &&
+      latestAssistant.content.includes('?') &&
+      /\b(scenario|source\s*\/\s*currency|monthly employer cost|monthly saving|baseline|percentage|compounding|one-off|recurring|start month|timing|horizon)\b/i.test(latestAssistant.content)
+  )
+  
+  if (
+    isScenarioClarification &&
+    direct === 'historical_forecast' &&
+    !value.includes('?') &&
+    !/\b(forecast|forecasting|history|historical)\b/.test(value)
+  ) {
+    return 'scenario'
+  }
+
   if (direct !== 'financial_position') return direct
   if (/\b(current cash|cash position|current runway|latest (?:cash|revenue|expenses|burn)|how much cash)\b/.test(value)) {
     return direct
   }
 
-  const isScenarioClarification = latestAssistant &&
-    latestAssistant.content.includes('?') &&
-    /\b(scenario|source\s*\/\s*currency|monthly employer cost|monthly saving|baseline|percentage|compounding|one-off|recurring|start month|timing|horizon)\b/i.test(latestAssistant.content)
 
   return isScenarioClarification ? 'scenario' : direct
 }

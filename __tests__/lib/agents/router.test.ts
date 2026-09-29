@@ -87,3 +87,27 @@ describe('scenario clarification replies', () => {
     ).toBe('scenario')
   })
 })
+
+describe('forecast words inside a scenario answer', () => {
+  const askedForTiming = [
+    { role: 'user' as const, content: 'What if I cut monthly burn by NZD 3,000 from next month?' },
+    {
+      role: 'assistant' as const,
+      content: 'What start and end timing should I use for the recurring NZD 3,000 monthly burn reduction?',
+    },
+  ]
+
+  it.each([
+    'Start October 2026, no end date. Apply it for the whole projection.',
+    'Use a 6 month horizon.',
+    'From next month, for the future.',
+  ])('keeps %p with the scenario specialist', (reply) => {
+    expect(routeFinancialConversation(reply, askedForTiming)).toBe('scenario')
+  })
+
+  it('still lets a plainly new forecast request through', () => {
+    expect(
+      routeFinancialConversation('Actually, can you forecast my cash for the next 3 months instead?', askedForTiming)
+    ).toBe('historical_forecast')
+  })
+})

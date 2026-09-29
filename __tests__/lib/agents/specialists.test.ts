@@ -25,6 +25,15 @@ jest.mock('@/lib/tools/financial/model-scenario', () => ({
 jest.mock('@/lib/tools/financial/calculate-ratios', () => ({
   createCalculateRatiosTool: jest.fn(() => ({ name: 'calculate_ratios' })),
 }))
+jest.mock('@/lib/tools/financial/list-analysed-companies', () => ({
+  createListAnalysedCompaniesTool: jest.fn(() => ({ name: 'list_analysed_companies' })),
+}))
+jest.mock('@/lib/tools/financial/analyse-company', () => ({
+  createAnalyseCompanyTool: jest.fn(() => ({ name: 'analyse_company' })),
+}))
+jest.mock('@/lib/tools/financial/compare-companies', () => ({
+  createCompareCompaniesTool: jest.fn(() => ({ name: 'compare_companies' })),
+}))
 
 const mockRunAgent = jest.mocked(runAgent)
 
@@ -188,5 +197,57 @@ describe('runMultiAgent', () => {
 
       warn.mockRestore()
     })
+  })
+})
+
+describe('company analysis specialist', () => {
+  beforeEach(() => jest.clearAllMocks())
+
+  it('gets only the company-analysis tools and the analyst prompt', async () => {
+    mockRunAgent.mockResolvedValue({ content: 'Comparison', tokensUsed: 5, toolsUsed: [] })
+
+    const result = await runMultiAgent('user-123', 'Compare Ressett with its competitor', [], [])
+
+    expect(result.specialist).toBe('company_analysis')
+    const tools = mockRunAgent.mock.calls[0][2]!
+    expect(tools.map((tool) => tool.name)).toEqual([
+      'list_analysed_companies',
+      'analyse_company',
+      'compare_companies',
+    ])
+    expect(mockRunAgent.mock.calls[0][4]).toContain('CIMA-qualified management accountant')
+    expect(mockRunAgent.mock.calls[0][4]).toContain('never with an industry average')
+  })
+})
+
+describe('routing with stored conversation history', () => {
+  beforeEach(() => jest.clearAllMocks())
+
+  it('routes a reply to a clarifying question by reading the stored question', async () => {
+    mockRunAgent.mockResolvedValue({
+      content: 'Which source should I use?',
+      tokensUsed: 1,
+      toolsUsed: [],
+      toolExecutions: [],
+    })
+    // Past replies are stored as Responses API content blocks, not plain text.
+    const storedQuestion = new AIMessage({
+      content: [
+        {
+          type: 'text',
+          text: 'What start and end timing should I use for the recurring NZD 3,000 monthly burn reduction?',
+          annotations: [],
+        },
+      ],
+    })
+
+    const result = await runMultiAgent(
+      'user-123',
+      'Start October 2026, no end date.',
+      [new HumanMessage('What if I cut monthly burn by NZD 3,000 from next month?'), storedQuestion],
+      []
+    )
+
+    expect(result.specialist).toBe('scenario')
   })
 })

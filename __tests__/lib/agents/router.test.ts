@@ -31,3 +31,59 @@ describe('routeFinancialQuestion', () => {
     )).toBe('scenario')
   })
 })
+
+describe('company analysis routing', () => {
+  it.each([
+    'Analyse Trimayr',
+    'Compare Ressett with its competitor',
+    "How is Fixxupp's revenue growing?",
+    'Tell me about Pallo and Troo',
+    'Which case study company is more profitable?',
+    'How do we compare with our competitors?',
+  ])('routes %p to the company analyst', (query) => {
+    expect(routeFinancialQuestion(query)).toBe('company_analysis')
+  })
+
+  it.each([
+    ['What do my ratios say?', 'financial_position'],
+    ['What do my ratios say by CIMA standards?', 'financial_position'],
+    ['What is my runway?', 'financial_position'],
+    ['Compare hiring for NZD 8,000 per month with buying equipment.', 'scenario'],
+  ] as const)('keeps own-business question %p with %s', (query, expected) => {
+    expect(routeFinancialQuestion(query)).toBe(expected)
+  })
+
+  const afterComparison = [
+    { role: 'user' as const, content: 'Compare Ressett with Fixxupp' },
+    { role: 'assistant' as const, content: 'Ressett is more profitable than Fixxupp, but Fixxupp is growing faster.' },
+  ]
+
+  it.each(['Which one is growing faster?', 'What about gearing?', 'Why?'])(
+    'keeps follow-up %p with the company analyst',
+    (query) => {
+      // "growing" alone would otherwise send this to the scenario specialist.
+      expect(routeFinancialConversation(query, afterComparison)).toBe('company_analysis')
+    }
+  )
+
+  it.each([
+    ['What is my runway?', 'financial_position'],
+    ['What if I cut burn by 10%?', 'scenario'],
+  ] as const)('lets %p return to the user’s own business', (query, expected) => {
+    expect(routeFinancialConversation(query, afterComparison)).toBe(expected)
+  })
+})
+
+describe('scenario clarification replies', () => {
+  it('keeps a timing answer with the scenario specialist', () => {
+    expect(
+      routeFinancialConversation('Start October 2026, no end date.', [
+        { role: 'user', content: 'What if I cut monthly burn by NZD 3,000 from next month?' },
+        {
+          role: 'assistant',
+          content: 'What start and end timing should I use for the recurring NZD 3,000 monthly burn reduction?',
+        },
+      ])
+    ).toBe('scenario')
+  })
+})

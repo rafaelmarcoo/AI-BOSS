@@ -13,6 +13,9 @@ import { createGetFinancialForecastTool } from '@/lib/tools/financial/get-financ
 import { createGetFinancialHistoryTool } from '@/lib/tools/financial/get-financial-history'
 import { createGetLatestSnapshotTool } from '@/lib/tools/financial/get-latest-snapshot'
 import { createModelScenarioTool } from '@/lib/tools/financial/model-scenario'
+import { createAnalyseCompanyTool } from '@/lib/tools/financial/analyse-company'
+import { createCompareCompaniesTool } from '@/lib/tools/financial/compare-companies'
+import { createListAnalysedCompaniesTool } from '@/lib/tools/financial/list-analysed-companies'
 import type { AppTool } from '@/lib/tools/contracts'
 import { isScenarioAnalysisResult } from '@/lib/scenarios/calculation'
 import { formatScenarioAnalysisForChat } from '@/lib/scenarios/chat-summary'
@@ -41,6 +44,23 @@ You are handling deterministic what-if scenarios only. Use model_scenario for up
 Call model_scenario immediately when the user has supplied the decision, amount, recurrence, and timing. Do not ask the user to confirm facts already stated. Omit sourceKey when the user has not named a statement so the tool can auto-select the only valid source or return the exact source choices. Leave manualBaseline empty unless the user explicitly asks to replace a stored baseline value; never copy source values into manualBaseline. Use the default six-month horizon unless the user requests another supported horizon. Treat an explicitly monthly employer cost for a hire as a recurring outflow. Treat a confirmed monthly employer cost or saving for firing/dismissal as the recurring saving created by removing that cost, which is an inflow. Treat an equipment purchase as a one-off outflow. Resolve an unambiguous named month to its next occurrence inside the projection horizon. Never add depreciation, tax, legal, HR, redundancy, equipment, recruitment, or payroll assumptions unless the user supplied them.
 
 A plain percentage is a fixed step; compounding requires explicit every-month wording. For hiring or firing, require confirmed total monthly employer cost or saving rather than converting annual salary. Ask only one focused question at a time in this order: source/currency, missing baseline values, amount/percentage, fixed/compounding, one-off/recurring, then start/end timing. If the tool requests source, currency, baseline, or assumptions, use its message and options. A financial answer is forbidden unless model_scenario returned status ready.`,
+  company_analysis: `${AGENT_SYSTEM_PROMPT}
+
+## Assigned specialist
+You are handling analysis of other companies from their published annual statements, such as the CIMA case-study companies (Trimayr and its competitor Pallo & Troo, Ressett and its competitor Fixxupp). These are not the user's business: never mix their figures with the user's own metrics, runway or scenarios.
+
+Use analyse_company for one company and compare_companies for two; omit competitor to use the company's competitor on record. Use list_analysed_companies when the user asks what is available or names a company the tools cannot find. Every figure in your answer must come from a tool result: never calculate, estimate or recall a figure yourself. If a tool says a company is not available, say so and offer the available companies.
+
+### How to analyse
+Write as a CIMA-qualified management accountant briefing a busy manager.
+- Lead with the story, not a list. Say what the ratios mean together and name the tensions, for example a company that is more profitable but growing more slowly than its competitor, or one whose margins rose while its liquidity fell.
+- Support each point with the figures and prior-year movements the tool gave. Quote the working for any figure the user asks about.
+- The tool marks payable days, dividend payout and marketing spend as trade-offs. Discuss what their level suggests instead of calling them good or bad.
+- Use the revenue streams where the tool provides them: which streams drive revenue, which carry the margin, and which are growing.
+- Respect the bases the tool reports. Margin after direct costs is not gross margin; ratios use year-end balances; amounts in different currencies are never compared, only ratios.
+- Cite the source the tool gives, for example "CIMA pre-seen material, pages 17–18".
+- No industry data is available. Compare only with the prior year and with the named competitor, never with an industry average or typical benchmark.
+- Finish with two or three questions a manager should investigate next. The statements show what changed, not why, so frame them as questions rather than conclusions.`,
 }
 
 const SCENARIO_RETRY_INSTRUCTION = `
@@ -91,6 +111,7 @@ const SPECIALIST_MODELS: Record<FinancialSpecialist, ModelName> = {
   financial_position: DEFAULT_MODEL,
   historical_forecast: DEFAULT_MODEL,
   scenario: DEFAULT_MODEL,
+  company_analysis: DEFAULT_MODEL,
 }
 
 export function modelForSpecialist(specialist: FinancialSpecialist): ModelName {
@@ -127,6 +148,14 @@ function specialistTools(userId: string, specialist: FinancialSpecialist): AppTo
     ]
   }
 
+  if (specialist === 'company_analysis') {
+    return [
+      createListAnalysedCompaniesTool(userId),
+      createAnalyseCompanyTool(userId),
+      createCompareCompaniesTool(userId),
+    ]
+  }
+
   return [createModelScenarioTool(userId)]
 }
 
@@ -144,7 +173,10 @@ export async function runMultiAgent(
 ): Promise<MultiAgentRunResult> {
   const routingHistory = chatHistory.flatMap((message) => {
     const role = message._getType()
-    const content = typeof message.content === 'string' ? message.content : ''
+    // Past replies are stored as Responses API content blocks, not strings;
+    // .text reads both. Reading only strings dropped every assistant turn, so a
+    // reply to a clarifying question was routed without the question.
+    const content = message.text
     return (role === 'human' || role === 'ai') && content
       ? [{ role: role === 'human' ? 'user' as const : 'assistant' as const, content }]
       : []

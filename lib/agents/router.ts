@@ -1,7 +1,10 @@
+import { CIMA_CASE_STUDIES } from '@/lib/company-analysis/cima-case-studies'
+
 export type FinancialSpecialist =
   | 'financial_position'
   | 'historical_forecast'
   | 'scenario'
+  | 'company_analysis'
 
 export interface FinancialRoutingMessage {
   role: 'user' | 'assistant'
@@ -11,9 +14,28 @@ export interface FinancialRoutingMessage {
 function normalize(value: string) {
   return value.toLowerCase().replace(/\s+/g, ' ').trim()
 }
+const COMPANY_TERMS = /\b(competitors?|competition|rivals?|peers?|case stud(?:y|ies))\b/
+const COMPANY_NAMES = new RegExp(
+  `\\b(${[
+    ...new Set(
+      CIMA_CASE_STUDIES.flatMap((company) =>
+        company.name.toLowerCase().split(/[^a-z]+/).filter((word) => word.length >= 4)
+      )
+    ),
+  ].join('|')})\\b`
+)
+
+const OWN_BUSINESS = /\b(i|me|my|our|we|us|runway|burn|cash)\b/
+
+function mentionsAnalysedCompany(value: string) {
+  return COMPANY_TERMS.test(value) || COMPANY_NAMES.test(value)
+}
 
 export function routeFinancialQuestion(query: string): FinancialSpecialist {
   const value = normalize(query)
+  if (mentionsAnalysedCompany(value)) {
+    return 'company_analysis'
+  }
 
   if (
     /\b(what if|scenario|compare|hir(?:e|ed|ing)|fir(?:e|ed|ing)|dismiss(?:al|ed|ing)?|redundan(?:cy|t|cies)|new employee|staff|subscription|lease|equipment|loan|grant|funding|client|customer|cut|reduce|increase|decrease|grow|growth|save|saving|cost change|spend)\b/.test(value) ||
@@ -36,16 +58,25 @@ export function routeFinancialConversation(
   history: FinancialRoutingMessage[] = []
 ): FinancialSpecialist {
   const direct = routeFinancialQuestion(query)
-  if (direct !== 'financial_position') return direct
+  if (direct === 'company_analysis') return direct
 
   const value = normalize(query)
+  const latestAssistant = [...history]
+    .reverse()
+    .find((message) => message.role === 'assistant')
+  if (
+    latestAssistant &&
+    mentionsAnalysedCompany(normalize(latestAssistant.content)) &&
+    !OWN_BUSINESS.test(value)
+  ) {
+    return 'company_analysis'
+  }
+
+  if (direct !== 'financial_position') return direct
   if (/\b(current cash|cash position|current runway|latest (?:cash|revenue|expenses|burn)|how much cash)\b/.test(value)) {
     return direct
   }
 
-  const latestAssistant = [...history]
-    .reverse()
-    .find((message) => message.role === 'assistant')
   const isScenarioClarification = latestAssistant &&
     latestAssistant.content.includes('?') &&
     /\b(scenario|source\s*\/\s*currency|monthly employer cost|monthly saving|baseline|percentage|compounding|one-off|recurring|start month|timing|horizon)\b/i.test(latestAssistant.content)

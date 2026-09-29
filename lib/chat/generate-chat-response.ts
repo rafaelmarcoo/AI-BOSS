@@ -88,7 +88,13 @@ export async function generateChatResponse(
         toolExecutions: [],
       }
       specialist = resolvedSpecialist
-    } else if (multiAgentEnabled || resolvedSpecialist === 'scenario') {
+    // Scenarios and company analysis always use their specialist: the general
+    // agent does not carry their tools.
+    } else if (
+      multiAgentEnabled ||
+      resolvedSpecialist === 'scenario' ||
+      resolvedSpecialist === 'company_analysis'
+    ) {
       const multiAgentResponse = await runMultiAgent(
         userId,
         latestUserMessage.content,

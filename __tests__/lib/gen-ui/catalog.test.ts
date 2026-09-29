@@ -17,6 +17,16 @@ describe('Gen UI widget catalog', () => {
         description: expect.any(String),
         selectionGuidance: expect.any(String),
         defaultSize: expect.stringMatching(/^(1x1|1x2|2x2)$/),
+        category: expect.any(String),
+        defaultColumnSpan: expect.any(Number),
+        dataRequirements: {
+          required: expect.any(Array),
+          optional: expect.any(Array),
+        },
+        supportedPeriods: expect.any(Array),
+        supportedFilters: expect.any(Array),
+        requiresForecast: expect.any(Boolean),
+        requiresDimensionalData: expect.any(Boolean),
       })
     }
   })

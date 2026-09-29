@@ -39,7 +39,15 @@ export interface GenUiWidgetBase {
   type: GenUiWidgetType
   title: string
   reason: string
+  state?: GenUiWidgetState
 }
+
+export type GenUiWidgetState =
+  | { status: 'ready' }
+  | { status: 'loading'; message?: string }
+  | { status: 'partial'; message: string }
+  | { status: 'unavailable'; message: string }
+  | { status: 'error'; message: string }
 
 export interface MetricSnapshotWidget extends GenUiWidgetBase {
   type: 'metric_snapshot'
@@ -228,6 +236,10 @@ export type GenUiWidget =
   | MetricSourceEvidenceWidget
   | MissingDataPanelWidget
   | HighlightExplainerWidget
+
+export type GenUiWidgetByType = {
+  [Type in GenUiWidgetType]: Extract<GenUiWidget, { type: Type }>
+}
 
 export interface GenUiPlan {
   version: typeof GEN_UI_PLAN_VERSION

@@ -95,6 +95,6 @@ export const DETAIL_LEVEL_LABELS: Record<GenUiDetailLevel, string> = {
 
 export function recommendedWidgetLimit(detailLevel: GenUiDetailLevel) {
   if (detailLevel === 'quick') return 2
-  if (detailLevel === 'detailed') return 5
+  if (detailLevel === 'detailed') return 4
   return 3
 }

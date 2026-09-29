@@ -1,4 +1,10 @@
 import type { GenUiWidgetType } from '@/lib/gen-ui/types'
+import type {
+  GenUiDataRequirements,
+  GenUiSupportedFilter,
+  GenUiSupportedPeriod,
+  GenUiWidgetCategory,
+} from '@/lib/gen-ui/requirements'
 
 export const GEN_UI_WIDGET_SIZES = ['1x1', '1x2', '2x2'] as const
 
@@ -20,6 +26,13 @@ export interface GenUiWidgetCatalogEntry {
   description: string
   selectionGuidance: string
   defaultSize: GenUiWidgetSize
+  category: GenUiWidgetCategory
+  defaultColumnSpan: 1 | 2
+  dataRequirements: GenUiDataRequirements
+  supportedPeriods: readonly GenUiSupportedPeriod[]
+  supportedFilters: readonly GenUiSupportedFilter[]
+  requiresForecast: boolean
+  requiresDimensionalData: boolean
 }
 
 export const GEN_UI_WIDGET_CATALOG = {
@@ -29,6 +42,13 @@ export const GEN_UI_WIDGET_CATALOG = {
     description: 'A focused set of live financial metrics and their sources.',
     selectionGuidance: 'Select only the metric keys directly relevant to the question.',
     defaultSize: '1x1',
+    category: 'overview',
+    defaultColumnSpan: 1,
+    dataRequirements: { required: [], optional: ['aggregate_metrics'] },
+    supportedPeriods: ['current'],
+    supportedFilters: ['metric', 'source'],
+    requiresForecast: false,
+    requiresDimensionalData: false,
   },
   data_connections: {
     type: 'data_connections',
@@ -36,6 +56,13 @@ export const GEN_UI_WIDGET_CATALOG = {
     description: 'Supported uploaded financial files and review availability.',
     selectionGuidance: 'Select for document, file upload, or source-review questions.',
     defaultSize: '1x2',
+    category: 'connections',
+    defaultColumnSpan: 2,
+    dataRequirements: { required: [], optional: ['document_sources'] },
+    supportedPeriods: [],
+    supportedFilters: ['source'],
+    requiresForecast: false,
+    requiresDimensionalData: false,
   },
   metric_trend_chart: {
     type: 'metric_trend_chart',
@@ -43,6 +70,13 @@ export const GEN_UI_WIDGET_CATALOG = {
     description: 'Shows deterministic historical movement for one financial metric.',
     selectionGuidance: 'Select only for a historical question that names one metric such as cash, revenue, expenses, burn rate, or runway.',
     defaultSize: '2x2',
+    category: 'trends',
+    defaultColumnSpan: 2,
+    dataRequirements: { required: ['metric_history'], optional: ['aggregate_metrics'] },
+    supportedPeriods: ['three_months', 'six_months', 'all_history'],
+    supportedFilters: ['metric', 'source'],
+    requiresForecast: false,
+    requiresDimensionalData: false,
   },
   metric_forecast_chart: {
     type: 'metric_forecast_chart',
@@ -50,6 +84,13 @@ export const GEN_UI_WIDGET_CATALOG = {
     description: 'Shows deterministic actual and projected movement for one financial metric.',
     selectionGuidance: 'Select only for a future-focused question that names cash, revenue, expenses, burn rate, or runway.',
     defaultSize: '2x2',
+    category: 'forecasting',
+    defaultColumnSpan: 2,
+    dataRequirements: { required: ['metric_forecast'], optional: ['metric_history'] },
+    supportedPeriods: ['three_months', 'six_months'],
+    supportedFilters: ['metric', 'source'],
+    requiresForecast: true,
+    requiresDimensionalData: false,
   },
   scenario_comparison: {
     type: 'scenario_comparison',
@@ -57,6 +98,13 @@ export const GEN_UI_WIDGET_CATALOG = {
     description: 'Compares the current runway with modeled burn changes.',
     selectionGuidance: 'Select for what-if, hiring, saving, or cost-change questions.',
     defaultSize: '2x2',
+    category: 'scenarios',
+    defaultColumnSpan: 2,
+    dataRequirements: { required: ['scenario_result'], optional: ['aggregate_metrics'] },
+    supportedPeriods: ['current'],
+    supportedFilters: ['scenario'],
+    requiresForecast: false,
+    requiresDimensionalData: false,
   },
   scenario_analysis: {
     type: 'scenario_analysis',
@@ -64,6 +112,13 @@ export const GEN_UI_WIDGET_CATALOG = {
     description: 'Shows the exact deterministic current-run-rate and historical-trend scenario result.',
     selectionGuidance: 'Use only when the model_scenario tool returned a ready structured result.',
     defaultSize: '2x2',
+    category: 'scenarios',
+    defaultColumnSpan: 2,
+    dataRequirements: { required: ['scenario_result'], optional: ['metric_history'] },
+    supportedPeriods: ['three_months', 'six_months'],
+    supportedFilters: ['scenario', 'source'],
+    requiresForecast: true,
+    requiresDimensionalData: false,
   },
   planning_checklist: {
     type: 'planning_checklist',
@@ -71,6 +126,13 @@ export const GEN_UI_WIDGET_CATALOG = {
     description: 'Prioritized actions based on current runway conditions.',
     selectionGuidance: 'Select when the user needs concrete next steps.',
     defaultSize: '1x1',
+    category: 'planning',
+    defaultColumnSpan: 1,
+    dataRequirements: { required: [], optional: ['aggregate_metrics', 'runway_trend'] },
+    supportedPeriods: ['current'],
+    supportedFilters: [],
+    requiresForecast: false,
+    requiresDimensionalData: false,
   },
   risk_threshold_timeline: {
     type: 'risk_threshold_timeline',
@@ -78,6 +140,13 @@ export const GEN_UI_WIDGET_CATALOG = {
     description: 'Shows current runway risk and time to caution or urgent thresholds.',
     selectionGuidance: 'Select for runway risk, timing, or buffer questions.',
     defaultSize: '1x1',
+    category: 'risk',
+    defaultColumnSpan: 1,
+    dataRequirements: { required: [], optional: ['aggregate_metrics', 'runway_trend'] },
+    supportedPeriods: ['current'],
+    supportedFilters: [],
+    requiresForecast: false,
+    requiresDimensionalData: false,
   },
   metric_source_evidence: {
     type: 'metric_source_evidence',
@@ -85,6 +154,13 @@ export const GEN_UI_WIDGET_CATALOG = {
     description: 'Displays the values and provenance supporting the answer.',
     selectionGuidance: 'Select for source, evidence, uploaded-data, or metric questions.',
     defaultSize: '1x2',
+    category: 'evidence',
+    defaultColumnSpan: 2,
+    dataRequirements: { required: [], optional: ['aggregate_metrics', 'document_sources'] },
+    supportedPeriods: ['current'],
+    supportedFilters: ['metric', 'source'],
+    requiresForecast: false,
+    requiresDimensionalData: false,
   },
   missing_data_panel: {
     type: 'missing_data_panel',
@@ -92,6 +168,13 @@ export const GEN_UI_WIDGET_CATALOG = {
     description: 'Explains which required financial inputs are unavailable.',
     selectionGuidance: 'Select when missing inputs materially limit the answer.',
     defaultSize: '1x1',
+    category: 'data_quality',
+    defaultColumnSpan: 1,
+    dataRequirements: { required: [], optional: ['aggregate_metrics'] },
+    supportedPeriods: ['current'],
+    supportedFilters: ['metric'],
+    requiresForecast: false,
+    requiresDimensionalData: false,
   },
   highlight_explainer: {
     type: 'highlight_explainer',
@@ -99,6 +182,13 @@ export const GEN_UI_WIDGET_CATALOG = {
     description: 'Connects selected workspace text to a focused follow-up question.',
     selectionGuidance: 'Select when the request originated from highlighted workspace text.',
     defaultSize: '1x2',
+    category: 'explanation',
+    defaultColumnSpan: 2,
+    dataRequirements: { required: ['selection_context'], optional: ['aggregate_metrics'] },
+    supportedPeriods: ['current'],
+    supportedFilters: [],
+    requiresForecast: false,
+    requiresDimensionalData: false,
   },
 } as const satisfies Record<GenUiWidgetType, GenUiWidgetCatalogEntry>
 

@@ -10,6 +10,13 @@ const WidgetBaseSchema = z.object({
   type: z.enum(GEN_UI_WIDGET_TYPES),
   title: z.string(),
   reason: z.string(),
+  state: z.discriminatedUnion('status', [
+    z.object({ status: z.literal('ready') }),
+    z.object({ status: z.literal('loading'), message: z.string().optional() }),
+    z.object({ status: z.literal('partial'), message: z.string() }),
+    z.object({ status: z.literal('unavailable'), message: z.string() }),
+    z.object({ status: z.literal('error'), message: z.string() }),
+  ]).optional(),
 })
 
 const MetricSnapshotWidgetSchema = WidgetBaseSchema.extend({
@@ -223,7 +230,7 @@ export const GenUiPlanSchema = z.object({
   source: z.enum(['chat', 'selection']),
   generatedAt: z.string(),
   summary: z.string(),
-  widgets: z.array(GenUiWidgetSchema).max(5),
+  widgets: z.array(GenUiWidgetSchema).max(4),
   workspaceMode: z.enum(['financial', 'document_review']).optional(),
   documentReviewSnapshot: z.object({
     documentIds: z.array(z.string().uuid()).min(1),

@@ -5,6 +5,7 @@ import {
   type CompanyAnalysis,
   type CompanyComparison,
   type RatioCategory,
+  type RatioUnit,
   type TrendDirection,
 } from '@/lib/company-analysis/statement-analysis'
 
@@ -48,6 +49,12 @@ function sourceLine({ company, pages }: CompanyContext) {
     : company.source
 }
 
+function signedChange(value: number, unit: RatioUnit) {
+  const places = unit === 'days' ? 0 : unit === '%' ? 1 : 2
+  const suffix = unit === '%' ? ' points' : unit === 'days' ? ' days' : unit === 'x' ? 'x' : ''
+  return `${value > 0 ? '+' : ''}${value.toFixed(places)}${suffix}`
+}
+
 function signed(value: number | null) {
   if (value === null) return 'not calculable (prior value is zero)'
   return `${value > 0 ? '+' : ''}${value.toFixed(1)}%`
@@ -67,7 +74,9 @@ export function formatCompanyAnalysis(analysis: CompanyAnalysis, context: Compan
   if (analysis.growth.length > 0) {
     lines.push('', 'Growth (year on year)')
     for (const measure of analysis.growth) {
-      lines.push(`- ${measure.label}: ${money(measure.prior)} → ${money(measure.latest)} (${signed(measure.growthPercent)})`)
+      const change = measure.latest - measure.prior
+      const changeText = `${change < 0 ? '-' : '+'}${money(Math.abs(change))}`
+      lines.push(`- ${measure.label}: ${money(measure.prior)} → ${money(measure.latest)} (${changeText}, ${signed(measure.growthPercent)})`)
     }
   }
 
@@ -78,7 +87,7 @@ export function formatCompanyAnalysis(analysis: CompanyAnalysis, context: Compan
     for (const ratio of ratios) {
       const trend = analysis.trends.find((candidate) => candidate.key === ratio.key)
       const comparison = trend
-        ? ` (prior year ${formatRatioValue(trend.prior, trend.unit)}, ${TREND_TEXT[trend.trend]})`
+        ? ` (prior year ${formatRatioValue(trend.prior, trend.unit)}, ${signedChange(trend.change, trend.unit)}, ${TREND_TEXT[trend.trend]})`
         : analysis.prior
           ? ' (no prior-year figure)'
           : ''

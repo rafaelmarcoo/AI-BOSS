@@ -97,10 +97,10 @@ describe('formatCompanyAnalysis', () => {
 
   it.each([
     'Source: CIMA Management Case Study pre-seen material, November 2025–February 2026 (© CIMA 2025), statement pages 17–18.',
-    'Revenue: L$197.2m → L$203.3m (+3.1%)',
-    'Operating margin: 14.0% (prior year 12.0%, improved)',
+    'Revenue: L$197.2m → L$203.3m (+L$6.1m, +3.1%)',
+    'Operating margin: 14.0% (prior year 12.0%, +2.0 points, improved)',
     'Working: Operating profit L$28.4m ÷ revenue L$203.3m × 100 = 14.0%',
-    'Payable days: 30 days (prior year 32 days, a trade-off, not judged better or worse)',
+    'Payable days: 30 days (prior year 32 days, -2 days, a trade-off, not judged better or worse)',
   ])('includes %p', (expected) => {
     expect(text).toContain(expected)
   })
@@ -111,6 +111,7 @@ describe('formatCompanyAnalysis', () => {
     expect(trimayrText).toContain(
       'Franchise royalties: D$113.1m, 47.7% of revenue, no direct costs reported, growth +9.9%'
     )
+    expect(trimayrText).toContain('Revenue: D$216.2m → D$237.2m (+D$21.0m, +9.7%)')
   })
 })
 

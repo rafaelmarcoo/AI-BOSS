@@ -1,4 +1,6 @@
+import { ApiError } from '@/lib/api/errors'
 import { createAdminSupabaseClient } from '@/lib/supabase'
+import type { AnalysedCompany, CompanyStatementLine } from '@/types/database'
 import {
   toStatementLineRows,
   type CaseStudyCompany,
@@ -67,4 +69,33 @@ export async function saveSharedCaseStudy(company: CaseStudyCompany) {
   }
 
   return { companyId, lineCount: rows.length }
+}
+export async function listVisibleCompanies(userId: string): Promise<AnalysedCompany[]> {
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase
+    .from('analysed_companies')
+    .select('*')
+    .or(`user_id.is.null,user_id.eq.${userId}`)
+    .order('name')
+
+  if (error) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Could not load analysed companies.')
+  }
+
+  return (data ?? []) as AnalysedCompany[]
+}
+
+/** Statement lines for a company already confirmed visible to the user. */
+export async function listStatementLines(companyId: string): Promise<CompanyStatementLine[]> {
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase
+    .from('company_statement_lines')
+    .select('*')
+    .eq('company_id', companyId)
+
+  if (error) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Could not load company statements.')
+  }
+
+  return (data ?? []) as CompanyStatementLine[]
 }

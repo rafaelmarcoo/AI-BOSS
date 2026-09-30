@@ -1,15 +1,22 @@
 "use client";
 
-import { useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import {
   Alert,
   Box,
   Button,
+  Checkbox,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControl,
+  FormControlLabel,
+  FormHelperText,
+  InputLabel,
+  MenuItem,
+  Select,
   Stack,
   Table,
   TableBody,
@@ -17,35 +24,67 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
   Typography,
 } from "@mui/material";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
+import type { CompanySummary } from "@/lib/company-analysis/persistence";
 import type { StatementUploadReview } from "@/lib/company-analysis/statement-upload";
 import { statementTableRows } from "@/lib/company-analysis/statement-template";
 import { dashboardTokens } from "@/app/theme";
 
-interface PreviewResponse {
+interface ApiPayload<T> {
   success: boolean;
-  data?: { review: StatementUploadReview };
-  error?: { message?: string };
+  data?: T;
+  message?: string;
+  error?: { message?: string; details?: Record<string, unknown> };
 }
 
 interface AddCompanyDialogProps {
   open: boolean;
+  companies: CompanySummary[];
   onClose: () => void;
+  onSaved: (message: string) => void;
 }
 
-export function AddCompanyDialog({ open, onClose }: AddCompanyDialogProps) {
+interface DetailsForm {
+  name: string;
+  industry: string;
+  currency: string;
+  amountsIn: "" | "units" | "thousands" | "millions";
+  competitorOf: string;
+}
+const EMPTY_DETAILS: DetailsForm = { name: "", industry: "", currency: "NZD", amountsIn: "", competitorOf: "" };
+
+export function AddCompanyDialog({ open, companies, onClose, onSaved }: AddCompanyDialogProps) {
   const [file, setFile] = useState<File | null>(null);
   const [review, setReview] = useState<StatementUploadReview | null>(null);
+  const [details, setDetails] = useState<DetailsForm>(EMPTY_DETAILS);
+  const [confirmedChecks, setConfirmedChecks] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [checking, setChecking] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
 
-  const close = () => {
-    if (checking) return;
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [error]);
+
+  const busy = checking || saving;
+
+  const reset = () => {
     setFile(null);
     setReview(null);
+    setDetails(EMPTY_DETAILS);
+    setConfirmedChecks(false);
+    setFieldErrors({});
     setError(null);
+  };
+
+  const close = () => {
+    if (busy) return;
+    reset();
     onClose();
   };
 
@@ -53,9 +92,9 @@ export function AddCompanyDialog({ open, onClose }: AddCompanyDialogProps) {
     const chosen = event.target.files?.[0];
     event.target.value = "";
     if (!chosen) return;
-
     setFile(chosen);
     setReview(null);
+    setConfirmedChecks(false);
     setError(null);
     setChecking(true);
 
@@ -63,7 +102,7 @@ export function AddCompanyDialog({ open, onClose }: AddCompanyDialogProps) {
       const body = new FormData();
       body.set("file", chosen);
       const response = await fetch("/api/companies/preview", { method: "POST", body });
-      const payload = (await response.json()) as PreviewResponse;
+      const payload = (await response.json()) as ApiPayload<{ review: StatementUploadReview }>;
 
       if (!response.ok || !payload.success || !payload.data) {
         throw new Error(payload.error?.message ?? "Could not read the file.");
@@ -71,13 +110,68 @@ export function AddCompanyDialog({ open, onClose }: AddCompanyDialogProps) {
 
       setReview(payload.data.review);
     } catch (requestError) {
-      setError(
-        requestError instanceof Error ? requestError.message : "Could not read the file.",
-      );
+      setError(requestError instanceof Error ? requestError.message : "Could not read the file.");
     } finally {
       setChecking(false);
     }
   };
+
+  const updateDetail = <K extends keyof DetailsForm>(key: K, value: DetailsForm[K]) => {
+    setDetails((current) => ({ ...current, [key]: value }));
+    setFieldErrors((current) => {
+      const rest = { ...current };
+      delete rest[key];
+      return rest;
+    });
+  };
+
+  const save = async () => {
+    if (!file) return;
+
+    setSaving(true);
+    setError(null);
+    setFieldErrors({});
+
+    try {
+      const body = new FormData();
+      body.set("file", file);
+      body.set("name", details.name);
+      body.set("industry", details.industry);
+      body.set("currency", details.currency);
+      body.set("amountsIn", details.amountsIn);
+      if (details.competitorOf) body.set("competitorOf", details.competitorOf);
+      body.set("confirmedChecks", String(confirmedChecks));
+
+      const response = await fetch("/api/companies", { method: "POST", body });
+      const payload = (await response.json()) as ApiPayload<unknown>;
+
+      if (!response.ok || !payload.success) {
+        const problems = payload.error?.details ?? {};
+        setFieldErrors(
+          Object.fromEntries(
+            Object.entries(problems).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+          ),
+        );
+        throw new Error(payload.error?.message ?? "Could not save the company.");
+      }
+
+      reset();
+      onSaved(payload.message ?? "Company added.");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Could not save the company.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const canSave =
+    Boolean(file && review) &&
+    review!.errors.length === 0 &&
+    (review!.failedChecks.length === 0 || confirmedChecks) &&
+    details.name.trim() !== "" &&
+    details.currency.trim() !== "" &&
+    details.amountsIn !== "" &&
+    !busy;
 
   return (
     <Dialog open={open} onClose={close} fullWidth maxWidth="md" scroll="paper">
@@ -85,8 +179,8 @@ export function AddCompanyDialog({ open, onClose }: AddCompanyDialogProps) {
       <DialogContent dividers>
         <Stack spacing={2}>
           <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
-            Upload the company&apos;s financial statements as a CSV using the template: one line per row,
-            one year per column. Nothing is saved until you confirm.
+            Upload the company&apos;s financial statements as a CSV file, using the template. Nothing is
+            saved until you press Save.
           </Typography>
 
           <Stack direction="row" spacing={1.5} alignItems="center">
@@ -94,7 +188,7 @@ export function AddCompanyDialog({ open, onClose }: AddCompanyDialogProps) {
               component="label"
               variant={review ? "outlined" : "contained"}
               startIcon={<UploadFileRoundedIcon />}
-              disabled={checking}
+              disabled={busy}
               sx={{ borderRadius: 2, whiteSpace: "nowrap" }}
             >
               {file ? "Choose a different file" : "Choose CSV file"}
@@ -114,19 +208,111 @@ export function AddCompanyDialog({ open, onClose }: AddCompanyDialogProps) {
             </Stack>
           ) : null}
 
-          {error ? <Alert severity="error">{error}</Alert> : null}
+          {review ? <ReviewSummary review={review} currency={details.currency} amountsIn={details.amountsIn} /> : null}
 
-          {review ? <ReviewSummary review={review} /> : null}
+          {review && review.errors.length === 0 ? (
+            <Stack spacing={2}>
+              <Typography variant="subtitle1" fontWeight={700}>Company details</Typography>
+
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                <TextField
+                  label="Company name"
+                  required
+                  value={details.name}
+                  onChange={(event) => updateDetail("name", event.target.value)}
+                  error={Boolean(fieldErrors.name)}
+                  helperText={fieldErrors.name}
+                  slotProps={{ htmlInput: { maxLength: 120 } }}
+                  sx={{ flex: 1 }}
+                />
+                <TextField
+                  label="Industry (optional)"
+                  value={details.industry}
+                  onChange={(event) => updateDetail("industry", event.target.value)}
+                  error={Boolean(fieldErrors.industry)}
+                  helperText={fieldErrors.industry}
+                  slotProps={{ htmlInput: { maxLength: 120 } }}
+                  sx={{ flex: 1 }}
+                />
+              </Stack>
+
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                <TextField
+                  label="Currency"
+                  required
+                  value={details.currency}
+                  onChange={(event) => updateDetail("currency", event.target.value.toUpperCase())}
+                  error={Boolean(fieldErrors.currency)}
+                  helperText={fieldErrors.currency ?? "For example NZD, AUD or USD."}
+                  slotProps={{ htmlInput: { maxLength: 4 } }}
+                  sx={{ flex: 1 }}
+                />
+                <FormControl required error={Boolean(fieldErrors.amountsIn)} sx={{ flex: 1 }}>
+                  <InputLabel>Figures are in</InputLabel>
+                  <Select
+                    label="Figures are in"
+                    value={details.amountsIn}
+                    onChange={(event) => updateDetail("amountsIn", event.target.value as DetailsForm["amountsIn"])}
+                  >
+                    <MenuItem value="units">Units (full amounts)</MenuItem>
+                    <MenuItem value="thousands">Thousands ($000)</MenuItem>
+                    <MenuItem value="millions">Millions ($m)</MenuItem>
+                  </Select>
+                  <FormHelperText>
+                    {fieldErrors.amountsIn ?? "Look for $000 or $m at the top of the statements."}
+                  </FormHelperText>
+                </FormControl>
+              </Stack>
+
+              <FormControl error={Boolean(fieldErrors.competitorOf)}>
+                <InputLabel>Competes with (optional)</InputLabel>
+                <Select
+                  label="Competes with (optional)"
+                  value={details.competitorOf}
+                  onChange={(event) => updateDetail("competitorOf", event.target.value)}
+                >
+                  <MenuItem value="">No competitor yet</MenuItem>
+                  {companies.map((company) => (
+                    <MenuItem key={company.id} value={company.id}>{company.name}</MenuItem>
+                  ))}
+                </Select>
+                <FormHelperText>
+                  {fieldErrors.competitorOf ?? "Pick a company it competes with, so you can compare them in chat."}
+                </FormHelperText>
+              </FormControl>
+
+              {review.failedChecks.length > 0 ? (
+                <FormControlLabel
+                  control={
+                    <Checkbox checked={confirmedChecks} onChange={(event) => setConfirmedChecks(event.target.checked)} />
+                  }
+                  label="I've checked these figures against the original statements and they're correct."
+                />
+              ) : null}
+            </Stack>
+          ) : null}
+
+          {error ? <Alert ref={errorRef} severity="error">{error}</Alert> : null}
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={close} disabled={checking}>Cancel</Button>
+        <Button onClick={close} disabled={busy}>Cancel</Button>
+        {review && review.errors.length === 0 ? (
+          <Button variant="contained" disabled={!canSave} onClick={() => void save()}>
+            {saving ? "Saving…" : "Save company"}
+          </Button>
+        ) : null}
       </DialogActions>
     </Dialog>
   );
 }
 
-function ReviewSummary({ review }: { review: StatementUploadReview }) {
+interface ScaleProps {
+  currency: string;
+  amountsIn: DetailsForm["amountsIn"];
+}
+
+function ReviewSummary({ review, currency, amountsIn }: { review: StatementUploadReview } & ScaleProps) {
   return (
     <Stack spacing={2}>
       {review.errors.length > 0 ? (
@@ -141,8 +327,8 @@ function ReviewSummary({ review }: { review: StatementUploadReview }) {
       ) : review.failedChecks.length > 0 ? (
         <Alert severity="warning">
           <Typography variant="body2" fontWeight={600}>
-            {review.failedChecks.length} of {review.checksRun} checks did not add up.
-            Check these against the original statements:
+            {review.failedChecks.length} of {review.checksRun} checks don&apos;t add up. Compare these with
+            the original statements:
           </Typography>
           <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
             {review.failedChecks.map((check) => (
@@ -153,13 +339,13 @@ function ReviewSummary({ review }: { review: StatementUploadReview }) {
           </Box>
         </Alert>
       ) : (
-        <Alert severity="success">All {review.checksRun} checks passed. The figures add up.</Alert>
+        <Alert severity="success">All {review.checksRun} checks passed.</Alert>
       )}
 
       {review.unrecognised.length > 0 ? (
         <Alert severity="info">
           <Typography variant="body2" fontWeight={600}>
-            These rows were not recognised and will be left out:
+            These rows weren&apos;t recognised and will be skipped:
           </Typography>
           <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
             {review.unrecognised.map((row) => (
@@ -169,17 +355,57 @@ function ReviewSummary({ review }: { review: StatementUploadReview }) {
         </Alert>
       ) : null}
 
-      {review.years.length > 0 ? <StatementTable review={review} /> : null}
+      {review.years.length > 0 ? (
+        <Stack spacing={1}>
+          <ScaleCaption review={review} currency={currency} amountsIn={amountsIn} />
+          <StatementTable review={review} />
+        </Stack>
+      ) : null}
     </Stack>
   );
+}
+
+const SCALE_MULTIPLIERS = { units: 1, thousands: 1_000, millions: 1_000_000 } as const;
+
+function ScaleCaption({ review, currency, amountsIn }: { review: StatementUploadReview } & ScaleProps) {
+  const hasCurrency = /^[A-Z]{1,3}\$?$/.test(currency);
+
+  if (!hasCurrency || !amountsIn) {
+    return (
+      <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
+        Amounts are shown exactly as in your file. Choose the currency and what the figures are in below.
+      </Typography>
+    );
+  }
+
+  const example = statementTableRows(review.years).find((row) => row.values[0] !== null);
+  const scaleLabel = amountsIn === "units" ? "" : ` ${amountsIn}`;
+
+  return (
+    <Typography variant="body2">
+      <strong>Figures in {currency}{scaleLabel}.</strong>
+      {example ? (
+        <>
+          {" "}For example, {example.label.toLowerCase()} of {formatValue(example.values[0], false)} in{" "}
+          {formatYear(review.years[0].fiscalYearEnd)} means{" "}
+          <strong>{formatMoney(Math.abs(example.values[0]!) * SCALE_MULTIPLIERS[amountsIn], currency)}</strong>.
+        </>
+      ) : null}
+    </Typography>
+  );
+}
+
+function formatMoney(amount: number, currency: string) {
+  const text = (Math.round(amount * 100) / 100).toLocaleString("en-NZ", { maximumFractionDigits: 2 });
+  return currency.endsWith("$") ? `${currency}${text}` : `${currency} ${text}`;
 }
 
 function StatementTable({ review }: { review: StatementUploadReview }) {
   const rows = statementTableRows(review.years);
 
   return (
-    <TableContainer sx={{ border: "1px solid", borderColor: dashboardTokens.border, borderRadius: 2 }}>
-      <Table size="small">
+    <TableContainer sx={{ border: "1px solid", borderColor: dashboardTokens.border, borderRadius: 2, maxHeight: 360 }}>
+      <Table size="small" stickyHeader>
         <TableHead>
           <TableRow>
             <TableCell>Line</TableCell>

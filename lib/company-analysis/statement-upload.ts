@@ -10,14 +10,14 @@ export function readStatementFile(value: FormDataEntryValue | null): File {
     throw new ApiError(400, 'BAD_REQUEST', 'Choose a CSV file to upload.')
   }
   if (value.size === 0) {
-    throw new ApiError(400, 'BAD_REQUEST', 'The uploaded file is empty.')
+    throw new ApiError(400, 'BAD_REQUEST', 'The file is empty.')
   }
   if (value.size > MAX_STATEMENT_UPLOAD_BYTES) {
-    throw new ApiError(400, 'BAD_REQUEST', 'The uploaded file is larger than 1 MB. A statement template should be a few kilobytes.')
+    throw new ApiError(400, 'BAD_REQUEST', 'The file is too big (over 1 MB). A filled-in template is much smaller, so check you picked the right file.')
   }
   const extension = value.name.split('.').pop()?.toLowerCase() ?? ''
   if (extension !== 'csv') {
-    throw new ApiError(400, 'BAD_REQUEST', 'Upload the statements as a CSV file using the template.')
+    throw new ApiError(400, 'BAD_REQUEST', 'Only CSV files work here. Use the template.')
   }
   return value
 }
@@ -51,12 +51,12 @@ export async function reviewStatementUpload(file: File): Promise<StatementUpload
 
 export function assertReadyToSave(review: StatementUploadReview, confirmedChecks: boolean) {
   if (review.errors.length > 0) {
-    throw new ApiError(400, 'VALIDATION_ERROR', 'The file has problems that need fixing before it can be saved.', {
+    throw new ApiError(400, 'VALIDATION_ERROR', 'Fix the problems in the file before saving.', {
       errors: review.errors,
     })
   }
   if (review.failedChecks.length > 0 && !confirmedChecks) {
-    throw new ApiError(400, 'VALIDATION_ERROR', 'Some figures do not add up. Check them, then confirm to save anyway.', {
+    throw new ApiError(400, 'VALIDATION_ERROR', 'Some figures don\'t add up. Tick the box to save anyway.', {
       failedChecks: review.failedChecks.map((check) => ({
         fiscalYearEnd: check.fiscalYearEnd,
         message: check.message,

@@ -26,7 +26,7 @@ describe('statement checks', () => {
 
     expect(failed.map((result) => result.id)).toEqual(['current_assets'])
     expect(failed[0].message).toBe(
-      'Current assets add up: the statement shows 39.1, but its parts add up to 39.2.'
+      'Current assets: the file says 39.1, but inventory + receivables + bank = 39.2.'
     )
   })
 
@@ -92,13 +92,13 @@ describe('parseStatementCsv', () => {
   })
 
   it.each([
-    ['a year heading that is not a date', ['Line,FY2025', 'Revenue,100'], 'must be a year-end date'],
-    ['the same year twice', ['Line,2025-03-31,2025-03-31', 'Revenue,100,90'], 'appears more than once'],
-    ['the same line twice', ['Line,2025-03-31', 'Revenue,100', 'Sales,90'], 'appears more than once (rows 2 and 3)'],
-    ['a figure that is not a number', ['Line,2025-03-31', 'Revenue,L$100'], 'is not a number'],
-    ['no recognisable lines', ['Line,2025-03-31', 'Other income,5'], 'No statement lines were recognised'],
-    ['direct costs without their revenue stream', ['Line,2025-03-31', 'Revenue,100', 'Direct costs: Salons,(5)'], 'has no matching "Revenue stream: Salons"'],
-    ['an impossible date', ['Line,2025-02-30', 'Revenue,100'], 'must be a year-end date'],
+    ['a year heading that is not a date', ['Line,FY2025', 'Revenue,100'], "isn't a date"],
+    ['the same year twice', ['Line,2025-03-31,2025-03-31', 'Revenue,100,90'], 'is in the file twice'],
+    ['the same line twice', ['Line,2025-03-31', 'Revenue,100', 'Sales,90'], 'is in the file twice (rows 2 and 3)'],
+    ['a figure that is not a number', ['Line,2025-03-31', 'Revenue,L$100'], "isn't a number"],
+    ['no recognisable lines', ['Line,2025-03-31', 'Other income,5'], 'None of the rows were recognised'],
+    ['direct costs without their revenue stream', ['Line,2025-03-31', 'Revenue,100', 'Direct costs: Salons,(5)'], 'needs a matching "Revenue stream: Salons"'],
+    ['an impossible date', ['Line,2025-02-30', 'Revenue,100'], "isn't a date"],
   ])('rejects %s', (_case, lines, message) => {
     const result = parseStatementCsv(encode(lines.join('\n')))
     expect(result.years).toEqual([])
@@ -110,12 +110,12 @@ describe('impossible values', () => {
   const read = (lines: string[]) => parseStatementCsv(encode(lines.join('\n')))
 
   it.each([
-    ['negative revenue', 'Revenue,-500', 'Revenue cannot be negative'],
-    ['massive negative revenue', 'Revenue,-999999999', 'Revenue cannot be negative'],
-    ['a negative revenue stream', 'Revenue stream: Royalties,-10', 'cannot be negative'],
-    ['a negative asset', 'Inventory,-5', 'Inventory cannot be negative'],
-    ['a negative liability', 'Current liabilities,-20', 'Current liabilities cannot be negative'],
-    ['a bracketed revenue figure', 'Revenue,(203.3)', 'Revenue cannot be negative'],
+    ['negative revenue', 'Revenue,-500', "Revenue can't be negative"],
+    ['massive negative revenue', 'Revenue,-999999999', "Revenue can't be negative"],
+    ['a negative revenue stream', 'Revenue stream: Royalties,-10', "can't be negative"],
+    ['a negative asset', 'Inventory,-5', "Inventory can't be negative"],
+    ['a negative liability', 'Current liabilities,-20', "Current liabilities can't be negative"],
+    ['a bracketed revenue figure', 'Revenue,(203.3)', "Revenue can't be negative"],
   ])('blocks %s', (_case, row, message) => {
     const result = read(['Line,2025-03-31', row])
     expect(result.years).toEqual([])
@@ -124,13 +124,13 @@ describe('impossible values', () => {
 
   it('explains that an overdraft is a liability, not negative cash', () => {
     const result = read(['Line,2025-03-31', 'Bank,-50'])
-    expect(result.errors.join(' ')).toContain('An overdraft belongs under liabilities')
+    expect(result.errors.join(' ')).toContain('An overdraft goes under liabilities')
   })
 
   it('blocks a figure too large to store instead of failing on save', () => {
     const result = read(['Line,2025-03-31', 'Revenue,999999999999999999999'])
     expect(result.years).toEqual([])
-    expect(result.errors.join(' ')).toContain('too large to store')
+    expect(result.errors.join(' ')).toContain('is too big')
   })
 
   it('allows the lines that can legitimately be negative', () => {
@@ -153,12 +153,12 @@ describe('impossible values', () => {
   it('reports a bad cell once, without a second "no figures" error', () => {
     const result = read(['Line,2025-03-31', 'Revenue,abc'])
     expect(result.errors).toEqual([
-      'Row 2 ("Revenue"): "abc" in 2025-03-31 is not a number.',
+      'Row 2: "abc" for Revenue (2025-03-31) isn\'t a number.',
     ])
   })
 
   it.each(['1e5', 'L$203.3', 'abc'])('rejects %p as not a number', (value) => {
-    expect(read(['Line,2025-03-31', `Revenue,${value}`]).errors.join(' ')).toContain('is not a number')
+    expect(read(['Line,2025-03-31', `Revenue,${value}`]).errors.join(' ')).toContain("isn't a number")
   })
 
   it('treats a runway row as unrecognised, since annual statements have no runway line', () => {

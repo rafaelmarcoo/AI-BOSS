@@ -149,7 +149,7 @@ export async function createUserCompany(params: {
       .delete()
       .eq('id', company.id)
       .eq('user_id', params.userId)
-    throw new ApiError(500, 'INTERNAL_ERROR', 'Could not save the company statements.')
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Could not save the figures, so nothing was saved. Please try again.')
   }
 
   return company as AnalysedCompany
@@ -166,7 +166,7 @@ export async function deleteUserCompany(userId: string, companyId: string) {
 
   if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Could not delete the company.')
   if (!data || data.length === 0) {
-    throw new ApiError(404, 'NOT_FOUND', 'Company not found. Only companies you added can be deleted.')
+    throw new ApiError(404, 'NOT_FOUND', 'Couldn\'t find that company. You can only delete companies you added.')
   }
 }
 

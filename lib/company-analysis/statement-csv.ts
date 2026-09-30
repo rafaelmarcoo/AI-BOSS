@@ -127,13 +127,13 @@ export function parseStatementCsv(fileBytes: Uint8Array): StatementCsvResult {
   const yearHeaders = sheet.headers.slice(1)
 
   if (yearHeaders.length === 0) {
-    errors.push('Add at least one year column, headed by its year-end date, for example 2025-03-31.')
+    errors.push('The file needs at least one year column, with the year-end date at the top, like 2025-03-31.')
   }
   for (const header of yearHeaders) {
     if (/^\d{4}-\d{2}-\d{2}_\d+$/.test(header)) {
-      errors.push(`The year ${header.replace(/_\d+$/, '')} appears more than once.`)
+      errors.push(`The year ${header.replace(/_\d+$/, '')} is in the file twice.`)
     } else if (!isIsoDate(header)) {
-      errors.push(`Column heading "${header}" must be a year-end date written like 2025-03-31.`)
+      errors.push(`The column heading "${header}" isn't a date. Write it like 2025-03-31.`)
     }
   }
   if (errors.length > 0) return { years: [], unrecognised, errors }
@@ -157,7 +157,7 @@ export function parseStatementCsv(fileBytes: Uint8Array): StatementCsvResult {
     const identity = target.kind === 'line' ? target.key : `${target.key}:${target.name.toLowerCase()}`
     const firstRow = seenAt.get(identity)
     if (firstRow !== undefined) {
-      errors.push(`"${label}" appears more than once (rows ${firstRow} and ${row.rowNumber}).`)
+      errors.push(`"${label}" is in the file twice (rows ${firstRow} and ${row.rowNumber}).`)
       continue
     }
     seenAt.set(identity, row.rowNumber)
@@ -167,13 +167,13 @@ export function parseStatementCsv(fileBytes: Uint8Array): StatementCsvResult {
       const parsed = parseAmount(raw)
       if (parsed === null) return
       if (parsed === 'invalid') {
-        errors.push(`Row ${row.rowNumber} ("${label}"): "${raw}" in ${date} is not a number.`)
+        errors.push(`Row ${row.rowNumber}: "${raw}" for ${label} (${date}) isn't a number.`)
         columnsWithCellErrors.add(date)
         return
       }
 
       if (Math.abs(parsed) >= LARGEST_STORABLE) {
-        errors.push(`Row ${row.rowNumber} ("${label}"): ${raw} in ${date} is too large to store. Check the figure, or enter the statements in thousands or millions.`)
+        errors.push(`Row ${row.rowNumber}: ${label} (${date}) is too big. Check the number, or enter the figures in thousands or millions.`)
         columnsWithCellErrors.add(date)
         return
       }
@@ -181,8 +181,8 @@ export function parseStatementCsv(fileBytes: Uint8Array): StatementCsvResult {
       const value = COST_KEYS.has(target.key) ? Math.abs(parsed) : parsed
 
       if (value < 0 && NEVER_NEGATIVE.has(target.key)) {
-        const hint = target.key === 'cash' ? ' An overdraft belongs under liabilities, not as negative cash.' : ' Check the sign.'
-        errors.push(`Row ${row.rowNumber} ("${label}"): ${label} cannot be negative (${raw} in ${date}).${hint}`)
+        const hint = target.key === 'cash' ? ' An overdraft goes under liabilities, not as negative cash.' : ''
+        errors.push(`Row ${row.rowNumber}: ${label} can't be negative (${raw} in ${date}).${hint}`)
         columnsWithCellErrors.add(date)
         return
       }
@@ -205,18 +205,18 @@ export function parseStatementCsv(fileBytes: Uint8Array): StatementCsvResult {
 
   for (const year of years.values()) {
     const hasFigures = Object.keys(year.lines).length > 0 || year.streams.length > 0
-    if (!hasFigures && !columnsWithCellErrors.has(year.fiscalYearEnd)) errors.push(`The ${year.fiscalYearEnd} column has no figures.`)
+    if (!hasFigures && !columnsWithCellErrors.has(year.fiscalYearEnd)) errors.push(`The ${year.fiscalYearEnd} column is empty.`)
 
     for (const stream of year.streams) {
       const hasRevenueRow = seenAt.has(`segment_revenue:${stream.name.toLowerCase()}`)
       if (!hasRevenueRow) {
-        errors.push(`"Direct costs: ${stream.name}" has no matching "Revenue stream: ${stream.name}" row.`)
+        errors.push(`"Direct costs: ${stream.name}" needs a matching "Revenue stream: ${stream.name}" row.`)
       }
     }
   }
 
   if (seenAt.size === 0) {
-    errors.push('No statement lines were recognised. Use the line names from the template, such as "Revenue" or "Total assets".')
+    errors.push('None of the rows were recognised. Use the line names from the template, like "Revenue" or "Total assets".')
   }
 
   if (errors.length > 0) return { years: [], unrecognised, errors: [...new Set(errors)] }

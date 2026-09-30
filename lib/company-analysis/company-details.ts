@@ -23,23 +23,23 @@ export function validateCompanyDetails(formData: FormData): CompanyDetails {
   const details: Record<string, string> = {}
 
   const name = text(formData, 'name')
-  if (!name || name.length > 120) details.name = 'Enter a company name of up to 120 characters.'
+  if (!name || name.length > 120) details.name = 'Enter a company name (up to 120 characters).'
 
   const industry = text(formData, 'industry')
-  if (industry.length > 120) details.industry = 'Keep the industry to 120 characters or fewer.'
+  if (industry.length > 120) details.industry = 'Industry can be up to 120 characters.'
 
   const currency = text(formData, 'currency').toUpperCase()
   if (!/^[A-Z]{1,3}\$?$/.test(currency)) {
-    details.currency = 'Choose a currency, such as NZD, AUD, USD, or a case-study currency such as D$.'
+    details.currency = 'Enter a currency, like NZD, AUD or USD.'
   }
 
   const amountsIn = text(formData, 'amountsIn')
   if (!(AMOUNT_SCALES as readonly string[]).includes(amountsIn)) {
-    details.amountsIn = 'Choose whether figures are in units, thousands or millions.'
+    details.amountsIn = 'Choose units, thousands or millions.'
   }
 
   if (Object.keys(details).length > 0) {
-    throw new ApiError(400, 'VALIDATION_ERROR', 'Some company details are missing or invalid.', details)
+    throw new ApiError(400, 'VALIDATION_ERROR', 'Some details are missing or wrong. Check the boxes marked in red.', details)
   }
 
   return {
@@ -67,7 +67,7 @@ export function planNewCompany(params: {
       'CONFLICT',
       clash.user_id
         ? `You already have a company called ${clash.name}.`
-        : `${clash.name} is already available as a case study. Choose a different name.`
+        : `${clash.name} is already a case study. Pick a different name.`
     )
   }
 
@@ -75,8 +75,8 @@ export function planNewCompany(params: {
   if (details.competitorOf) {
     const competitor = visibleCompanies.find((company) => company.id === details.competitorOf)
     if (!competitor?.peer_group) {
-      throw new ApiError(400, 'VALIDATION_ERROR', 'The chosen competitor could not be found.', {
-        competitorOf: 'Choose a competitor from the list.',
+      throw new ApiError(400, 'VALIDATION_ERROR', 'That competitor no longer exists.', {
+        competitorOf: 'Pick another company from the list.',
       })
     }
     peerGroup = competitor.peer_group

@@ -23,7 +23,9 @@ function check(
   id: string,
   label: string,
   reported: number | undefined,
-  expected: number | null
+  expected: number | null,
+  name: string,
+  parts: string
 ): StatementCheck[] {
   if (reported === undefined || expected === null) return []
   const passed = withinRounding(reported, expected)
@@ -34,7 +36,7 @@ function check(
       passed,
       reported,
       expected,
-      message: passed ? '' : `${label}: the statement shows ${show(reported)}, but its parts add up to ${show(expected)}.`,
+      message: passed ? '' : `${name}: the file says ${show(reported)}, but ${parts} = ${show(expected)}.`,
     },
   ]
 }
@@ -67,13 +69,17 @@ export function checkStatementYear(year: StatementYear, prior?: StatementYear): 
       'revenue_streams',
       'Revenue equals the sum of its revenue streams',
       year.streams.length > 0 ? l.revenue : undefined,
-      year.streams.reduce((total, stream) => total + stream.revenue, 0)
+      year.streams.reduce((total, stream) => total + stream.revenue, 0),
+      'Revenue',
+      'the revenue streams added together'
     ),
     ...check(
       'gross_profit',
       'Gross profit equals revenue less cost of sales',
       l.gross_profit,
-      l.revenue !== undefined && l.cost_of_sales !== undefined ? l.revenue - l.cost_of_sales : null
+      l.revenue !== undefined && l.cost_of_sales !== undefined ? l.revenue - l.cost_of_sales : null,
+      'Gross profit',
+      'revenue - cost of sales'
     ),
     ...check(
       'total_operating_costs',
@@ -81,31 +87,39 @@ export function checkStatementYear(year: StatementYear, prior?: StatementYear): 
       l.total_operating_costs,
       l.administrative_expenses !== undefined
         ? directCosts + (l.marketing_expenses ?? 0) + l.administrative_expenses
-        : null
+        : null,
+      'Total operating costs',
+      'direct costs + marketing + administration'
     ),
-    ...check('operating_profit', 'Operating profit follows from revenue and costs', l.operating_profit, operatingProfitExpected),
+    ...check('operating_profit', 'Operating profit follows from revenue and costs', l.operating_profit, operatingProfitExpected, 'Operating profit', 'revenue - costs'),
     ...check(
       'profit_before_tax',
       'Profit before tax equals operating profit less finance costs',
       l.profit_before_tax,
-      l.operating_profit !== undefined && l.finance_costs !== undefined ? l.operating_profit - l.finance_costs : null
+      l.operating_profit !== undefined && l.finance_costs !== undefined ? l.operating_profit - l.finance_costs : null,
+      'Profit before tax',
+      'operating profit - finance costs'
     ),
     ...check(
       'profit_for_year',
       'Profit for the year equals profit before tax less tax',
       l.profit_for_year,
-      l.profit_before_tax !== undefined && l.tax_expense !== undefined ? l.profit_before_tax - l.tax_expense : null
+      l.profit_before_tax !== undefined && l.tax_expense !== undefined ? l.profit_before_tax - l.tax_expense : null,
+      'Profit for the year',
+      'profit before tax - tax'
     ),
-    ...check('non_current_assets', 'Non-current assets add up', l.non_current_assets, sum(year, ['intangible_assets', 'property_plant_equipment'])),
-    ...check('current_assets', 'Current assets add up', l.current_assets, sum(year, ['inventory', 'trade_receivables', 'cash'])),
-    ...check('total_assets', 'Total assets equal non-current plus current assets', l.total_assets, sum(year, ['non_current_assets', 'current_assets'])),
-    ...check('total_equity', 'Total equity equals share capital plus retained earnings', l.total_equity, sum(year, ['share_capital', 'retained_earnings'])),
-    ...check('current_liabilities', 'Current liabilities add up', l.current_liabilities, sum(year, ['trade_payables', 'tax_payable'])),
+    ...check('non_current_assets', 'Non-current assets add up', l.non_current_assets, sum(year, ['intangible_assets', 'property_plant_equipment']), 'Non-current assets', 'intangible assets + property, plant and equipment'),
+    ...check('current_assets', 'Current assets add up', l.current_assets, sum(year, ['inventory', 'trade_receivables', 'cash']), 'Current assets', 'inventory + receivables + bank'),
+    ...check('total_assets', 'Total assets equal non-current plus current assets', l.total_assets, sum(year, ['non_current_assets', 'current_assets']), 'Total assets', 'non-current assets + current assets'),
+    ...check('total_equity', 'Total equity equals share capital plus retained earnings', l.total_equity, sum(year, ['share_capital', 'retained_earnings']), 'Total equity', 'share capital + retained earnings'),
+    ...check('current_liabilities', 'Current liabilities add up', l.current_liabilities, sum(year, ['trade_payables', 'tax_payable']), 'Current liabilities', 'payables + tax payable'),
     ...check(
       'balance_sheet',
       'Total assets equal equity plus liabilities',
       l.total_assets,
-      sum(year, ['total_equity', 'non_current_borrowings', 'current_liabilities'])
+      sum(year, ['total_equity', 'non_current_borrowings', 'current_liabilities']),
+      'Balance sheet',
+      'equity + loans + current liabilities'
     ),
     ...check(
       'retained_earnings',
@@ -113,7 +127,9 @@ export function checkStatementYear(year: StatementYear, prior?: StatementYear): 
       l.retained_earnings,
       prior?.lines.retained_earnings !== undefined && l.profit_for_year !== undefined && l.dividends !== undefined
         ? prior.lines.retained_earnings + l.profit_for_year - l.dividends
-        : null
+        : null,
+      'Retained earnings',
+      "last year's retained earnings + profit - dividends"
     ),
   ]
 }

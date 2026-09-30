@@ -16,7 +16,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     const { companyId } = await context.params
 
     if (!UUID_PATTERN.test(companyId)) {
-      throw new ApiError(404, 'NOT_FOUND', 'Company not found. Only companies you added can be deleted.')
+      throw new ApiError(404, 'NOT_FOUND', 'Couldn\'t find that company. You can only delete companies you added.')
     }
 
     await deleteUserCompany(user.id, companyId)

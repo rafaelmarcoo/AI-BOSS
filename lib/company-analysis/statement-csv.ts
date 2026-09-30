@@ -1,6 +1,7 @@
 import { parseCsvTabularData } from '@/lib/documents/tabular'
 import type { StatementLineKey } from '@/lib/company-analysis/statement-lines'
 import type { StatementYear } from '@/lib/company-analysis/statement-analysis'
+import { parseYearEnd } from '@/lib/company-analysis/year-end-date'
 
 type CompanyLineKey = Exclude<StatementLineKey, 'segment_revenue' | 'segment_direct_costs'>
 
@@ -89,12 +90,6 @@ function parseAmount(raw: string): number | null | 'invalid' {
   return negative ? -value : value
 }
 
-function isIsoDate(value: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
-  const parsed = new Date(`${value}T00:00:00Z`)
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
-}
-
 export interface StatementCsvResult {
   years: StatementYear[]
   unrecognised: Array<{ rowNumber: number; label: string }>
@@ -129,17 +124,22 @@ export function parseStatementCsv(fileBytes: Uint8Array): StatementCsvResult {
   if (yearHeaders.length === 0) {
     errors.push('The file needs at least one year column, with the year-end date at the top, like 2025-03-31.')
   }
+  
+  const yearDates: string[] = []
   for (const header of yearHeaders) {
-    if (/^\d{4}-\d{2}-\d{2}_\d+$/.test(header)) {
-      errors.push(`The year ${header.replace(/_\d+$/, '')} is in the file twice.`)
-    } else if (!isIsoDate(header)) {
-      errors.push(`The column heading "${header}" isn't a date. Write it like 2025-03-31.`)
+    const result = parseYearEnd(header.replace(/_\d+$/, ''))
+    if (!result.ok) {
+      errors.push(result.message)
+    } else if (yearDates.includes(result.date)) {
+      errors.push(`The year ${result.date} is in the file twice.`)
+    } else {
+      yearDates.push(result.date)
     }
   }
-  if (errors.length > 0) return { years: [], unrecognised, errors }
+  if (errors.length > 0) return { years: [], unrecognised, errors: [...new Set(errors)] }
 
   const years = new Map<string, StatementYear>(
-    yearHeaders.map((date) => [date, { fiscalYearEnd: date, lines: {}, streams: [] }])
+    yearDates.map((date) => [date, { fiscalYearEnd: date, lines: {}, streams: [] }])
   )
   const seenAt = new Map<string, number>()
   const columnsWithCellErrors = new Set<string>()
@@ -162,7 +162,7 @@ export function parseStatementCsv(fileBytes: Uint8Array): StatementCsvResult {
     }
     seenAt.set(identity, row.rowNumber)
 
-    yearHeaders.forEach((date, index) => {
+    yearDates.forEach((date, index) => {
       const raw = row.values[index + 1] ?? ''
       const parsed = parseAmount(raw)
       if (parsed === null) return

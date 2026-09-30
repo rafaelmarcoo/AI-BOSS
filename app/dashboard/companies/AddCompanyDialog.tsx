@@ -327,8 +327,7 @@ function ReviewSummary({ review, currency, amountsIn }: { review: StatementUploa
       ) : review.failedChecks.length > 0 ? (
         <Alert severity="warning">
           <Typography variant="body2" fontWeight={600}>
-            {review.failedChecks.length} of {review.checksRun} checks don&apos;t add up. Compare these with
-            the original statements:
+            {`${review.failedChecks.length} of ${review.checksRun} checks don't add up. Compare these with the original statements:`}
           </Typography>
           <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
             {review.failedChecks.map((check) => (

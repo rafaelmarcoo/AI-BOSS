@@ -25,6 +25,25 @@ import {
   buildRevenueTrendWidgets,
 } from "./existing-data/existing-data-builders";
 import type { GenUiDataContext, PlannerWidget } from "./types";
+import {
+  buildBreakEvenAnalysisWidget,
+  buildBreakEvenProgressWidget,
+  buildBudgetForecastWidget,
+  buildBudgetRemainingWidget,
+  buildBudgetVsActualWidget,
+  buildCashFlowForecastWidget,
+  buildCashFlowSummaryWidget,
+  buildCashInflowForecastWidget,
+  buildCashOutflowForecastWidget,
+  buildExpenseBreakdownWidget,
+  buildExpenseChangeDetectorWidget,
+  buildLargestExpensesWidget,
+  buildProfitForecastWidget,
+  buildProfitMarginWidget,
+  buildProfitSnapshotWidget,
+  buildProfitTrendWidget,
+  buildRevenueForecastWidget,
+} from "./stage3/stage3-builders";
 
 export type GenUiWidgetBuilder = (
   spec: PlannerWidget,
@@ -104,6 +123,23 @@ export const GEN_UI_BUILDER_REGISTRY = {
   ai_financial_brief: (spec, index, context) => [
     buildAiFinancialBriefWidget(spec, index, context),
   ],
+  cash_flow_summary: (spec, index, context) => [buildCashFlowSummaryWidget(spec, index, context)],
+  cash_flow_forecast: (spec, index, context) => [buildCashFlowForecastWidget(spec, index, context)],
+  revenue_forecast: (spec, index, context) => [buildRevenueForecastWidget(spec, index, context)],
+  profit_snapshot: (spec, index, context) => [buildProfitSnapshotWidget(spec, index, context)],
+  profit_trend: (spec, index, context) => [buildProfitTrendWidget(spec, index, context)],
+  profit_forecast: (spec, index, context) => [buildProfitForecastWidget(spec, index, context)],
+  profit_margin: (spec, index, context) => [buildProfitMarginWidget(spec, index, context)],
+  break_even_analysis: (spec, index, context) => [buildBreakEvenAnalysisWidget(spec, index, context)],
+  break_even_progress: (spec, index, context) => [buildBreakEvenProgressWidget(spec, index, context)],
+  expense_breakdown: (spec, index, context) => [buildExpenseBreakdownWidget(spec, index, context)],
+  largest_expenses: (spec, index, context) => [buildLargestExpensesWidget(spec, index, context)],
+  expense_change_detector: (spec, index, context) => [buildExpenseChangeDetectorWidget(spec, index, context)],
+  budget_vs_actual: (spec, index, context) => [buildBudgetVsActualWidget(spec, index, context)],
+  budget_remaining: (spec, index, context) => [buildBudgetRemainingWidget(spec, index, context)],
+  budget_forecast: (spec, index, context) => [buildBudgetForecastWidget(spec, index, context)],
+  cash_inflow_forecast: (spec, index, context) => [buildCashInflowForecastWidget(spec, index, context)],
+  cash_outflow_forecast: (spec, index, context) => [buildCashOutflowForecastWidget(spec, index, context)],
 } satisfies GenUiBuilderRegistry;
 
 export function buildGenUiWidgets(

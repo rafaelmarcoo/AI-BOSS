@@ -266,6 +266,189 @@ export interface FinancialMetricObservation {
   updated_at: string
 }
 
+export type FinancialSyncStatus = 'running' | 'completed' | 'partial' | 'failed'
+export type FinancialAccountClass =
+  | 'asset'
+  | 'liability'
+  | 'equity'
+  | 'revenue'
+  | 'expense'
+  | 'other'
+export type FinancialCostBehavior = 'fixed' | 'variable' | 'mixed' | 'unclassified'
+export type FinancialStatementType = 'profit_loss' | 'cash_flow'
+export type FinancialStatementClassification =
+  | 'revenue'
+  | 'cost_of_sales'
+  | 'operating_expense'
+  | 'other_income'
+  | 'other_expense'
+  | 'gross_profit'
+  | 'operating_profit'
+  | 'net_profit'
+  | 'cash_inflow'
+  | 'cash_outflow'
+  | 'net_cash_flow'
+  | 'other'
+export type FinancialTransactionType =
+  | 'receipt'
+  | 'payment'
+  | 'purchase'
+  | 'sale'
+  | 'transfer'
+  | 'journal'
+  | 'other'
+export type FinancialTransactionStatus = 'draft' | 'posted' | 'voided' | 'deleted'
+export type FinancialTransactionDirection = 'inflow' | 'outflow' | 'transfer'
+export type FinancialBudgetStatus = 'draft' | 'approved' | 'archived'
+export type FinancialBudgetLineKind = 'revenue' | 'expense' | 'cash_inflow' | 'cash_outflow'
+
+export interface FinancialSyncRun {
+  id: string
+  user_id: string
+  connection_id: string
+  provider: AccountingProvider
+  status: FinancialSyncStatus
+  started_at: string
+  completed_at: string | null
+  source_as_of_date: string | null
+  capabilities: string[]
+  record_counts: Record<string, number>
+  error_message: string | null
+  created_at: string
+}
+
+export interface FinancialAccount {
+  id: string
+  user_id: string
+  connection_id: string | null
+  sync_run_id: string | null
+  source_type: FinancialMetricSourceType
+  source_label: string
+  provider_account_id: string
+  account_code: string | null
+  account_name: string
+  account_class: FinancialAccountClass
+  account_subtype: string | null
+  canonical_category: string | null
+  cost_behavior: FinancialCostBehavior
+  currency: string | null
+  is_active: boolean
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialReportingPeriod {
+  id: string
+  user_id: string
+  connection_id: string | null
+  document_id: string | null
+  sync_run_id: string | null
+  source_type: FinancialMetricSourceType
+  source_label: string
+  statement_type: FinancialStatementType
+  period_start: string
+  period_end: string
+  currency: string
+  generated_at: string | null
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialStatementLine {
+  id: string
+  reporting_period_id: string
+  user_id: string
+  account_id: string | null
+  parent_line_id: string | null
+  line_key: string
+  label: string
+  classification: FinancialStatementClassification
+  canonical_category: string | null
+  amount: number
+  cost_behavior: FinancialCostBehavior
+  is_total: boolean
+  sort_order: number
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialTransaction {
+  id: string
+  user_id: string
+  connection_id: string | null
+  document_id: string | null
+  sync_run_id: string | null
+  source_type: FinancialMetricSourceType
+  source_label: string
+  provider_transaction_id: string
+  transaction_type: FinancialTransactionType
+  transaction_date: string
+  status: FinancialTransactionStatus
+  direction: FinancialTransactionDirection
+  reference: string | null
+  counterparty_name: string | null
+  description: string | null
+  currency: string
+  total_amount: number
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialTransactionLine {
+  id: string
+  transaction_id: string
+  user_id: string
+  account_id: string | null
+  line_key: string
+  description: string | null
+  canonical_category: string | null
+  amount: number
+  tax_amount: number
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialBudget {
+  id: string
+  user_id: string
+  connection_id: string | null
+  document_id: string | null
+  sync_run_id: string | null
+  source_type: FinancialMetricSourceType
+  source_label: string
+  provider_budget_id: string
+  name: string
+  status: FinancialBudgetStatus
+  period_start: string
+  period_end: string
+  currency: string
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialBudgetLine {
+  id: string
+  budget_id: string
+  user_id: string
+  account_id: string | null
+  line_key: string
+  label: string
+  kind: FinancialBudgetLineKind
+  canonical_category: string | null
+  period_start: string
+  period_end: string
+  amount: number
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
 export interface SavedScenario {
   id: string
   user_id: string

@@ -1,6 +1,7 @@
 import type { AccountingProvider, NormalizedFinancialData } from '@/lib/integrations/types'
 import { createAdminSupabaseClient } from '@/lib/supabase'
 import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
+import { saveAccountingReadModels } from '@/lib/financial-data/reporting/persistence'
 
 type SnapshotMetricKey = Extract<
   FinancialMetricKey,
@@ -48,6 +49,8 @@ export async function saveAccountingSnapshot(params: {
   if (error) {
     throw new Error(`Failed to write accounting observations: ${error.message}`)
   }
+
+  await saveAccountingReadModels(params)
 
   await supabase
     .from('data_connections')

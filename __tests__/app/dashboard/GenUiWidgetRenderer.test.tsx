@@ -7,6 +7,7 @@ import {
   GEN_UI_WIDGET_TYPES,
   type GenUiWidget,
 } from '@/lib/gen-ui/types'
+import type { ScenarioAnalysisResult } from '@/lib/scenarios/calculation'
 
 jest.mock('@/components/data-sources-panel', () => ({
   DataSourcesPanel: () => <div>Data sources</div>,
@@ -62,6 +63,21 @@ const scenarioResult = {
   warnings: [],
   metricInputs: {},
   calculatedAt: '2026-06-01T00:00:00Z',
+} as ScenarioAnalysisResult
+
+const stage3Summary = {
+  currency: 'NZD', periodStart: '2026-08-01', periodEnd: '2026-08-31', sourceLabel: 'Xero',
+  metrics: [{ label: 'Value', value: 1000, tone: 'neutral' as const }], note: 'Verified summary.',
+}
+const stage3Forecast = {
+  label: 'Forecast', currency: 'NZD', actualPoints: [{ date: '2026-08-31', value: 1000 }],
+  forecastPoints: [{ date: '2026-09-30', value: 1100 }], method: 'linear trend', assumptions: ['Test assumption.'],
+}
+const stage3Budget = {
+  budgetName: 'Operating budget', currency: 'NZD', periodStart: '2026-07-01', periodEnd: '2027-06-30',
+  totalBudget: 120000, totalActual: 50000, totalRemaining: 70000, projectedActual: 110000,
+  projectedVariance: 10000, elapsedPercentage: 50,
+  lines: [{ label: 'Software', budgetAmount: 12000, actualAmount: 5000, variance: 7000, remaining: 7000 }],
 }
 
 const widgets: GenUiWidget[] = [
@@ -235,6 +251,46 @@ const widgets: GenUiWidget[] = [
       }],
     },
   },
+  { ...base, type: 'cash_flow_summary', data: stage3Summary },
+  { ...base, type: 'cash_flow_forecast', data: { ...stage3Forecast, openingCash: 100000, horizonDays: 30 } },
+  { ...base, type: 'revenue_forecast', data: stage3Forecast },
+  { ...base, type: 'profit_snapshot', data: stage3Summary },
+  { ...base, type: 'profit_trend', data: { ...stage3Forecast, forecastPoints: [], profitType: 'operating' } },
+  { ...base, type: 'profit_forecast', data: { ...stage3Forecast, profitType: 'operating' } },
+  { ...base, type: 'profit_margin', data: { ...stage3Summary, marginType: 'operating' } },
+  {
+    ...base, type: 'break_even_analysis', data: {
+      currency: 'NZD', revenue: 100000, fixedCosts: 40000, variableCosts: 30000,
+      contributionMarginPercentage: 70, breakEvenRevenue: 57142.86, unclassifiedCostAmount: 0, note: 'Classified costs.',
+    },
+  },
+  {
+    ...base, type: 'break_even_progress', data: {
+      currency: 'NZD', currentRevenue: 100000, breakEvenRevenue: 57142.86,
+      progressPercentage: 175, remainingRevenue: 0, note: 'Above break-even.',
+    },
+  },
+  {
+    ...base, type: 'expense_breakdown', data: {
+      currency: 'NZD', periodStart: '2026-08-01', periodEnd: '2026-08-31',
+      categories: [{ label: 'Software', amount: 1000, percentage: 100 }],
+    },
+  },
+  {
+    ...base, type: 'largest_expenses', data: {
+      currency: 'NZD', items: [{ id: 'expense-1', label: 'Hosting', counterparty: 'Cloud Co', date: '2026-08-20', amount: 1000, category: 'Software' }],
+    },
+  },
+  {
+    ...base, type: 'expense_change_detector', data: {
+      currency: 'NZD', changes: [{ category: 'Software', currentAmount: 1200, previousAmount: 1000, change: 200, percentageChange: 20 }],
+    },
+  },
+  { ...base, type: 'budget_vs_actual', data: stage3Budget },
+  { ...base, type: 'budget_remaining', data: stage3Budget },
+  { ...base, type: 'budget_forecast', data: { ...stage3Budget, method: 'run rate', assumptions: ['Test assumption.'] } },
+  { ...base, type: 'cash_inflow_forecast', data: stage3Forecast },
+  { ...base, type: 'cash_outflow_forecast', data: stage3Forecast },
 ]
 
 describe('Gen UI registries', () => {

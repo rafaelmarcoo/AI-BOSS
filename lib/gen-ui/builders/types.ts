@@ -5,6 +5,7 @@ import type { SourceAwareMetricReadResult } from "@/lib/financial-data/read-mode
 import type { RunwayTrendSummary } from "@/lib/financial-data/runway-history";
 import type { ScenarioAnalysisResult } from "@/lib/scenarios/calculation";
 import type { GenUiSource, GenUiWidgetType } from "@/lib/gen-ui/types";
+import type { Stage3FinancialData } from "@/lib/financial-data/reporting/types";
 
 export interface PlannerWidget {
   type: GenUiWidgetType;
@@ -22,5 +23,5 @@ export interface GenUiDataContext {
   metricHistories: MetricHistorySummary[];
   metricForecasts: MetricForecastSummary[];
   scenarioResult: ScenarioAnalysisResult | null;
+  stage3Data: Stage3FinancialData;
 }
-

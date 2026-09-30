@@ -496,6 +496,66 @@ are published only from included candidates through `confirm_document_extraction
 
 ---
 
+### 14. Stage 3 canonical financial read models
+
+Detailed accounting data is normalized separately from
+`financial_metric_observations`. Provider payloads remain available in
+`raw_data` for audit, but application calculations use the canonical columns.
+Every table is user-owned, protected by RLS, and retains source connection and
+sync-run provenance where applicable.
+
+#### financial_sync_runs
+
+Tracks each detailed accounting import, its provider capabilities, source date,
+record counts, completion state, and any error. This makes partial provider
+support explicit and keeps sync failures from masquerading as zero values.
+
+#### financial_accounts
+
+Stores the canonical chart of accounts. Account class and category drive
+profit and expense calculations. `cost_behavior` is one of `fixed`, `variable`,
+`mixed`, or `unclassified`; break-even widgets may not treat unclassified costs
+as fixed or variable.
+
+#### financial_reporting_periods and financial_statement_lines
+
+Stores distinct `profit_loss` and `cash_flow` reports by reporting period and
+currency. Repeated syncs upsert the same period instead of creating another
+month. Statement lines identify revenue, cost of sales, operating expenses,
+profit totals, cash inflows, cash outflows, and net cash flow.
+
+Component revenue and cost lines use positive magnitudes. Derived profit and net
+cash-flow totals may be negative. This avoids interpreting revenue minus
+expenses as cash flow.
+
+#### financial_transactions and financial_transaction_lines
+
+Stores posted receipts, payments, purchases, sales, transfers, journals, and
+other canonical transactions. Provider transaction IDs prevent repeated syncs
+from duplicating transactions. Lines retain account/category links for expense
+breakdowns and largest-expense analysis.
+
+#### financial_budgets and financial_budget_lines
+
+Stores draft, approved, or archived budgets and their dated revenue, expense,
+cash-inflow, and cash-outflow lines. Actual-versus-budget calculations align
+lines by currency, category/account, and overlapping reporting period.
+
+**RLS Policies:**
+- Users can view, insert, update, and delete only rows whose `user_id` matches `auth.uid()`
+- Server-side provider synchronization still verifies the authenticated owner before using the administrative client
+
+**Deduplication:**
+- Accounts: `(user_id, source_type, provider_account_id)`
+- Reporting periods: `(user_id, source_type, statement_type, period_start, period_end, currency)`
+- Statement lines: `(reporting_period_id, line_key)`
+- Transactions: `(user_id, source_type, provider_transaction_id)`
+- Transaction lines: `(transaction_id, line_key)`
+- Budgets: `(user_id, source_type, provider_budget_id)`
+- Budget lines: `(budget_id, line_key, period_start, period_end)`
+
+---
+
 ### 14. scenarios
 
 Stores reusable what-if drafts and the latest explicitly calculated result. The
@@ -572,6 +632,15 @@ users (1) ──< (many) oauth_connection_states
 users (1) ──< (many) financial_metric_observations
 data_connections (1) ──< (many) financial_metric_observations
 documents (1) ──< (many) financial_metric_observations
+users (1) ──< (many) financial_sync_runs
+data_connections (1) ──< (many) financial_sync_runs
+users (1) ──< (many) financial_accounts
+users (1) ──< (many) financial_reporting_periods
+financial_reporting_periods (1) ──< (many) financial_statement_lines
+users (1) ──< (many) financial_transactions
+financial_transactions (1) ──< (many) financial_transaction_lines
+users (1) ──< (many) financial_budgets
+financial_budgets (1) ──< (many) financial_budget_lines
 users (1) ──< (many) scenarios
 companies (1) ──< (many) scenarios
 users (1) ──< (one) user_gen_ui_preferences
@@ -601,6 +670,7 @@ All schema changes are tracked in `db/migrations/`:
 - `017_daily_company_join_codes.sql` - Adds protected stored company join codes and a daily UTC rotation job
 - `018_gen_ui_personalization.sql` - Adds shared company size and per-user Gen UI personalization preferences
 - `019_company_gen_ui_controls.sql` - Moves planning horizon to the admin-controlled company profile and adds worker-specific roles
+- `020_stage3_financial_read_models.sql` - Adds canonical accounts, financial statements, transactions, budgets, sync provenance, RLS, and provider-safe deduplication for Stage 3 widgets
 
 ---
 

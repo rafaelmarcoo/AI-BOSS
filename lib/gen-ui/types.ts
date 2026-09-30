@@ -24,6 +24,23 @@ export const GEN_UI_WIDGET_TYPES = [
   'accounts_receivable',
   'accounts_payable',
   'ai_financial_brief',
+  'cash_flow_summary',
+  'cash_flow_forecast',
+  'revenue_forecast',
+  'profit_snapshot',
+  'profit_trend',
+  'profit_forecast',
+  'profit_margin',
+  'break_even_analysis',
+  'break_even_progress',
+  'expense_breakdown',
+  'largest_expenses',
+  'expense_change_detector',
+  'budget_vs_actual',
+  'budget_remaining',
+  'budget_forecast',
+  'cash_inflow_forecast',
+  'cash_outflow_forecast',
 ] as const
 
 export type GenUiWidgetType = (typeof GEN_UI_WIDGET_TYPES)[number]
@@ -152,6 +169,178 @@ export interface AiFinancialBriefWidget extends GenUiWidgetBase {
       sourceLabel: string
     }>
   }
+}
+
+export interface FinancialSummaryMetric {
+  label: string
+  value: number | null
+  percentage?: number | null
+  comparisonPercentage?: number | null
+  comparisonLabel?: string | null
+  tone: 'positive' | 'warning' | 'neutral'
+}
+
+export interface FinancialSummaryData {
+  currency: string | null
+  periodStart: string | null
+  periodEnd: string | null
+  sourceLabel: string
+  metrics: FinancialSummaryMetric[]
+  note: string
+}
+
+export interface FinancialForecastData {
+  label: string
+  currency: string | null
+  actualPoints: Array<{ date: string; value: number }>
+  forecastPoints: Array<{ date: string; value: number }>
+  method: string
+  assumptions: string[]
+}
+
+export interface CashFlowSummaryWidget extends GenUiWidgetBase {
+  type: 'cash_flow_summary'
+  data: FinancialSummaryData
+}
+
+export interface CashFlowForecastWidget extends GenUiWidgetBase {
+  type: 'cash_flow_forecast'
+  data: FinancialForecastData & { openingCash: number | null; horizonDays: 30 | 60 | 90 }
+}
+
+export interface RevenueForecastWidget extends GenUiWidgetBase {
+  type: 'revenue_forecast'
+  data: FinancialForecastData
+}
+
+export interface ProfitSnapshotWidget extends GenUiWidgetBase {
+  type: 'profit_snapshot'
+  data: FinancialSummaryData
+}
+
+export interface ProfitTrendWidget extends GenUiWidgetBase {
+  type: 'profit_trend'
+  data: FinancialForecastData & { profitType: 'gross' | 'operating' | 'net' }
+}
+
+export interface ProfitForecastWidget extends GenUiWidgetBase {
+  type: 'profit_forecast'
+  data: FinancialForecastData & { profitType: 'gross' | 'operating' | 'net' }
+}
+
+export interface ProfitMarginWidget extends GenUiWidgetBase {
+  type: 'profit_margin'
+  data: FinancialSummaryData & { marginType: 'gross' | 'operating' | 'net' }
+}
+
+export interface BreakEvenAnalysisWidget extends GenUiWidgetBase {
+  type: 'break_even_analysis'
+  data: {
+    currency: string | null
+    revenue: number | null
+    fixedCosts: number | null
+    variableCosts: number | null
+    contributionMarginPercentage: number | null
+    breakEvenRevenue: number | null
+    unclassifiedCostAmount: number
+    note: string
+  }
+}
+
+export interface BreakEvenProgressWidget extends GenUiWidgetBase {
+  type: 'break_even_progress'
+  data: {
+    currency: string | null
+    currentRevenue: number | null
+    breakEvenRevenue: number | null
+    progressPercentage: number | null
+    remainingRevenue: number | null
+    note: string
+  }
+}
+
+export interface ExpenseBreakdownWidget extends GenUiWidgetBase {
+  type: 'expense_breakdown'
+  data: {
+    currency: string | null
+    periodStart: string | null
+    periodEnd: string | null
+    categories: Array<{ label: string; amount: number; percentage: number }>
+  }
+}
+
+export interface LargestExpensesWidget extends GenUiWidgetBase {
+  type: 'largest_expenses'
+  data: {
+    currency: string | null
+    items: Array<{
+      id: string
+      label: string
+      counterparty: string | null
+      date: string
+      amount: number
+      category: string | null
+    }>
+  }
+}
+
+export interface ExpenseChangeDetectorWidget extends GenUiWidgetBase {
+  type: 'expense_change_detector'
+  data: {
+    currency: string | null
+    changes: Array<{
+      category: string
+      currentAmount: number
+      previousAmount: number
+      change: number
+      percentageChange: number | null
+    }>
+  }
+}
+
+export interface BudgetWidgetData {
+  budgetName: string | null
+  currency: string | null
+  periodStart: string | null
+  periodEnd: string | null
+  totalBudget: number | null
+  totalActual: number | null
+  totalRemaining: number | null
+  projectedActual: number | null
+  projectedVariance: number | null
+  elapsedPercentage: number | null
+  lines: Array<{
+    label: string
+    budgetAmount: number
+    actualAmount: number
+    variance: number
+    remaining: number
+  }>
+}
+
+export interface BudgetVsActualWidget extends GenUiWidgetBase {
+  type: 'budget_vs_actual'
+  data: BudgetWidgetData
+}
+
+export interface BudgetRemainingWidget extends GenUiWidgetBase {
+  type: 'budget_remaining'
+  data: BudgetWidgetData
+}
+
+export interface BudgetForecastWidget extends GenUiWidgetBase {
+  type: 'budget_forecast'
+  data: BudgetWidgetData & { method: string; assumptions: string[] }
+}
+
+export interface CashInflowForecastWidget extends GenUiWidgetBase {
+  type: 'cash_inflow_forecast'
+  data: FinancialForecastData
+}
+
+export interface CashOutflowForecastWidget extends GenUiWidgetBase {
+  type: 'cash_outflow_forecast'
+  data: FinancialForecastData
 }
 
 export interface MetricSnapshotWidget extends GenUiWidgetBase {
@@ -350,6 +539,23 @@ export type GenUiWidget =
   | AccountsReceivableWidget
   | AccountsPayableWidget
   | AiFinancialBriefWidget
+  | CashFlowSummaryWidget
+  | CashFlowForecastWidget
+  | RevenueForecastWidget
+  | ProfitSnapshotWidget
+  | ProfitTrendWidget
+  | ProfitForecastWidget
+  | ProfitMarginWidget
+  | BreakEvenAnalysisWidget
+  | BreakEvenProgressWidget
+  | ExpenseBreakdownWidget
+  | LargestExpensesWidget
+  | ExpenseChangeDetectorWidget
+  | BudgetVsActualWidget
+  | BudgetRemainingWidget
+  | BudgetForecastWidget
+  | CashInflowForecastWidget
+  | CashOutflowForecastWidget
 
 export type GenUiWidgetByType = {
   [Type in GenUiWidgetType]: Extract<GenUiWidget, { type: Type }>

@@ -113,6 +113,150 @@ const AiFinancialBriefWidgetSchema = WidgetBaseSchema.extend({
   }),
 })
 
+const FinancialSummaryDataSchema = z.object({
+  currency: z.string().nullable(),
+  periodStart: z.string().nullable(),
+  periodEnd: z.string().nullable(),
+  sourceLabel: z.string(),
+  metrics: z.array(z.object({
+    label: z.string(),
+    value: z.number().nullable(),
+    percentage: z.number().nullable().optional(),
+    comparisonPercentage: z.number().nullable().optional(),
+    comparisonLabel: z.string().nullable().optional(),
+    tone: z.enum(['positive', 'warning', 'neutral']),
+  })),
+  note: z.string(),
+})
+
+const FinancialForecastDataSchema = z.object({
+  label: z.string(),
+  currency: z.string().nullable(),
+  actualPoints: z.array(z.object({ date: z.string(), value: z.number() })),
+  forecastPoints: z.array(z.object({ date: z.string(), value: z.number() })),
+  method: z.string(),
+  assumptions: z.array(z.string()),
+})
+
+const CashFlowSummaryWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('cash_flow_summary'),
+  data: FinancialSummaryDataSchema,
+})
+const CashFlowForecastWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('cash_flow_forecast'),
+  data: FinancialForecastDataSchema.extend({
+    openingCash: z.number().nullable(),
+    horizonDays: z.union([z.literal(30), z.literal(60), z.literal(90)]),
+  }),
+})
+const RevenueForecastWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('revenue_forecast'),
+  data: FinancialForecastDataSchema,
+})
+const ProfitSnapshotWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('profit_snapshot'),
+  data: FinancialSummaryDataSchema,
+})
+const ProfitTrendWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('profit_trend'),
+  data: FinancialForecastDataSchema.extend({ profitType: z.enum(['gross', 'operating', 'net']) }),
+})
+const ProfitForecastWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('profit_forecast'),
+  data: FinancialForecastDataSchema.extend({ profitType: z.enum(['gross', 'operating', 'net']) }),
+})
+const ProfitMarginWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('profit_margin'),
+  data: FinancialSummaryDataSchema.extend({ marginType: z.enum(['gross', 'operating', 'net']) }),
+})
+const BreakEvenAnalysisWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('break_even_analysis'),
+  data: z.object({
+    currency: z.string().nullable(),
+    revenue: z.number().nullable(),
+    fixedCosts: z.number().nullable(),
+    variableCosts: z.number().nullable(),
+    contributionMarginPercentage: z.number().nullable(),
+    breakEvenRevenue: z.number().nullable(),
+    unclassifiedCostAmount: z.number(),
+    note: z.string(),
+  }),
+})
+const BreakEvenProgressWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('break_even_progress'),
+  data: z.object({
+    currency: z.string().nullable(),
+    currentRevenue: z.number().nullable(),
+    breakEvenRevenue: z.number().nullable(),
+    progressPercentage: z.number().nullable(),
+    remainingRevenue: z.number().nullable(),
+    note: z.string(),
+  }),
+})
+const ExpenseBreakdownWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('expense_breakdown'),
+  data: z.object({
+    currency: z.string().nullable(),
+    periodStart: z.string().nullable(),
+    periodEnd: z.string().nullable(),
+    categories: z.array(z.object({ label: z.string(), amount: z.number(), percentage: z.number() })),
+  }),
+})
+const LargestExpensesWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('largest_expenses'),
+  data: z.object({
+    currency: z.string().nullable(),
+    items: z.array(z.object({
+      id: z.string(),
+      label: z.string(),
+      counterparty: z.string().nullable(),
+      date: z.string(),
+      amount: z.number(),
+      category: z.string().nullable(),
+    })),
+  }),
+})
+const ExpenseChangeDetectorWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('expense_change_detector'),
+  data: z.object({
+    currency: z.string().nullable(),
+    changes: z.array(z.object({
+      category: z.string(),
+      currentAmount: z.number(),
+      previousAmount: z.number(),
+      change: z.number(),
+      percentageChange: z.number().nullable(),
+    })),
+  }),
+})
+const BudgetWidgetDataSchema = z.object({
+  budgetName: z.string().nullable(),
+  currency: z.string().nullable(),
+  periodStart: z.string().nullable(),
+  periodEnd: z.string().nullable(),
+  totalBudget: z.number().nullable(),
+  totalActual: z.number().nullable(),
+  totalRemaining: z.number().nullable(),
+  projectedActual: z.number().nullable(),
+  projectedVariance: z.number().nullable(),
+  elapsedPercentage: z.number().nullable(),
+  lines: z.array(z.object({
+    label: z.string(),
+    budgetAmount: z.number(),
+    actualAmount: z.number(),
+    variance: z.number(),
+    remaining: z.number(),
+  })),
+})
+const BudgetVsActualWidgetSchema = WidgetBaseSchema.extend({ type: z.literal('budget_vs_actual'), data: BudgetWidgetDataSchema })
+const BudgetRemainingWidgetSchema = WidgetBaseSchema.extend({ type: z.literal('budget_remaining'), data: BudgetWidgetDataSchema })
+const BudgetForecastWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('budget_forecast'),
+  data: BudgetWidgetDataSchema.extend({ method: z.string(), assumptions: z.array(z.string()) }),
+})
+const CashInflowForecastWidgetSchema = WidgetBaseSchema.extend({ type: z.literal('cash_inflow_forecast'), data: FinancialForecastDataSchema })
+const CashOutflowForecastWidgetSchema = WidgetBaseSchema.extend({ type: z.literal('cash_outflow_forecast'), data: FinancialForecastDataSchema })
+
 const MetricSnapshotWidgetSchema = WidgetBaseSchema.extend({
   type: z.literal('metric_snapshot'),
   data: z.object({
@@ -326,6 +470,23 @@ export const GenUiWidgetSchema = z.discriminatedUnion('type', [
   AccountsReceivableWidgetSchema,
   AccountsPayableWidgetSchema,
   AiFinancialBriefWidgetSchema,
+  CashFlowSummaryWidgetSchema,
+  CashFlowForecastWidgetSchema,
+  RevenueForecastWidgetSchema,
+  ProfitSnapshotWidgetSchema,
+  ProfitTrendWidgetSchema,
+  ProfitForecastWidgetSchema,
+  ProfitMarginWidgetSchema,
+  BreakEvenAnalysisWidgetSchema,
+  BreakEvenProgressWidgetSchema,
+  ExpenseBreakdownWidgetSchema,
+  LargestExpensesWidgetSchema,
+  ExpenseChangeDetectorWidgetSchema,
+  BudgetVsActualWidgetSchema,
+  BudgetRemainingWidgetSchema,
+  BudgetForecastWidgetSchema,
+  CashInflowForecastWidgetSchema,
+  CashOutflowForecastWidgetSchema,
 ])
 
 export const GenUiPlanSchema = z.object({

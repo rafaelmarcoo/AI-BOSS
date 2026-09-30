@@ -34,6 +34,25 @@ import {
   RevenueSnapshotWidgetView,
   RevenueTrendWidgetView,
 } from "./widgets/existing-data/ExistingDataWidgets";
+import {
+  BreakEvenAnalysisWidgetView,
+  BreakEvenProgressWidgetView,
+  BudgetForecastWidgetView,
+  BudgetRemainingWidgetView,
+  BudgetVsActualWidgetView,
+  CashFlowForecastWidgetView,
+  CashFlowSummaryWidgetView,
+  CashInflowForecastWidgetView,
+  CashOutflowForecastWidgetView,
+  ExpenseBreakdownWidgetView,
+  ExpenseChangeDetectorWidgetView,
+  LargestExpensesWidgetView,
+  ProfitForecastWidgetView,
+  ProfitMarginWidgetView,
+  ProfitSnapshotWidgetView,
+  ProfitTrendWidgetView,
+  RevenueForecastWidgetView,
+} from "./widgets/stage3/Stage3Widgets";
 
 export type GenUiRendererProps<Type extends GenUiWidgetType> =
   GenUiWidgetInteractionProps & {
@@ -65,4 +84,21 @@ export const GEN_UI_RENDERER_REGISTRY = {
   accounts_receivable: AccountsReceivableWidgetView,
   accounts_payable: AccountsPayableWidgetView,
   ai_financial_brief: AiFinancialBriefWidgetView,
+  cash_flow_summary: CashFlowSummaryWidgetView,
+  cash_flow_forecast: CashFlowForecastWidgetView,
+  revenue_forecast: RevenueForecastWidgetView,
+  profit_snapshot: ProfitSnapshotWidgetView,
+  profit_trend: ProfitTrendWidgetView,
+  profit_forecast: ProfitForecastWidgetView,
+  profit_margin: ProfitMarginWidgetView,
+  break_even_analysis: BreakEvenAnalysisWidgetView,
+  break_even_progress: BreakEvenProgressWidgetView,
+  expense_breakdown: ExpenseBreakdownWidgetView,
+  largest_expenses: LargestExpensesWidgetView,
+  expense_change_detector: ExpenseChangeDetectorWidgetView,
+  budget_vs_actual: BudgetVsActualWidgetView,
+  budget_remaining: BudgetRemainingWidgetView,
+  budget_forecast: BudgetForecastWidgetView,
+  cash_inflow_forecast: CashInflowForecastWidgetView,
+  cash_outflow_forecast: CashOutflowForecastWidgetView,
 } satisfies GenUiRendererRegistry;

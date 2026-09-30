@@ -53,6 +53,9 @@ import {
   listExistingDataWidgetCandidates,
   selectExistingDataFallbackSpecs,
 } from '@/lib/gen-ui/existing-data-selection'
+import { EMPTY_STAGE3_FINANCIAL_DATA, readStage3FinancialData } from '@/lib/financial-data/reporting/read-service'
+import { listStage3WidgetCandidates, selectStage3FallbackSpecs } from '@/lib/gen-ui/stage3-selection'
+import { STAGE3_WIDGET_TYPES } from '@/lib/gen-ui/builders/stage3/stage3-builders'
 
 const MAX_WIDGETS = 4
 
@@ -152,8 +155,15 @@ function defaultWidgetSpecs(
   const normalized = userMessage.toLowerCase()
   const widgets: PlannerWidget[] = []
   const missingMetrics = listMissingMetrics(snapshot)
+  const stage3Specs = selectStage3FallbackSpecs(userMessage)
+  widgets.push(...stage3Specs)
   const existingDataSpecs = selectExistingDataFallbackSpecs(userMessage)
-  widgets.push(...existingDataSpecs)
+  const hasStage3ExpenseDetail = stage3Specs.some((spec) =>
+    ['expense_breakdown', 'largest_expenses', 'expense_change_detector'].includes(spec.type)
+  )
+  widgets.push(...existingDataSpecs.filter((spec) =>
+    !(hasStage3ExpenseDetail && ['expense_summary', 'expense_trend'].includes(spec.type))
+  ))
   const dedicatedMetricKeys = new Set<FinancialMetricKey>(
     existingDataSpecs.flatMap((spec) => {
       if (spec.type === 'cash_balance') return ['cash']
@@ -165,6 +175,7 @@ function defaultWidgetSpecs(
       }
       if (spec.type === 'accounts_receivable') return ['accounts_receivable']
       if (spec.type === 'accounts_payable') return ['accounts_payable']
+      if (spec.type === 'revenue_forecast') return ['monthly_revenue']
       return []
     })
   )
@@ -189,7 +200,14 @@ function defaultWidgetSpecs(
     })
   }
 
-  if (forecastMetricKey) {
+  const hasDedicatedStage3Forecast = stage3Specs.some((spec) => [
+    'revenue_forecast',
+    'cash_flow_forecast',
+    'cash_inflow_forecast',
+    'cash_outflow_forecast',
+  ].includes(spec.type))
+
+  if (forecastMetricKey && !hasDedicatedStage3Forecast) {
     widgets.push({
       type: 'metric_forecast_chart',
       title: `${FINANCIAL_METRIC_LABELS[forecastMetricKey]} forecast`,
@@ -415,6 +433,13 @@ function buildPlannerCandidates(params: {
         [],
         params.personalization,
       ),
+    })),
+  )
+
+  candidates.push(
+    ...listStage3WidgetCandidates(params.userMessage).map((candidate) => ({
+      ...candidate,
+      personalizationFit: describePersonalizationFit(candidate.id, candidate.label, [], params.personalization),
     })),
   )
 
@@ -679,6 +704,7 @@ export async function planGenUi({
     runwayTrend,
     metricHistoryCollection,
     metricForecastCollection,
+    stage3Data,
     personalization,
   ] = await Promise.all([
     readSourceAwareMetrics(userId),
@@ -700,6 +726,10 @@ export async function planGenUi({
     forecastMetricKey
       ? readFinancialMetricForecastSeries({ userId, metricKey: forecastMetricKey, range: 'all', horizon: forecastHorizon, recordLimit: 'all' }).catch(() => null)
       : Promise.resolve(null),
+    readStage3FinancialData(userId).catch((error) => {
+      console.error('Stage 3 financial read models could not be loaded; widgets will use unavailable states.', error)
+      return EMPTY_STAGE3_FINANCIAL_DATA
+    }),
     getGenUiPersonalization(userId).catch((error) => {
       console.error(
         'Gen UI personalization could not be loaded; using neutral defaults.',
@@ -751,6 +781,7 @@ export async function planGenUi({
     ['metric_trend_chart', 'revenue_trend', 'revenue_growth', 'expense_trend'].includes(spec.type)
   )
   const forecastSpec = fallbackSpecs.find((spec) => spec.type === 'metric_forecast_chart')
+  const stage3Specs = fallbackSpecs.filter((spec) => STAGE3_WIDGET_TYPES.includes(spec.type))
   const scenarioSpec: PlannerWidget | null = scenarioResult
     ? {
         type: 'scenario_analysis',
@@ -760,6 +791,7 @@ export async function planGenUi({
     : null
   const specs = dedupeWidgetSpecs([
     ...historySpecs,
+    ...stage3Specs,
     ...(forecastSpec ? [forecastSpec] : []),
     ...(scenarioSpec ? [scenarioSpec] : []),
     ...(modelSpecs ?? fallbackSpecs).filter(
@@ -780,6 +812,7 @@ export async function planGenUi({
     metricHistories: metricHistoryCollection?.series ?? [],
     metricForecasts: metricForecastCollection?.series ?? [],
     scenarioResult,
+    stage3Data,
   }
   const widgets = specs.flatMap((spec, index) =>
     buildGenUiWidgets(spec, index, context)

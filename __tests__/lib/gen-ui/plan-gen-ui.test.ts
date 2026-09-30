@@ -4,6 +4,7 @@ import { readSourceAwareMetrics } from '@/lib/financial-data/read-service'
 import { readRunwayObservationHistory } from '@/lib/financial-data/runway-history'
 import { readFinancialMetricHistorySeries } from '@/lib/financial-data/metric-history'
 import { readFinancialMetricForecastSeries } from '@/lib/financial-data/metric-forecast'
+import { readStage3FinancialData } from '@/lib/financial-data/reporting/read-service'
 import { getGenUiPersonalization } from '@/lib/gen-ui/preferences-persistence'
 import { planGenUi } from '@/lib/gen-ui/plan-gen-ui'
 
@@ -33,6 +34,10 @@ jest.mock('@/lib/financial-data/metric-history', () => ({
 jest.mock('@/lib/financial-data/metric-forecast', () => ({
   readFinancialMetricForecastSeries: jest.fn(),
 }))
+jest.mock('@/lib/financial-data/reporting/read-service', () => ({
+  EMPTY_STAGE3_FINANCIAL_DATA: { accounts: [], reportingPeriods: [], transactions: [], budgets: [] },
+  readStage3FinancialData: jest.fn(),
+}))
 jest.mock('@/lib/gen-ui/preferences-persistence', () => ({
   getGenUiPersonalization: jest.fn(),
 }))
@@ -44,6 +49,7 @@ const mockReadRunwayObservationHistory = jest.mocked(
 )
 const mockReadFinancialMetricHistorySeries = jest.mocked(readFinancialMetricHistorySeries)
 const mockReadFinancialMetricForecastSeries = jest.mocked(readFinancialMetricForecastSeries)
+const mockReadStage3FinancialData = jest.mocked(readStage3FinancialData)
 const mockGetGenUiPersonalization = jest.mocked(getGenUiPersonalization)
 const originalApiKey = process.env.OPENAI_API_KEY
 
@@ -99,6 +105,12 @@ describe('planGenUi', () => {
       metricKey: 'cash', label: 'Cash', range: 'all', horizon: 3,
       }],
     } as never)
+    mockReadStage3FinancialData.mockResolvedValue({
+      accounts: [],
+      reportingPeriods: [],
+      transactions: [],
+      budgets: [],
+    })
     mockGetGenUiPersonalization.mockResolvedValue({
       businessSize: null,
       canEditBusinessSize: false,

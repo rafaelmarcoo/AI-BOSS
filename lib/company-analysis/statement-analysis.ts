@@ -44,11 +44,6 @@ export type RatioCategory =
 
 export type RatioUnit = '%' | 'x' | 'days' | 'ratio'
 
-/**
- * Which way is better. Neutral ratios involve a trade-off (paying suppliers
- * later helps cash but strains the relationship), so the code does not pick a
- * winner and leaves the judgement to the explanation.
- */
 export type RatioDirection = 'higher' | 'lower' | 'neutral'
 
 export type RatioKey =
@@ -78,7 +73,6 @@ export interface StatementRatio {
   unit: RatioUnit
   direction: RatioDirection
   value: number
-  /** The arithmetic with the actual figures, so a reader can check it. */
   working: string
 }
 
@@ -98,7 +92,6 @@ export interface GrowthMeasure {
   label: string
   latest: number
   prior: number
-  /** Percentage change, or null when the prior value is zero. */
   growthPercent: number | null
 }
 
@@ -106,7 +99,6 @@ export interface StreamAnalysis {
   name: string
   revenue: number
   shareOfRevenuePercent: number
-  /** Null when the statements show no direct cost for the stream. */
   marginAfterDirectCostsPercent: number | null
   growthPercent: number | null
 }
@@ -114,7 +106,6 @@ export interface StreamAnalysis {
 export interface YearAnalysis {
   fiscalYearEnd: string
   ratios: StatementRatio[]
-  /** Ratios that could not be calculated and the lines they need. */
   unavailable: Array<{ key: RatioKey; label: string; missing: string[] }>
   streams: StreamAnalysis[]
 }
@@ -159,7 +150,6 @@ interface RatioSpec {
   category: RatioCategory
   unit: RatioUnit
   direction: RatioDirection
-  /** Returns the value and its working, or the lines it is missing. */
   calculate: (
     year: StatementYear,
     fmt: (value: number) => string
@@ -173,10 +163,6 @@ function totalDirectCosts(year: StatementYear) {
     : costs.reduce((sum, stream) => sum + (stream.directCosts ?? 0), 0)
 }
 
-/**
- * The cost base for inventory and payable days. Cost of sales where the
- * company reports it; otherwise the direct costs of its revenue streams.
- */
 function costBase(year: StatementYear): { value: number; label: string } | null {
   if (year.lines.cost_of_sales !== undefined) {
     return { value: year.lines.cost_of_sales, label: 'cost of sales' }
@@ -224,8 +210,6 @@ const RATIOS: RatioSpec[] = [
     unit: '%',
     direction: 'higher',
     calculate: (year, fmt) => {
-      // Only meaningful where the statements show direct costs by stream
-      // instead of a single cost-of-sales line.
       if (year.lines.cost_of_sales !== undefined) return { missing: ['revenue streams with direct costs'] }
       const direct = totalDirectCosts(year)
       if (direct === null || year.lines.revenue === undefined) {
@@ -531,8 +515,6 @@ function analyseYear(company: CompanyStatements, year: StatementYear, prior: Sta
   for (const spec of RATIOS) {
     const result = spec.calculate(year, fmt)
     if ('missing' in result) {
-      // A company that reports cost of sales has no "margin after direct
-      // costs", and vice versa. That is a different basis, not a gap.
       const differentBasis =
         (spec.key === 'margin_after_direct_costs' && year.lines.cost_of_sales !== undefined) ||
         (spec.key === 'gross_margin' && year.lines.cost_of_sales === undefined && year.streams.length > 0)
@@ -644,7 +626,6 @@ export interface RatioComparison {
   first: number
   second: number
   difference: number
-  /** Name of the stronger company, or null for neutral or equal ratios. */
   stronger: string | null
 }
 
@@ -653,14 +634,9 @@ export interface CompanyComparison {
   second: CompanyAnalysis
   ratios: RatioComparison[]
   growth: Array<{ label: string; first: number | null; second: number | null }>
-  /**
-   * Absolute sizes, only when both companies report in the same currency and
-   * scale. Otherwise the reason amounts cannot be compared.
-   */
   size:
     | { comparable: true; lines: Array<{ label: string; first: number; second: number }> }
     | { comparable: false; reason: string }
-  /** Set when the latest years end on different dates. */
   periodNote: string | null
 }
 
@@ -779,4 +755,36 @@ export function statementsFromLines(
     amountsIn: company.amountsIn,
     years: [...years.values()].sort((x, y) => y.fiscalYearEnd.localeCompare(x.fiscalYearEnd)),
   }
+}
+
+export function linesFromStatements(years: StatementYear[]) {
+  return years.flatMap((year) => [
+    ...(Object.entries(year.lines) as Array<[CompanyLineKey, number]>).map(([lineKey, value]) => ({
+      fiscal_year_end: year.fiscalYearEnd,
+      line_key: lineKey as StatementLineKey,
+      segment: '',
+      value,
+      source_page: null as number | null,
+    })),
+    ...year.streams.flatMap((stream) => [
+      {
+        fiscal_year_end: year.fiscalYearEnd,
+        line_key: 'segment_revenue' as StatementLineKey,
+        segment: stream.name,
+        value: stream.revenue,
+        source_page: null as number | null,
+      },
+      ...(stream.directCosts === null
+        ? []
+        : [
+            {
+              fiscal_year_end: year.fiscalYearEnd,
+              line_key: 'segment_direct_costs' as StatementLineKey,
+              segment: stream.name,
+              value: stream.directCosts,
+              source_page: null as number | null,
+            },
+          ]),
+    ]),
+  ])
 }

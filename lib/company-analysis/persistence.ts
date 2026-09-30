@@ -1,5 +1,9 @@
 import { ApiError } from '@/lib/api/errors'
+import { randomUUID } from 'node:crypto'
 import { createAdminSupabaseClient } from '@/lib/supabase'
+import { planNewCompany, type CompanyDetails } from '@/lib/company-analysis/company-details'
+import { findPeers } from '@/lib/company-analysis/lookup'
+import { linesFromStatements, type StatementYear } from '@/lib/company-analysis/statement-analysis'
 import type { AnalysedCompany, CompanyStatementLine } from '@/types/database'
 import {
   toStatementLineRows,
@@ -98,4 +102,95 @@ export async function listStatementLines(companyId: string): Promise<CompanyStat
   }
 
   return (data ?? []) as CompanyStatementLine[]
+}
+
+export async function createUserCompany(params: {
+  userId: string
+  details: CompanyDetails
+  years: StatementYear[]
+  fileName: string
+}): Promise<AnalysedCompany> {
+  const visibleCompanies = await listVisibleCompanies(params.userId)
+  const { peerGroup } = planNewCompany({
+    details: params.details,
+    visibleCompanies,
+    newGroupId: `user-${randomUUID()}`,
+  })
+
+  const supabase = createAdminSupabaseClient()
+  const { data: company, error } = await supabase
+    .from('analysed_companies')
+    .insert({
+      user_id: params.userId,
+      name: params.details.name,
+      industry: params.details.industry,
+      peer_group: peerGroup,
+      currency: params.details.currency,
+      amounts_in: params.details.amountsIn,
+      description: null,
+      source: `Uploaded by you: ${params.fileName}`,
+    })
+    .select('*')
+    .single()
+
+  if (error || !company) {
+    if (error?.code === '23505') {
+      throw new ApiError(409, 'CONFLICT', `You already have a company called ${params.details.name}.`)
+    }
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Could not save the company.')
+  }
+
+  const rows = linesFromStatements(params.years).map((row) => ({ ...row, company_id: company.id }))
+  const { error: linesError } = await supabase.from('company_statement_lines').insert(rows)
+
+  if (linesError) {
+    await supabase
+      .from('analysed_companies')
+      .delete()
+      .eq('id', company.id)
+      .eq('user_id', params.userId)
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Could not save the company statements.')
+  }
+
+  return company as AnalysedCompany
+}
+
+export async function deleteUserCompany(userId: string, companyId: string) {
+  const supabase = createAdminSupabaseClient()
+  const { data, error } = await supabase
+    .from('analysed_companies')
+    .delete()
+    .eq('id', companyId)
+    .eq('user_id', userId)
+    .select('id')
+
+  if (error) throw new ApiError(500, 'INTERNAL_ERROR', 'Could not delete the company.')
+  if (!data || data.length === 0) {
+    throw new ApiError(404, 'NOT_FOUND', 'Company not found. Only companies you added can be deleted.')
+  }
+}
+
+export interface CompanySummary {
+  id: string
+  name: string
+  industry: string | null
+  currency: string
+  amountsIn: AnalysedCompany['amounts_in']
+  source: string
+  isOwn: boolean
+  competitors: string[]
+}
+
+export async function listCompanySummaries(userId: string): Promise<CompanySummary[]> {
+  const companies = await listVisibleCompanies(userId)
+  return companies.map((company) => ({
+    id: company.id,
+    name: company.name,
+    industry: company.industry,
+    currency: company.currency,
+    amountsIn: company.amounts_in,
+    source: company.source,
+    isOwn: company.user_id === userId,
+    competitors: findPeers(companies, company).map((peer) => peer.name),
+  }))
 }

@@ -21,33 +21,57 @@ function csvCell(value: string) {
   return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
 }
 
-function amount(value: number | null | undefined, isCost: boolean) {
-  if (value === null || value === undefined) return ''
-  return isCost ? `(${Math.abs(value)})` : String(value)
+export interface StatementTableRow {
+  label: string
+  values: Array<number | null>
+  isCost: boolean
 }
 
-export function buildStatementTemplate(years: StatementYear[]) {
-  const rows: string[][] = [['Line', ...years.map((year) => year.fiscalYearEnd)]]
+export function statementTableRows(years: StatementYear[]): StatementTableRow[] {
+  const rows: StatementTableRow[] = []
 
   const companyKeys = STATEMENT_LINE_KEYS.filter(
     (key): key is CompanyLineKey => key !== 'segment_revenue' && key !== 'segment_direct_costs'
   )
   for (const key of companyKeys) {
     if (years.every((year) => year.lines[key] === undefined)) continue
-    rows.push([
-      STATEMENT_LINE_LABELS[key],
-      ...years.map((year) => amount(year.lines[key], COST_KEYS.has(key))),
-    ])
+    rows.push({
+      label: STATEMENT_LINE_LABELS[key],
+      values: years.map((year) => year.lines[key] ?? null),
+      isCost: COST_KEYS.has(key),
+    })
   }
 
   const streamNames = [...new Set(years.flatMap((year) => year.streams.map((stream) => stream.name)))]
   for (const name of streamNames) {
     const streamIn = (year: StatementYear) => year.streams.find((stream) => stream.name === name)
-    rows.push([`Revenue stream: ${name}`, ...years.map((year) => amount(streamIn(year)?.revenue, false))])
+    rows.push({
+      label: `Revenue stream: ${name}`,
+      values: years.map((year) => streamIn(year)?.revenue ?? null),
+      isCost: false,
+    })
     if (years.some((year) => streamIn(year)?.directCosts != null)) {
-      rows.push([`Direct costs: ${name}`, ...years.map((year) => amount(streamIn(year)?.directCosts, true))])
+      rows.push({
+        label: `Direct costs: ${name}`,
+        values: years.map((year) => streamIn(year)?.directCosts ?? null),
+        isCost: true,
+      })
     }
   }
+
+  return rows
+}
+
+function amount(value: number | null, isCost: boolean) {
+  if (value === null) return ''
+  return isCost ? `(${Math.abs(value)})` : String(value)
+}
+
+export function buildStatementTemplate(years: StatementYear[]) {
+  const rows: string[][] = [
+    ['Line', ...years.map((year) => year.fiscalYearEnd)],
+    ...statementTableRows(years).map((row) => [row.label, ...row.values.map((value) => amount(value, row.isCost))]),
+  ]
 
   return rows.map((row) => row.map(csvCell).join(',')).join('\n') + '\n'
 }

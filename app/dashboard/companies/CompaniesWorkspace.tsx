@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Alert, Box, Chip, CircularProgress, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, CircularProgress, Stack, Typography } from "@mui/material";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
 import BusinessCenterOutlinedIcon from "@mui/icons-material/BusinessCenterOutlined";
 import type { CompanySummary } from "@/lib/company-analysis/persistence";
 import { dashboardTokens } from "@/app/theme";
+import { AddCompanyDialog } from "./AddCompanyDialog";
 
 interface CompaniesResponse {
   success: boolean;
@@ -17,6 +19,7 @@ export function CompaniesWorkspace() {
   const [companies, setCompanies] = useState<CompanySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
 
   const loadCompanies = async () => {
     setLoading(true);
@@ -52,6 +55,7 @@ export function CompaniesWorkspace() {
 
   return (
     <Stack spacing={3}>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "flex-start" }}>
       <Stack direction="row" spacing={1.5} alignItems="flex-start">
         <Box sx={{ display: "grid", placeItems: "center", width: 44, height: 44, borderRadius: 2.5, bgcolor: "rgba(59,130,246,0.16)", color: "#93c5fd", flex: "0 0 auto" }}>
           <ApartmentRoundedIcon />
@@ -62,6 +66,10 @@ export function CompaniesWorkspace() {
             Companies whose financial statements you can analyse and compare in chat.
           </Typography>
         </Stack>
+      </Stack>
+        <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => setAdding(true)} sx={{ borderRadius: 2, whiteSpace: "nowrap", flex: "0 0 auto" }}>
+          Add company
+        </Button>
       </Stack>
 
       {error ? <Alert severity="error">{error}</Alert> : null}
@@ -116,6 +124,8 @@ export function CompaniesWorkspace() {
           ))}
         </Stack>
       )}
+
+      <AddCompanyDialog open={adding} onClose={() => setAdding(false)} />
     </Stack>
   );
 }

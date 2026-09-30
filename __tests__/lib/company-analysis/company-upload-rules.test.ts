@@ -1,3 +1,5 @@
+/** @jest-environment node */
+
 import { CIMA_CASE_STUDIES } from '@/lib/company-analysis/cima-case-studies'
 import { planNewCompany, validateCompanyDetails } from '@/lib/company-analysis/company-details'
 import { linesFromStatements, statementsFromCaseStudy, statementsFromLines } from '@/lib/company-analysis/statement-analysis'

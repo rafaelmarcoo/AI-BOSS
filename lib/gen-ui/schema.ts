@@ -401,6 +401,69 @@ const DebtRepaymentTimelineWidgetSchema = WidgetBaseSchema.extend({
   }),
 })
 
+const CustomerRevenueGroupDataSchema = z.object({
+  sourceLabel: z.string(),
+  currency: z.string(),
+  periodStart: z.string(),
+  periodEnd: z.string(),
+  periodLabel: z.string(),
+  totalRevenue: z.number(),
+  allocatedRevenue: z.number(),
+  unallocatedRevenue: z.number(),
+  rankingMethod: z.string(),
+  items: z.array(z.object({
+    customerId: z.string(),
+    customerName: z.string(),
+    revenue: z.number(),
+    percentage: z.number().nullable(),
+  })),
+})
+const CustomerRevenueBreakdownWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('customer_revenue_breakdown'),
+  data: z.object({ groups: z.array(CustomerRevenueGroupDataSchema), note: z.string() }),
+})
+const CustomerConcentrationRiskWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('customer_concentration_risk'),
+  data: z.object({
+    groups: z.array(CustomerRevenueGroupDataSchema.extend({
+      status: z.enum(['ready', 'partial_unallocated', 'unavailable_non_positive_revenue', 'unavailable_negative_customer_revenue', 'unavailable_no_customer_mapping']),
+      riskLevel: z.enum(['high', 'elevated', 'diversified', 'unavailable']),
+      topCustomerPercentage: z.number().nullable(),
+      topThreePercentage: z.number().nullable(),
+      topFivePercentage: z.number().nullable(),
+      thresholds: z.object({ elevated: z.string(), high: z.string() }),
+    })),
+    note: z.string(),
+  }),
+})
+const RevenueDimensionTypeSchema = z.enum(['product_service', 'subscription', 'department', 'business_unit', 'tracking'])
+const ProductServiceRevenueWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('product_service_revenue'),
+  data: z.object({
+    dimensionType: RevenueDimensionTypeSchema,
+    groups: z.array(z.object({
+      sourceLabel: z.string(),
+      currency: z.string(),
+      periodStart: z.string(),
+      periodEnd: z.string(),
+      periodLabel: z.string(),
+      dimensionType: RevenueDimensionTypeSchema,
+      dimensionGroup: z.string(),
+      totalRevenue: z.number(),
+      allocatedRevenue: z.number(),
+      unallocatedRevenue: z.number(),
+      rankingMethod: z.string(),
+      items: z.array(z.object({
+        dimensionId: z.string(),
+        name: z.string(),
+        revenue: z.number(),
+        percentage: z.number().nullable(),
+      })),
+    })),
+    note: z.string(),
+  }),
+})
+
 const MetricSnapshotWidgetSchema = WidgetBaseSchema.extend({
   type: z.literal('metric_snapshot'),
   data: z.object({
@@ -643,6 +706,9 @@ export const GenUiWidgetSchema = z.discriminatedUnion('type', [
   EquitySnapshotWidgetSchema,
   DebtOverviewWidgetSchema,
   DebtRepaymentTimelineWidgetSchema,
+  CustomerRevenueBreakdownWidgetSchema,
+  CustomerConcentrationRiskWidgetSchema,
+  ProductServiceRevenueWidgetSchema,
 ])
 
 export const GenUiPlanSchema = z.object({

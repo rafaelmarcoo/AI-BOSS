@@ -323,6 +323,14 @@ export type FinancialInvoicePaymentStatus = 'posted' | 'voided' | 'deleted'
 export type FinancialDebtType = 'loan' | 'credit_card' | 'line_of_credit' | 'lease' | 'other'
 export type FinancialDebtStatus = 'active' | 'paid' | 'refinanced' | 'closed'
 export type FinancialDebtRepaymentStatus = 'scheduled' | 'paid' | 'missed' | 'cancelled'
+export type FinancialCustomerStatus = 'active' | 'inactive'
+export type FinancialRevenueEntryStatus = 'draft' | 'posted' | 'voided' | 'deleted'
+export type FinancialRevenueDimensionType =
+  | 'product_service'
+  | 'subscription'
+  | 'department'
+  | 'business_unit'
+  | 'tracking'
 
 export interface FinancialSyncRun {
   id: string
@@ -566,6 +574,74 @@ export interface FinancialDebtRepayment {
   interest_amount: number
   total_amount: number
   paid_at: string | null
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialCustomer {
+  id: string
+  user_id: string
+  connection_id: string | null
+  document_id: string | null
+  sync_run_id: string | null
+  source_type: FinancialMetricSourceType
+  source_label: string
+  provider_customer_id: string
+  customer_name: string
+  status: FinancialCustomerStatus
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialRevenueDimension {
+  id: string
+  user_id: string
+  connection_id: string | null
+  document_id: string | null
+  sync_run_id: string | null
+  source_type: FinancialMetricSourceType
+  source_label: string
+  provider_dimension_id: string
+  dimension_type: FinancialRevenueDimensionType
+  dimension_group: string
+  dimension_name: string
+  status: FinancialCustomerStatus
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialRevenueEntry {
+  id: string
+  user_id: string
+  connection_id: string | null
+  document_id: string | null
+  sync_run_id: string | null
+  source_type: FinancialMetricSourceType
+  source_label: string
+  provider_revenue_id: string
+  revenue_date: string
+  status: FinancialRevenueEntryStatus
+  currency: string
+  amount: number
+  customer_id: string | null
+  invoice_id: string | null
+  transaction_id: string | null
+  description: string | null
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialRevenueEntryDimension {
+  id: string
+  revenue_entry_id: string
+  user_id: string
+  dimension_id: string
+  dimension_type: FinancialRevenueDimensionType
+  dimension_group: string
   raw_data: unknown
   created_at: string
   updated_at: string

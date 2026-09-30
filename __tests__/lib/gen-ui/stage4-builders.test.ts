@@ -31,7 +31,7 @@ function context(capabilities: string[], invoices: InvoiceWithDetails[] = []): G
     source: 'chat', selectedText: null, userMessage: 'bills due in 14 days',
     metricHistories: [], metricForecasts: [], scenarioResult: null,
     stage3Data: {
-      capabilities, accounts: [], reportingPeriods: [], transactions: [], budgets: [], invoices, debts: [],
+      capabilities, accounts: [], reportingPeriods: [], transactions: [], budgets: [], invoices, debts: [], revenueEntries: [],
     },
   }
 }

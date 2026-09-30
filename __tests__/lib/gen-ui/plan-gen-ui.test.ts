@@ -35,7 +35,7 @@ jest.mock('@/lib/financial-data/metric-forecast', () => ({
   readFinancialMetricForecastSeries: jest.fn(),
 }))
 jest.mock('@/lib/financial-data/reporting/read-service', () => ({
-  EMPTY_STAGE3_FINANCIAL_DATA: { capabilities: [], accounts: [], reportingPeriods: [], transactions: [], budgets: [], invoices: [], debts: [] },
+  EMPTY_STAGE3_FINANCIAL_DATA: { capabilities: [], accounts: [], reportingPeriods: [], transactions: [], budgets: [], invoices: [], debts: [], revenueEntries: [] },
   readStage3FinancialData: jest.fn(),
 }))
 jest.mock('@/lib/gen-ui/preferences-persistence', () => ({
@@ -113,6 +113,7 @@ describe('planGenUi', () => {
       budgets: [],
       invoices: [],
       debts: [],
+      revenueEntries: [],
     })
     mockGetGenUiPersonalization.mockResolvedValue({
       businessSize: null,
@@ -784,6 +785,25 @@ describe('planGenUi', () => {
       state: {
         status: 'unavailable',
         message: 'A classified balance sheet is required for this calculation.',
+      },
+    }))
+  })
+
+  it('keeps a directly requested Stage 6 widget with an honest unavailable state', async () => {
+    mockPlannerInvoke.mockResolvedValue({ widgets: [] })
+
+    const plan = await planGenUi({
+      userId: 'user-123',
+      userMessage: 'Show revenue by customer',
+      assistantMessage: 'Customer-linked revenue is not connected yet.',
+      toolsUsed: [],
+    })
+
+    expect(plan?.widgets).toContainEqual(expect.objectContaining({
+      type: 'customer_revenue_breakdown',
+      state: {
+        status: 'unavailable',
+        message: 'Customer-linked revenue entries are required for this breakdown.',
       },
     }))
   })

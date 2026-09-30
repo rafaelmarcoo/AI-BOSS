@@ -60,6 +60,8 @@ function datasetFor(snapshot: NormalizedFinancialData): NormalizedAccountingData
     if (snapshot.detailed.debts?.some((debt) => debt.repayments.length > 0)) {
       capabilities.add('debt_repayment_schedule')
     }
+    if ((snapshot.detailed.revenueEntries?.length ?? 0) > 0) capabilities.add('customer_revenue')
+    if ((snapshot.detailed.revenueDimensions?.length ?? 0) > 0) capabilities.add('revenue_dimensions')
     return {
       ...snapshot.detailed,
       capabilities: [...capabilities],
@@ -68,6 +70,9 @@ function datasetFor(snapshot: NormalizedFinancialData): NormalizedAccountingData
         : [...snapshot.detailed.reportingPeriods, minimalProfitAndLoss(snapshot)],
       invoices: snapshot.detailed.invoices ?? [],
       debts: snapshot.detailed.debts ?? [],
+      customers: snapshot.detailed.customers ?? [],
+      revenueDimensions: snapshot.detailed.revenueDimensions ?? [],
+      revenueEntries: snapshot.detailed.revenueEntries ?? [],
     }
   }
   return {
@@ -78,6 +83,9 @@ function datasetFor(snapshot: NormalizedFinancialData): NormalizedAccountingData
     budgets: [],
     invoices: [],
     debts: [],
+    customers: [],
+    revenueDimensions: [],
+    revenueEntries: [],
   }
 }
 
@@ -110,6 +118,10 @@ export async function saveAccountingReadModels(params: {
 
   const syncRunId = syncRun.id as string
   const accountIds = new Map<string, string>()
+  const customerIds = new Map<string, string>()
+  const dimensionIds = new Map<string, string>()
+  const invoiceIds = new Map<string, string>()
+  const transactionIds = new Map<string, string>()
 
   try {
     for (const account of dataset.accounts) {
@@ -207,6 +219,7 @@ export async function saveAccountingReadModels(params: {
         .single()
       if (error || !data) throw error ?? new Error('Transaction upsert returned no row.')
       const transactionId = data.id as string
+      transactionIds.set(transaction.providerTransactionId, transactionId)
       const transactionLines = transaction.lines.map((line) => ({
           transaction_id: transactionId,
           user_id: params.userId,
@@ -270,6 +283,51 @@ export async function saveAccountingReadModels(params: {
       }
     }
 
+    for (const customer of dataset.customers ?? []) {
+      const { data, error } = await supabase
+        .from('financial_customers')
+        .upsert({
+          user_id: params.userId,
+          connection_id: params.connectionId,
+          sync_run_id: syncRunId,
+          source_type: params.provider,
+          source_label: params.sourceLabel,
+          provider_customer_id: customer.providerCustomerId,
+          customer_name: customer.name,
+          status: customer.status ?? 'active',
+          raw_data: customer.raw ?? {},
+        }, { onConflict: 'user_id,source_type,provider_customer_id' })
+        .select('id')
+        .single()
+      if (error || !data) throw error ?? new Error('Customer upsert returned no row.')
+      customerIds.set(customer.providerCustomerId, data.id as string)
+    }
+
+    for (const dimension of dataset.revenueDimensions ?? []) {
+      const { data, error } = await supabase
+        .from('financial_revenue_dimensions')
+        .upsert({
+          user_id: params.userId,
+          connection_id: params.connectionId,
+          sync_run_id: syncRunId,
+          source_type: params.provider,
+          source_label: params.sourceLabel,
+          provider_dimension_id: dimension.providerDimensionId,
+          dimension_type: dimension.dimensionType,
+          dimension_group: dimension.dimensionGroup,
+          dimension_name: dimension.name,
+          status: dimension.status ?? 'active',
+          raw_data: dimension.raw ?? {},
+        }, { onConflict: 'user_id,source_type,dimension_type,dimension_group,provider_dimension_id' })
+        .select('id')
+        .single()
+      if (error || !data) throw error ?? new Error('Revenue dimension upsert returned no row.')
+      dimensionIds.set(
+        `${dimension.dimensionType}\u0000${dimension.dimensionGroup}\u0000${dimension.providerDimensionId}`,
+        data.id as string,
+      )
+    }
+
     for (const invoice of dataset.invoices ?? []) {
       const { data, error } = await supabase
         .from('financial_invoices')
@@ -297,6 +355,7 @@ export async function saveAccountingReadModels(params: {
         .single()
       if (error || !data) throw error ?? new Error('Invoice upsert returned no row.')
       const invoiceId = data.id as string
+      invoiceIds.set(invoice.providerInvoiceId, invoiceId)
       const invoiceLines = invoice.lines.map((line) => ({
         invoice_id: invoiceId,
         user_id: params.userId,
@@ -387,6 +446,52 @@ export async function saveAccountingReadModels(params: {
       }
     }
 
+    for (const revenue of dataset.revenueEntries ?? []) {
+      const { data, error } = await supabase
+        .from('financial_revenue_entries')
+        .upsert({
+          user_id: params.userId,
+          connection_id: params.connectionId,
+          sync_run_id: syncRunId,
+          source_type: params.provider,
+          source_label: params.sourceLabel,
+          provider_revenue_id: revenue.providerRevenueId,
+          revenue_date: revenue.revenueDate,
+          status: revenue.status ?? 'posted',
+          currency: revenue.currency,
+          amount: revenue.amount,
+          customer_id: revenue.providerCustomerId ? customerIds.get(revenue.providerCustomerId) ?? null : null,
+          invoice_id: revenue.providerInvoiceId ? invoiceIds.get(revenue.providerInvoiceId) ?? null : null,
+          transaction_id: revenue.providerTransactionId ? transactionIds.get(revenue.providerTransactionId) ?? null : null,
+          description: revenue.description ?? null,
+          raw_data: revenue.raw ?? {},
+        }, { onConflict: 'user_id,source_type,provider_revenue_id' })
+        .select('id')
+        .single()
+      if (error || !data) throw error ?? new Error('Revenue entry upsert returned no row.')
+      const revenueEntryId = data.id as string
+      const links = revenue.dimensions.flatMap((dimension) => {
+        const dimensionId = dimensionIds.get(
+          `${dimension.dimensionType}\u0000${dimension.dimensionGroup}\u0000${dimension.providerDimensionId}`,
+        )
+        return dimensionId ? [{
+          revenue_entry_id: revenueEntryId,
+          user_id: params.userId,
+          dimension_id: dimensionId,
+          dimension_type: dimension.dimensionType,
+          dimension_group: dimension.dimensionGroup,
+          raw_data: dimension.raw ?? {},
+        }] : []
+      })
+      if (links.length > 0) {
+        const { error: linkError } = await supabase.from('financial_revenue_entry_dimensions').upsert(
+          links,
+          { onConflict: 'revenue_entry_id,dimension_type,dimension_group' },
+        )
+        if (linkError) throw linkError
+      }
+    }
+
     const recordCounts = {
       accounts: dataset.accounts.length,
       reportingPeriods: dataset.reportingPeriods.length,
@@ -394,6 +499,9 @@ export async function saveAccountingReadModels(params: {
       budgets: dataset.budgets.length,
       invoices: dataset.invoices?.length ?? 0,
       debts: dataset.debts?.length ?? 0,
+      customers: dataset.customers?.length ?? 0,
+      revenueDimensions: dataset.revenueDimensions?.length ?? 0,
+      revenueEntries: dataset.revenueEntries?.length ?? 0,
     }
     await supabase.from('financial_sync_runs').update({
       status: 'completed',

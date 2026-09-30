@@ -204,6 +204,48 @@ export interface NormalizedDebtRecord {
   raw?: unknown
 }
 
+export type NormalizedRevenueDimensionType =
+  | 'product_service'
+  | 'subscription'
+  | 'department'
+  | 'business_unit'
+  | 'tracking'
+
+export interface NormalizedCustomerRecord {
+  providerCustomerId: string
+  name: string
+  status?: 'active' | 'inactive'
+  raw?: unknown
+}
+
+export interface NormalizedRevenueDimensionRecord {
+  providerDimensionId: string
+  dimensionType: NormalizedRevenueDimensionType
+  dimensionGroup: string
+  name: string
+  status?: 'active' | 'inactive'
+  raw?: unknown
+}
+
+export interface NormalizedRevenueEntryRecord {
+  providerRevenueId: string
+  revenueDate: string
+  status?: 'draft' | 'posted' | 'voided' | 'deleted'
+  currency: string
+  amount: number
+  providerCustomerId?: string | null
+  providerInvoiceId?: string | null
+  providerTransactionId?: string | null
+  description?: string | null
+  dimensions: Array<{
+    providerDimensionId: string
+    dimensionType: NormalizedRevenueDimensionType
+    dimensionGroup: string
+    raw?: unknown
+  }>
+  raw?: unknown
+}
+
 export interface NormalizedAccountingDataset {
   capabilities: string[]
   accounts: NormalizedAccountRecord[]
@@ -212,6 +254,9 @@ export interface NormalizedAccountingDataset {
   budgets: NormalizedBudgetRecord[]
   invoices?: NormalizedInvoiceRecord[]
   debts?: NormalizedDebtRecord[]
+  customers?: NormalizedCustomerRecord[]
+  revenueDimensions?: NormalizedRevenueDimensionRecord[]
+  revenueEntries?: NormalizedRevenueEntryRecord[]
 }
 
 export interface WebhookEvent {

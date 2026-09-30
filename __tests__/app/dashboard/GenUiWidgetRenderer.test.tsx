@@ -96,6 +96,15 @@ const stage5CategoryGroup = {
   sourceLabel: 'Xero', currency: 'NZD', asOfDate: '2026-09-30', total: 100000,
   items: [{ label: 'Cash', category: 'cash', amount: 100000, percentage: 100 }],
 }
+const stage6CustomerGroup = {
+  sourceLabel: 'Xero', currency: 'NZD', periodStart: '2026-01-01', periodEnd: '2026-09-30',
+  periodLabel: 'Year to date', totalRevenue: 200000, allocatedRevenue: 190000, unallocatedRevenue: 10000,
+  rankingMethod: 'Net recorded revenue, highest to lowest',
+  items: [
+    { customerId: 'customer-1', customerName: 'Alpha Ltd', revenue: 100000, percentage: 50 },
+    { customerId: 'customer-2', customerName: 'Beta Ltd', revenue: 60000, percentage: 30 },
+  ],
+}
 
 const widgets: GenUiWidget[] = [
   {
@@ -357,6 +366,30 @@ const widgets: GenUiWidget[] = [
         repayments: [{ id: 'repayment-1', debtName: 'Term loan', dueDate: '2026-10-15', principalAmount: 1800, interestAmount: 200, totalAmount: 2000 }],
       }],
       note: 'Stored dates only.',
+    },
+  },
+  { ...base, type: 'customer_revenue_breakdown', data: { groups: [stage6CustomerGroup], note: 'Sources stay separate.' } },
+  {
+    ...base, type: 'customer_concentration_risk', data: {
+      groups: [{
+        ...stage6CustomerGroup, status: 'partial_unallocated', riskLevel: 'high',
+        topCustomerPercentage: 50, topThreePercentage: 80, topFivePercentage: 80,
+        thresholds: { elevated: 'Top customer ≥30% or top three ≥60%', high: 'Top customer ≥50% or top three ≥80%' },
+      }],
+      note: 'Unallocated revenue stays in the denominator.',
+    },
+  },
+  {
+    ...base, type: 'product_service_revenue', data: {
+      dimensionType: 'product_service',
+      groups: [{
+        sourceLabel: 'Xero', currency: 'NZD', periodStart: '2026-01-01', periodEnd: '2026-09-30',
+        periodLabel: 'Year to date', dimensionType: 'product_service', dimensionGroup: 'default',
+        totalRevenue: 200000, allocatedRevenue: 180000, unallocatedRevenue: 20000,
+        rankingMethod: 'Net recorded revenue, highest to lowest',
+        items: [{ dimensionId: 'consulting', name: 'Consulting', revenue: 120000, percentage: 60 }],
+      }],
+      note: 'Stored dimensions only.',
     },
   },
 ]

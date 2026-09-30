@@ -69,6 +69,11 @@ import {
   QuickRatioWidgetView,
   WorkingCapitalWidgetView,
 } from "./widgets/stage5/Stage5Widgets";
+import {
+  CustomerConcentrationRiskWidgetView,
+  CustomerRevenueBreakdownWidgetView,
+  ProductServiceRevenueWidgetView,
+} from "./widgets/stage6/Stage6Widgets";
 
 export type GenUiRendererProps<Type extends GenUiWidgetType> =
   GenUiWidgetInteractionProps & {
@@ -129,4 +134,7 @@ export const GEN_UI_RENDERER_REGISTRY = {
   equity_snapshot: EquitySnapshotWidgetView,
   debt_overview: DebtOverviewWidgetView,
   debt_repayment_timeline: DebtRepaymentTimelineWidgetView,
+  customer_revenue_breakdown: CustomerRevenueBreakdownWidgetView,
+  customer_concentration_risk: CustomerConcentrationRiskWidgetView,
+  product_service_revenue: ProductServiceRevenueWidgetView,
 } satisfies GenUiRendererRegistry;

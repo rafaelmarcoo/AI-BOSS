@@ -53,6 +53,9 @@ export const GEN_UI_WIDGET_TYPES = [
   'equity_snapshot',
   'debt_overview',
   'debt_repayment_timeline',
+  'customer_revenue_breakdown',
+  'customer_concentration_risk',
+  'product_service_revenue',
 ] as const
 
 export type GenUiWidgetType = (typeof GEN_UI_WIDGET_TYPES)[number]
@@ -522,6 +525,71 @@ export interface DebtRepaymentTimelineWidget extends GenUiWidgetBase {
   }
 }
 
+export interface CustomerRevenueGroupData {
+  sourceLabel: string
+  currency: string
+  periodStart: string
+  periodEnd: string
+  periodLabel: string
+  totalRevenue: number
+  allocatedRevenue: number
+  unallocatedRevenue: number
+  rankingMethod: string
+  items: Array<{
+    customerId: string
+    customerName: string
+    revenue: number
+    percentage: number | null
+  }>
+}
+
+export interface CustomerRevenueBreakdownWidget extends GenUiWidgetBase {
+  type: 'customer_revenue_breakdown'
+  data: { groups: CustomerRevenueGroupData[]; note: string }
+}
+
+export interface CustomerConcentrationRiskWidget extends GenUiWidgetBase {
+  type: 'customer_concentration_risk'
+  data: {
+    groups: Array<CustomerRevenueGroupData & {
+      status: 'ready' | 'partial_unallocated' | 'unavailable_non_positive_revenue' | 'unavailable_negative_customer_revenue' | 'unavailable_no_customer_mapping'
+      riskLevel: 'high' | 'elevated' | 'diversified' | 'unavailable'
+      topCustomerPercentage: number | null
+      topThreePercentage: number | null
+      topFivePercentage: number | null
+      thresholds: { elevated: string; high: string }
+    }>
+    note: string
+  }
+}
+
+export interface ProductServiceRevenueWidget extends GenUiWidgetBase {
+  type: 'product_service_revenue'
+  data: {
+    dimensionType: 'product_service' | 'subscription' | 'department' | 'business_unit' | 'tracking'
+    groups: Array<{
+      sourceLabel: string
+      currency: string
+      periodStart: string
+      periodEnd: string
+      periodLabel: string
+      dimensionType: 'product_service' | 'subscription' | 'department' | 'business_unit' | 'tracking'
+      dimensionGroup: string
+      totalRevenue: number
+      allocatedRevenue: number
+      unallocatedRevenue: number
+      rankingMethod: string
+      items: Array<{
+        dimensionId: string
+        name: string
+        revenue: number
+        percentage: number | null
+      }>
+    }>
+    note: string
+  }
+}
+
 export interface MetricSnapshotWidget extends GenUiWidgetBase {
   type: 'metric_snapshot'
   data: {
@@ -747,6 +815,9 @@ export type GenUiWidget =
   | EquitySnapshotWidget
   | DebtOverviewWidget
   | DebtRepaymentTimelineWidget
+  | CustomerRevenueBreakdownWidget
+  | CustomerConcentrationRiskWidget
+  | ProductServiceRevenueWidget
 
 export type GenUiWidgetByType = {
   [Type in GenUiWidgetType]: Extract<GenUiWidget, { type: Type }>

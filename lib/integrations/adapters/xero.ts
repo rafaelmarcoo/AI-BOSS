@@ -5,6 +5,9 @@ import type {
   NormalizedFinancialData,
   NormalizedReportingPeriodRecord,
   NormalizedStatementLineRecord,
+  NormalizedCustomerRecord,
+  NormalizedRevenueDimensionRecord,
+  NormalizedRevenueEntryRecord,
   OAuthTokens,
   WebhookEvent,
 } from '@/lib/integrations/types'
@@ -269,6 +272,83 @@ async function fetchXeroInvoices(headers: Record<string, string>) {
   }
 }
 
+function normalizeXeroRevenueAnalytics(invoices: NormalizedInvoiceRecord[]) {
+  const customers = new Map<string, NormalizedCustomerRecord>()
+  const dimensions = new Map<string, NormalizedRevenueDimensionRecord>()
+  const revenueEntries: NormalizedRevenueEntryRecord[] = []
+  for (const invoice of invoices) {
+    if (invoice.invoiceKind !== 'sales_invoice') continue
+    const revenueStatus: NormalizedRevenueEntryRecord['status'] =
+      invoice.status === 'voided' ? 'voided'
+        : invoice.status === 'deleted' ? 'deleted'
+          : invoice.status === 'draft' || invoice.status === 'submitted' ? 'draft'
+            : 'posted'
+    const invoiceRaw = invoice.raw as Record<string, unknown> | undefined
+    const contact = invoiceRaw?.Contact as Record<string, unknown> | undefined
+    const providerCustomerId = String(contact?.ContactID ?? '') || null
+    if (providerCustomerId && invoice.counterpartyName) {
+      customers.set(providerCustomerId, {
+        providerCustomerId,
+        name: invoice.counterpartyName,
+        status: String(contact?.ContactStatus ?? 'ACTIVE').toUpperCase() === 'ARCHIVED' ? 'inactive' : 'active',
+        raw: contact ?? {},
+      })
+    }
+
+    for (const line of invoice.lines) {
+      const raw = line.raw as Record<string, unknown> | undefined
+      const entryDimensions: NormalizedRevenueEntryRecord['dimensions'] = []
+      const itemCode = String(raw?.ItemCode ?? '').trim()
+      if (itemCode) {
+        const providerDimensionId = `item:${itemCode}`
+        dimensions.set(`product_service\u0000default\u0000${providerDimensionId}`, {
+          providerDimensionId,
+          dimensionType: 'product_service',
+          dimensionGroup: 'default',
+          name: line.description || itemCode,
+          raw: raw ?? {},
+        })
+        entryDimensions.push({ providerDimensionId, dimensionType: 'product_service', dimensionGroup: 'default', raw: raw ?? {} })
+      }
+
+      const tracking = Array.isArray(raw?.Tracking) ? raw.Tracking as Array<Record<string, unknown>> : []
+      for (const tracked of tracking) {
+        const optionName = String(tracked.Option ?? '').trim()
+        const groupName = String(tracked.Name ?? '').trim()
+        if (!optionName || !groupName) continue
+        const providerDimensionId = `tracking:${String(tracked.TrackingCategoryID ?? groupName)}:${String(tracked.TrackingOptionID ?? optionName)}`
+        dimensions.set(`tracking\u0000${groupName}\u0000${providerDimensionId}`, {
+          providerDimensionId,
+          dimensionType: 'tracking',
+          dimensionGroup: groupName,
+          name: optionName,
+          raw: tracked,
+        })
+        entryDimensions.push({ providerDimensionId, dimensionType: 'tracking', dimensionGroup: groupName, raw: tracked })
+      }
+
+      revenueEntries.push({
+        providerRevenueId: `invoice:${invoice.providerInvoiceId}:line:${line.lineKey}`,
+        revenueDate: invoice.issueDate,
+        status: revenueStatus,
+        currency: invoice.currency,
+        amount: line.lineAmount,
+        providerCustomerId,
+        providerInvoiceId: invoice.providerInvoiceId,
+        description: line.description,
+        dimensions: entryDimensions,
+        raw: raw ?? {},
+      })
+    }
+  }
+
+  return {
+    customers: [...customers.values()],
+    revenueDimensions: [...dimensions.values()],
+    revenueEntries,
+  }
+}
+
 export class XeroAdapter implements AccountingAdapter {
   readonly provider = 'xero' as const
   readonly label = 'Xero'
@@ -407,9 +487,12 @@ export class XeroAdapter implements AccountingAdapter {
     const asOf = new Date().toISOString().slice(0, 10)
     const currency = String(balanceReport?.CurrencyCode ?? 'USD').toUpperCase()
     const normalizedBalanceSheet = normalizeXeroBalanceSheet(balanceReport, asOf, currency)
+    const revenueAnalytics = normalizeXeroRevenueAnalytics(invoiceResult.invoices)
     const capabilities = [
       ...(invoiceResult.available ? ['invoice_details', 'bill_details'] : []),
       ...(normalizedBalanceSheet ? ['balance_sheet'] : []),
+      ...(revenueAnalytics.revenueEntries.length > 0 ? ['customer_revenue'] : []),
+      ...(revenueAnalytics.revenueDimensions.length > 0 ? ['revenue_dimensions'] : []),
     ]
 
     return {
@@ -431,6 +514,7 @@ export class XeroAdapter implements AccountingAdapter {
         budgets: [],
         invoices: invoiceResult.invoices,
         debts: [],
+        ...revenueAnalytics,
       },
     }
   }

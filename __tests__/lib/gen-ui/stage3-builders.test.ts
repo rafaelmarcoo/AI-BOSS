@@ -89,6 +89,7 @@ function context(): GenUiDataContext {
       budgets: [],
       invoices: [],
       debts: [],
+      revenueEntries: [],
     },
   }
 }

@@ -577,6 +577,33 @@ export const GEN_UI_WIDGET_CATALOG = {
     supportedPeriods: ['three_months', 'six_months', 'twelve_months'], supportedFilters: ['source', 'debt_type'],
     requiresForecast: false, requiresDimensionalData: true,
   },
+  customer_revenue_breakdown: {
+    type: 'customer_revenue_breakdown', label: 'Customer revenue breakdown',
+    description: 'Recorded revenue ranked by canonical customer for a defined period.',
+    selectionGuidance: 'Use when the user asks which customers generate revenue or requests top-customer revenue.',
+    defaultSize: '2x2', category: 'customers', defaultColumnSpan: 2,
+    dataRequirements: { required: ['customer_revenue'], optional: [] },
+    supportedPeriods: ['month', 'quarter', 'year', 'three_months', 'six_months', 'twelve_months'], supportedFilters: ['source', 'customer'],
+    requiresForecast: false, requiresDimensionalData: true,
+  },
+  customer_concentration_risk: {
+    type: 'customer_concentration_risk', label: 'Customer concentration risk',
+    description: 'Top-one, top-three, and top-five shares of recorded revenue for a defined period.',
+    selectionGuidance: 'Use for dependency, concentration, or revenue-risk questions about major customers.',
+    defaultSize: '1x2', category: 'customers', defaultColumnSpan: 2,
+    dataRequirements: { required: ['customer_revenue'], optional: [] },
+    supportedPeriods: ['month', 'quarter', 'year', 'three_months', 'six_months', 'twelve_months'], supportedFilters: ['source', 'customer'],
+    requiresForecast: false, requiresDimensionalData: true,
+  },
+  product_service_revenue: {
+    type: 'product_service_revenue', label: 'Product or service revenue',
+    description: 'Recorded revenue ranked by product/service or another explicitly stored revenue dimension.',
+    selectionGuidance: 'Use for product, service, subscription, department, business-unit, or tracking-category revenue questions.',
+    defaultSize: '2x2', category: 'revenue', defaultColumnSpan: 2,
+    dataRequirements: { required: ['customer_revenue', 'revenue_dimensions'], optional: [] },
+    supportedPeriods: ['month', 'quarter', 'year', 'three_months', 'six_months', 'twelve_months'], supportedFilters: ['source', 'revenue_dimension'],
+    requiresForecast: false, requiresDimensionalData: true,
+  },
 } as const satisfies Record<GenUiWidgetType, GenUiWidgetCatalogEntry>
 
 export const GEN_UI_WIDGET_CATALOG_ENTRIES = Object.values(

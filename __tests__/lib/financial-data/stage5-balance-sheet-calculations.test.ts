@@ -37,7 +37,7 @@ function balancePeriod(lines: ReportingPeriodWithLines['lines']): ReportingPerio
 }
 
 function data(periods: ReportingPeriodWithLines[] = []): Stage3FinancialData {
-  return { capabilities: ['balance_sheet', 'debt_details', 'debt_repayment_schedule'], accounts: [], reportingPeriods: periods, transactions: [], budgets: [], invoices: [], debts: [] }
+  return { capabilities: ['balance_sheet', 'debt_details', 'debt_repayment_schedule'], accounts: [], reportingPeriods: periods, transactions: [], budgets: [], invoices: [], debts: [], revenueEntries: [] }
 }
 
 describe('Stage 5 balance-sheet and debt calculations', () => {

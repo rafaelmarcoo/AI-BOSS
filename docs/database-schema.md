@@ -637,6 +637,47 @@ the distinction between contractual dates and estimates.
 
 ---
 
+### 17. Stage 6 customer and dimensional revenue analytics
+
+Stage 6 stores each dated revenue value once in `financial_revenue_entries` and
+links it to an optional canonical customer plus zero or more typed dimensions.
+Customer, product, service, department, business-unit, and provider tracking
+analytics therefore share the same revenue source without duplicating amounts.
+
+#### financial_customers
+
+Stores provider-neutral customer identities with source identifiers and active
+status. Revenue without a resolved customer remains valid and is reported as
+unallocated rather than assigned to a fabricated customer.
+
+#### financial_revenue_entries
+
+Stores signed, dated revenue values with currency, lifecycle status, and provenance. Entries may
+link back to their canonical invoice or transaction. Analytics group every
+source and currency independently; currency conversion requires a separately
+stored exchange rate and conversion date and is not performed by Stage 6.
+
+#### financial_revenue_dimensions and financial_revenue_entry_dimensions
+
+Stores reusable typed dimensions and their links to revenue entries. Supported
+types are `product_service`, `subscription`, `department`, `business_unit`, and
+`tracking`. Provider tracking categories remain `tracking` unless the source
+explicitly classifies them more specifically. `dimension_group` separates
+independent axes, so one revenue entry cannot be counted twice inside the same
+dimension group.
+
+**RLS Policies:**
+- Users can view, insert, update, and delete only their own customer and revenue rows
+- Provider synchronization verifies ownership before administrative writes
+
+**Deduplication:**
+- Customers: `(user_id, source_type, provider_customer_id)`
+- Revenue entries: `(user_id, source_type, provider_revenue_id)`
+- Dimensions: `(user_id, source_type, dimension_type, dimension_group, provider_dimension_id)`
+- Entry dimensions: `(revenue_entry_id, dimension_type, dimension_group)`
+
+---
+
 ### 14. scenarios
 
 Stores reusable what-if drafts and the latest explicitly calculated result. The
@@ -727,6 +768,11 @@ financial_invoices (1) ──< (many) financial_invoice_lines
 financial_invoices (1) ──< (many) financial_invoice_payments
 users (1) ──< (many) financial_debts
 financial_debts (1) ──< (many) financial_debt_repayments
+users (1) ──< (many) financial_customers
+users (1) ──< (many) financial_revenue_entries
+financial_customers (1) ──< (many) financial_revenue_entries
+financial_revenue_entries (1) ──< (many) financial_revenue_entry_dimensions
+financial_revenue_dimensions (1) ──< (many) financial_revenue_entry_dimensions
 users (1) ──< (many) scenarios
 companies (1) ──< (many) scenarios
 users (1) ──< (one) user_gen_ui_preferences
@@ -759,6 +805,7 @@ All schema changes are tracked in `db/migrations/`:
 - `020_stage3_financial_read_models.sql` - Adds canonical accounts, financial statements, transactions, budgets, sync provenance, RLS, and provider-safe deduplication for Stage 3 widgets
 - `021_stage4_invoices_and_bills.sql` - Adds canonical sales invoices, supplier bills, line items, payments, due-date indexes, RLS, and provider-safe deduplication for Stage 4 widgets
 - `022_stage5_balance_sheet_and_debt.sql` - Adds balance-sheet classifications, explicit quick-ratio treatment, debts, and stored repayment schedules
+- `023_stage6_customer_and_revenue_dimensions.sql` - Adds canonical customers, signed revenue entries, typed dimensions, RLS, and provider-safe deduplication for Stage 6 analytics
 
 ---
 

@@ -14,6 +14,10 @@ import type {
   FinancialInvoicePayment,
   FinancialDebt,
   FinancialDebtRepayment,
+  FinancialCustomer,
+  FinancialRevenueDimension,
+  FinancialRevenueEntry,
+  FinancialRevenueEntryDimension,
 } from '@/types/database'
 import type {
   BudgetWithLines,
@@ -22,6 +26,7 @@ import type {
   TransactionWithLines,
   InvoiceWithDetails,
   DebtWithRepayments,
+  RevenueEntryWithDetails,
 } from './types'
 
 export const EMPTY_STAGE3_FINANCIAL_DATA: Stage3FinancialData = {
@@ -32,11 +37,12 @@ export const EMPTY_STAGE3_FINANCIAL_DATA: Stage3FinancialData = {
   budgets: [],
   invoices: [],
   debts: [],
+  revenueEntries: [],
 }
 
 export async function readStage3FinancialData(userId: string): Promise<Stage3FinancialData> {
   const supabase = createAdminSupabaseClient()
-  const [syncRunsResult, accountsResult, periodsResult, transactionsResult, budgetsResult, invoicesResult, debtsResult] = await Promise.all([
+  const [syncRunsResult, accountsResult, periodsResult, transactionsResult, budgetsResult, invoicesResult, debtsResult, revenueResult] = await Promise.all([
     supabase
       .from('financial_sync_runs')
       .select('capabilities')
@@ -74,9 +80,16 @@ export async function readStage3FinancialData(userId: string): Promise<Stage3Fin
       .select('*, financial_debt_repayments(*)')
       .eq('user_id', userId)
       .order('maturity_date', { ascending: true, nullsFirst: false }),
+    supabase
+      .from('financial_revenue_entries')
+      .select('*, financial_customers(*), financial_revenue_entry_dimensions(*, financial_revenue_dimensions(*))')
+      .eq('user_id', userId)
+      .eq('status', 'posted')
+      .order('revenue_date', { ascending: false })
+      .limit(5000),
   ])
 
-  const firstError = [syncRunsResult, accountsResult, periodsResult, transactionsResult, budgetsResult, invoicesResult, debtsResult]
+  const firstError = [syncRunsResult, accountsResult, periodsResult, transactionsResult, budgetsResult, invoicesResult, debtsResult, revenueResult]
     .map((result) => result.error)
     .find(Boolean)
   if (firstError) {
@@ -123,6 +136,24 @@ export async function readStage3FinancialData(userId: string): Promise<Stage3Fin
     const { financial_debt_repayments: repayments = [], ...debt } = record
     return { ...debt, repayments } satisfies DebtWithRepayments
   })
+  const revenueEntries = (revenueResult.data ?? []).map((row) => {
+    const record = row as FinancialRevenueEntry & {
+      financial_customers?: FinancialCustomer | null
+      financial_revenue_entry_dimensions?: Array<FinancialRevenueEntryDimension & {
+        financial_revenue_dimensions?: FinancialRevenueDimension | null
+      }>
+    }
+    const {
+      financial_customers: customer = null,
+      financial_revenue_entry_dimensions: rawDimensions = [],
+      ...entry
+    } = record
+    const dimensions = rawDimensions.map(({ financial_revenue_dimensions: dimension = null, ...link }) => ({
+      ...link,
+      dimension,
+    }))
+    return { ...entry, customer, dimensions } satisfies RevenueEntryWithDetails
+  })
 
   return {
     capabilities: [...new Set((syncRunsResult.data ?? []).flatMap((row) =>
@@ -134,5 +165,6 @@ export async function readStage3FinancialData(userId: string): Promise<Stage3Fin
     budgets,
     invoices,
     debts,
+    revenueEntries,
   }
 }

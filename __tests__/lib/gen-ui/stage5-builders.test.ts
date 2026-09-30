@@ -15,7 +15,7 @@ function context(capabilities: string[], userMessage = 'show working capital'): 
     },
     runwayTrend: { observations: [], direction: 'insufficient_data', change: null, averageChange: null },
     source: 'chat', selectedText: null, userMessage, metricHistories: [], metricForecasts: [], scenarioResult: null,
-    stage3Data: { capabilities, accounts: [], reportingPeriods: [], transactions: [], budgets: [], invoices: [], debts: [] },
+    stage3Data: { capabilities, accounts: [], reportingPeriods: [], transactions: [], budgets: [], invoices: [], debts: [], revenueEntries: [] },
   }
 }
 

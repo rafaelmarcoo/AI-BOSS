@@ -51,6 +51,7 @@ function data(invoices: InvoiceWithDetails[]): Stage3FinancialData {
     budgets: [],
     invoices,
     debts: [],
+    revenueEntries: [],
   }
 }
 

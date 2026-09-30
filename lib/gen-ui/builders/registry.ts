@@ -60,6 +60,11 @@ import {
   buildQuickRatioWidget,
   buildWorkingCapitalWidget,
 } from "./stage5/stage5-builders";
+import {
+  buildCustomerConcentrationRiskWidget,
+  buildCustomerRevenueBreakdownWidget,
+  buildProductServiceRevenueWidget,
+} from "./stage6/stage6-builders";
 
 export type GenUiWidgetBuilder = (
   spec: PlannerWidget,
@@ -168,6 +173,9 @@ export const GEN_UI_BUILDER_REGISTRY = {
   equity_snapshot: (spec, index, context) => [buildEquitySnapshotWidget(spec, index, context)],
   debt_overview: (spec, index, context) => [buildDebtOverviewWidget(spec, index, context)],
   debt_repayment_timeline: (spec, index, context) => [buildDebtRepaymentTimelineWidget(spec, index, context)],
+  customer_revenue_breakdown: (spec, index, context) => [buildCustomerRevenueBreakdownWidget(spec, index, context)],
+  customer_concentration_risk: (spec, index, context) => [buildCustomerConcentrationRiskWidget(spec, index, context)],
+  product_service_revenue: (spec, index, context) => [buildProductServiceRevenueWidget(spec, index, context)],
 } satisfies GenUiBuilderRegistry;
 
 export function buildGenUiWidgets(

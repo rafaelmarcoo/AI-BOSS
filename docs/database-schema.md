@@ -556,6 +556,54 @@ lines by currency, category/account, and overlapping reporting period.
 
 ---
 
+### 15. Stage 4 invoices, bills, and payments
+
+Stage 4 stores invoice-level due dates and outstanding balances separately from
+aggregate accounts receivable and accounts payable. Widgets never reconstruct
+invoice ageing from aggregate totals.
+
+#### financial_invoices
+
+Stores both customer invoices (`sales_invoice`) and supplier bills
+(`supplier_bill`). Canonical status, issue date, due date, currency, total,
+paid amount, and outstanding amount are explicit columns. Provider payloads are
+retained in `raw_data` for audit and future provider-specific troubleshooting.
+
+Only invoices with a positive `outstanding_amount` and a non-terminal status
+are used for overdue, ageing, expected-payment, and bills-due calculations.
+Calculations group records by source and currency; no implicit currency
+conversion occurs.
+
+#### financial_invoice_lines
+
+Stores canonical invoice or bill line items, including optional chart-of-account
+links, descriptions, categories, quantity, unit amount, tax, and line amount.
+Stage 4 widgets primarily use invoice headers, while these lines preserve the
+normalized detail required by later customer and product analytics.
+
+#### financial_invoice_payments
+
+Stores posted, voided, or deleted payments linked to an invoice or bill.
+Provider payment IDs make repeated synchronization idempotent. The header-level
+`amount_paid` and `outstanding_amount` remain the source of truth for current
+open balances.
+
+**RLS Policies:**
+- Users can view, insert, update, and delete only rows whose `user_id` matches `auth.uid()`
+- Provider synchronization verifies the authenticated owner before administrative writes
+
+**Deduplication:**
+- Invoices: `(user_id, source_type, provider_invoice_id)`
+- Invoice lines: `(invoice_id, line_key)`
+- Payments: `(invoice_id, provider_payment_id)`
+
+**Ageing boundaries:**
+- Age is measured from the stored due date to the displayed as-of date
+- Buckets are 0–30, 31–60, 61–90, and 90+ days overdue
+- Not-yet-due invoices are excluded from overdue ageing and handled by Expected Payments
+
+---
+
 ### 14. scenarios
 
 Stores reusable what-if drafts and the latest explicitly calculated result. The
@@ -641,6 +689,9 @@ users (1) ──< (many) financial_transactions
 financial_transactions (1) ──< (many) financial_transaction_lines
 users (1) ──< (many) financial_budgets
 financial_budgets (1) ──< (many) financial_budget_lines
+users (1) ──< (many) financial_invoices
+financial_invoices (1) ──< (many) financial_invoice_lines
+financial_invoices (1) ──< (many) financial_invoice_payments
 users (1) ──< (many) scenarios
 companies (1) ──< (many) scenarios
 users (1) ──< (one) user_gen_ui_preferences
@@ -671,6 +722,7 @@ All schema changes are tracked in `db/migrations/`:
 - `018_gen_ui_personalization.sql` - Adds shared company size and per-user Gen UI personalization preferences
 - `019_company_gen_ui_controls.sql` - Moves planning horizon to the admin-controlled company profile and adds worker-specific roles
 - `020_stage3_financial_read_models.sql` - Adds canonical accounts, financial statements, transactions, budgets, sync provenance, RLS, and provider-safe deduplication for Stage 3 widgets
+- `021_stage4_invoices_and_bills.sql` - Adds canonical sales invoices, supplier bills, line items, payments, due-date indexes, RLS, and provider-safe deduplication for Stage 4 widgets
 
 ---
 

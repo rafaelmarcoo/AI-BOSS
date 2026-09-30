@@ -35,7 +35,7 @@ jest.mock('@/lib/financial-data/metric-forecast', () => ({
   readFinancialMetricForecastSeries: jest.fn(),
 }))
 jest.mock('@/lib/financial-data/reporting/read-service', () => ({
-  EMPTY_STAGE3_FINANCIAL_DATA: { accounts: [], reportingPeriods: [], transactions: [], budgets: [] },
+  EMPTY_STAGE3_FINANCIAL_DATA: { capabilities: [], accounts: [], reportingPeriods: [], transactions: [], budgets: [], invoices: [] },
   readStage3FinancialData: jest.fn(),
 }))
 jest.mock('@/lib/gen-ui/preferences-persistence', () => ({
@@ -106,10 +106,12 @@ describe('planGenUi', () => {
       }],
     } as never)
     mockReadStage3FinancialData.mockResolvedValue({
+      capabilities: [],
       accounts: [],
       reportingPeriods: [],
       transactions: [],
       budgets: [],
+      invoices: [],
     })
     mockGetGenUiPersonalization.mockResolvedValue({
       businessSize: null,
@@ -744,6 +746,25 @@ describe('planGenUi', () => {
           expect.objectContaining({ label: 'Monthly revenue', sourceLabel: 'verified.csv' }),
         ]),
       }),
+    }))
+  })
+
+  it('keeps a directly requested Stage 4 widget with an honest unavailable state', async () => {
+    mockPlannerInvoke.mockResolvedValue({ widgets: [] })
+
+    const plan = await planGenUi({
+      userId: 'user-123',
+      userMessage: 'Show me overdue customer invoices',
+      assistantMessage: 'Invoice detail is not connected yet.',
+      toolsUsed: [],
+    })
+
+    expect(plan?.widgets).toContainEqual(expect.objectContaining({
+      type: 'overdue_invoices',
+      state: {
+        status: 'unavailable',
+        message: 'Detailed customer invoices are required for overdue analysis.',
+      },
     }))
   })
 

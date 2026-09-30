@@ -56,6 +56,8 @@ import {
 import { EMPTY_STAGE3_FINANCIAL_DATA, readStage3FinancialData } from '@/lib/financial-data/reporting/read-service'
 import { listStage3WidgetCandidates, selectStage3FallbackSpecs } from '@/lib/gen-ui/stage3-selection'
 import { STAGE3_WIDGET_TYPES } from '@/lib/gen-ui/builders/stage3/stage3-builders'
+import { listStage4WidgetCandidates, selectStage4FallbackSpecs } from '@/lib/gen-ui/stage4-selection'
+import { STAGE4_WIDGET_TYPES } from '@/lib/gen-ui/builders/stage4/stage4-builders'
 
 const MAX_WIDGETS = 4
 
@@ -155,6 +157,8 @@ function defaultWidgetSpecs(
   const normalized = userMessage.toLowerCase()
   const widgets: PlannerWidget[] = []
   const missingMetrics = listMissingMetrics(snapshot)
+  const stage4Specs = selectStage4FallbackSpecs(userMessage)
+  widgets.push(...stage4Specs)
   const stage3Specs = selectStage3FallbackSpecs(userMessage)
   widgets.push(...stage3Specs)
   const existingDataSpecs = selectExistingDataFallbackSpecs(userMessage)
@@ -438,6 +442,13 @@ function buildPlannerCandidates(params: {
 
   candidates.push(
     ...listStage3WidgetCandidates(params.userMessage).map((candidate) => ({
+      ...candidate,
+      personalizationFit: describePersonalizationFit(candidate.id, candidate.label, [], params.personalization),
+    })),
+  )
+
+  candidates.push(
+    ...listStage4WidgetCandidates(params.userMessage).map((candidate) => ({
       ...candidate,
       personalizationFit: describePersonalizationFit(candidate.id, candidate.label, [], params.personalization),
     })),
@@ -782,6 +793,7 @@ export async function planGenUi({
   )
   const forecastSpec = fallbackSpecs.find((spec) => spec.type === 'metric_forecast_chart')
   const stage3Specs = fallbackSpecs.filter((spec) => STAGE3_WIDGET_TYPES.includes(spec.type))
+  const stage4Specs = fallbackSpecs.filter((spec) => STAGE4_WIDGET_TYPES.includes(spec.type))
   const scenarioSpec: PlannerWidget | null = scenarioResult
     ? {
         type: 'scenario_analysis',
@@ -792,6 +804,7 @@ export async function planGenUi({
   const specs = dedupeWidgetSpecs([
     ...historySpecs,
     ...stage3Specs,
+    ...stage4Specs,
     ...(forecastSpec ? [forecastSpec] : []),
     ...(scenarioSpec ? [scenarioSpec] : []),
     ...(modelSpecs ?? fallbackSpecs).filter(

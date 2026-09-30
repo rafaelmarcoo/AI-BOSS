@@ -17,6 +17,7 @@ export const GEN_UI_WIDGET_CATEGORIES = [
   'brief',
   'profit',
   'budgets',
+  'invoices',
 ] as const
 
 export type GenUiWidgetCategory = (typeof GEN_UI_WIDGET_CATEGORIES)[number]
@@ -35,6 +36,8 @@ export const GEN_UI_DATA_CAPABILITIES = [
   'expense_transactions',
   'budget_lines',
   'cost_classification',
+  'invoice_details',
+  'bill_details',
 ] as const
 
 export type GenUiDataCapability = (typeof GEN_UI_DATA_CAPABILITIES)[number]
@@ -51,6 +54,8 @@ export const GEN_UI_SUPPORTED_PERIODS = [
   'sixty_days',
   'ninety_days',
   'twelve_months',
+  'seven_days',
+  'fourteen_days',
 ] as const
 
 export type GenUiSupportedPeriod = (typeof GEN_UI_SUPPORTED_PERIODS)[number]
@@ -62,6 +67,8 @@ export const GEN_UI_SUPPORTED_FILTERS = [
   'category',
   'profit_type',
   'budget',
+  'counterparty',
+  'invoice_status',
 ] as const
 
 export type GenUiSupportedFilter = (typeof GEN_UI_SUPPORTED_FILTERS)[number]

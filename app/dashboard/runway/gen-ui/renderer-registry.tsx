@@ -53,6 +53,12 @@ import {
   ProfitTrendWidgetView,
   RevenueForecastWidgetView,
 } from "./widgets/stage3/Stage3Widgets";
+import {
+  BillsDueWidgetView,
+  ExpectedPaymentsWidgetView,
+  InvoiceAgeingWidgetView,
+  OverdueInvoicesWidgetView,
+} from "./widgets/stage4/Stage4Widgets";
 
 export type GenUiRendererProps<Type extends GenUiWidgetType> =
   GenUiWidgetInteractionProps & {
@@ -101,4 +107,8 @@ export const GEN_UI_RENDERER_REGISTRY = {
   budget_forecast: BudgetForecastWidgetView,
   cash_inflow_forecast: CashInflowForecastWidgetView,
   cash_outflow_forecast: CashOutflowForecastWidgetView,
+  overdue_invoices: OverdueInvoicesWidgetView,
+  invoice_ageing: InvoiceAgeingWidgetView,
+  expected_payments: ExpectedPaymentsWidgetView,
+  bills_due: BillsDueWidgetView,
 } satisfies GenUiRendererRegistry;

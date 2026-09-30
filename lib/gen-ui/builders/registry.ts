@@ -44,6 +44,12 @@ import {
   buildProfitTrendWidget,
   buildRevenueForecastWidget,
 } from "./stage3/stage3-builders";
+import {
+  buildBillsDueWidget,
+  buildExpectedPaymentsWidget,
+  buildInvoiceAgeingWidget,
+  buildOverdueInvoicesWidget,
+} from "./stage4/stage4-builders";
 
 export type GenUiWidgetBuilder = (
   spec: PlannerWidget,
@@ -140,6 +146,10 @@ export const GEN_UI_BUILDER_REGISTRY = {
   budget_forecast: (spec, index, context) => [buildBudgetForecastWidget(spec, index, context)],
   cash_inflow_forecast: (spec, index, context) => [buildCashInflowForecastWidget(spec, index, context)],
   cash_outflow_forecast: (spec, index, context) => [buildCashOutflowForecastWidget(spec, index, context)],
+  overdue_invoices: (spec, index, context) => [buildOverdueInvoicesWidget(spec, index, context)],
+  invoice_ageing: (spec, index, context) => [buildInvoiceAgeingWidget(spec, index, context)],
+  expected_payments: (spec, index, context) => [buildExpectedPaymentsWidget(spec, index, context)],
+  bills_due: (spec, index, context) => [buildBillsDueWidget(spec, index, context)],
 } satisfies GenUiBuilderRegistry;
 
 export function buildGenUiWidgets(

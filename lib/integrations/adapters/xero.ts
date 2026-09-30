@@ -1,6 +1,7 @@
 import crypto from 'node:crypto'
 import type {
   AccountingAdapter,
+  NormalizedInvoiceRecord,
   NormalizedFinancialData,
   OAuthTokens,
   WebhookEvent,
@@ -66,6 +67,109 @@ function findRowValue(rows: unknown[], title: string): number {
   }
 
   return 0
+}
+
+function xeroDate(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length === 0) return null
+  const timestamp = value.match(/^\/Date\((\d+)/)?.[1]
+  if (timestamp) return new Date(Number(timestamp)).toISOString().slice(0, 10)
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.valueOf()) ? null : parsed.toISOString().slice(0, 10)
+}
+
+function xeroInvoiceStatus(value: unknown, amountPaid: number, amountDue: number): NormalizedInvoiceRecord['status'] {
+  const status = String(value ?? '').toUpperCase()
+  if (status === 'PAID') return 'paid'
+  if (status === 'VOIDED') return 'voided'
+  if (status === 'DELETED') return 'deleted'
+  if (status === 'DRAFT') return 'draft'
+  if (status === 'SUBMITTED') return 'submitted'
+  if (amountPaid > 0 && amountDue > 0) return 'partially_paid'
+  return 'authorised'
+}
+
+function normalizeXeroInvoice(record: Record<string, unknown>): NormalizedInvoiceRecord | null {
+  const providerInvoiceId = String(record.InvoiceID ?? '')
+  const issueDate = xeroDate(record.DateString ?? record.Date)
+  const dueDate = xeroDate(record.DueDateString ?? record.DueDate)
+  const type = String(record.Type ?? '')
+  if (!providerInvoiceId || !issueDate || !dueDate || dueDate < issueDate) return null
+  if (type !== 'ACCREC' && type !== 'ACCPAY') return null
+
+  const totalAmount = Math.abs(Number(record.Total ?? 0))
+  const amountPaid = Math.min(totalAmount, Math.abs(Number(record.AmountPaid ?? 0)))
+  const outstandingAmount = Math.min(
+    totalAmount,
+    Math.max(0, Math.abs(Number(record.AmountDue ?? totalAmount - amountPaid))),
+  )
+  const currency = String(record.CurrencyCode ?? '').toUpperCase()
+  if (!/^[A-Z]{3}$/.test(currency)) return null
+  const contact = record.Contact as Record<string, unknown> | undefined
+  const lineItems = Array.isArray(record.LineItems) ? record.LineItems as Array<Record<string, unknown>> : []
+  const payments = Array.isArray(record.Payments) ? record.Payments as Array<Record<string, unknown>> : []
+
+  return {
+    providerInvoiceId,
+    invoiceKind: type === 'ACCREC' ? 'sales_invoice' : 'supplier_bill',
+    status: xeroInvoiceStatus(record.Status, amountPaid, outstandingAmount),
+    invoiceNumber: String(record.InvoiceNumber ?? record.Reference ?? '') || null,
+    counterpartyName: String(contact?.Name ?? '') || null,
+    issueDate,
+    dueDate,
+    currency,
+    totalAmount,
+    amountPaid,
+    outstandingAmount,
+    fullyPaidAt: record.FullyPaidOnDate ? xeroDate(record.FullyPaidOnDate) : null,
+    lines: lineItems.map((line, index) => ({
+      lineKey: String(line.LineItemID ?? `${providerInvoiceId}:${index}`),
+      providerAccountId: line.AccountID ? String(line.AccountID) : null,
+      description: String(line.Description ?? '') || null,
+      canonicalCategory: String(line.AccountCode ?? '') || null,
+      quantity: line.Quantity === undefined ? null : Number(line.Quantity),
+      unitAmount: line.UnitAmount === undefined ? null : Number(line.UnitAmount),
+      taxAmount: Math.abs(Number(line.TaxAmount ?? 0)),
+      lineAmount: Math.abs(Number(line.LineAmount ?? 0)),
+      raw: line,
+    })),
+    payments: payments.flatMap((payment) => {
+      const paymentDate = xeroDate(payment.Date)
+      const providerPaymentId = String(payment.PaymentID ?? '')
+      if (!paymentDate || !providerPaymentId) return []
+      return [{
+        providerPaymentId,
+        paymentDate,
+        status: String(payment.Status ?? '').toUpperCase() === 'DELETED' ? 'deleted' as const : 'posted' as const,
+        currency,
+        amount: Math.abs(Number(payment.Amount ?? 0)),
+        reference: String(payment.Reference ?? '') || null,
+        raw: payment,
+      }]
+    }),
+    raw: record,
+  }
+}
+
+async function fetchXeroInvoices(headers: Record<string, string>) {
+  const records: Array<Record<string, unknown>> = []
+  for (let page = 1; page <= 10; page += 1) {
+    const response = await fetch(`${XERO_API_URL}/Invoices?page=${page}&order=DueDate%20ASC`, {
+      signal: AbortSignal.timeout(15_000),
+      headers,
+    })
+    if (!response.ok) return { available: false, invoices: [] as NormalizedInvoiceRecord[] }
+    const payload = await response.json() as { Invoices?: Array<Record<string, unknown>> }
+    const pageRecords = payload.Invoices ?? []
+    records.push(...pageRecords)
+    if (pageRecords.length < 100) break
+  }
+  return {
+    available: true,
+    invoices: records.flatMap((record) => {
+      const invoice = normalizeXeroInvoice(record)
+      return invoice ? [invoice] : []
+    }),
+  }
 }
 
 export class XeroAdapter implements AccountingAdapter {
@@ -202,6 +306,7 @@ export class XeroAdapter implements AccountingAdapter {
 
     const balanceRows = (balanceReport?.Rows as unknown[]) ?? []
     const profitLossRows = (profitLossReport?.Rows as unknown[]) ?? []
+    const invoiceResult = await fetchXeroInvoices(headers)
 
     return {
       cashBalance: findRowValue(balanceRows, 'Bank'),
@@ -214,6 +319,14 @@ export class XeroAdapter implements AccountingAdapter {
       currency: (balanceReport?.CurrencyCode as string) ?? 'USD',
       asOf: new Date().toISOString().slice(0, 10),
       raw: { balanceSheet, profitLoss },
+      detailed: {
+        capabilities: invoiceResult.available ? ['invoice_details', 'bill_details'] : [],
+        accounts: [],
+        reportingPeriods: [],
+        transactions: [],
+        budgets: [],
+        invoices: invoiceResult.invoices,
+      },
     }
   }
 

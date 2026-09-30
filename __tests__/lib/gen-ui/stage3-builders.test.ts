@@ -70,12 +70,6 @@ function context(): GenUiDataContext {
       direction: 'insufficient_data',
       change: null,
       averageChange: null,
-      workingCapitalAdjusted: {
-        observations: [],
-        direction: 'insufficient_data',
-        change: null,
-        averageChange: null,
-      },
     },
     source: 'chat',
     selectedText: null,
@@ -84,6 +78,7 @@ function context(): GenUiDataContext {
     metricForecasts: [],
     scenarioResult: null,
     stage3Data: {
+      capabilities: [],
       accounts: [],
       reportingPeriods: [
         reportingPeriod('p1', '2026-07-31', 100000, 30000, 40000),
@@ -91,6 +86,7 @@ function context(): GenUiDataContext {
       ],
       transactions: [],
       budgets: [],
+      invoices: [],
     },
   }
 }

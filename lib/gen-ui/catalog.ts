@@ -469,6 +469,42 @@ export const GEN_UI_WIDGET_CATALOG = {
     supportedPeriods: ['three_months', 'six_months'], supportedFilters: ['source'],
     requiresForecast: true, requiresDimensionalData: false,
   },
+  overdue_invoices: {
+    type: 'overdue_invoices', label: 'Overdue invoices',
+    description: 'Open customer invoices past their stored due date, grouped by source and currency.',
+    selectionGuidance: 'Use for overdue customer invoice counts, balances, or collection-priority questions.',
+    defaultSize: '1x2', category: 'invoices', defaultColumnSpan: 2,
+    dataRequirements: { required: ['invoice_details'], optional: [] },
+    supportedPeriods: ['current'], supportedFilters: ['source', 'counterparty', 'invoice_status'],
+    requiresForecast: false, requiresDimensionalData: true,
+  },
+  invoice_ageing: {
+    type: 'invoice_ageing', label: 'Invoice ageing',
+    description: 'Overdue customer balances grouped into due-date ageing buckets.',
+    selectionGuidance: 'Use for invoice ageing or aged-receivables questions; age from the stored due date.',
+    defaultSize: '2x2', category: 'invoices', defaultColumnSpan: 2,
+    dataRequirements: { required: ['invoice_details'], optional: [] },
+    supportedPeriods: ['current'], supportedFilters: ['source', 'counterparty'],
+    requiresForecast: false, requiresDimensionalData: true,
+  },
+  expected_payments: {
+    type: 'expected_payments', label: 'Expected payments',
+    description: 'Open customer invoice balances due during the next 7, 14, or 30 days.',
+    selectionGuidance: 'Use for expected customer receipts and clearly state that invoice due dates are not payment guarantees.',
+    defaultSize: '1x2', category: 'invoices', defaultColumnSpan: 2,
+    dataRequirements: { required: ['invoice_details'], optional: [] },
+    supportedPeriods: ['seven_days', 'fourteen_days', 'thirty_days'], supportedFilters: ['source', 'counterparty'],
+    requiresForecast: true, requiresDimensionalData: true,
+  },
+  bills_due: {
+    type: 'bills_due', label: 'Bills due',
+    description: 'Open supplier bills due during the next 7, 14, or 30 days.',
+    selectionGuidance: 'Use for upcoming supplier-payment and near-term payable questions.',
+    defaultSize: '1x2', category: 'payables', defaultColumnSpan: 2,
+    dataRequirements: { required: ['bill_details'], optional: [] },
+    supportedPeriods: ['seven_days', 'fourteen_days', 'thirty_days'], supportedFilters: ['source', 'counterparty'],
+    requiresForecast: false, requiresDimensionalData: true,
+  },
 } as const satisfies Record<GenUiWidgetType, GenUiWidgetCatalogEntry>
 
 export const GEN_UI_WIDGET_CATALOG_ENTRIES = Object.values(

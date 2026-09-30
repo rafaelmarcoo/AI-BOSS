@@ -126,12 +126,53 @@ export interface NormalizedBudgetRecord {
   raw?: unknown
 }
 
+export interface NormalizedInvoiceLineRecord {
+  lineKey: string
+  providerAccountId?: string | null
+  description?: string | null
+  canonicalCategory?: string | null
+  quantity?: number | null
+  unitAmount?: number | null
+  taxAmount?: number
+  lineAmount: number
+  raw?: unknown
+}
+
+export interface NormalizedInvoicePaymentRecord {
+  providerPaymentId: string
+  paymentDate: string
+  status?: 'posted' | 'voided' | 'deleted'
+  currency: string
+  amount: number
+  reference?: string | null
+  raw?: unknown
+}
+
+export interface NormalizedInvoiceRecord {
+  providerInvoiceId: string
+  invoiceKind: 'sales_invoice' | 'supplier_bill'
+  status: 'draft' | 'submitted' | 'authorised' | 'partially_paid' | 'paid' | 'voided' | 'deleted'
+  invoiceNumber?: string | null
+  counterpartyName?: string | null
+  issueDate: string
+  dueDate: string
+  currency: string
+  totalAmount: number
+  amountPaid: number
+  outstandingAmount: number
+  fullyPaidAt?: string | null
+  lines: NormalizedInvoiceLineRecord[]
+  payments: NormalizedInvoicePaymentRecord[]
+  raw?: unknown
+}
+
 export interface NormalizedAccountingDataset {
   capabilities: string[]
   accounts: NormalizedAccountRecord[]
   reportingPeriods: NormalizedReportingPeriodRecord[]
   transactions: NormalizedTransactionRecord[]
   budgets: NormalizedBudgetRecord[]
+  invoices?: NormalizedInvoiceRecord[]
 }
 
 export interface WebhookEvent {

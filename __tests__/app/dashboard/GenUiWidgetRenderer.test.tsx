@@ -63,7 +63,7 @@ const scenarioResult = {
   warnings: [],
   metricInputs: {},
   calculatedAt: '2026-06-01T00:00:00Z',
-} as ScenarioAnalysisResult
+} as unknown as ScenarioAnalysisResult
 
 const stage3Summary = {
   currency: 'NZD', periodStart: '2026-08-01', periodEnd: '2026-08-31', sourceLabel: 'Xero',
@@ -78,6 +78,13 @@ const stage3Budget = {
   totalBudget: 120000, totalActual: 50000, totalRemaining: 70000, projectedActual: 110000,
   projectedVariance: 10000, elapsedPercentage: 50,
   lines: [{ label: 'Software', budgetAmount: 12000, actualAmount: 5000, variance: 7000, remaining: 7000 }],
+}
+const stage4Group = {
+  currency: 'NZD', sourceLabel: 'Xero', count: 1, totalOutstanding: 2500,
+  items: [{
+    id: 'invoice-1', invoiceNumber: 'INV-001', counterpartyName: 'Customer Ltd',
+    issueDate: '2026-08-01', dueDate: '2026-08-31', outstandingAmount: 2500, daysOverdue: 30,
+  }],
 }
 
 const widgets: GenUiWidget[] = [
@@ -291,6 +298,32 @@ const widgets: GenUiWidget[] = [
   { ...base, type: 'budget_forecast', data: { ...stage3Budget, method: 'run rate', assumptions: ['Test assumption.'] } },
   { ...base, type: 'cash_inflow_forecast', data: stage3Forecast },
   { ...base, type: 'cash_outflow_forecast', data: stage3Forecast },
+  { ...base, type: 'overdue_invoices', data: { asOfDate: '2026-09-30', groups: [stage4Group], note: 'Past due.' } },
+  {
+    ...base, type: 'invoice_ageing', data: {
+      asOfDate: '2026-09-30', note: 'Aged from due dates.', groups: [{
+        currency: 'NZD', sourceLabel: 'Xero', totalOutstanding: 2500,
+        buckets: [
+          { key: 'days_0_30', label: '0–30 days', count: 1, amount: 2500, percentage: 100 },
+          { key: 'days_31_60', label: '31–60 days', count: 0, amount: 0, percentage: 0 },
+          { key: 'days_61_90', label: '61–90 days', count: 0, amount: 0, percentage: 0 },
+          { key: 'days_90_plus', label: '90+ days', count: 0, amount: 0, percentage: 0 },
+        ],
+      }],
+    },
+  },
+  {
+    ...base, type: 'expected_payments', data: {
+      asOfDate: '2026-09-30', throughDate: '2026-10-30', horizonDays: 30,
+      groups: [stage4Group], method: 'Stored invoice due dates', note: 'Expected, not guaranteed.',
+    },
+  },
+  {
+    ...base, type: 'bills_due', data: {
+      asOfDate: '2026-09-30', throughDate: '2026-10-14', horizonDays: 14,
+      groups: [stage4Group], note: 'Open supplier bills.',
+    },
+  },
 ]
 
 describe('Gen UI registries', () => {

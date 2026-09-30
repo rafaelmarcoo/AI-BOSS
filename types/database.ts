@@ -301,6 +301,16 @@ export type FinancialTransactionStatus = 'draft' | 'posted' | 'voided' | 'delete
 export type FinancialTransactionDirection = 'inflow' | 'outflow' | 'transfer'
 export type FinancialBudgetStatus = 'draft' | 'approved' | 'archived'
 export type FinancialBudgetLineKind = 'revenue' | 'expense' | 'cash_inflow' | 'cash_outflow'
+export type FinancialInvoiceKind = 'sales_invoice' | 'supplier_bill'
+export type FinancialInvoiceStatus =
+  | 'draft'
+  | 'submitted'
+  | 'authorised'
+  | 'partially_paid'
+  | 'paid'
+  | 'voided'
+  | 'deleted'
+export type FinancialInvoicePaymentStatus = 'posted' | 'voided' | 'deleted'
 
 export interface FinancialSyncRun {
   id: string
@@ -444,6 +454,63 @@ export interface FinancialBudgetLine {
   period_start: string
   period_end: string
   amount: number
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialInvoice {
+  id: string
+  user_id: string
+  connection_id: string | null
+  document_id: string | null
+  sync_run_id: string | null
+  source_type: FinancialMetricSourceType
+  source_label: string
+  provider_invoice_id: string
+  invoice_kind: FinancialInvoiceKind
+  status: FinancialInvoiceStatus
+  invoice_number: string | null
+  counterparty_name: string | null
+  issue_date: string
+  due_date: string
+  currency: string
+  total_amount: number
+  amount_paid: number
+  outstanding_amount: number
+  fully_paid_at: string | null
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialInvoiceLine {
+  id: string
+  invoice_id: string
+  user_id: string
+  account_id: string | null
+  line_key: string
+  description: string | null
+  canonical_category: string | null
+  quantity: number | null
+  unit_amount: number | null
+  tax_amount: number
+  line_amount: number
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialInvoicePayment {
+  id: string
+  invoice_id: string
+  user_id: string
+  provider_payment_id: string
+  payment_date: string
+  status: FinancialInvoicePaymentStatus
+  currency: string
+  amount: number
+  reference: string | null
   raw_data: unknown
   created_at: string
   updated_at: string

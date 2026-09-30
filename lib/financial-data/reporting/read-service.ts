@@ -9,24 +9,37 @@ import type {
   FinancialStatementLine,
   FinancialTransaction,
   FinancialTransactionLine,
+  FinancialInvoice,
+  FinancialInvoiceLine,
+  FinancialInvoicePayment,
 } from '@/types/database'
 import type {
   BudgetWithLines,
   ReportingPeriodWithLines,
   Stage3FinancialData,
   TransactionWithLines,
+  InvoiceWithDetails,
 } from './types'
 
 export const EMPTY_STAGE3_FINANCIAL_DATA: Stage3FinancialData = {
+  capabilities: [],
   accounts: [],
   reportingPeriods: [],
   transactions: [],
   budgets: [],
+  invoices: [],
 }
 
 export async function readStage3FinancialData(userId: string): Promise<Stage3FinancialData> {
   const supabase = createAdminSupabaseClient()
-  const [accountsResult, periodsResult, transactionsResult, budgetsResult] = await Promise.all([
+  const [syncRunsResult, accountsResult, periodsResult, transactionsResult, budgetsResult, invoicesResult] = await Promise.all([
+    supabase
+      .from('financial_sync_runs')
+      .select('capabilities')
+      .eq('user_id', userId)
+      .eq('status', 'completed')
+      .order('started_at', { ascending: false })
+      .limit(20),
     supabase.from('financial_accounts').select('*').eq('user_id', userId).eq('is_active', true),
     supabase
       .from('financial_reporting_periods')
@@ -46,9 +59,15 @@ export async function readStage3FinancialData(userId: string): Promise<Stage3Fin
       .eq('user_id', userId)
       .in('status', ['approved', 'draft'])
       .order('period_end', { ascending: false }),
+    supabase
+      .from('financial_invoices')
+      .select('*, financial_invoice_lines(*), financial_invoice_payments(*)')
+      .eq('user_id', userId)
+      .order('due_date', { ascending: true })
+      .limit(1000),
   ])
 
-  const firstError = [accountsResult, periodsResult, transactionsResult, budgetsResult]
+  const firstError = [syncRunsResult, accountsResult, periodsResult, transactionsResult, budgetsResult, invoicesResult]
     .map((result) => result.error)
     .find(Boolean)
   if (firstError) {
@@ -76,11 +95,27 @@ export async function readStage3FinancialData(userId: string): Promise<Stage3Fin
     const { financial_budget_lines: lines = [], ...budget } = record
     return { ...budget, lines } satisfies BudgetWithLines
   })
+  const invoices = (invoicesResult.data ?? []).map((row) => {
+    const record = row as FinancialInvoice & {
+      financial_invoice_lines?: FinancialInvoiceLine[]
+      financial_invoice_payments?: FinancialInvoicePayment[]
+    }
+    const {
+      financial_invoice_lines: lines = [],
+      financial_invoice_payments: payments = [],
+      ...invoice
+    } = record
+    return { ...invoice, lines, payments } satisfies InvoiceWithDetails
+  })
 
   return {
+    capabilities: [...new Set((syncRunsResult.data ?? []).flatMap((row) =>
+      Array.isArray(row.capabilities) ? row.capabilities as string[] : []
+    ))],
     accounts: (accountsResult.data ?? []) as FinancialAccount[],
     reportingPeriods,
     transactions,
     budgets,
+    invoices,
   }
 }

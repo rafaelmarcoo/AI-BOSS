@@ -24,6 +24,7 @@ function dataFixture(): Stage3FinancialData {
     })),
   })
   return {
+    capabilities: [],
     accounts: [], transactions: [],
     reportingPeriods: [
       period('p1', '2026-07-31', [
@@ -57,6 +58,7 @@ function dataFixture(): Stage3FinancialData {
         raw_data: {}, created_at: '2026-08-01', updated_at: '2026-08-01',
       }],
     }],
+    invoices: [],
   }
 }
 

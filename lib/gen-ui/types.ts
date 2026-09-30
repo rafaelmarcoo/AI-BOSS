@@ -41,6 +41,10 @@ export const GEN_UI_WIDGET_TYPES = [
   'budget_forecast',
   'cash_inflow_forecast',
   'cash_outflow_forecast',
+  'overdue_invoices',
+  'invoice_ageing',
+  'expected_payments',
+  'bills_due',
 ] as const
 
 export type GenUiWidgetType = (typeof GEN_UI_WIDGET_TYPES)[number]
@@ -343,6 +347,76 @@ export interface CashOutflowForecastWidget extends GenUiWidgetBase {
   data: FinancialForecastData
 }
 
+export interface InvoiceBalanceItemData {
+  id: string
+  invoiceNumber: string | null
+  counterpartyName: string | null
+  issueDate: string
+  dueDate: string
+  outstandingAmount: number
+  daysOverdue: number | null
+}
+
+export interface InvoiceBalanceGroupData {
+  currency: string
+  sourceLabel: string
+  count: number
+  totalOutstanding: number
+  items: InvoiceBalanceItemData[]
+}
+
+export interface OverdueInvoicesWidget extends GenUiWidgetBase {
+  type: 'overdue_invoices'
+  data: {
+    asOfDate: string
+    groups: InvoiceBalanceGroupData[]
+    note: string
+  }
+}
+
+export interface InvoiceAgeingWidget extends GenUiWidgetBase {
+  type: 'invoice_ageing'
+  data: {
+    asOfDate: string
+    groups: Array<{
+      currency: string
+      sourceLabel: string
+      totalOutstanding: number
+      buckets: Array<{
+        key: 'days_0_30' | 'days_31_60' | 'days_61_90' | 'days_90_plus'
+        label: string
+        count: number
+        amount: number
+        percentage: number
+      }>
+    }>
+    note: string
+  }
+}
+
+export interface ExpectedPaymentsWidget extends GenUiWidgetBase {
+  type: 'expected_payments'
+  data: {
+    asOfDate: string
+    throughDate: string
+    horizonDays: 7 | 14 | 30
+    groups: InvoiceBalanceGroupData[]
+    method: string
+    note: string
+  }
+}
+
+export interface BillsDueWidget extends GenUiWidgetBase {
+  type: 'bills_due'
+  data: {
+    asOfDate: string
+    throughDate: string
+    horizonDays: 7 | 14 | 30
+    groups: InvoiceBalanceGroupData[]
+    note: string
+  }
+}
+
 export interface MetricSnapshotWidget extends GenUiWidgetBase {
   type: 'metric_snapshot'
   data: {
@@ -556,6 +630,10 @@ export type GenUiWidget =
   | BudgetForecastWidget
   | CashInflowForecastWidget
   | CashOutflowForecastWidget
+  | OverdueInvoicesWidget
+  | InvoiceAgeingWidget
+  | ExpectedPaymentsWidget
+  | BillsDueWidget
 
 export type GenUiWidgetByType = {
   [Type in GenUiWidgetType]: Extract<GenUiWidget, { type: Type }>

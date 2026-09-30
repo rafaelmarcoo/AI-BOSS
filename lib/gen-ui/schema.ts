@@ -257,6 +257,65 @@ const BudgetForecastWidgetSchema = WidgetBaseSchema.extend({
 const CashInflowForecastWidgetSchema = WidgetBaseSchema.extend({ type: z.literal('cash_inflow_forecast'), data: FinancialForecastDataSchema })
 const CashOutflowForecastWidgetSchema = WidgetBaseSchema.extend({ type: z.literal('cash_outflow_forecast'), data: FinancialForecastDataSchema })
 
+const InvoiceBalanceItemDataSchema = z.object({
+  id: z.string(),
+  invoiceNumber: z.string().nullable(),
+  counterpartyName: z.string().nullable(),
+  issueDate: z.string(),
+  dueDate: z.string(),
+  outstandingAmount: z.number(),
+  daysOverdue: z.number().int().nonnegative().nullable(),
+})
+const InvoiceBalanceGroupDataSchema = z.object({
+  currency: z.string(),
+  sourceLabel: z.string(),
+  count: z.number().int().nonnegative(),
+  totalOutstanding: z.number().nonnegative(),
+  items: z.array(InvoiceBalanceItemDataSchema),
+})
+const OverdueInvoicesWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('overdue_invoices'),
+  data: z.object({
+    asOfDate: z.string(),
+    groups: z.array(InvoiceBalanceGroupDataSchema),
+    note: z.string(),
+  }),
+})
+const InvoiceAgeingWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('invoice_ageing'),
+  data: z.object({
+    asOfDate: z.string(),
+    groups: z.array(z.object({
+      currency: z.string(),
+      sourceLabel: z.string(),
+      totalOutstanding: z.number().nonnegative(),
+      buckets: z.array(z.object({
+        key: z.enum(['days_0_30', 'days_31_60', 'days_61_90', 'days_90_plus']),
+        label: z.string(),
+        count: z.number().int().nonnegative(),
+        amount: z.number().nonnegative(),
+        percentage: z.number().min(0).max(100),
+      })),
+    })),
+    note: z.string(),
+  }),
+})
+const UpcomingInvoiceDataSchema = z.object({
+  asOfDate: z.string(),
+  throughDate: z.string(),
+  horizonDays: z.union([z.literal(7), z.literal(14), z.literal(30)]),
+  groups: z.array(InvoiceBalanceGroupDataSchema),
+  note: z.string(),
+})
+const ExpectedPaymentsWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('expected_payments'),
+  data: UpcomingInvoiceDataSchema.extend({ method: z.string() }),
+})
+const BillsDueWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('bills_due'),
+  data: UpcomingInvoiceDataSchema,
+})
+
 const MetricSnapshotWidgetSchema = WidgetBaseSchema.extend({
   type: z.literal('metric_snapshot'),
   data: z.object({
@@ -487,6 +546,10 @@ export const GenUiWidgetSchema = z.discriminatedUnion('type', [
   BudgetForecastWidgetSchema,
   CashInflowForecastWidgetSchema,
   CashOutflowForecastWidgetSchema,
+  OverdueInvoicesWidgetSchema,
+  InvoiceAgeingWidgetSchema,
+  ExpectedPaymentsWidgetSchema,
+  BillsDueWidgetSchema,
 ])
 
 export const GenUiPlanSchema = z.object({

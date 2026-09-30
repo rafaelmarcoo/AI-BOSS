@@ -86,12 +86,6 @@ function context(params: {
       direction: 'insufficient_data',
       change: null,
       averageChange: null,
-      workingCapitalAdjusted: {
-        observations: [],
-        direction: 'insufficient_data',
-        change: null,
-        averageChange: null,
-      },
     },
     source: 'chat',
     selectedText: null,
@@ -99,7 +93,7 @@ function context(params: {
     metricHistories: params.histories ?? [],
     metricForecasts: [],
     scenarioResult: null,
-    stage3Data: { accounts: [], reportingPeriods: [], transactions: [], budgets: [] },
+    stage3Data: { capabilities: [], accounts: [], reportingPeriods: [], transactions: [], budgets: [], invoices: [] },
   }
 }
 

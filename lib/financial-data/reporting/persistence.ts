@@ -47,13 +47,25 @@ function minimalProfitAndLoss(snapshot: NormalizedFinancialData): NormalizedRepo
 }
 
 function datasetFor(snapshot: NormalizedFinancialData): NormalizedAccountingDataset {
-  if (snapshot.detailed) return snapshot.detailed
+  if (snapshot.detailed) {
+    return {
+      ...snapshot.detailed,
+      capabilities: snapshot.detailed.reportingPeriods.length > 0
+        ? snapshot.detailed.capabilities
+        : [...snapshot.detailed.capabilities, 'profit_loss_summary'],
+      reportingPeriods: snapshot.detailed.reportingPeriods.length > 0
+        ? snapshot.detailed.reportingPeriods
+        : [minimalProfitAndLoss(snapshot)],
+      invoices: snapshot.detailed.invoices ?? [],
+    }
+  }
   return {
     capabilities: ['profit_loss_summary'],
     accounts: [],
     reportingPeriods: [minimalProfitAndLoss(snapshot)],
     transactions: [],
     budgets: [],
+    invoices: [],
   }
 }
 
@@ -245,11 +257,80 @@ export async function saveAccountingReadModels(params: {
       }
     }
 
+    for (const invoice of dataset.invoices ?? []) {
+      const { data, error } = await supabase
+        .from('financial_invoices')
+        .upsert({
+          user_id: params.userId,
+          connection_id: params.connectionId,
+          sync_run_id: syncRunId,
+          source_type: params.provider,
+          source_label: params.sourceLabel,
+          provider_invoice_id: invoice.providerInvoiceId,
+          invoice_kind: invoice.invoiceKind,
+          status: invoice.status,
+          invoice_number: invoice.invoiceNumber ?? null,
+          counterparty_name: invoice.counterpartyName ?? null,
+          issue_date: invoice.issueDate,
+          due_date: invoice.dueDate,
+          currency: invoice.currency,
+          total_amount: Math.abs(invoice.totalAmount),
+          amount_paid: Math.abs(invoice.amountPaid),
+          outstanding_amount: Math.abs(invoice.outstandingAmount),
+          fully_paid_at: invoice.fullyPaidAt ?? null,
+          raw_data: invoice.raw ?? {},
+        }, { onConflict: 'user_id,source_type,provider_invoice_id' })
+        .select('id')
+        .single()
+      if (error || !data) throw error ?? new Error('Invoice upsert returned no row.')
+      const invoiceId = data.id as string
+      const invoiceLines = invoice.lines.map((line) => ({
+        invoice_id: invoiceId,
+        user_id: params.userId,
+        account_id: line.providerAccountId ? accountIds.get(line.providerAccountId) ?? null : null,
+        line_key: line.lineKey,
+        description: line.description ?? null,
+        canonical_category: line.canonicalCategory ?? null,
+        quantity: line.quantity ?? null,
+        unit_amount: line.unitAmount ?? null,
+        tax_amount: Math.abs(line.taxAmount ?? 0),
+        line_amount: Math.abs(line.lineAmount),
+        raw_data: line.raw ?? {},
+      }))
+      if (invoiceLines.length > 0) {
+        const { error: lineError } = await supabase.from('financial_invoice_lines').upsert(
+          invoiceLines,
+          { onConflict: 'invoice_id,line_key' },
+        )
+        if (lineError) throw lineError
+      }
+
+      const payments = invoice.payments.map((payment) => ({
+        invoice_id: invoiceId,
+        user_id: params.userId,
+        provider_payment_id: payment.providerPaymentId,
+        payment_date: payment.paymentDate,
+        status: payment.status ?? 'posted',
+        currency: payment.currency,
+        amount: Math.abs(payment.amount),
+        reference: payment.reference ?? null,
+        raw_data: payment.raw ?? {},
+      }))
+      if (payments.length > 0) {
+        const { error: paymentError } = await supabase.from('financial_invoice_payments').upsert(
+          payments,
+          { onConflict: 'invoice_id,provider_payment_id' },
+        )
+        if (paymentError) throw paymentError
+      }
+    }
+
     const recordCounts = {
       accounts: dataset.accounts.length,
       reportingPeriods: dataset.reportingPeriods.length,
       transactions: dataset.transactions.length,
       budgets: dataset.budgets.length,
+      invoices: dataset.invoices?.length ?? 0,
     }
     await supabase.from('financial_sync_runs').update({
       status: 'completed',

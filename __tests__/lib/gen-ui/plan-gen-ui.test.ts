@@ -35,7 +35,7 @@ jest.mock('@/lib/financial-data/metric-forecast', () => ({
   readFinancialMetricForecastSeries: jest.fn(),
 }))
 jest.mock('@/lib/financial-data/reporting/read-service', () => ({
-  EMPTY_STAGE3_FINANCIAL_DATA: { capabilities: [], accounts: [], reportingPeriods: [], transactions: [], budgets: [], invoices: [] },
+  EMPTY_STAGE3_FINANCIAL_DATA: { capabilities: [], accounts: [], reportingPeriods: [], transactions: [], budgets: [], invoices: [], debts: [] },
   readStage3FinancialData: jest.fn(),
 }))
 jest.mock('@/lib/gen-ui/preferences-persistence', () => ({
@@ -112,6 +112,7 @@ describe('planGenUi', () => {
       transactions: [],
       budgets: [],
       invoices: [],
+      debts: [],
     })
     mockGetGenUiPersonalization.mockResolvedValue({
       businessSize: null,
@@ -764,6 +765,25 @@ describe('planGenUi', () => {
       state: {
         status: 'unavailable',
         message: 'Detailed customer invoices are required for overdue analysis.',
+      },
+    }))
+  })
+
+  it('keeps a directly requested Stage 5 ratio with an honest unavailable state', async () => {
+    mockPlannerInvoke.mockResolvedValue({ widgets: [] })
+
+    const plan = await planGenUi({
+      userId: 'user-123',
+      userMessage: 'What is our current ratio?',
+      assistantMessage: 'A classified balance sheet is not connected yet.',
+      toolsUsed: [],
+    })
+
+    expect(plan?.widgets).toContainEqual(expect.objectContaining({
+      type: 'current_ratio',
+      state: {
+        status: 'unavailable',
+        message: 'A classified balance sheet is required for this calculation.',
       },
     }))
   })

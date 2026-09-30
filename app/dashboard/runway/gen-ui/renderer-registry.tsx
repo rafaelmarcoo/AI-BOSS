@@ -59,6 +59,16 @@ import {
   InvoiceAgeingWidgetView,
   OverdueInvoicesWidgetView,
 } from "./widgets/stage4/Stage4Widgets";
+import {
+  AssetSummaryWidgetView,
+  CurrentRatioWidgetView,
+  DebtOverviewWidgetView,
+  DebtRepaymentTimelineWidgetView,
+  EquitySnapshotWidgetView,
+  LiabilitySummaryWidgetView,
+  QuickRatioWidgetView,
+  WorkingCapitalWidgetView,
+} from "./widgets/stage5/Stage5Widgets";
 
 export type GenUiRendererProps<Type extends GenUiWidgetType> =
   GenUiWidgetInteractionProps & {
@@ -111,4 +121,12 @@ export const GEN_UI_RENDERER_REGISTRY = {
   invoice_ageing: InvoiceAgeingWidgetView,
   expected_payments: ExpectedPaymentsWidgetView,
   bills_due: BillsDueWidgetView,
+  working_capital: WorkingCapitalWidgetView,
+  current_ratio: CurrentRatioWidgetView,
+  quick_ratio: QuickRatioWidgetView,
+  asset_summary: AssetSummaryWidgetView,
+  liability_summary: LiabilitySummaryWidgetView,
+  equity_snapshot: EquitySnapshotWidgetView,
+  debt_overview: DebtOverviewWidgetView,
+  debt_repayment_timeline: DebtRepaymentTimelineWidgetView,
 } satisfies GenUiRendererRegistry;

@@ -50,6 +50,7 @@ function data(invoices: InvoiceWithDetails[]): Stage3FinancialData {
     transactions: [],
     budgets: [],
     invoices,
+    debts: [],
   }
 }
 

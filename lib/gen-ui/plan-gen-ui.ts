@@ -58,6 +58,8 @@ import { listStage3WidgetCandidates, selectStage3FallbackSpecs } from '@/lib/gen
 import { STAGE3_WIDGET_TYPES } from '@/lib/gen-ui/builders/stage3/stage3-builders'
 import { listStage4WidgetCandidates, selectStage4FallbackSpecs } from '@/lib/gen-ui/stage4-selection'
 import { STAGE4_WIDGET_TYPES } from '@/lib/gen-ui/builders/stage4/stage4-builders'
+import { listStage5WidgetCandidates, selectStage5FallbackSpecs } from '@/lib/gen-ui/stage5-selection'
+import { STAGE5_WIDGET_TYPES } from '@/lib/gen-ui/builders/stage5/stage5-builders'
 
 const MAX_WIDGETS = 4
 
@@ -157,6 +159,8 @@ function defaultWidgetSpecs(
   const normalized = userMessage.toLowerCase()
   const widgets: PlannerWidget[] = []
   const missingMetrics = listMissingMetrics(snapshot)
+  const stage5Specs = selectStage5FallbackSpecs(userMessage)
+  widgets.push(...stage5Specs)
   const stage4Specs = selectStage4FallbackSpecs(userMessage)
   widgets.push(...stage4Specs)
   const stage3Specs = selectStage3FallbackSpecs(userMessage)
@@ -449,6 +453,13 @@ function buildPlannerCandidates(params: {
 
   candidates.push(
     ...listStage4WidgetCandidates(params.userMessage).map((candidate) => ({
+      ...candidate,
+      personalizationFit: describePersonalizationFit(candidate.id, candidate.label, [], params.personalization),
+    })),
+  )
+
+  candidates.push(
+    ...listStage5WidgetCandidates(params.userMessage).map((candidate) => ({
       ...candidate,
       personalizationFit: describePersonalizationFit(candidate.id, candidate.label, [], params.personalization),
     })),
@@ -794,6 +805,7 @@ export async function planGenUi({
   const forecastSpec = fallbackSpecs.find((spec) => spec.type === 'metric_forecast_chart')
   const stage3Specs = fallbackSpecs.filter((spec) => STAGE3_WIDGET_TYPES.includes(spec.type))
   const stage4Specs = fallbackSpecs.filter((spec) => STAGE4_WIDGET_TYPES.includes(spec.type))
+  const stage5Specs = fallbackSpecs.filter((spec) => STAGE5_WIDGET_TYPES.includes(spec.type))
   const scenarioSpec: PlannerWidget | null = scenarioResult
     ? {
         type: 'scenario_analysis',
@@ -805,6 +817,7 @@ export async function planGenUi({
     ...historySpecs,
     ...stage3Specs,
     ...stage4Specs,
+    ...stage5Specs,
     ...(forecastSpec ? [forecastSpec] : []),
     ...(scenarioSpec ? [scenarioSpec] : []),
     ...(modelSpecs ?? fallbackSpecs).filter(

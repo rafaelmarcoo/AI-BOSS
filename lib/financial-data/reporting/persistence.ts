@@ -48,15 +48,26 @@ function minimalProfitAndLoss(snapshot: NormalizedFinancialData): NormalizedRepo
 
 function datasetFor(snapshot: NormalizedFinancialData): NormalizedAccountingDataset {
   if (snapshot.detailed) {
+    const hasProfitAndLoss = snapshot.detailed.reportingPeriods.some(
+      (period) => period.statementType === 'profit_loss',
+    )
+    const capabilities = new Set(snapshot.detailed.capabilities)
+    if (!hasProfitAndLoss) capabilities.add('profit_loss_summary')
+    if (snapshot.detailed.reportingPeriods.some((period) => period.statementType === 'balance_sheet')) {
+      capabilities.add('balance_sheet')
+    }
+    if ((snapshot.detailed.debts?.length ?? 0) > 0) capabilities.add('debt_details')
+    if (snapshot.detailed.debts?.some((debt) => debt.repayments.length > 0)) {
+      capabilities.add('debt_repayment_schedule')
+    }
     return {
       ...snapshot.detailed,
-      capabilities: snapshot.detailed.reportingPeriods.length > 0
-        ? snapshot.detailed.capabilities
-        : [...snapshot.detailed.capabilities, 'profit_loss_summary'],
-      reportingPeriods: snapshot.detailed.reportingPeriods.length > 0
+      capabilities: [...capabilities],
+      reportingPeriods: hasProfitAndLoss
         ? snapshot.detailed.reportingPeriods
-        : [minimalProfitAndLoss(snapshot)],
+        : [...snapshot.detailed.reportingPeriods, minimalProfitAndLoss(snapshot)],
       invoices: snapshot.detailed.invoices ?? [],
+      debts: snapshot.detailed.debts ?? [],
     }
   }
   return {
@@ -66,6 +77,7 @@ function datasetFor(snapshot: NormalizedFinancialData): NormalizedAccountingData
     transactions: [],
     budgets: [],
     invoices: [],
+    debts: [],
   }
 }
 
@@ -153,6 +165,7 @@ export async function saveAccountingReadModels(params: {
           line_key: line.lineKey,
           label: line.label,
           classification: line.classification,
+          quick_ratio_treatment: line.quickRatioTreatment ?? 'not_applicable',
           canonical_category: line.canonicalCategory ?? null,
           amount: line.amount,
           cost_behavior: line.costBehavior ?? 'unclassified',
@@ -325,12 +338,62 @@ export async function saveAccountingReadModels(params: {
       }
     }
 
+    for (const debt of dataset.debts ?? []) {
+      const { data, error } = await supabase
+        .from('financial_debts')
+        .upsert({
+          user_id: params.userId,
+          connection_id: params.connectionId,
+          sync_run_id: syncRunId,
+          source_type: params.provider,
+          source_label: params.sourceLabel,
+          provider_debt_id: debt.providerDebtId,
+          debt_name: debt.name,
+          lender_name: debt.lenderName ?? null,
+          debt_type: debt.debtType,
+          status: debt.status,
+          currency: debt.currency,
+          original_principal: debt.originalPrincipal ?? null,
+          current_balance: Math.abs(debt.currentBalance),
+          annual_interest_rate: debt.annualInterestRate ?? null,
+          start_date: debt.startDate ?? null,
+          maturity_date: debt.maturityDate ?? null,
+          minimum_payment: debt.minimumPayment ?? null,
+          account_id: debt.providerAccountId ? accountIds.get(debt.providerAccountId) ?? null : null,
+          raw_data: debt.raw ?? {},
+        }, { onConflict: 'user_id,source_type,provider_debt_id' })
+        .select('id')
+        .single()
+      if (error || !data) throw error ?? new Error('Debt upsert returned no row.')
+      const debtId = data.id as string
+      const repayments = debt.repayments.map((repayment) => ({
+        debt_id: debtId,
+        user_id: params.userId,
+        provider_repayment_id: repayment.providerRepaymentId,
+        due_date: repayment.dueDate,
+        status: repayment.status ?? 'scheduled',
+        principal_amount: Math.abs(repayment.principalAmount),
+        interest_amount: Math.abs(repayment.interestAmount),
+        total_amount: Math.abs(repayment.totalAmount),
+        paid_at: repayment.paidAt ?? null,
+        raw_data: repayment.raw ?? {},
+      }))
+      if (repayments.length > 0) {
+        const { error: repaymentError } = await supabase.from('financial_debt_repayments').upsert(
+          repayments,
+          { onConflict: 'debt_id,provider_repayment_id' },
+        )
+        if (repaymentError) throw repaymentError
+      }
+    }
+
     const recordCounts = {
       accounts: dataset.accounts.length,
       reportingPeriods: dataset.reportingPeriods.length,
       transactions: dataset.transactions.length,
       budgets: dataset.budgets.length,
       invoices: dataset.invoices?.length ?? 0,
+      debts: dataset.debts?.length ?? 0,
     }
     await supabase.from('financial_sync_runs').update({
       status: 'completed',

@@ -3,6 +3,8 @@ import type {
   AccountingAdapter,
   NormalizedInvoiceRecord,
   NormalizedFinancialData,
+  NormalizedReportingPeriodRecord,
+  NormalizedStatementLineRecord,
   OAuthTokens,
   WebhookEvent,
 } from '@/lib/integrations/types'
@@ -67,6 +69,101 @@ function findRowValue(rows: unknown[], title: string): number {
   }
 
   return 0
+}
+
+type BalanceClassification = Extract<NormalizedStatementLineRecord['classification'],
+  | 'current_asset'
+  | 'non_current_asset'
+  | 'current_liability'
+  | 'non_current_liability'
+  | 'equity'
+  | 'total_assets'
+  | 'total_liabilities'
+  | 'total_equity'
+  | 'other'
+>
+
+function balanceClassification(text: string, inherited: BalanceClassification = 'other'): BalanceClassification {
+  const normalized = text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  if (/^total assets?$/.test(normalized)) return 'total_assets'
+  if (/^total liabilities?$/.test(normalized)) return 'total_liabilities'
+  if (/^total equity$/.test(normalized)) return 'total_equity'
+  if (/non current assets?|fixed assets?/.test(normalized)) return 'non_current_asset'
+  if (/current assets?/.test(normalized)) return 'current_asset'
+  if (/non current liabilities?|long term liabilities?/.test(normalized)) return 'non_current_liability'
+  if (/current liabilities?/.test(normalized)) return 'current_liability'
+  if (/\bequity\b/.test(normalized)) return 'equity'
+  return inherited
+}
+
+function quickRatioTreatment(label: string, classification: BalanceClassification): NormalizedStatementLineRecord['quickRatioTreatment'] {
+  if (classification !== 'current_asset') return 'not_applicable'
+  const normalized = label.toLowerCase()
+  if (/bank|cash|accounts? receivable|trade debtors?|marketable securit/.test(normalized)) return 'include'
+  if (/inventory|stock on hand|prepaid|prepayment/.test(normalized)) return 'exclude'
+  return 'unclassified'
+}
+
+function normalizeBalanceSheetRows(rows: unknown[]): NormalizedStatementLineRecord[] {
+  const lines: NormalizedStatementLineRecord[] = []
+  let sequence = 0
+
+  function visit(items: unknown[], inherited: BalanceClassification, path: string[]) {
+    items.forEach((item, itemIndex) => {
+      const row = item as Record<string, unknown>
+      const title = typeof row.Title === 'string' ? row.Title : ''
+      const cells = Array.isArray(row.Cells) ? row.Cells as Array<{ Value?: string; Attributes?: Array<{ Id?: string; Value?: string }> }> : []
+      const label = String(cells[0]?.Value ?? title ?? '').trim()
+      const classification = balanceClassification(label || title, balanceClassification(title, inherited))
+      const nextPath = title ? [...path, title] : path
+
+      if (cells.length >= 2 && label) {
+        const rawAmount = cells.slice(1).find((cell) => cell?.Value !== undefined)?.Value
+        if (rawAmount !== undefined && rawAmount !== '') {
+          const rowType = String(row.RowType ?? '')
+          const explicitTotal = /^total\b/i.test(label)
+          lines.push({
+            lineKey: `balance:${nextPath.join(':')}:${label}:${itemIndex}`.toLowerCase().replace(/[^a-z0-9:]+/g, '-'),
+            label,
+            classification,
+            amount: Math.abs(parseNumber(rawAmount)),
+            canonicalCategory: label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''),
+            quickRatioTreatment: quickRatioTreatment(label, classification),
+            isTotal: rowType === 'SummaryRow' || explicitTotal,
+            sortOrder: sequence += 10,
+            raw: row,
+          })
+        }
+      }
+
+      if (Array.isArray(row.Rows)) {
+        visit(row.Rows, balanceClassification(title, inherited), nextPath)
+      }
+    })
+  }
+
+  visit(rows, 'other', [])
+  return lines
+}
+
+function normalizeXeroBalanceSheet(
+  report: Record<string, unknown> | undefined,
+  fallbackDate: string,
+  fallbackCurrency: string,
+): NormalizedReportingPeriodRecord | null {
+  const rows = (report?.Rows as unknown[]) ?? []
+  const lines = normalizeBalanceSheetRows(rows)
+  if (lines.length === 0) return null
+  const reportDate = xeroDate(report?.ReportDate) ?? fallbackDate
+  return {
+    statementType: 'balance_sheet',
+    periodStart: reportDate,
+    periodEnd: reportDate,
+    currency: String(report?.CurrencyCode ?? fallbackCurrency).toUpperCase(),
+    generatedAt: new Date().toISOString(),
+    lines,
+    raw: report ?? {},
+  }
 }
 
 function xeroDate(value: unknown): string | null {
@@ -307,6 +404,13 @@ export class XeroAdapter implements AccountingAdapter {
     const balanceRows = (balanceReport?.Rows as unknown[]) ?? []
     const profitLossRows = (profitLossReport?.Rows as unknown[]) ?? []
     const invoiceResult = await fetchXeroInvoices(headers)
+    const asOf = new Date().toISOString().slice(0, 10)
+    const currency = String(balanceReport?.CurrencyCode ?? 'USD').toUpperCase()
+    const normalizedBalanceSheet = normalizeXeroBalanceSheet(balanceReport, asOf, currency)
+    const capabilities = [
+      ...(invoiceResult.available ? ['invoice_details', 'bill_details'] : []),
+      ...(normalizedBalanceSheet ? ['balance_sheet'] : []),
+    ]
 
     return {
       cashBalance: findRowValue(balanceRows, 'Bank'),
@@ -316,16 +420,17 @@ export class XeroAdapter implements AccountingAdapter {
       monthlyExpenses:
         findRowValue(profitLossRows, 'Less Cost of Sales') +
         findRowValue(profitLossRows, 'Less Operating Expenses'),
-      currency: (balanceReport?.CurrencyCode as string) ?? 'USD',
-      asOf: new Date().toISOString().slice(0, 10),
+      currency,
+      asOf,
       raw: { balanceSheet, profitLoss },
       detailed: {
-        capabilities: invoiceResult.available ? ['invoice_details', 'bill_details'] : [],
+        capabilities,
         accounts: [],
-        reportingPeriods: [],
+        reportingPeriods: normalizedBalanceSheet ? [normalizedBalanceSheet] : [],
         transactions: [],
         budgets: [],
         invoices: invoiceResult.invoices,
+        debts: [],
       },
     }
   }

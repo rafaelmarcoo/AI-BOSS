@@ -9,6 +9,8 @@ import type {
   FinancialInvoice,
   FinancialInvoiceLine,
   FinancialInvoicePayment,
+  FinancialDebt,
+  FinancialDebtRepayment,
 } from '@/types/database'
 
 export interface ReportingPeriodWithLines extends FinancialReportingPeriod {
@@ -28,6 +30,10 @@ export interface InvoiceWithDetails extends FinancialInvoice {
   payments: FinancialInvoicePayment[]
 }
 
+export interface DebtWithRepayments extends FinancialDebt {
+  repayments: FinancialDebtRepayment[]
+}
+
 export interface Stage3FinancialData {
   capabilities: string[]
   accounts: FinancialAccount[]
@@ -35,6 +41,7 @@ export interface Stage3FinancialData {
   transactions: TransactionWithLines[]
   budgets: BudgetWithLines[]
   invoices: InvoiceWithDetails[]
+  debts: DebtWithRepayments[]
 }
 
 export interface DatedFinancialValue {

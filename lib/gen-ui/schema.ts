@@ -316,6 +316,91 @@ const BillsDueWidgetSchema = WidgetBaseSchema.extend({
   data: UpcomingInvoiceDataSchema,
 })
 
+const BalanceSheetMetricGroupDataSchema = z.object({
+  sourceLabel: z.string(),
+  currency: z.string(),
+  asOfDate: z.string(),
+  currentAssets: z.number().nonnegative(),
+  currentLiabilities: z.number().nonnegative(),
+  workingCapital: z.number(),
+  currentRatio: z.number().nonnegative().nullable(),
+  quickAssets: z.number().nonnegative().nullable(),
+  quickRatio: z.number().nonnegative().nullable(),
+  quickRatioStatus: z.enum(['ready', 'unclassified_current_assets', 'no_current_liabilities']),
+  unclassifiedQuickAssetCount: z.number().int().nonnegative(),
+})
+const BalanceMetricDataSchema = z.object({
+  groups: z.array(BalanceSheetMetricGroupDataSchema),
+  formula: z.string(),
+  note: z.string(),
+})
+const WorkingCapitalWidgetSchema = WidgetBaseSchema.extend({ type: z.literal('working_capital'), data: BalanceMetricDataSchema })
+const CurrentRatioWidgetSchema = WidgetBaseSchema.extend({ type: z.literal('current_ratio'), data: BalanceMetricDataSchema })
+const QuickRatioWidgetSchema = WidgetBaseSchema.extend({ type: z.literal('quick_ratio'), data: BalanceMetricDataSchema })
+
+const BalanceSheetCategoryDataSchema = z.object({
+  groups: z.array(z.object({
+    sourceLabel: z.string(),
+    currency: z.string(),
+    asOfDate: z.string(),
+    total: z.number().nonnegative(),
+    items: z.array(z.object({
+      label: z.string(),
+      category: z.string(),
+      amount: z.number().nonnegative(),
+      percentage: z.number().min(0).max(100),
+    })),
+  })),
+  note: z.string(),
+})
+const AssetSummaryWidgetSchema = WidgetBaseSchema.extend({ type: z.literal('asset_summary'), data: BalanceSheetCategoryDataSchema })
+const LiabilitySummaryWidgetSchema = WidgetBaseSchema.extend({ type: z.literal('liability_summary'), data: BalanceSheetCategoryDataSchema })
+const EquitySnapshotWidgetSchema = WidgetBaseSchema.extend({ type: z.literal('equity_snapshot'), data: BalanceSheetCategoryDataSchema })
+
+const DebtOverviewWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('debt_overview'),
+  data: z.object({
+    groups: z.array(z.object({
+      sourceLabel: z.string(),
+      currency: z.string(),
+      totalBalance: z.number().nonnegative(),
+      debts: z.array(z.object({
+        id: z.string(),
+        name: z.string(),
+        lenderName: z.string().nullable(),
+        debtType: z.enum(['loan', 'credit_card', 'line_of_credit', 'lease', 'other']),
+        currentBalance: z.number().nonnegative(),
+        annualInterestRate: z.number().min(0).max(100).nullable(),
+        maturityDate: z.string().nullable(),
+        minimumPayment: z.number().nonnegative().nullable(),
+      })),
+    })),
+    note: z.string(),
+  }),
+})
+const DebtRepaymentTimelineWidgetSchema = WidgetBaseSchema.extend({
+  type: z.literal('debt_repayment_timeline'),
+  data: z.object({
+    asOfDate: z.string(),
+    throughDate: z.string(),
+    horizonMonths: z.union([z.literal(3), z.literal(6), z.literal(12)]),
+    groups: z.array(z.object({
+      sourceLabel: z.string(),
+      currency: z.string(),
+      totalScheduled: z.number().nonnegative(),
+      repayments: z.array(z.object({
+        id: z.string(),
+        debtName: z.string(),
+        dueDate: z.string(),
+        principalAmount: z.number().nonnegative(),
+        interestAmount: z.number().nonnegative(),
+        totalAmount: z.number().nonnegative(),
+      })),
+    })),
+    note: z.string(),
+  }),
+})
+
 const MetricSnapshotWidgetSchema = WidgetBaseSchema.extend({
   type: z.literal('metric_snapshot'),
   data: z.object({
@@ -550,6 +635,14 @@ export const GenUiWidgetSchema = z.discriminatedUnion('type', [
   InvoiceAgeingWidgetSchema,
   ExpectedPaymentsWidgetSchema,
   BillsDueWidgetSchema,
+  WorkingCapitalWidgetSchema,
+  CurrentRatioWidgetSchema,
+  QuickRatioWidgetSchema,
+  AssetSummaryWidgetSchema,
+  LiabilitySummaryWidgetSchema,
+  EquitySnapshotWidgetSchema,
+  DebtOverviewWidgetSchema,
+  DebtRepaymentTimelineWidgetSchema,
 ])
 
 export const GenUiPlanSchema = z.object({

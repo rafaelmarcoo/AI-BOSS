@@ -45,6 +45,14 @@ export const GEN_UI_WIDGET_TYPES = [
   'invoice_ageing',
   'expected_payments',
   'bills_due',
+  'working_capital',
+  'current_ratio',
+  'quick_ratio',
+  'asset_summary',
+  'liability_summary',
+  'equity_snapshot',
+  'debt_overview',
+  'debt_repayment_timeline',
 ] as const
 
 export type GenUiWidgetType = (typeof GEN_UI_WIDGET_TYPES)[number]
@@ -417,6 +425,103 @@ export interface BillsDueWidget extends GenUiWidgetBase {
   }
 }
 
+export interface BalanceSheetMetricGroupData {
+  sourceLabel: string
+  currency: string
+  asOfDate: string
+  currentAssets: number
+  currentLiabilities: number
+  workingCapital: number
+  currentRatio: number | null
+  quickAssets: number | null
+  quickRatio: number | null
+  quickRatioStatus: 'ready' | 'unclassified_current_assets' | 'no_current_liabilities'
+  unclassifiedQuickAssetCount: number
+}
+
+export interface WorkingCapitalWidget extends GenUiWidgetBase {
+  type: 'working_capital'
+  data: { groups: BalanceSheetMetricGroupData[]; formula: string; note: string }
+}
+
+export interface CurrentRatioWidget extends GenUiWidgetBase {
+  type: 'current_ratio'
+  data: { groups: BalanceSheetMetricGroupData[]; formula: string; note: string }
+}
+
+export interface QuickRatioWidget extends GenUiWidgetBase {
+  type: 'quick_ratio'
+  data: { groups: BalanceSheetMetricGroupData[]; formula: string; note: string }
+}
+
+export interface BalanceSheetCategoryGroupData {
+  sourceLabel: string
+  currency: string
+  asOfDate: string
+  total: number
+  items: Array<{ label: string; category: string; amount: number; percentage: number }>
+}
+
+export interface AssetSummaryWidget extends GenUiWidgetBase {
+  type: 'asset_summary'
+  data: { groups: BalanceSheetCategoryGroupData[]; note: string }
+}
+
+export interface LiabilitySummaryWidget extends GenUiWidgetBase {
+  type: 'liability_summary'
+  data: { groups: BalanceSheetCategoryGroupData[]; note: string }
+}
+
+export interface EquitySnapshotWidget extends GenUiWidgetBase {
+  type: 'equity_snapshot'
+  data: { groups: BalanceSheetCategoryGroupData[]; note: string }
+}
+
+export interface DebtOverviewWidget extends GenUiWidgetBase {
+  type: 'debt_overview'
+  data: {
+    groups: Array<{
+      sourceLabel: string
+      currency: string
+      totalBalance: number
+      debts: Array<{
+        id: string
+        name: string
+        lenderName: string | null
+        debtType: 'loan' | 'credit_card' | 'line_of_credit' | 'lease' | 'other'
+        currentBalance: number
+        annualInterestRate: number | null
+        maturityDate: string | null
+        minimumPayment: number | null
+      }>
+    }>
+    note: string
+  }
+}
+
+export interface DebtRepaymentTimelineWidget extends GenUiWidgetBase {
+  type: 'debt_repayment_timeline'
+  data: {
+    asOfDate: string
+    throughDate: string
+    horizonMonths: 3 | 6 | 12
+    groups: Array<{
+      sourceLabel: string
+      currency: string
+      totalScheduled: number
+      repayments: Array<{
+        id: string
+        debtName: string
+        dueDate: string
+        principalAmount: number
+        interestAmount: number
+        totalAmount: number
+      }>
+    }>
+    note: string
+  }
+}
+
 export interface MetricSnapshotWidget extends GenUiWidgetBase {
   type: 'metric_snapshot'
   data: {
@@ -634,6 +739,14 @@ export type GenUiWidget =
   | InvoiceAgeingWidget
   | ExpectedPaymentsWidget
   | BillsDueWidget
+  | WorkingCapitalWidget
+  | CurrentRatioWidget
+  | QuickRatioWidget
+  | AssetSummaryWidget
+  | LiabilitySummaryWidget
+  | EquitySnapshotWidget
+  | DebtOverviewWidget
+  | DebtRepaymentTimelineWidget
 
 export type GenUiWidgetByType = {
   [Type in GenUiWidgetType]: Extract<GenUiWidget, { type: Type }>

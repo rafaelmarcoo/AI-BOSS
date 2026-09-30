@@ -58,18 +58,27 @@ export interface NormalizedStatementLineRecord {
     | 'cash_inflow'
     | 'cash_outflow'
     | 'net_cash_flow'
+    | 'current_asset'
+    | 'non_current_asset'
+    | 'current_liability'
+    | 'non_current_liability'
+    | 'equity'
+    | 'total_assets'
+    | 'total_liabilities'
+    | 'total_equity'
     | 'other'
   amount: number
   providerAccountId?: string | null
   canonicalCategory?: string | null
   costBehavior?: 'fixed' | 'variable' | 'mixed' | 'unclassified'
+  quickRatioTreatment?: 'include' | 'exclude' | 'unclassified' | 'not_applicable'
   isTotal?: boolean
   sortOrder?: number
   raw?: unknown
 }
 
 export interface NormalizedReportingPeriodRecord {
-  statementType: 'profit_loss' | 'cash_flow'
+  statementType: 'profit_loss' | 'cash_flow' | 'balance_sheet'
   periodStart: string
   periodEnd: string
   currency: string
@@ -166,6 +175,35 @@ export interface NormalizedInvoiceRecord {
   raw?: unknown
 }
 
+export interface NormalizedDebtRepaymentRecord {
+  providerRepaymentId: string
+  dueDate: string
+  status?: 'scheduled' | 'paid' | 'missed' | 'cancelled'
+  principalAmount: number
+  interestAmount: number
+  totalAmount: number
+  paidAt?: string | null
+  raw?: unknown
+}
+
+export interface NormalizedDebtRecord {
+  providerDebtId: string
+  name: string
+  lenderName?: string | null
+  debtType: 'loan' | 'credit_card' | 'line_of_credit' | 'lease' | 'other'
+  status: 'active' | 'paid' | 'refinanced' | 'closed'
+  currency: string
+  originalPrincipal?: number | null
+  currentBalance: number
+  annualInterestRate?: number | null
+  startDate?: string | null
+  maturityDate?: string | null
+  minimumPayment?: number | null
+  providerAccountId?: string | null
+  repayments: NormalizedDebtRepaymentRecord[]
+  raw?: unknown
+}
+
 export interface NormalizedAccountingDataset {
   capabilities: string[]
   accounts: NormalizedAccountRecord[]
@@ -173,6 +211,7 @@ export interface NormalizedAccountingDataset {
   transactions: NormalizedTransactionRecord[]
   budgets: NormalizedBudgetRecord[]
   invoices?: NormalizedInvoiceRecord[]
+  debts?: NormalizedDebtRecord[]
 }
 
 export interface WebhookEvent {

@@ -604,6 +604,39 @@ open balances.
 
 ---
 
+### 16. Stage 5 balance sheet and debt
+
+Balance-sheet reports reuse `financial_reporting_periods` and
+`financial_statement_lines` with `statement_type = balance_sheet`. Lines are
+classified as current/non-current assets and liabilities, equity, or explicit
+statement totals. Component lines and total lines are stored separately so
+calculations do not double count them.
+
+`quick_ratio_treatment` records whether each current-asset component is
+included, excluded, or still unclassified for the quick ratio. The application
+does not calculate that ratio while any component remains unclassified.
+
+#### financial_debts and financial_debt_repayments
+
+`financial_debts` stores lender, balance, currency, interest rate, and optional
+start/maturity details for a specific debt. `financial_debt_repayments` stores
+provider- or user-supplied repayment dates and amounts. A balance or maturity
+date is never expanded into an invented repayment schedule.
+
+Debt overview calculations group records by source and currency. Repayment
+timelines use only stored repayment rows with a scheduled status, preserving
+the distinction between contractual dates and estimates.
+
+**RLS Policies:**
+- Users can view, insert, update, and delete only their own debt and repayment rows
+- Provider synchronization verifies ownership before administrative writes
+
+**Deduplication:**
+- Debts: `(user_id, source_type, provider_debt_id)`
+- Repayments: `(debt_id, provider_repayment_id)`
+
+---
+
 ### 14. scenarios
 
 Stores reusable what-if drafts and the latest explicitly calculated result. The
@@ -692,6 +725,8 @@ financial_budgets (1) ──< (many) financial_budget_lines
 users (1) ──< (many) financial_invoices
 financial_invoices (1) ──< (many) financial_invoice_lines
 financial_invoices (1) ──< (many) financial_invoice_payments
+users (1) ──< (many) financial_debts
+financial_debts (1) ──< (many) financial_debt_repayments
 users (1) ──< (many) scenarios
 companies (1) ──< (many) scenarios
 users (1) ──< (one) user_gen_ui_preferences
@@ -723,6 +758,7 @@ All schema changes are tracked in `db/migrations/`:
 - `019_company_gen_ui_controls.sql` - Moves planning horizon to the admin-controlled company profile and adds worker-specific roles
 - `020_stage3_financial_read_models.sql` - Adds canonical accounts, financial statements, transactions, budgets, sync provenance, RLS, and provider-safe deduplication for Stage 3 widgets
 - `021_stage4_invoices_and_bills.sql` - Adds canonical sales invoices, supplier bills, line items, payments, due-date indexes, RLS, and provider-safe deduplication for Stage 4 widgets
+- `022_stage5_balance_sheet_and_debt.sql` - Adds balance-sheet classifications, explicit quick-ratio treatment, debts, and stored repayment schedules
 
 ---
 

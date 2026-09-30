@@ -86,6 +86,16 @@ const stage4Group = {
     issueDate: '2026-08-01', dueDate: '2026-08-31', outstandingAmount: 2500, daysOverdue: 30,
   }],
 }
+const stage5MetricGroup = {
+  sourceLabel: 'Xero', currency: 'NZD', asOfDate: '2026-09-30',
+  currentAssets: 100000, currentLiabilities: 50000, workingCapital: 50000,
+  currentRatio: 2, quickAssets: 70000, quickRatio: 1.4,
+  quickRatioStatus: 'ready' as const, unclassifiedQuickAssetCount: 0,
+}
+const stage5CategoryGroup = {
+  sourceLabel: 'Xero', currency: 'NZD', asOfDate: '2026-09-30', total: 100000,
+  items: [{ label: 'Cash', category: 'cash', amount: 100000, percentage: 100 }],
+}
 
 const widgets: GenUiWidget[] = [
   {
@@ -322,6 +332,31 @@ const widgets: GenUiWidget[] = [
     ...base, type: 'bills_due', data: {
       asOfDate: '2026-09-30', throughDate: '2026-10-14', horizonDays: 14,
       groups: [stage4Group], note: 'Open supplier bills.',
+    },
+  },
+  { ...base, type: 'working_capital', data: { groups: [stage5MetricGroup], formula: 'Current assets − current liabilities', note: 'No FX conversion.' } },
+  { ...base, type: 'current_ratio', data: { groups: [stage5MetricGroup], formula: 'Current assets ÷ current liabilities', note: 'Classified inputs.' } },
+  { ...base, type: 'quick_ratio', data: { groups: [stage5MetricGroup], formula: 'Quick assets ÷ current liabilities', note: 'Explicit treatments.' } },
+  { ...base, type: 'asset_summary', data: { groups: [stage5CategoryGroup], note: 'Component lines.' } },
+  { ...base, type: 'liability_summary', data: { groups: [stage5CategoryGroup], note: 'Component lines.' } },
+  { ...base, type: 'equity_snapshot', data: { groups: [stage5CategoryGroup], note: 'Component lines.' } },
+  {
+    ...base, type: 'debt_overview', data: {
+      groups: [{
+        sourceLabel: 'Manual', currency: 'NZD', totalBalance: 80000,
+        debts: [{ id: 'debt-1', name: 'Term loan', lenderName: 'Bank', debtType: 'loan', currentBalance: 80000, annualInterestRate: 7.5, maturityDate: '2027-09-30', minimumPayment: 2000 }],
+      }],
+      note: 'Stored debts only.',
+    },
+  },
+  {
+    ...base, type: 'debt_repayment_timeline', data: {
+      asOfDate: '2026-09-30', throughDate: '2026-12-30', horizonMonths: 3,
+      groups: [{
+        sourceLabel: 'Manual', currency: 'NZD', totalScheduled: 2000,
+        repayments: [{ id: 'repayment-1', debtName: 'Term loan', dueDate: '2026-10-15', principalAmount: 1800, interestAmount: 200, totalAmount: 2000 }],
+      }],
+      note: 'Stored dates only.',
     },
   },
 ]

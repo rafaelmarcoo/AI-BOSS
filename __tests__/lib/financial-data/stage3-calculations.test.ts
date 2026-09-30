@@ -59,6 +59,7 @@ function dataFixture(): Stage3FinancialData {
       }],
     }],
     invoices: [],
+    debts: [],
   }
 }
 

@@ -46,6 +46,7 @@ function reportingPeriod(
       canonical_category: null,
       amount: line.amount,
       cost_behavior: 'unclassified',
+      quick_ratio_treatment: 'not_applicable',
       is_total: line.isTotal,
       sort_order: index,
       raw_data: {},
@@ -87,6 +88,7 @@ function context(): GenUiDataContext {
       transactions: [],
       budgets: [],
       invoices: [],
+      debts: [],
     },
   }
 }

@@ -93,7 +93,7 @@ function context(params: {
     metricHistories: params.histories ?? [],
     metricForecasts: [],
     scenarioResult: null,
-    stage3Data: { capabilities: [], accounts: [], reportingPeriods: [], transactions: [], budgets: [], invoices: [] },
+    stage3Data: { capabilities: [], accounts: [], reportingPeriods: [], transactions: [], budgets: [], invoices: [], debts: [] },
   }
 }
 

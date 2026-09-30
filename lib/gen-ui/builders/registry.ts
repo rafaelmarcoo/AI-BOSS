@@ -50,6 +50,16 @@ import {
   buildInvoiceAgeingWidget,
   buildOverdueInvoicesWidget,
 } from "./stage4/stage4-builders";
+import {
+  buildAssetSummaryWidget,
+  buildCurrentRatioWidget,
+  buildDebtOverviewWidget,
+  buildDebtRepaymentTimelineWidget,
+  buildEquitySnapshotWidget,
+  buildLiabilitySummaryWidget,
+  buildQuickRatioWidget,
+  buildWorkingCapitalWidget,
+} from "./stage5/stage5-builders";
 
 export type GenUiWidgetBuilder = (
   spec: PlannerWidget,
@@ -150,6 +160,14 @@ export const GEN_UI_BUILDER_REGISTRY = {
   invoice_ageing: (spec, index, context) => [buildInvoiceAgeingWidget(spec, index, context)],
   expected_payments: (spec, index, context) => [buildExpectedPaymentsWidget(spec, index, context)],
   bills_due: (spec, index, context) => [buildBillsDueWidget(spec, index, context)],
+  working_capital: (spec, index, context) => [buildWorkingCapitalWidget(spec, index, context)],
+  current_ratio: (spec, index, context) => [buildCurrentRatioWidget(spec, index, context)],
+  quick_ratio: (spec, index, context) => [buildQuickRatioWidget(spec, index, context)],
+  asset_summary: (spec, index, context) => [buildAssetSummaryWidget(spec, index, context)],
+  liability_summary: (spec, index, context) => [buildLiabilitySummaryWidget(spec, index, context)],
+  equity_snapshot: (spec, index, context) => [buildEquitySnapshotWidget(spec, index, context)],
+  debt_overview: (spec, index, context) => [buildDebtOverviewWidget(spec, index, context)],
+  debt_repayment_timeline: (spec, index, context) => [buildDebtRepaymentTimelineWidget(spec, index, context)],
 } satisfies GenUiBuilderRegistry;
 
 export function buildGenUiWidgets(

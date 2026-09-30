@@ -18,6 +18,8 @@ export const GEN_UI_WIDGET_CATEGORIES = [
   'profit',
   'budgets',
   'invoices',
+  'balance_sheet',
+  'debt',
 ] as const
 
 export type GenUiWidgetCategory = (typeof GEN_UI_WIDGET_CATEGORIES)[number]
@@ -38,6 +40,10 @@ export const GEN_UI_DATA_CAPABILITIES = [
   'cost_classification',
   'invoice_details',
   'bill_details',
+  'balance_sheet',
+  'quick_ratio_classification',
+  'debt_details',
+  'debt_repayment_schedule',
 ] as const
 
 export type GenUiDataCapability = (typeof GEN_UI_DATA_CAPABILITIES)[number]
@@ -69,6 +75,8 @@ export const GEN_UI_SUPPORTED_FILTERS = [
   'budget',
   'counterparty',
   'invoice_status',
+  'debt_type',
+  'debt_status',
 ] as const
 
 export type GenUiSupportedFilter = (typeof GEN_UI_SUPPORTED_FILTERS)[number]

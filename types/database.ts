@@ -275,7 +275,7 @@ export type FinancialAccountClass =
   | 'expense'
   | 'other'
 export type FinancialCostBehavior = 'fixed' | 'variable' | 'mixed' | 'unclassified'
-export type FinancialStatementType = 'profit_loss' | 'cash_flow'
+export type FinancialStatementType = 'profit_loss' | 'cash_flow' | 'balance_sheet'
 export type FinancialStatementClassification =
   | 'revenue'
   | 'cost_of_sales'
@@ -288,7 +288,16 @@ export type FinancialStatementClassification =
   | 'cash_inflow'
   | 'cash_outflow'
   | 'net_cash_flow'
+  | 'current_asset'
+  | 'non_current_asset'
+  | 'current_liability'
+  | 'non_current_liability'
+  | 'equity'
+  | 'total_assets'
+  | 'total_liabilities'
+  | 'total_equity'
   | 'other'
+export type FinancialQuickRatioTreatment = 'include' | 'exclude' | 'unclassified' | 'not_applicable'
 export type FinancialTransactionType =
   | 'receipt'
   | 'payment'
@@ -311,6 +320,9 @@ export type FinancialInvoiceStatus =
   | 'voided'
   | 'deleted'
 export type FinancialInvoicePaymentStatus = 'posted' | 'voided' | 'deleted'
+export type FinancialDebtType = 'loan' | 'credit_card' | 'line_of_credit' | 'lease' | 'other'
+export type FinancialDebtStatus = 'active' | 'paid' | 'refinanced' | 'closed'
+export type FinancialDebtRepaymentStatus = 'scheduled' | 'paid' | 'missed' | 'cancelled'
 
 export interface FinancialSyncRun {
   id: string
@@ -375,6 +387,7 @@ export interface FinancialStatementLine {
   line_key: string
   label: string
   classification: FinancialStatementClassification
+  quick_ratio_treatment: FinancialQuickRatioTreatment
   canonical_category: string | null
   amount: number
   cost_behavior: FinancialCostBehavior
@@ -511,6 +524,48 @@ export interface FinancialInvoicePayment {
   currency: string
   amount: number
   reference: string | null
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialDebt {
+  id: string
+  user_id: string
+  connection_id: string | null
+  document_id: string | null
+  sync_run_id: string | null
+  source_type: FinancialMetricSourceType
+  source_label: string
+  provider_debt_id: string
+  debt_name: string
+  lender_name: string | null
+  debt_type: FinancialDebtType
+  status: FinancialDebtStatus
+  currency: string
+  original_principal: number | null
+  current_balance: number
+  annual_interest_rate: number | null
+  start_date: string | null
+  maturity_date: string | null
+  minimum_payment: number | null
+  account_id: string | null
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialDebtRepayment {
+  id: string
+  debt_id: string
+  user_id: string
+  provider_repayment_id: string
+  due_date: string
+  status: FinancialDebtRepaymentStatus
+  principal_amount: number
+  interest_amount: number
+  total_amount: number
+  paid_at: string | null
   raw_data: unknown
   created_at: string
   updated_at: string

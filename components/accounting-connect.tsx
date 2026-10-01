@@ -21,7 +21,6 @@ import SyncIcon from "@mui/icons-material/Sync";
 import SyncProblemIcon from "@mui/icons-material/SyncProblem";
 import { useRouter } from "next/navigation";
 import { dashboardTokens } from "@/app/theme";
-import { XeroConnect } from "@/components/xero-connect";
 import type { ProviderStatus } from "@/lib/integrations/types";
 
 const PROVIDERS = [
@@ -44,13 +43,6 @@ const PROVIDERS = [
     label: "FreshBooks",
     shortLabel: "F",
     color: "#0075DD",
-    note: "OAuth backend ready",
-  },
-  {
-    provider: "myob",
-    label: "MYOB",
-    shortLabel: "M",
-    color: "#7B2D8B",
     note: "OAuth backend ready",
   },
   {
@@ -146,10 +138,6 @@ export function AccountingConnect() {
     void loadStatuses();
   }, [loadStatuses]);
 
-  const handleXeroStatusChange = useCallback(() => {
-    void loadStatuses();
-  }, [loadStatuses]);
-
   async function handleSync() {
     if (!isConnected) return;
 
@@ -211,21 +199,6 @@ export function AccountingConnect() {
     } finally {
       setBusyAction(null);
     }
-  }
-
-  if (selectedProvider === "xero") {
-    return (
-      <>
-        <Stack spacing={1.5}>
-          <ProviderSelect
-            selectedProvider={selectedProvider}
-            onChange={setSelectedProvider}
-          />
-          <XeroConnect onStatusChange={handleXeroStatusChange} />
-        </Stack>
-        <StatusToast toast={toast} onClose={() => setToast(null)} />
-      </>
-    );
   }
 
   return (

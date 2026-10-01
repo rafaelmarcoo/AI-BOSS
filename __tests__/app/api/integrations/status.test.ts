@@ -72,7 +72,6 @@ describe('/api/integrations/status', () => {
       'xero',
       'quickbooks',
       'freshbooks',
-      'myob',
       'zoho_books',
       'freeagent',
     ])
@@ -93,13 +92,6 @@ describe('/api/integrations/status', () => {
       },
       {
         provider: 'freshbooks',
-        status: 'available',
-        displayName: null,
-        connectedAt: null,
-        lastSyncedAt: null,
-      },
-      {
-        provider: 'myob',
         status: 'available',
         displayName: null,
         connectedAt: null,

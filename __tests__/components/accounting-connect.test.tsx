@@ -1,5 +1,4 @@
 import { render, screen, waitFor } from '@testing-library/react'
-import { useEffect } from 'react'
 import { AccountingConnect } from '@/components/accounting-connect'
 
 jest.mock('next/navigation', () => ({
@@ -8,26 +7,12 @@ jest.mock('next/navigation', () => ({
   }),
 }))
 
-jest.mock('@/components/xero-connect', () => ({
-  XeroConnect({ onStatusChange }: { onStatusChange?: () => void }) {
-    useEffect(() => {
-      onStatusChange?.()
-    }, [onStatusChange])
-
-    return (
-      <button type="button" onClick={onStatusChange}>
-        Xero connector
-      </button>
-    )
-  },
-}))
-
 describe('AccountingConnect', () => {
   beforeEach(() => {
     jest.clearAllMocks()
   })
 
-  it('loads accounting statuses without hiding the Xero connector', async () => {
+  it('loads accounting statuses and shows Xero as connected', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -46,18 +31,15 @@ describe('AccountingConnect', () => {
 
     render(<AccountingConnect />)
 
-    expect(await screen.findByText('Xero connector')).toBeInTheDocument()
+    expect(await screen.findByText('Demo Company NZ')).toBeInTheDocument()
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith('/api/integrations/status', {
         credentials: 'include',
       })
     })
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledTimes(2)
-    })
   })
 
-  it('keeps the Xero connector available when status loading fails', async () => {
+  it('shows an error when status loading fails', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,
       json: async () => ({
@@ -68,9 +50,20 @@ describe('AccountingConnect', () => {
 
     render(<AccountingConnect />)
 
-    expect(await screen.findByText('Xero connector')).toBeInTheDocument()
     expect(
       await screen.findByText('Could not load accounting connection statuses.')
     ).toBeInTheDocument()
+  })
+
+  it('links the Connect button straight to the direct-OAuth connect route', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: [] }),
+    }) as jest.Mock
+
+    render(<AccountingConnect />)
+
+    const connectLink = await screen.findByRole('link', { name: 'Connect' })
+    expect(connectLink).toHaveAttribute('href', '/api/integrations/connect/xero')
   })
 })

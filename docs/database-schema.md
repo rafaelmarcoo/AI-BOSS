@@ -271,7 +271,7 @@ uploaded, or made available. OAuth credential rows link back to this table.
 |--------|------|-------------|
 | id | UUID (PK) | Primary key |
 | user_id | UUID (FK) | References users(id) |
-| provider | TEXT | `xero`, `quickbooks`, `freshbooks`, `myob`, `zoho_books`, `freeagent`, `csv`, `pdf`, `manual`, or `demo` |
+| provider | TEXT | `xero`, `quickbooks`, `freshbooks`, `zoho_books`, `freeagent`, `csv`, `pdf`, `manual`, or `demo` |
 | status | TEXT | `connected`, `disconnected`, `available`, or `error` |
 | display_name | TEXT | User-facing source name |
 | source_label | TEXT | Short provider/source label |
@@ -305,7 +305,7 @@ storage and are only decrypted server-side when calling or revoking a provider.
 | id | UUID (PK) | Primary key |
 | connection_id | UUID (FK) | References data_connections(id), unique |
 | user_id | UUID (FK) | References users(id) |
-| provider | TEXT | `xero`, `quickbooks`, `freshbooks`, `myob`, `zoho_books`, or `freeagent` |
+| provider | TEXT | `xero`, `quickbooks`, `freshbooks`, `zoho_books`, or `freeagent` |
 | tenant_id | TEXT | Provider tenant/company/organisation ID |
 | tenant_name | TEXT | Provider tenant/company/organisation display name |
 | access_token_enc | TEXT | Encrypted provider access token |
@@ -333,7 +333,7 @@ callback validation.
 |--------|------|-------------|
 | id | UUID (PK) | Primary key |
 | user_id | UUID (FK) | References users(id), unique per user |
-| provider | TEXT | OAuth provider such as `xero`, `quickbooks`, `freshbooks`, `myob`, `zoho_books`, or `freeagent` |
+| provider | TEXT | OAuth provider such as `xero`, `quickbooks`, `freshbooks`, `zoho_books`, or `freeagent` |
 | state | TEXT | Random OAuth state value used for CSRF protection |
 | redirect_path | TEXT | Path to return to after OAuth completes |
 | created_at | TIMESTAMP | State creation time |
@@ -366,7 +366,7 @@ one source/period, rather than a wide snapshot of all metrics.
 | period_start | DATE | Optional period start for period-based metrics |
 | period_end | DATE | Optional period end for period-based metrics |
 | as_of_date | DATE | Optional point-in-time date for balance metrics |
-| source_type | TEXT | `xero`, `quickbooks`, `freshbooks`, `myob`, `zoho_books`, `freeagent`, `document`, `manual`, or `demo` |
+| source_type | TEXT | `xero`, `quickbooks`, `freshbooks`, `zoho_books`, `freeagent`, `document`, `manual`, or `demo` |
 | source_label | TEXT | User-facing source label |
 | confidence | NUMERIC(4,3) | Confidence score from 0 to 1 |
 | evidence | JSONB | Evidence reference such as document page, row range, chunk, URL, or excerpt |
@@ -422,6 +422,7 @@ All schema changes are tracked in `db/migrations/`:
 - `015_document_xlsx_text_docx_support.sql` - Allows `xlsx`, `text`, and `docx` as document file_types
 - `016_zoho_books_provider.sql` - Allows `zoho_books` as an accounting provider alongside xero/quickbooks/freshbooks/myob
 - `017_freeagent_provider.sql` - Allows `freeagent` as an accounting provider alongside xero/quickbooks/freshbooks/myob/zoho_books
+- `018_drop_myob_provider.sql` - Removes `myob` as a valid accounting provider (its adapter was dropped, no connections ever existed for it)
 - `010_add_user_type.sql` - Adds admin/employee roles used by company signup and joining; existing company accounts are backfilled as admins
 - `011_company_chat_visibility.sql` - Adds company-scoped conversation history and message read access
 - `012_conversation_visibility_modes.sql` - Adds private, company, and admins-only conversation visibility

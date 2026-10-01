@@ -4,7 +4,6 @@ export type FinancialMetricSourceType =
   | 'xero'
   | 'quickbooks'
   | 'freshbooks'
-  | 'myob'
   | 'zoho_books'
   | 'freeagent'
   | 'document'

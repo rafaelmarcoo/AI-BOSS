@@ -7,6 +7,7 @@ import {
   createPdfChunks,
 } from '@/lib/documents/chunking'
 import { extractImageMetrics, extractImageText } from '@/lib/documents/image-extraction'
+import type { ExtractedItem, ItemAttributes } from '@/lib/financial-data/attributes'
 import type {
   ParsedCsvRow,
   ParsedDocumentResult,
@@ -281,11 +282,23 @@ async function parseImageDocument(
 
     let extractedMetrics: Record<string, number> = {}
     let extractedMetricIssues: Array<{ label: string; rawValue: string }> = []
+    let extractedItems: ExtractedItem[] = []
+    let extractedMetricAttributes: Record<string, ItemAttributes> = {}
 
     try {
-      const result = await extractImageMetrics(fileBytes, document.mime_type)
-      extractedMetrics = result.metrics
+      const result = await extractImageMetrics(fileBytes, document.mime_type, {
+        documentId: document.id,
+        sourceLabel: document.file_name,
+        extractedAt: new Date().toISOString(),
+      })
+      // Canonical fixed metrics (result.metrics) are not written to
+      // financial_metric_observations from this branch — see the note in
+      // image-extraction.ts. Only the free-form label -> number map goes into
+      // the document's displayed metadata, same as before this change.
+      extractedMetrics = result.customMetrics
       extractedMetricIssues = result.issues
+      extractedItems = result.items
+      extractedMetricAttributes = result.itemAttributes
     } catch (metricsError) {
       console.error(
         `Failed to extract structured metrics from ${document.file_name}.`,
@@ -301,6 +314,14 @@ async function parseImageDocument(
 
     if (extractedMetricIssues.length > 0) {
       metadata.extractedMetricIssues = extractedMetricIssues
+    }
+
+    if (extractedItems.length > 0) {
+      metadata.extractedItems = extractedItems
+    }
+
+    if (Object.keys(extractedMetricAttributes).length > 0) {
+      metadata.extractedMetricAttributes = extractedMetricAttributes
     }
 
     return {

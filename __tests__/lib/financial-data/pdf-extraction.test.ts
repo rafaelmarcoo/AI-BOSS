@@ -1,4 +1,7 @@
-import { extractPdfFinancialMetrics } from '@/lib/financial-data/extraction/pdf'
+import {
+  extractPdfFinancialData,
+  extractPdfFinancialMetrics,
+} from '@/lib/financial-data/extraction/pdf'
 import {
   CASH_BURN_STATEMENT_LINES,
   DATED_FINANCIAL_STATEMENT_LINES,
@@ -6,15 +9,15 @@ import {
 } from '@/test-fixtures/pdf-metric-extraction'
 
 function extract(lines: string[]) {
-  return extractPdfFinancialMetrics({
+  return extractPdfFinancialData({
     pages: [{ pageNumber: 2, text: lines.join('\n'), lines }],
     documentId: 'document-123',
     sourceLabel: 'May statement.pdf',
     extractedAt: '2026-06-01T00:00:00.000Z',
-  })
+  }).metrics
 }
 
-describe('extractPdfFinancialMetrics', () => {
+describe('extractPdfFinancialData', () => {
   it('extracts dated, labelled metrics with currency and page evidence', () => {
     const metrics = extract(DATED_FINANCIAL_STATEMENT_LINES)
 
@@ -53,7 +56,7 @@ describe('extractPdfFinancialMetrics', () => {
     expect(extract(UNDATED_FINANCIAL_STATEMENT_LINES)).toEqual([])
   })
 
-  it('keeps the first clear occurrence of each metric', () => {
+  it('sums multiple occurrences of an additive metric instead of keeping only the first', () => {
     const metrics = extract([
       'As of 2026-05-31',
       'Cash: 100,000 NZD',
@@ -61,14 +64,54 @@ describe('extractPdfFinancialMetrics', () => {
     ])
 
     expect(metrics).toHaveLength(1)
-    expect(metrics[0]).toEqual(expect.objectContaining({ key: 'cash', value: 100000 }))
+    expect(metrics[0]).toEqual(expect.objectContaining({ key: 'cash', value: 220000 }))
   })
 
-  it('does not extract unsupported labels', () => {
-    expect(extract([
-      'As at 31 May 2026',
-      'Inventory: 55,000 NZD',
-      'Debt to equity: 1.2',
-    ])).toEqual([])
+  it('keeps only the first occurrence for non-additive metrics like runway', () => {
+    const metrics = extract([
+      'As of 2026-05-31',
+      'Runway: 6 months',
+      'Runway: 9 months',
+    ])
+
+    expect(metrics).toHaveLength(1)
+    expect(metrics[0]).toEqual(expect.objectContaining({ key: 'runway_months', value: 6 }))
+  })
+
+  it('captures unrecognized labels as custom metrics instead of dropping them', () => {
+    const result = extractPdfFinancialData({
+      pages: [{
+        pageNumber: 1,
+        text: '',
+        lines: ['As at 31 May 2026', 'Inventory: 55,000 NZD', 'Debt to equity: 1.2'],
+      }],
+      documentId: 'document-123',
+      sourceLabel: 'May statement.pdf',
+      extractedAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    expect(result.metrics).toEqual([])
+    expect(result.customMetrics).toEqual({ Inventory: 55000, 'Debt to equity': 1.2 })
+  })
+})
+
+describe('extractPdfFinancialMetrics', () => {
+  // main's document-review candidate builder calls this function by name and
+  // uses the result directly as an array (`metrics.map(...)`). This is the
+  // one contract that must never change shape, so it gets its own test.
+  it('returns a plain array of metrics, not the full customMetrics result', () => {
+    const lines = ['As of 2026-05-31', 'Cash: 100,000 NZD']
+    const params = {
+      pages: [{ pageNumber: 2, text: lines.join('\n'), lines }],
+      documentId: 'document-123',
+      sourceLabel: 'May statement.pdf',
+      extractedAt: '2026-06-01T00:00:00.000Z',
+    }
+
+    const metrics = extractPdfFinancialMetrics(params)
+
+    expect(Array.isArray(metrics)).toBe(true)
+    expect(metrics).toEqual(extractPdfFinancialData(params).metrics)
+    expect(metrics.map((metric) => metric.key)).toEqual(['cash'])
   })
 })

@@ -1,4 +1,5 @@
 import type { ParsedPdfPage } from '@/lib/documents/types'
+import { ADDITIVE_METRIC_KEYS } from '@/lib/financial-data/extraction/additive-metric-keys'
 import type {
   AvailableFinancialMetricValue,
   FinancialMetricKey,
@@ -105,38 +106,95 @@ function getPageLines(page: ParsedPdfPage) {
   return page.lines ?? page.text.split('\n')
 }
 
-export function extractPdfFinancialMetrics(params: {
+export interface PdfExtractionResult {
+  metrics: AvailableFinancialMetricValue[]
+  // Lines that matched the "label: value" shape but whose label didn't map
+  // onto any known metric — same free-form bucket image extraction already
+  // uses for labels like "Icecream Revenue" that don't fit metric_key.
+  customMetrics: Record<string, number>
+}
+
+interface AccumulatedMetric {
+  key: FinancialMetricKey
+  value: number
+  currency: string | null
+  confidence: number
+  excerpts: string[]
+  sourcePage: number
+}
+
+// The full result: metrics plus unmatched custom labels. Used by our own
+// process.ts.
+export function extractPdfFinancialData(params: {
   pages: ParsedPdfPage[]
   documentId: string
   sourceLabel: string
   extractedAt: string
-}): AvailableFinancialMetricValue[] {
+}): PdfExtractionResult {
+  // Reporting date only gates the fixed metrics (they feed trend charts, so
+  // an unclear date makes them unsafe to record) — custom metrics carry no
+  // date at all, so they're captured either way.
   const asOfDate = findReportingDate(params.pages)
-  if (!asOfDate) return []
 
-  const results: AvailableFinancialMetricValue[] = []
-  const seenKeys = new Set<FinancialMetricKey>()
+  const accumulated = new Map<FinancialMetricKey, AccumulatedMetric>()
+  const customMetrics: Record<string, number> = {}
   const linePattern = /^(.+?)(?:\s*:\s*|\s+)(\(?\s*[-−]?\s*[$£€¥]?\s*[\d,]+(?:\.\d{1,2})?\s*\)?)(?:\s+(months?))?(?:\s+([A-Z]{3}))?\s*$/i
 
   for (const page of params.pages) {
     for (const rawLine of getPageLines(page)) {
       const line = rawLine.trim()
+      // The reporting-date line itself ("As at 31 May 2026") can superficially
+      // fit the "label: value" shape too — skip it so it isn't captured as a
+      // bogus custom metric.
+      if (REPORTING_DATE_PATTERN.test(line)) continue
+
       const match = line.match(linePattern)
       if (!match) continue
 
       const [, label, rawValue, unit, inlineCurrency] = match
       const metric = matchMetricLabel(label)
       const value = parseNumber(rawValue)
-      if (!metric || value === null || seenKeys.has(metric.key)) continue
+      if (value === null) continue
+
+      if (!metric) {
+        if (label.trim()) {
+          customMetrics[label.trim()] = value
+        }
+        continue
+      }
+
       if (unit && metric.key !== 'runway_months') continue
 
-      seenKeys.add(metric.key)
       const currency = inlineCurrency?.toUpperCase() ?? line.match(CURRENCY_PATTERN)?.[1]?.toUpperCase() ?? null
-      results.push({
+      const existing = accumulated.get(metric.key)
+
+      if (!existing) {
+        accumulated.set(metric.key, {
+          key: metric.key,
+          value,
+          currency,
+          confidence: metric.confidence,
+          excerpts: [line],
+          sourcePage: page.pageNumber,
+        })
+      } else if (ADDITIVE_METRIC_KEYS.has(metric.key)) {
+        existing.value += value
+        existing.excerpts.push(line)
+      }
+    }
+  }
+
+  if (!asOfDate) {
+    return { metrics: [], customMetrics }
+  }
+
+  const metrics: AvailableFinancialMetricValue[] = [...accumulated.values()].map(
+    (entry) =>
+      ({
         status: 'available',
-        key: metric.key,
-        value,
-        currency,
+        key: entry.key,
+        value: entry.value,
+        currency: entry.currency,
         periodStart: null,
         periodEnd: null,
         asOfDate,
@@ -146,15 +204,24 @@ export function extractPdfFinancialMetrics(params: {
           sourceId: params.documentId,
           evidence: {
             documentId: params.documentId,
-            sourcePage: page.pageNumber,
-            excerpt: line,
+            sourcePage: entry.sourcePage,
+            excerpt: entry.excerpts.join(' | '),
           },
         },
-        confidence: metric.confidence,
+        confidence: entry.confidence,
         updatedAt: params.extractedAt,
-      })
-    }
-  }
+      }) satisfies AvailableFinancialMetricValue
+  )
 
-  return results
+  return { metrics, customMetrics }
+}
+
+// Kept as its own function, with the exact name and plain-array shape this
+// module has always exported, so code that only wants the fixed metrics
+// (main's document-review candidate builder) never has to know that
+// customMetrics exists.
+export function extractPdfFinancialMetrics(
+  params: Parameters<typeof extractPdfFinancialData>[0]
+): AvailableFinancialMetricValue[] {
+  return extractPdfFinancialData(params).metrics
 }

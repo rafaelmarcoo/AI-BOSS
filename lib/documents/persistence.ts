@@ -1,6 +1,13 @@
 import { randomUUID } from 'crypto'
 import { ApiError } from '@/lib/api/errors'
 import { createAdminSupabaseClient } from '@/lib/supabase'
+import type { ItemAttributes } from '@/lib/financial-data/attributes'
+import {
+  applyItemAppend,
+  applyItemAttributeEdit,
+  applyItemValueEdit,
+  type AttributeChanges,
+} from '@/lib/financial-data/item-matrix'
 import { DOCUMENTS_STORAGE_BUCKET, IMAGE_MIME_TYPES } from '@/lib/documents/constants'
 import type { Document, DocumentChunk, DocumentDeletionResult } from '@/types/database'
 import type { DocumentChunkInsert, DocumentSummary } from '@/lib/documents/types'
@@ -277,6 +284,69 @@ export async function updateDocumentExtractedMetric(params: {
 
   return updateDocumentRecord(params.documentId, params.userId, {
     metadata: updatedMetadata,
+  })
+}
+
+// Edits one extracted item by its position in `extractedItems`. Position, not
+// label, because the same label can appear more than once (e.g. Revenue for
+// two companies). The metadata rules live in applyItemValueEdit.
+export async function updateDocumentExtractedItem(params: {
+  documentId: string
+  userId: string
+  index: number
+  value?: number
+  attributes?: AttributeChanges
+}) {
+  const document = await getDocumentById(params.documentId, params.userId)
+  let metadata: Record<string, unknown> | null = null
+
+  // A value edit goes first so an attribute edit in the same request sees it.
+  if (params.value !== undefined) {
+    metadata = applyItemValueEdit(document.metadata, params.index, params.value)
+  }
+
+  if (params.attributes !== undefined && (params.value === undefined || metadata)) {
+    metadata = applyItemAttributeEdit(metadata ?? document.metadata, params.index, params.attributes)
+  }
+
+  if (!metadata) {
+    throw new ApiError(404, 'NOT_FOUND', 'That item no longer exists.')
+  }
+
+  return updateDocumentRecord(params.documentId, params.userId, { metadata })
+}
+
+// Adds a manually entered row as an item, so it can carry attributes too.
+export async function addDocumentExtractedItem(params: {
+  documentId: string
+  userId: string
+  label: string
+  value: number
+  attributes?: ItemAttributes
+}) {
+  const document = await getDocumentById(params.documentId, params.userId)
+  const metadata = applyItemAppend(document.metadata, {
+    label: params.label,
+    value: params.value,
+    attributes: params.attributes,
+  })
+
+  return updateDocumentRecord(params.documentId, params.userId, { metadata })
+}
+
+export async function updateDocumentCurrency(params: {
+  documentId: string
+  userId: string
+  currency: string
+}) {
+  const document = await getDocumentById(params.documentId, params.userId)
+  const currentMetadata =
+    document.metadata && typeof document.metadata === 'object' && !Array.isArray(document.metadata)
+      ? (document.metadata as Record<string, unknown>)
+      : {}
+
+  return updateDocumentRecord(params.documentId, params.userId, {
+    metadata: { ...currentMetadata, currency: params.currency },
   })
 }
 

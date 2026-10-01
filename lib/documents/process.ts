@@ -5,11 +5,13 @@ import {
 } from '@/lib/documents/embeddings'
 import { logDocumentIngestion } from '@/lib/documents/log-document-ingestion'
 import { parseDocumentContent } from '@/lib/documents/parsing'
+import { extractTextFinancialMetrics } from '@/lib/documents/text-metric-extraction'
+import type { ExtractedItem, ItemAttributes } from '@/lib/financial-data/attributes'
 import {
-  extractCsvFinancialMetrics,
+  extractCsvFinancialData,
   findCsvValueIssues,
 } from '@/lib/financial-data/extraction/csv'
-import { extractPdfFinancialMetrics } from '@/lib/financial-data/extraction/pdf'
+import { extractPdfFinancialData } from '@/lib/financial-data/extraction/pdf'
 import {
   deleteFinancialMetricObservationsForDocument,
   saveFinancialMetricObservations,
@@ -27,18 +29,78 @@ function addMetricObservationCount(
   metadata: unknown,
   metricObservationCount: number,
   embeddingModel: string,
-  valueIssues: ReturnType<typeof findCsvValueIssues> = []
+  valueIssues: ReturnType<typeof findCsvValueIssues> = [],
+  customMetrics: Record<string, number> = {},
+  itemAttributes: Record<string, ItemAttributes> = {},
+  items: ExtractedItem[] = []
 ) {
   const base =
     metadata && typeof metadata === 'object' && !Array.isArray(metadata)
-      ? metadata
+      ? (metadata as Record<string, unknown>)
       : {}
+
+  const existingCustomMetrics =
+    base.extractedMetrics && typeof base.extractedMetrics === 'object' && !Array.isArray(base.extractedMetrics)
+      ? (base.extractedMetrics as Record<string, number>)
+      : {}
+  const mergedCustomMetrics = { ...existingCustomMetrics, ...customMetrics }
 
   return {
     ...base,
     metricObservationCount,
     embeddingModel,
     ...(valueIssues.length > 0 ? { valueIssues } : {}),
+    ...(Object.keys(mergedCustomMetrics).length > 0 ? { extractedMetrics: mergedCustomMetrics } : {}),
+    // Sibling of extractedMetrics, keyed by the same item labels, so the
+    // simple label -> number map stays untouched for everything that reads it.
+    ...(Object.keys(itemAttributes).length > 0 ? { extractedMetricAttributes: itemAttributes } : {}),
+    // Every extracted item including repeated labels, e.g. Icecream for
+    // department A and for department B. The two maps above stay as the
+    // simple first-occurrence view; anything item-level should read this.
+    ...(items.length > 0 ? { extractedItems: items } : {}),
+  }
+}
+
+// PDF, DOCX and plain text share one pipeline. The model reads the text we
+// already extracted (so tables, several companies and extra columns like
+// price/quantity are understood in context); the regex extractor stays as the
+// fallback so an upload never fails just because the model call did.
+async function getModelMetrics(params: {
+  document: Awaited<ReturnType<typeof getDocumentById>>
+  parsedDocument: ParsedDocumentResult
+}) {
+  const usesModelExtraction =
+    params.document.file_type === 'pdf' ||
+    params.document.file_type === 'text' ||
+    params.document.file_type === 'docx'
+
+  if (
+    !usesModelExtraction ||
+    !params.parsedDocument.rawText.trim() ||
+    !process.env.OPENAI_API_KEY
+  ) {
+    return null
+  }
+
+  try {
+    // One entry per PDF page. DOCX and plain text arrive as a single page and
+    // are cut into pieces by the extractor itself.
+    const pages = params.parsedDocument.pdfPages?.length
+      ? params.parsedDocument.pdfPages.map((page) => page.text)
+      : [params.parsedDocument.rawText]
+    const result = await extractTextFinancialMetrics(pages, {
+      documentId: params.document.id,
+      sourceLabel: params.document.file_name,
+      extractedAt: new Date().toISOString(),
+    })
+
+    return result && Object.keys(result.customMetrics).length > 0 ? result : null
+  } catch (error) {
+    console.error(
+      `Model extraction failed for ${params.document.file_name}; using regex extraction instead.`,
+      error
+    )
+    return null
   }
 }
 
@@ -51,11 +113,17 @@ function getCsvMetrics(params: {
   const isTabular = params.document.file_type === 'csv' || params.document.file_type === 'xlsx'
 
   if (!isTabular || !params.parsedDocument.csvData) {
-    return { metrics: [], issues: [] as ReturnType<typeof findCsvValueIssues> }
+    return {
+      metrics: [],
+      issues: [] as ReturnType<typeof findCsvValueIssues>,
+      customMetrics: {} as Record<string, number>,
+      items: [] as ExtractedItem[],
+      itemAttributes: {} as Record<string, ItemAttributes>,
+    }
   }
 
   const extractedAt = new Date().toISOString()
-  const metrics = extractCsvFinancialMetrics({
+  const { metrics, customMetrics, items, itemAttributes } = extractCsvFinancialData({
     csvData: params.parsedDocument.csvData,
     documentId: params.document.id,
     sourceLabel: params.document.file_name,
@@ -63,7 +131,7 @@ function getCsvMetrics(params: {
   })
   const issues = findCsvValueIssues(params.parsedDocument.csvData)
 
-  return { metrics, issues }
+  return { metrics, issues, customMetrics, items, itemAttributes }
 }
 
 function getPdfMetrics(params: {
@@ -80,10 +148,10 @@ function getPdfMetrics(params: {
     params.document.file_type === 'docx'
 
   if (!usesPdfExtraction || !params.parsedDocument.pdfPages) {
-    return []
+    return { metrics: [], customMetrics: {} as Record<string, number> }
   }
 
-  return extractPdfFinancialMetrics({
+  return extractPdfFinancialData({
     pages: params.parsedDocument.pdfPages,
     documentId: params.document.id,
     sourceLabel: params.document.file_name,
@@ -110,11 +178,22 @@ export async function processDocument(documentId: string, userId: string) {
     const embeddedChunks = await embedDocumentChunks(parsedDocument.chunks)
 
     await replaceDocumentChunks(document.id, document.user_id, embeddedChunks)
-    const { metrics: csvMetrics, issues: csvValueIssues } = getCsvMetrics({
-      document,
-      parsedDocument,
-    })
-    const pdfMetrics = getPdfMetrics({ document, parsedDocument })
+    const {
+      metrics: csvMetrics,
+      issues: csvValueIssues,
+      customMetrics: csvCustomMetrics,
+      items: csvItems,
+      itemAttributes: csvItemAttributes,
+    } = getCsvMetrics({ document, parsedDocument })
+    const regexPdfResult = getPdfMetrics({ document, parsedDocument })
+    const modelResult = await getModelMetrics({ document, parsedDocument })
+    const pdfMetrics = modelResult ? modelResult.metrics : regexPdfResult.metrics
+    const pdfCustomMetrics = modelResult
+      ? modelResult.customMetrics
+      : regexPdfResult.customMetrics
+    const itemAttributes = { ...csvItemAttributes, ...modelResult?.itemAttributes }
+    const items = [...csvItems, ...(modelResult?.items ?? [])]
+    const customMetrics = { ...csvCustomMetrics, ...pdfCustomMetrics }
 
     // Reprocessing must replace the document's derived metrics, not append stale values.
     await deleteFinancialMetricObservationsForDocument(document.id, document.user_id)
@@ -132,7 +211,7 @@ export async function processDocument(documentId: string, userId: string) {
       documentId: document.id,
       metrics: pdfMetrics,
       rawData: {
-        extractor: 'deterministic_pdf_v1',
+        extractor: modelResult ? 'llm_text_v1' : 'deterministic_pdf_v1',
         fileName: document.file_name,
       },
     })
@@ -141,7 +220,10 @@ export async function processDocument(documentId: string, userId: string) {
       parsedDocument.metadata,
       metricObservationCount,
       DOCUMENT_EMBEDDING_MODEL,
-      csvValueIssues
+      csvValueIssues,
+      customMetrics,
+      itemAttributes,
+      items
     )
 
     await updateDocumentRecord(document.id, document.user_id, {

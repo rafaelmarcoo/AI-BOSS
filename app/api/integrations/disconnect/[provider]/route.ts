@@ -15,11 +15,29 @@ export async function DELETE(
     const adapter = getAdapter(provider)
     const supabase = createAdminSupabaseClient()
 
+    const { data: connection } = await supabase
+      .from('data_connections')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('provider', adapter.provider)
+      .maybeSingle()
+
     await supabase
       .from('oauth_tokens')
       .delete()
       .eq('user_id', user.id)
       .eq('provider', adapter.provider)
+
+    if (connection) {
+      // Clear this connection's own metric history so the comparison table
+      // drops its column immediately — reconnecting fetches a fresh snapshot.
+      await supabase
+        .from('financial_metric_observations')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('connection_id', connection.id)
+    }
+
     await deactivateConnection(user.id, adapter.provider)
 
     return successResponse({ disconnected: adapter.provider })

@@ -101,7 +101,11 @@ export class XeroAdapter implements AccountingAdapter {
       }),
     })
 
-    if (!tokenResponse.ok) throw new Error(`Xero token exchange failed: ${tokenResponse.status}`)
+    if (!tokenResponse.ok) {
+      const errorBody = await tokenResponse.text()
+      console.error('Xero token exchange failed', tokenResponse.status, errorBody)
+      throw new Error(`Xero token exchange failed: ${tokenResponse.status}`)
+    }
     const token = (await tokenResponse.json()) as {
       access_token: string
       refresh_token: string

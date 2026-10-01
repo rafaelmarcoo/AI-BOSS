@@ -109,7 +109,8 @@ const PROVIDER_LABELS: Record<string, string> = {
   xero: "Xero",
   quickbooks: "QuickBooks",
   freshbooks: "FreshBooks",
-  myob: "MYOB",
+  zoho_books: "Zoho Books",
+  freeagent: "FreeAgent",
 };
 
 const FILE_TYPE_LABELS: Record<string, string> = {
@@ -740,7 +741,13 @@ export function DataConnectorsWorkspace() {
                                     size="small"
                                     label="Save"
                                     onClick={() => void saveEditingCell(row.metricLabel, cell)}
-                                    sx={{ cursor: "pointer" }}
+                                    sx={{
+                                      cursor: "pointer",
+                                      bgcolor: dashboardTokens.accent,
+                                      color: "common.white",
+                                      fontWeight: 700,
+                                      "&:hover": { bgcolor: dashboardTokens.accentHover },
+                                    }}
                                   />
                                 </Stack>
                               )}

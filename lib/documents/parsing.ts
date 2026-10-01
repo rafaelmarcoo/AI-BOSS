@@ -467,16 +467,65 @@ function parseTextDocument(
   }
 }
 
+function stripHtmlTags(html: string) {
+  return html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function tableHtmlToLines(tableHtml: string) {
+  const rows = tableHtml.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) ?? []
+
+  return rows
+    .map((row) => {
+      const cells = row.match(/<t[dh][^>]*>[\s\S]*?<\/t[dh]>/gi) ?? []
+      return cells.map(stripHtmlTags).filter(Boolean).join(': ')
+    })
+    .filter(Boolean)
+}
+
+// mammoth's plain-text mode puts each table cell on its own line (so "Revenue"
+// and "10000" end up as two separate lines, never "Revenue: 10000" together),
+// which the label/value line-matching below can never recognize. Converting to
+// HTML instead preserves <table><tr><td> structure, letting each row become one
+// reconstructed "label: value" line — everything outside tables still becomes
+// one line per paragraph, same as before.
+export function mammothHtmlToLines(html: string) {
+  const segments = html.split(/(<table[^>]*>[\s\S]*?<\/table>)/gi)
+  const lines: string[] = []
+
+  for (const segment of segments) {
+    if (/^<table/i.test(segment)) {
+      lines.push(...tableHtmlToLines(segment))
+      continue
+    }
+
+    const paragraphs = segment.match(/<p[^>]*>[\s\S]*?<\/p>/gi) ?? [segment]
+    for (const paragraph of paragraphs) {
+      const text = stripHtmlTags(paragraph)
+      if (text) lines.push(text)
+    }
+  }
+
+  return lines
+}
+
 async function parseDocxDocument(
   document: Pick<Document, 'id' | 'user_id' | 'file_name'>,
   fileBytes: Uint8Array
 ) {
   try {
     const mammoth = await import('mammoth')
-    const result = await mammoth.extractRawText({
+    const result = await mammoth.convertToHtml({
       buffer: Buffer.from(fileBytes),
     })
-    const decoded = normalizeWhitespace(result.value)
+    const decoded = normalizeWhitespace(mammothHtmlToLines(result.value).join('\n'))
 
     return buildTextAsSinglePageResult(document, decoded)
   } catch (error) {

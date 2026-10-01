@@ -194,3 +194,13 @@ export async function listCompanySummaries(userId: string): Promise<CompanySumma
     competitors: findPeers(companies, company).map((peer) => peer.name),
   }))
 }
+
+export async function listCompanyNamesForRouting(userId: string): Promise<string[]> {
+  try {
+    const companies = await listVisibleCompanies(userId)
+    return companies.map((company) => company.name)
+  } catch (error) {
+    console.error('Could not load company names for routing', error)
+    return []
+  }
+}

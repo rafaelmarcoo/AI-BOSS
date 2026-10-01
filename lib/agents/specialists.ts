@@ -49,7 +49,7 @@ A plain percentage is a fixed step; compounding requires explicit every-month wo
 ## Assigned specialist
 You are handling analysis of other companies from their published annual statements, such as the CIMA case-study companies (Trimayr and its competitor Pallo & Troo, Ressett and its competitor Fixxupp). These are not the user's business: never mix their figures with the user's own metrics, runway or scenarios.
 
-Use analyse_company for one company and compare_companies for two; omit competitor to use the company's competitor on record. Use list_analysed_companies when the user asks what is available or names a company the tools cannot find. Every figure in your answer must come from a tool result: never calculate, estimate or recall a figure yourself. If a tool says a company is not available, say so and offer the available companies.
+Use analyse_company for one company and compare_companies for two; omit competitor to use the company's competitor on record. Use list_analysed_companies when the user asks what is available or names a company the tools cannot find. Every figure in your answer must come from a tool result: never calculate, estimate or recall a figure yourself. If a tool says a company is not available, say so and offer the available companies. For a follow-up question (for example "what about gearing?"), work out from the conversation which company or companies are meant and call the tool again for the figures; never decline because the figures were in an earlier answer. A company the user uploaded has its file name as its source; a file name that mentions another company does not mean the figures belong to that company.
 
 ### How to analyse
 Write as a CIMA-qualified management accountant briefing a busy manager.
@@ -171,7 +171,8 @@ export async function runMultiAgent(
   input: string,
   chatHistory: BaseMessage[] = [],
   contextMessages: BaseMessage[] = [],
-  modelOverride?: ModelName
+  modelOverride?: ModelName,
+  companyNames: string[] = []
 ): Promise<MultiAgentRunResult> {
   const routingHistory = chatHistory.flatMap((message) => {
     const role = message._getType()
@@ -183,7 +184,7 @@ export async function runMultiAgent(
       ? [{ role: role === 'human' ? 'user' as const : 'assistant' as const, content }]
       : []
   })
-  const specialist = routeFinancialConversation(input, routingHistory)
+  const specialist = routeFinancialConversation(input, routingHistory, companyNames)
   const preflightClarification = getScenarioPreflightClarification(input)
 
   if (preflightClarification) {

@@ -13,6 +13,7 @@ import {
   type FinancialSpecialist,
 } from '@/lib/agents/router'
 import { runMultiAgent } from '@/lib/agents/specialists'
+import { listCompanyNamesForRouting } from '@/lib/company-analysis/persistence'
 import { DEFAULT_MODEL, MODEL_CATALOG, type ModelName } from '@/lib/ai/models'
 import { logChatDecision } from '@/lib/chat/log-chat-decision'
 import { buildChatContext } from '@/lib/chat/build-chat-context'
@@ -74,9 +75,11 @@ export async function generateChatResponse(
     // Logged with the decision, so the audit trail records the model that
     // actually answered rather than assuming the default.
     let modelUsed: string = MODEL_CATALOG[model ?? DEFAULT_MODEL].model
+    const companyNames = await listCompanyNamesForRouting(userId)
     const resolvedSpecialist = routeFinancialConversation(
       latestUserMessage.content,
-      persistedChatHistory
+      persistedChatHistory,
+      companyNames
     )
     const preflightClarification = getScenarioPreflightClarification(latestUserMessage.content)
 
@@ -100,7 +103,8 @@ export async function generateChatResponse(
         latestUserMessage.content,
         chatHistory,
         chatContext.messages,
-        model
+        model,
+        companyNames
       )
       agentResponse = multiAgentResponse
       specialist = multiAgentResponse.specialist

@@ -1,4 +1,5 @@
 import { CIMA_CASE_STUDIES } from '@/lib/company-analysis/cima-case-studies'
+import { normalizeCompanyName } from '@/lib/company-analysis/lookup'
 
 export type FinancialSpecialist =
   | 'financial_position'
@@ -27,13 +28,21 @@ const COMPANY_NAMES = new RegExp(
 
 const OWN_BUSINESS = /\b(i|me|my|our|we|us|runway|burn|cash)\b/
 
-function mentionsAnalysedCompany(value: string) {
-  return COMPANY_TERMS.test(value) || COMPANY_NAMES.test(value)
+function mentionsNamedCompany(value: string, companyNames: string[]) {
+  const text = ` ${normalizeCompanyName(value)} `
+  return companyNames.some((name) => {
+    const wanted = normalizeCompanyName(name)
+    return wanted.length >= 3 && text.includes(` ${wanted} `)
+  })
 }
 
-export function routeFinancialQuestion(query: string): FinancialSpecialist {
+function mentionsAnalysedCompany(value: string, companyNames: string[]) {
+  return COMPANY_TERMS.test(value) || COMPANY_NAMES.test(value) || mentionsNamedCompany(value, companyNames)
+}
+
+export function routeFinancialQuestion(query: string, companyNames: string[] = []): FinancialSpecialist {
   const value = normalize(query)
-  if (mentionsAnalysedCompany(value)) {
+  if (mentionsAnalysedCompany(value, companyNames)) {
     return 'company_analysis'
   }
 
@@ -55,9 +64,10 @@ export function routeFinancialQuestion(query: string): FinancialSpecialist {
 
 export function routeFinancialConversation(
   query: string,
-  history: FinancialRoutingMessage[] = []
+  history: FinancialRoutingMessage[] = [],
+  companyNames: string[] = []
 ): FinancialSpecialist {
-  const direct = routeFinancialQuestion(query)
+  const direct = routeFinancialQuestion(query, companyNames)
   if (direct === 'company_analysis') return direct
 
   const value = normalize(query)
@@ -66,7 +76,7 @@ export function routeFinancialConversation(
     .find((message) => message.role === 'assistant')
   if (
     latestAssistant &&
-    mentionsAnalysedCompany(normalize(latestAssistant.content)) &&
+    mentionsAnalysedCompany(normalize(latestAssistant.content), companyNames) &&
     !OWN_BUSINESS.test(value)
   ) {
     return 'company_analysis'

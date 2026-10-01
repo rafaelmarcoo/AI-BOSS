@@ -74,6 +74,40 @@ describe('company analysis routing', () => {
   })
 })
 
+describe('uploaded company names', () => {
+  const names = ['Kiwi Salons', 'Pallo & Troo', 'Ressett']
+
+  it.each([
+    'Analyse Kiwi Salons',
+    'how is kiwi salons doing?',
+    "What is Kiwi Salons's gross margin?",
+    'Compare Kiwi Salons with Trimayr',
+  ])('routes %p to the company analyst', (query) => {
+    expect(routeFinancialQuestion(query, names)).toBe('company_analysis')
+  })
+
+  it('does not know the name unless it is passed in', () => {
+    expect(routeFinancialQuestion('Analyse Kiwi Salons')).toBe('financial_position')
+  })
+
+  it.each([
+    ['How are my salons doing?', 'financial_position'],
+    ['What is my runway?', 'financial_position'],
+    ['Forecast revenue for kiwi season', 'historical_forecast'],
+  ] as const)('does not capture own-business question %p with part of a name', (query, expected) => {
+    expect(routeFinancialQuestion(query, names)).toBe(expected)
+  })
+
+  it('keeps a follow-up about an uploaded company with the company analyst', () => {
+    const afterKiwi = [
+      { role: 'user' as const, content: 'Analyse Kiwi Salons' },
+      { role: 'assistant' as const, content: 'Kiwi Salons grew revenue by 9.7% and its operating margin rose.' },
+    ]
+    expect(routeFinancialConversation('What about gearing?', afterKiwi, names)).toBe('company_analysis')
+    expect(routeFinancialConversation('What is my runway?', afterKiwi, names)).toBe('financial_position')
+  })
+})
+
 describe('scenario clarification replies', () => {
   it('keeps a timing answer with the scenario specialist', () => {
     expect(

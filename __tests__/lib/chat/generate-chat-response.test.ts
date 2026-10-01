@@ -13,6 +13,7 @@ import {
 } from '@/lib/chat/persistence'
 import { logChatDecision } from '@/lib/chat/log-chat-decision'
 import { planGenUi } from '@/lib/gen-ui/plan-gen-ui'
+import { listCompanyNamesForRouting } from '@/lib/company-analysis/persistence'
 
 jest.mock('@/lib/chat/build-chat-context', () => ({
   buildChatContext: jest.fn(),
@@ -44,6 +45,10 @@ jest.mock('@/lib/chat/persistence', () => ({
   ),
 }))
 
+jest.mock('@/lib/company-analysis/persistence', () => ({
+  listCompanyNamesForRouting: jest.fn(),
+}))
+
 jest.mock('@/lib/chat/log-chat-decision', () => ({
   logChatDecision: jest.fn(),
 }))
@@ -62,12 +67,14 @@ const mockInsertConversationTurn = jest.mocked(insertConversationTurn)
 const mockListConversationMessages = jest.mocked(listConversationMessages)
 const mockLogChatDecision = jest.mocked(logChatDecision)
 const mockPlanGenUi = jest.mocked(planGenUi)
+const mockListCompanyNamesForRouting = jest.mocked(listCompanyNamesForRouting)
 
 describe('generateChatResponse', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     delete process.env.MULTI_AGENT_MODE
     mockLogChatDecision.mockResolvedValue(undefined)
+    mockListCompanyNamesForRouting.mockResolvedValue([])
   })
 
   it('passes built financial and document context into the agent', async () => {
@@ -167,7 +174,7 @@ describe('generateChatResponse', () => {
 
     await generateChatResponse('user-123', [{ role: 'user', content: 'Forecast cash' }], 'conversation-1')
 
-    expect(mockRunMultiAgent).toHaveBeenCalledWith('user-123', 'Forecast cash', [], contextMessages, undefined)
+    expect(mockRunMultiAgent).toHaveBeenCalledWith('user-123', 'Forecast cash', [], contextMessages, undefined, [])
     expect(mockRunAgent).not.toHaveBeenCalled()
     expect(mockLogChatDecision).toHaveBeenCalledWith(expect.objectContaining({ specialist: 'historical_forecast' }))
     expect(mockLogChatDecision).toHaveBeenCalledWith(expect.objectContaining({ modelUsed: 'gpt-4o' }))
@@ -201,12 +208,45 @@ describe('generateChatResponse', () => {
     await generateChatResponse('user-123', [{ role: 'user', content: prompt }], conversation.id)
 
     // The fifth argument is the user's chosen model; none was chosen here.
-    expect(mockRunMultiAgent).toHaveBeenCalledWith('user-123', prompt, [], contextMessages, undefined)
+    expect(mockRunMultiAgent).toHaveBeenCalledWith('user-123', prompt, [], contextMessages, undefined, [])
     expect(mockRunAgent).not.toHaveBeenCalled()
     expect(mockPlanGenUi).toHaveBeenCalledWith(expect.objectContaining({
       scenarioMode: true,
       toolExecutions: [],
     }))
+  })
+
+  it("sends a question about the user's uploaded company to the company analyst", async () => {
+    const prompt = 'Analyse Kiwi Salons'
+    const contextMessages = [new SystemMessage('metrics and RAG context')]
+    const conversation = {
+      id: 'conversation-1', user_id: 'user-123', company_id: 'company-1', visibility: 'company' as const,
+      title: prompt, created_at: '2026-10-01T00:00:00.000Z', updated_at: '2026-10-01T00:00:00.000Z',
+    }
+    const userMessage = {
+      id: 'message-user', conversation_id: conversation.id, user_id: 'user-123', role: 'user' as const,
+      content: prompt, citations: null, ui_payload: null, created_at: '2026-10-01T00:00:00.000Z',
+    }
+    const assistantMessage = {
+      id: 'message-assistant', conversation_id: conversation.id, user_id: 'user-123', role: 'assistant' as const,
+      content: 'Kiwi Salons analysis', citations: null, ui_payload: null, created_at: '2026-10-01T00:00:01.000Z',
+    }
+
+    mockListCompanyNamesForRouting.mockResolvedValue(['Kiwi Salons', 'Trimayr'])
+    mockGetOrCreateConversation.mockResolvedValue(conversation)
+    mockInsertConversationTurn.mockResolvedValue({ userMessage, assistantMessage })
+    mockListConversationMessages.mockResolvedValue([])
+    mockBuildChatContext.mockResolvedValue({ messages: contextMessages, metricKeys: [], retrievedChunks: [], hasUnreviewedDocumentEvidence: false })
+    mockRunMultiAgent.mockResolvedValue({
+      content: 'Kiwi Salons analysis', tokensUsed: 50, toolsUsed: [], toolExecutions: [], specialist: 'company_analysis', modelName: 'gpt-5.6-luna',
+    })
+    mockPlanGenUi.mockResolvedValue(null)
+
+    await generateChatResponse('user-123', [{ role: 'user', content: prompt }], conversation.id)
+
+    expect(mockListCompanyNamesForRouting).toHaveBeenCalledWith('user-123')
+    expect(mockRunMultiAgent).toHaveBeenCalledWith('user-123', prompt, [], contextMessages, undefined, ['Kiwi Salons', 'Trimayr'])
+    expect(mockRunAgent).not.toHaveBeenCalled()
   })
 
   it('does not persist a user message when the model call fails', async () => {

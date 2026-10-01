@@ -5,6 +5,7 @@ export type FinancialMetricSourceType =
   | 'quickbooks'
   | 'freshbooks'
   | 'myob'
+  | 'zoho_books'
   | 'document'
   | 'manual'
   | 'demo'

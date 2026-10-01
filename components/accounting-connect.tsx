@@ -53,6 +53,13 @@ const PROVIDERS = [
     color: "#7B2D8B",
     note: "OAuth backend ready",
   },
+  {
+    provider: "zoho_books",
+    label: "Zoho Books",
+    shortLabel: "Z",
+    color: "#E42527",
+    note: "OAuth backend ready",
+  },
 ] as const;
 
 type Provider = (typeof PROVIDERS)[number]["provider"];

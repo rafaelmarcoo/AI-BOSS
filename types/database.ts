@@ -90,7 +90,7 @@ export interface DocumentDeletionResult {
   deleted: boolean
 }
 
-export type AccountingProvider = 'xero' | 'quickbooks' | 'freshbooks' | 'myob'
+export type AccountingProvider = 'xero' | 'quickbooks' | 'freshbooks' | 'myob' | 'zoho_books'
 export type DataConnectionProvider =
   | AccountingProvider
   | 'csv'

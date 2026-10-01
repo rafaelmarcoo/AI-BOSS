@@ -19,6 +19,7 @@
     "@langchain/openai": "^1.4.1",
     "@mui/icons-material": "^7.3.9",
     "@mui/material": "^7.3.9",
+    "@napi-rs/canvas": "^1.0.9",
     "@supabase/supabase-js": "^2.99.3",
     "langchain": "^1.2.39",
     "mammoth": "^1.12.2",

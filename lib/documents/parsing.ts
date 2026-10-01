@@ -26,6 +26,21 @@ const PDFJS_STANDARD_FONT_DATA_PATH = `${join(
   'node_modules/pdfjs-dist/standard_fonts'
 )}/`
 
+// pdfjs-dist's "legacy" build still references browser-only globals
+// (DOMMatrix, Path2D, ImageData) even for text-only extraction with no
+// rendering — they're missing in a plain Node.js/serverless runtime, which
+// surfaces as "DOMMatrix is not defined" the first time a PDF is parsed.
+// @napi-rs/canvas ships real implementations of these; only needs doing once
+// per warm process.
+async function ensurePdfCanvasPolyfills() {
+  if (typeof (globalThis as Record<string, unknown>).DOMMatrix !== 'undefined') {
+    return
+  }
+
+  const { DOMMatrix, Path2D, ImageData, DOMRect } = await import('@napi-rs/canvas')
+  Object.assign(globalThis, { DOMMatrix, Path2D, ImageData, DOMRect })
+}
+
 function normalizeWhitespace(value: string) {
   return value
     .replace(/\r\n/g, '\n')
@@ -316,6 +331,7 @@ async function parsePdfDocument(
   document: Pick<Document, 'id' | 'user_id' | 'file_type' | 'file_name'>,
   fileBytes: Uint8Array
 ) {
+  await ensurePdfCanvasPolyfills()
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
   const loadingTask = pdfjs.getDocument({
     data: fileBytes,

@@ -243,6 +243,32 @@ export async function updateFinancialMetricObservationValue(params: {
   return data as FinancialMetricObservation
 }
 
+/**
+ * Bulk-sets the currency on every observation derived from one document —
+ * currency is chosen once per upload and applies to all of its metrics, not
+ * set per-value like the observation's own numeric value is.
+ */
+export async function updateFinancialMetricObservationsCurrencyForDocument(params: {
+  userId: string
+  documentId: string
+  currency: string
+}) {
+  const supabase = createAdminSupabaseClient()
+  const { error } = await supabase
+    .from('financial_metric_observations')
+    .update({ currency: params.currency, updated_at: new Date().toISOString() })
+    .eq('document_id', params.documentId)
+    .eq('user_id', params.userId)
+
+  if (error) {
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to update financial metric observation currency.'
+    )
+  }
+}
+
 export async function listFinancialMetricObservationHistory(params: {
   userId: string
   metricKey: FinancialMetricKey

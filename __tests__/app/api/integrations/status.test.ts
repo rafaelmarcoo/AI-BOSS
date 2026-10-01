@@ -74,6 +74,7 @@ describe('/api/integrations/status', () => {
       'freshbooks',
       'myob',
       'zoho_books',
+      'freeagent',
     ])
     expect(payload.data).toEqual([
       {
@@ -106,6 +107,13 @@ describe('/api/integrations/status', () => {
       },
       {
         provider: 'zoho_books',
+        status: 'available',
+        displayName: null,
+        connectedAt: null,
+        lastSyncedAt: null,
+      },
+      {
+        provider: 'freeagent',
         status: 'available',
         displayName: null,
         connectedAt: null,

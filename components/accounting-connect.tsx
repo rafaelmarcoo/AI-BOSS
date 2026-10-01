@@ -60,6 +60,13 @@ const PROVIDERS = [
     color: "#E42527",
     note: "OAuth backend ready",
   },
+  {
+    provider: "freeagent",
+    label: "FreeAgent",
+    shortLabel: "F",
+    color: "#4F5D95",
+    note: "OAuth backend ready",
+  },
 ] as const;
 
 type Provider = (typeof PROVIDERS)[number]["provider"];

@@ -55,6 +55,20 @@ function createStoragePath(userId: string, fileName: string) {
 
 async function ensureDocumentsBucketExists() {
   const supabase = createAdminSupabaseClient()
+  const bucketOptions = {
+    public: false,
+    fileSizeLimit: '15MB',
+    allowedMimeTypes: [
+      'application/pdf',
+      'text/csv',
+      'application/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+      ...IMAGE_MIME_TYPES,
+    ],
+  }
   const { data, error } = await supabase.storage.listBuckets()
 
   if (error) {
@@ -72,25 +86,30 @@ async function ensureDocumentsBucketExists() {
   )
 
   if (existingBucket) {
+    // A bucket created before a file type was added here (e.g. XLSX, DOCX,
+    // images) would otherwise keep rejecting it forever, since Supabase only
+    // applies these settings at creation time unless told to update them.
+    const { error: updateError } = await supabase.storage.updateBucket(
+      DOCUMENTS_STORAGE_BUCKET,
+      bucketOptions
+    )
+
+    if (updateError) {
+      console.error('Failed to update the document storage bucket.', updateError)
+      throw new ApiError(
+        500,
+        'INTERNAL_ERROR',
+        'Failed to configure document storage.',
+        updateError.message
+      )
+    }
+
     return
   }
 
   const { error: createError } = await supabase.storage.createBucket(
     DOCUMENTS_STORAGE_BUCKET,
-    {
-      public: false,
-      fileSizeLimit: '15MB',
-      allowedMimeTypes: [
-        'application/pdf',
-        'text/csv',
-        'application/csv',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'text/plain',
-        ...IMAGE_MIME_TYPES,
-      ],
-    }
+    bucketOptions
   )
 
   if (createError && createError.message !== 'Bucket already exists') {

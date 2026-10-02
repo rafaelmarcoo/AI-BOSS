@@ -108,6 +108,47 @@ describe('uploaded company names', () => {
   })
 })
 
+describe('a company named by the start of its name (6d)', () => {
+  it('sends "the company momo" to the company analyst when "momo new" exists', () => {
+    expect(routeFinancialQuestion('can you tell me about the company momo', ['momo new'])).toBe('company_analysis')
+    expect(routeFinancialQuestion('Tell me about the business called kiwi', ['Kiwi Salons'])).toBe('company_analysis')
+  })
+
+  it.each([
+    'How is my company doing?',
+    'How is the company doing this month?',
+    'What is my business runway?',
+  ])('keeps own-business question %p with the own-business agent', (query) => {
+    expect(routeFinancialQuestion(query, ['momo new', 'Kiwi Salons'])).toBe('financial_position')
+  })
+
+  it('does not match a word that only appears later in a name', () => {
+    expect(routeFinancialQuestion('Tell me about the company salons', ['Kiwi Salons'])).toBe('financial_position')
+  })
+})
+
+describe('a long briefing is not a scenario question (6d)', () => {
+  const briefing = [
+    'momo — management briefing. momo had a strong year operationally. Revenue grew modestly, but profitability improved substantially: operating profit rose faster than sales and margins widened.',
+    'Liquidity also improved. The main tension is that momo paid out almost all of its profit as dividends, leaving less profit retained in the business.',
+    'Marketing as a percentage of revenue was not calculable because marketing expense data was unavailable.',
+    'Questions management should investigate next: 1. What drove the improvement in margins? 2. Can revenue growth accelerate without increasing inventory or receivable days? 3. Is the 96.2% dividend payout compatible with investment needs?',
+  ].join(' ')
+
+  it('does not treat the next message as a scenario answer', () => {
+    expect(briefing.length).toBeGreaterThan(600)
+    expect(
+      routeFinancialConversation('so in detail tell me how good the company momo is', [
+        { role: 'user', content: 'can you tell me about the company momo' },
+        { role: 'assistant', content: briefing },
+      ], ['momo new'])
+    ).toBe('company_analysis')
+    expect(
+      routeFinancialConversation('Tell me more about that.', [{ role: 'assistant', content: briefing }])
+    ).toBe('financial_position')
+  })
+})
+
 describe('scenario clarification replies', () => {
   it('keeps a timing answer with the scenario specialist', () => {
     expect(

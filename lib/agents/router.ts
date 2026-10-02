@@ -36,9 +36,26 @@ function mentionsNamedCompany(value: string, companyNames: string[]) {
   })
 }
 
-function mentionsAnalysedCompany(value: string, companyNames: string[]) {
-  return COMPANY_TERMS.test(value) || COMPANY_NAMES.test(value) || mentionsNamedCompany(value, companyNames)
+function namesCompanyByItsStart(value: string, companyNames: string[]) {
+  const firstWords = new Set(
+    companyNames.map((name) => normalizeCompanyName(name).split(' ')[0]).filter((word) => word.length >= 3)
+  )
+  const text = normalizeCompanyName(value)
+  return [...text.matchAll(/\b(?:company|business|competitor)\s+(?:called\s+|named\s+)?([a-z0-9]+)/g)].some(
+    (match) => firstWords.has(match[1])
+  )
 }
+
+function mentionsAnalysedCompany(value: string, companyNames: string[]) {
+  return (
+    COMPANY_TERMS.test(value) ||
+    COMPANY_NAMES.test(value) ||
+    mentionsNamedCompany(value, companyNames) ||
+    namesCompanyByItsStart(value, companyNames)
+  )
+}
+
+const MAX_CLARIFYING_QUESTION_LENGTH = 600
 
 export function routeFinancialQuestion(query: string, companyNames: string[] = []): FinancialSpecialist {
   const value = normalize(query)
@@ -84,6 +101,7 @@ export function routeFinancialConversation(
 
   const isScenarioClarification = Boolean(
     latestAssistant &&
+      latestAssistant.content.length <= MAX_CLARIFYING_QUESTION_LENGTH &&
       latestAssistant.content.includes('?') &&
       /\b(scenario|source\s*\/\s*currency|monthly employer cost|monthly saving|baseline|percentage|compounding|one-off|recurring|start month|timing|horizon)\b/i.test(latestAssistant.content)
   )

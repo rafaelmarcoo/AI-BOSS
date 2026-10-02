@@ -117,6 +117,31 @@ describe('planNewCompany', () => {
   })
 })
 
+describe('planNewCompany when editing', () => {
+  const details = validateCompanyDetails(form(validFields))
+  const kiwi = company({ id: 'kiwi', name: 'Kiwi Repairs', user_id: 'user-1', peer_group: 'user-group' })
+
+  it('lets a company keep its own name', () => {
+    expect(planNewCompany({ details, visibleCompanies: [company({}), kiwi], newGroupId: 'g', editingId: 'kiwi' })).toEqual({
+      peerGroup: 'g',
+    })
+  })
+
+  it("still refuses another company's name", async () => {
+    const error = await rejection(() =>
+      planNewCompany({ details: { ...details, name: 'Ressett' }, visibleCompanies: [company({}), kiwi], newGroupId: 'g', editingId: 'kiwi' })
+    )
+    expect(error.status).toBe(409)
+  })
+
+  it('refuses making a company its own competitor', async () => {
+    const error = await rejection(() =>
+      planNewCompany({ details: { ...details, competitorOf: 'kiwi' }, visibleCompanies: [kiwi], newGroupId: 'g', editingId: 'kiwi' })
+    )
+    expect(error.status).toBe(400)
+  })
+})
+
 describe('readStatementFile', () => {
   it('accepts a CSV file', () => {
     const file = new File(['a,b'], 'ressett.CSV')

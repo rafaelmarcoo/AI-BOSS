@@ -3,7 +3,7 @@
 import { NextRequest } from 'next/server'
 import { GET as listCompanies, POST as saveCompany } from '@/app/api/companies/route'
 import { POST as previewCompany } from '@/app/api/companies/preview/route'
-import { DELETE as deleteCompany } from '@/app/api/companies/[companyId]/route'
+import { DELETE as deleteCompany, PUT as editCompany } from '@/app/api/companies/[companyId]/route'
 import { ApiError } from '@/lib/api/errors'
 import { requireAuthenticatedUser } from '@/lib/auth'
 import { CIMA_CASE_STUDIES } from '@/lib/company-analysis/cima-case-studies'
@@ -11,6 +11,7 @@ import {
   createUserCompany,
   deleteUserCompany,
   listCompanySummaries,
+  updateUserCompany,
 } from '@/lib/company-analysis/persistence'
 import { statementsFromCaseStudy } from '@/lib/company-analysis/statement-analysis'
 import { buildStatementTemplate } from '@/lib/company-analysis/statement-template'
@@ -24,12 +25,14 @@ jest.mock('@/lib/company-analysis/persistence', () => ({
   createUserCompany: jest.fn(),
   deleteUserCompany: jest.fn(),
   listCompanySummaries: jest.fn(),
+  updateUserCompany: jest.fn(),
 }))
 
 const mockRequireAuthenticatedUser = jest.mocked(requireAuthenticatedUser)
 const mockCreateUserCompany = jest.mocked(createUserCompany)
 const mockDeleteUserCompany = jest.mocked(deleteUserCompany)
 const mockListCompanySummaries = jest.mocked(listCompanySummaries)
+const mockUpdateUserCompany = jest.mocked(updateUserCompany)
 
 const ressett = statementsFromCaseStudy(CIMA_CASE_STUDIES.find((study) => study.name === 'Ressett')!)
 const goodCsv = buildStatementTemplate(ressett.years)
@@ -122,6 +125,54 @@ describe('GET /api/companies', () => {
 
     expect(response.status).toBe(200)
     expect(mockListCompanySummaries).toHaveBeenCalledWith('user-1')
+  })
+})
+
+describe('PUT /api/companies/[companyId]', () => {
+  const companyId = '0b8f3a52-6a3e-4c1b-9d7e-2f4a5b6c7d8e'
+  const updated = { id: companyId, name: 'Kiwi Repairs' } as Awaited<ReturnType<typeof updateUserCompany>>
+
+  function editRequest(fields: Record<string, string>, csv?: string, id = companyId) {
+    const body = new FormData()
+    if (csv !== undefined) body.set('file', new File([csv], 'new.csv', { type: 'text/csv' }))
+    for (const [key, value] of Object.entries(fields)) body.set(key, value)
+    return editCompany(new NextRequest(`http://localhost/api/companies/${id}`, { method: 'PUT', body }), {
+      params: Promise.resolve({ companyId: id }),
+    })
+  }
+
+  it('saves details only when no file is sent', async () => {
+    mockUpdateUserCompany.mockResolvedValue(updated)
+    const response = await editRequest(details)
+
+    expect(response.status).toBe(200)
+    expect(mockUpdateUserCompany).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user-1', companyId, years: null, fileName: null })
+    )
+  })
+
+  it('checks a new file and passes its figures on', async () => {
+    mockUpdateUserCompany.mockResolvedValue(updated)
+    const response = await editRequest(details, goodCsv)
+
+    expect(response.status).toBe(200)
+    expect(mockUpdateUserCompany).toHaveBeenCalledWith(
+      expect.objectContaining({ years: ressett.years, fileName: 'new.csv' })
+    )
+  })
+
+  it('refuses a new file with failed checks unless confirmed', async () => {
+    const response = await editRequest(details, unbalancedCsv)
+
+    expect(response.status).toBe(400)
+    expect((await response.json()).error.details).toHaveProperty('failedChecks')
+    expect(mockUpdateUserCompany).not.toHaveBeenCalled()
+  })
+
+  it('answers 404 for a malformed id', async () => {
+    const response = await editRequest(details, undefined, 'not-an-id')
+    expect(response.status).toBe(404)
+    expect(mockUpdateUserCompany).not.toHaveBeenCalled()
   })
 })
 

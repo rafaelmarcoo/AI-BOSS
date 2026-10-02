@@ -45,6 +45,8 @@ interface ApiPayload<T> {
 interface AddCompanyDialogProps {
   open: boolean;
   companies: CompanySummary[];
+  editing?: CompanySummary | null;
+  initialFile?: File | null;
   onClose: () => void;
   onSaved: (message: string) => void;
 }
@@ -58,13 +60,46 @@ interface DetailsForm {
 }
 const EMPTY_DETAILS: DetailsForm = { name: "", industry: "", currency: "NZD", amountsIn: "", competitorOf: "" };
 
-export function AddCompanyDialog({ open, companies, onClose, onSaved }: AddCompanyDialogProps) {
-  const [file, setFile] = useState<File | null>(null);
+function startingDetails(editing: CompanySummary | null, companies: CompanySummary[]): DetailsForm {
+  if (!editing) return EMPTY_DETAILS;
+  const competitor = companies.find(
+    (company) => company.id !== editing.id && editing.competitors.includes(company.name),
+  );
+  return {
+    name: editing.name,
+    industry: editing.industry ?? "",
+    currency: editing.currency,
+    amountsIn: editing.amountsIn,
+    competitorOf: competitor?.id ?? "",
+  };
+}
+
+async function fetchReview(file: File): Promise<StatementUploadReview> {
+  const body = new FormData();
+  body.set("file", file);
+  const response = await fetch("/api/companies/preview", { method: "POST", body });
+  const payload = (await response.json()) as ApiPayload<{ review: StatementUploadReview }>;
+
+  if (!response.ok || !payload.success || !payload.data) {
+    throw new Error(payload.error?.message ?? "Could not read the file.");
+  }
+  return payload.data.review;
+}
+
+export function AddCompanyDialog({
+  open,
+  companies,
+  editing = null,
+  initialFile = null,
+  onClose,
+  onSaved,
+}: AddCompanyDialogProps) {
+  const [file, setFile] = useState<File | null>(initialFile);
   const [review, setReview] = useState<StatementUploadReview | null>(null);
-  const [details, setDetails] = useState<DetailsForm>(EMPTY_DETAILS);
+  const [details, setDetails] = useState<DetailsForm>(() => startingDetails(editing, companies));
   const [confirmedChecks, setConfirmedChecks] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [checking, setChecking] = useState(false);
+  const [checking, setChecking] = useState(Boolean(initialFile));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const errorRef = useRef<HTMLDivElement>(null);
@@ -72,6 +107,18 @@ export function AddCompanyDialog({ open, companies, onClose, onSaved }: AddCompa
   useEffect(() => {
     if (error) errorRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [error]);
+
+  useEffect(() => {
+    if (!initialFile) return;
+    let cancelled = false;
+    fetchReview(initialFile)
+      .then((result) => !cancelled && setReview(result))
+      .catch((requestError) => !cancelled && setError(requestError instanceof Error ? requestError.message : "Could not read the file."))
+      .finally(() => !cancelled && setChecking(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [initialFile]);
 
   const busy = checking || saving;
 
@@ -82,7 +129,7 @@ export function AddCompanyDialog({ open, companies, onClose, onSaved }: AddCompa
   const reset = () => {
     setFile(null);
     setReview(null);
-    setDetails(EMPTY_DETAILS);
+    setDetails(startingDetails(editing, companies));
     setConfirmedChecks(false);
     setFieldErrors({});
     setError(null);
@@ -105,21 +152,19 @@ export function AddCompanyDialog({ open, companies, onClose, onSaved }: AddCompa
     setChecking(true);
 
     try {
-      const body = new FormData();
-      body.set("file", chosen);
-      const response = await fetch("/api/companies/preview", { method: "POST", body });
-      const payload = (await response.json()) as ApiPayload<{ review: StatementUploadReview }>;
-
-      if (!response.ok || !payload.success || !payload.data) {
-        throw new Error(payload.error?.message ?? "Could not read the file.");
-      }
-
-      setReview(payload.data.review);
+      setReview(await fetchReview(chosen));
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Could not read the file.");
     } finally {
       setChecking(false);
     }
+  };
+
+  const keepCurrentFigures = () => {
+    setFile(null);
+    setReview(null);
+    setConfirmedChecks(false);
+    setError(null);
   };
 
   const updateDetail = <K extends keyof DetailsForm>(key: K, value: DetailsForm[K]) => {
@@ -132,7 +177,7 @@ export function AddCompanyDialog({ open, companies, onClose, onSaved }: AddCompa
   };
 
   const save = async () => {
-    if (!file) return;
+    if (!file && !editing) return;
 
     setSaving(true);
     setError(null);
@@ -140,7 +185,7 @@ export function AddCompanyDialog({ open, companies, onClose, onSaved }: AddCompa
 
     try {
       const body = new FormData();
-      body.set("file", file);
+      if (file) body.set("file", file);
       body.set("name", details.name);
       body.set("industry", details.industry);
       body.set("currency", details.currency);
@@ -148,7 +193,9 @@ export function AddCompanyDialog({ open, companies, onClose, onSaved }: AddCompa
       if (details.competitorOf) body.set("competitorOf", details.competitorOf);
       body.set("confirmedChecks", String(confirmedChecks));
 
-      const response = await fetch("/api/companies", { method: "POST", body });
+      const response = editing
+        ? await fetch(`/api/companies/${encodeURIComponent(editing.id)}`, { method: "PUT", body })
+        : await fetch("/api/companies", { method: "POST", body });
       const payload = (await response.json()) as ApiPayload<unknown>;
 
       if (!response.ok || !payload.success) {
@@ -162,7 +209,7 @@ export function AddCompanyDialog({ open, companies, onClose, onSaved }: AddCompa
       }
 
       reset();
-      onSaved(payload.message ?? "Company added.");
+      onSaved(payload.message ?? (editing ? "Changes saved." : "Company added."));
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Could not save the company.");
     } finally {
@@ -170,10 +217,13 @@ export function AddCompanyDialog({ open, companies, onClose, onSaved }: AddCompa
     }
   };
 
+  const fileReady =
+    file === null
+      ? Boolean(editing)
+      : Boolean(review) && review!.errors.length === 0 && (review!.failedChecks.length === 0 || confirmedChecks);
+
   const canSave =
-    Boolean(file && review) &&
-    review!.errors.length === 0 &&
-    (review!.failedChecks.length === 0 || confirmedChecks) &&
+    fileReady &&
     details.name.trim() !== "" &&
     details.currency.trim() !== "" &&
     details.amountsIn !== "" &&
@@ -181,36 +231,48 @@ export function AddCompanyDialog({ open, companies, onClose, onSaved }: AddCompa
 
   return (
     <Dialog open={open} onClose={close} fullWidth maxWidth="md" scroll="paper">
-      <DialogTitle>Add a company</DialogTitle>
+      <DialogTitle>{editing ? `Edit ${editing.name}` : "Add a company"}</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
-          <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
-            Upload the company&apos;s financial statements as a CSV file, using the template. Nothing is
-            saved until you press Save.
-          </Typography>
+          {editing ? (
+            <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
+              Change any details below. To replace the figures, choose a new file: it gets the same checks
+              as a new company. Anything you don&apos;t change stays as it is.
+            </Typography>
+          ) : (
+            <>
+              <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
+                Upload the company&apos;s financial statements as a CSV file, using the template. Nothing is
+                saved until you press Save.
+              </Typography>
 
-          <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
-            Don&apos;t have the template? Download the{" "}
-            <Link component="button" type="button" onClick={() => downloadTemplate("blank")}>blank template</Link>
-            {" "}or see{" "}
-            <Link component="button" type="button" onClick={() => downloadTemplate("example")}>an example</Link>.
-          </Typography>
+              <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
+                Don&apos;t have the template? Download the{" "}
+                <Link component="button" type="button" onClick={() => downloadTemplate("blank")}>blank template</Link>
+                {" "}or see{" "}
+                <Link component="button" type="button" onClick={() => downloadTemplate("example")}>an example</Link>.
+              </Typography>
+            </>
+          )}
 
           <Stack direction="row" spacing={1.5} alignItems="center">
             <Button
               component="label"
-              variant={review ? "outlined" : "contained"}
+              variant={review || editing ? "outlined" : "contained"}
               startIcon={<UploadFileRoundedIcon />}
               disabled={busy}
               sx={{ borderRadius: 2, whiteSpace: "nowrap" }}
             >
-              {file ? "Choose a different file" : "Choose CSV file"}
+              {file ? "Choose a different file" : editing ? "Choose a new file (optional)" : "Choose CSV file"}
               <input hidden type="file" accept=".csv,text/csv" onChange={(event) => void chooseFile(event)} />
             </Button>
             {file ? (
               <Typography variant="body2" sx={{ color: dashboardTokens.textMuted, overflowWrap: "anywhere" }}>
                 {file.name}
               </Typography>
+            ) : null}
+            {editing && file && !busy ? (
+              <Link component="button" type="button" onClick={keepCurrentFigures}>Keep current figures</Link>
             ) : null}
           </Stack>
 
@@ -223,7 +285,7 @@ export function AddCompanyDialog({ open, companies, onClose, onSaved }: AddCompa
 
           {review ? <ReviewSummary review={review} currency={details.currency} amountsIn={details.amountsIn} /> : null}
 
-          {review && review.errors.length === 0 ? (
+          {editing || (review && review.errors.length === 0) ? (
             <Stack spacing={2}>
               <Typography variant="subtitle1" fontWeight={700}>Company details</Typography>
 
@@ -285,7 +347,7 @@ export function AddCompanyDialog({ open, companies, onClose, onSaved }: AddCompa
                   onChange={(event) => updateDetail("competitorOf", event.target.value)}
                 >
                   <MenuItem value="">No competitor yet</MenuItem>
-                  {companies.map((company) => (
+                  {companies.filter((company) => company.id !== editing?.id).map((company) => (
                     <MenuItem key={company.id} value={company.id}>{company.name}</MenuItem>
                   ))}
                 </Select>
@@ -294,13 +356,19 @@ export function AddCompanyDialog({ open, companies, onClose, onSaved }: AddCompa
                 </FormHelperText>
               </FormControl>
 
-              {review.failedChecks.length > 0 ? (
+              {review && review.failedChecks.length > 0 ? (
                 <FormControlLabel
                   control={
                     <Checkbox checked={confirmedChecks} onChange={(event) => setConfirmedChecks(event.target.checked)} />
                   }
                   label="I've checked these figures against the original statements and they're correct."
                 />
+              ) : null}
+
+              {editing && review && review.errors.length === 0 ? (
+                <Alert severity="info">
+                  Saving replaces all of {editing.name}&apos;s saved figures with the figures in this file.
+                </Alert>
               ) : null}
             </Stack>
           ) : null}
@@ -310,9 +378,9 @@ export function AddCompanyDialog({ open, companies, onClose, onSaved }: AddCompa
       </DialogContent>
       <DialogActions>
         <Button onClick={close} disabled={busy}>Cancel</Button>
-        {review && review.errors.length === 0 ? (
+        {editing || (review && review.errors.length === 0) ? (
           <Button variant="contained" disabled={!canSave} onClick={() => void save()}>
-            {saving ? "Saving…" : "Save company"}
+            {saving ? "Saving…" : editing ? "Save changes" : "Save company"}
           </Button>
         ) : null}
       </DialogActions>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import {
   Alert,
   Box,
@@ -21,6 +21,8 @@ import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
 import BusinessCenterOutlinedIcon from "@mui/icons-material/BusinessCenterOutlined";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import type { CompanySummary } from "@/lib/company-analysis/persistence";
 import { dashboardTokens } from "@/app/theme";
 import { downloadCompanyFigures, downloadStatementTemplate, type TemplateKind } from "@/lib/company-analysis/download-template";
@@ -37,7 +39,31 @@ export function CompaniesWorkspace() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
+  const [dialog, setDialog] = useState<{ key: number; editing: CompanySummary | null; file: File | null }>({
+    key: 0,
+    editing: null,
+    file: null,
+  });
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const newFiguresInput = useRef<HTMLInputElement>(null);
+  const newFiguresFor = useRef<CompanySummary | null>(null);
+
+  const openDialog = (editing: CompanySummary | null, file: File | null = null) => {
+    setNotice(null);
+    setDialog((current) => ({ key: current.key + 1, editing, file }));
+    setDialogOpen(true);
+  };
+
+  const chooseNewFigures = (company: CompanySummary) => {
+    newFiguresFor.current = company;
+    newFiguresInput.current?.click();
+  };
+
+  const newFiguresChosen = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (file && newFiguresFor.current) openDialog(newFiguresFor.current, file);
+  };
   const [companyToDelete, setCompanyToDelete] = useState<CompanySummary | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [templateMenu, setTemplateMenu] = useState<HTMLElement | null>(null);
@@ -88,7 +114,7 @@ export function CompaniesWorkspace() {
   }, []);
 
   const companySaved = (message: string) => {
-    setAdding(false);
+    setDialogOpen(false);
     setNotice(message);
     void loadCompanies();
   };
@@ -147,7 +173,7 @@ export function CompaniesWorkspace() {
           <Button variant="outlined" startIcon={<DownloadRoundedIcon />} onClick={(event) => setTemplateMenu(event.currentTarget)} sx={{ borderRadius: 2, whiteSpace: "nowrap" }}>
             Template
           </Button>
-          <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => { setNotice(null); setAdding(true); }} sx={{ borderRadius: 2, whiteSpace: "nowrap" }}>
+          <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => openDialog(null)} sx={{ borderRadius: 2, whiteSpace: "nowrap" }}>
             Add company
           </Button>
         </Stack>
@@ -208,6 +234,24 @@ export function CompaniesWorkspace() {
                   </Stack>
                 </Stack>
                 <Stack direction={{ xs: "row", sm: "column" }} spacing={0.5} sx={{ alignSelf: { xs: "flex-start", sm: "center" }, flex: "0 0 auto" }}>
+                  {company.isOwn ? (
+                    <>
+                      <Button
+                        startIcon={<UploadFileRoundedIcon />}
+                        onClick={() => chooseNewFigures(company)}
+                        sx={{ borderRadius: 2, px: 1.25, whiteSpace: "nowrap", justifyContent: "flex-start" }}
+                      >
+                        Upload new figures
+                      </Button>
+                      <Button
+                        startIcon={<EditRoundedIcon />}
+                        onClick={() => openDialog(company)}
+                        sx={{ borderRadius: 2, px: 1.25, whiteSpace: "nowrap", justifyContent: "flex-start" }}
+                      >
+                        Edit details
+                      </Button>
+                    </>
+                  ) : null}
                   <Button
                     startIcon={<DownloadRoundedIcon />}
                     disabled={downloadingId === company.id}
@@ -233,10 +277,15 @@ export function CompaniesWorkspace() {
         </Stack>
       )}
 
+      <input ref={newFiguresInput} hidden type="file" accept=".csv,text/csv" onChange={newFiguresChosen} />
+
       <AddCompanyDialog
-        open={adding}
+        key={dialog.key}
+        open={dialogOpen}
         companies={sortedCompanies}
-        onClose={() => setAdding(false)}
+        editing={dialog.editing}
+        initialFile={dialog.file}
+        onClose={() => setDialogOpen(false)}
         onSaved={companySaved}
       />
 

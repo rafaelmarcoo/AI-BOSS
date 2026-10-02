@@ -56,10 +56,13 @@ export function planNewCompany(params: {
   details: CompanyDetails
   visibleCompanies: AnalysedCompany[]
   newGroupId: string
+  editingId?: string
 }) {
   const { details, visibleCompanies } = params
   const wanted = normalizeCompanyName(details.name)
-  const clash = visibleCompanies.find((company) => normalizeCompanyName(company.name) === wanted)
+  const clash = visibleCompanies.find(
+    (company) => company.id !== params.editingId && normalizeCompanyName(company.name) === wanted
+  )
 
   if (clash) {
     throw new ApiError(
@@ -72,6 +75,11 @@ export function planNewCompany(params: {
   }
 
   let peerGroup = params.newGroupId
+  if (details.competitorOf && details.competitorOf === params.editingId) {
+    throw new ApiError(400, 'VALIDATION_ERROR', "A company can't compete with itself.", {
+      competitorOf: 'Pick another company from the list.',
+    })
+  }
   if (details.competitorOf) {
     const competitor = visibleCompanies.find((company) => company.id === details.competitorOf)
     if (!competitor?.peer_group) {

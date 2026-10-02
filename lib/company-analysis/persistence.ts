@@ -155,6 +155,98 @@ export async function createUserCompany(params: {
   return company as AnalysedCompany
 }
 
+export async function updateUserCompany(params: {
+  userId: string
+  companyId: string
+  details: CompanyDetails
+  years: StatementYear[] | null
+  fileName: string | null
+}): Promise<AnalysedCompany> {
+  const visibleCompanies = await listVisibleCompanies(params.userId)
+  const current = visibleCompanies.find(
+    (company) => company.id === params.companyId && company.user_id === params.userId
+  )
+  if (!current) {
+    throw new ApiError(404, 'NOT_FOUND', "Couldn't find that company. You can only edit companies you added.")
+  }
+
+  const { peerGroup } = planNewCompany({
+    details: params.details,
+    visibleCompanies,
+    newGroupId: `user-${randomUUID()}`,
+    editingId: params.companyId,
+  })
+
+  const supabase = createAdminSupabaseClient()
+  const { data: company, error } = await supabase
+    .from('analysed_companies')
+    .update({
+      name: params.details.name,
+      industry: params.details.industry,
+      peer_group: peerGroup,
+      currency: params.details.currency,
+      amounts_in: params.details.amountsIn,
+    })
+    .eq('id', params.companyId)
+    .eq('user_id', params.userId)
+    .select('*')
+    .single()
+
+  if (error || !company) {
+    if (error?.code === '23505') {
+      throw new ApiError(409, 'CONFLICT', `You already have a company called ${params.details.name}.`)
+    }
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Could not save the changes.')
+  }
+
+  if (!params.years) return company as AnalysedCompany
+
+  await replaceStatementLines(params.companyId, params.years)
+
+  const { data: updated } = await supabase
+    .from('analysed_companies')
+    .update({ source: `Uploaded by you: ${params.fileName}` })
+    .eq('id', params.companyId)
+    .eq('user_id', params.userId)
+    .select('*')
+    .single()
+
+  return (updated ?? company) as AnalysedCompany
+}
+
+async function replaceStatementLines(companyId: string, years: StatementYear[]) {
+  const supabase = createAdminSupabaseClient()
+  const previous = await listStatementLines(companyId)
+
+  const { error: deleteError } = await supabase.from('company_statement_lines').delete().eq('company_id', companyId)
+  if (deleteError) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Could not replace the figures, so the old ones were kept. Please try again.')
+  }
+
+  const rows = linesFromStatements(years).map((row) => ({ ...row, company_id: companyId }))
+  const { error: insertError } = await supabase.from('company_statement_lines').insert(rows)
+  if (!insertError) return
+
+  const restore = previous.map((line) => ({
+    company_id: line.company_id,
+    fiscal_year_end: line.fiscal_year_end,
+    line_key: line.line_key,
+    segment: line.segment,
+    value: line.value,
+    source_page: line.source_page,
+  }))
+  const { error: restoreError } = await supabase.from('company_statement_lines').insert(restore)
+  if (restoreError) {
+    console.error('Could not restore company figures after a failed replace', { companyId, restoreError })
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Could not save the new figures, and the old figures could not be put back. Please upload the file again.'
+    )
+  }
+  throw new ApiError(500, 'INTERNAL_ERROR', 'Could not save the new figures, so the old ones were kept. Please try again.')
+}
+
 export async function deleteUserCompany(userId: string, companyId: string) {
   const supabase = createAdminSupabaseClient()
   const { data, error } = await supabase

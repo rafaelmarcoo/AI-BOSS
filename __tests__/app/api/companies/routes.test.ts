@@ -4,10 +4,12 @@ import { NextRequest } from 'next/server'
 import { GET as listCompanies, POST as saveCompany } from '@/app/api/companies/route'
 import { POST as previewCompany } from '@/app/api/companies/preview/route'
 import { DELETE as deleteCompany, PUT as editCompany } from '@/app/api/companies/[companyId]/route'
+import { POST as copyCompany } from '@/app/api/companies/[companyId]/copy/route'
 import { ApiError } from '@/lib/api/errors'
 import { requireAuthenticatedUser } from '@/lib/auth'
 import { CIMA_CASE_STUDIES } from '@/lib/company-analysis/cima-case-studies'
 import {
+  copyCompanyForUser,
   createUserCompany,
   deleteUserCompany,
   listCompanySummaries,
@@ -26,6 +28,7 @@ jest.mock('@/lib/company-analysis/persistence', () => ({
   deleteUserCompany: jest.fn(),
   listCompanySummaries: jest.fn(),
   updateUserCompany: jest.fn(),
+  copyCompanyForUser: jest.fn(),
 }))
 
 const mockRequireAuthenticatedUser = jest.mocked(requireAuthenticatedUser)
@@ -33,6 +36,7 @@ const mockCreateUserCompany = jest.mocked(createUserCompany)
 const mockDeleteUserCompany = jest.mocked(deleteUserCompany)
 const mockListCompanySummaries = jest.mocked(listCompanySummaries)
 const mockUpdateUserCompany = jest.mocked(updateUserCompany)
+const mockCopyCompanyForUser = jest.mocked(copyCompanyForUser)
 
 const ressett = statementsFromCaseStudy(CIMA_CASE_STUDIES.find((study) => study.name === 'Ressett')!)
 const goodCsv = buildStatementTemplate(ressett.years)
@@ -173,6 +177,28 @@ describe('PUT /api/companies/[companyId]', () => {
     const response = await editRequest(details, undefined, 'not-an-id')
     expect(response.status).toBe(404)
     expect(mockUpdateUserCompany).not.toHaveBeenCalled()
+  })
+})
+
+describe('POST /api/companies/[companyId]/copy', () => {
+  const companyId = '0b8f3a52-6a3e-4c1b-9d7e-2f4a5b6c7d8e'
+  const copyRequest = (id: string) =>
+    copyCompany(new NextRequest(`http://localhost/api/companies/${id}/copy`, { method: 'POST' }), {
+      params: Promise.resolve({ companyId: id }),
+    })
+
+  it("copies the company for the signed-in user", async () => {
+    mockCopyCompanyForUser.mockResolvedValue({ id: 'copy-id', name: 'Ressett (copy)' } as Awaited<ReturnType<typeof copyCompanyForUser>>)
+    const response = await copyRequest(companyId)
+
+    expect(response.status).toBe(201)
+    expect((await response.json()).message).toBe('Ressett (copy) was added to your companies. You can edit it.')
+    expect(mockCopyCompanyForUser).toHaveBeenCalledWith('user-1', companyId)
+  })
+
+  it('answers 404 for a malformed id', async () => {
+    expect((await copyRequest('not-an-id')).status).toBe(404)
+    expect(mockCopyCompanyForUser).not.toHaveBeenCalled()
   })
 })
 

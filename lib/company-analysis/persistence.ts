@@ -2,7 +2,7 @@ import { ApiError } from '@/lib/api/errors'
 import { randomUUID } from 'node:crypto'
 import { createAdminSupabaseClient } from '@/lib/supabase'
 import { planNewCompany, type CompanyDetails } from '@/lib/company-analysis/company-details'
-import { findPeers } from '@/lib/company-analysis/lookup'
+import { findPeers, normalizeCompanyName } from '@/lib/company-analysis/lookup'
 import { linesFromStatements, type StatementYear } from '@/lib/company-analysis/statement-analysis'
 import type { AnalysedCompany, CompanyStatementLine } from '@/types/database'
 import {
@@ -245,6 +245,64 @@ async function replaceStatementLines(companyId: string, years: StatementYear[]) 
     )
   }
   throw new ApiError(500, 'INTERNAL_ERROR', 'Could not save the new figures, so the old ones were kept. Please try again.')
+}
+
+export async function copyCompanyForUser(userId: string, companyId: string): Promise<AnalysedCompany> {
+  const visibleCompanies = await listVisibleCompanies(userId)
+  const original = visibleCompanies.find((company) => company.id === companyId)
+  if (!original) throw new ApiError(404, 'NOT_FOUND', "Couldn't find that company.")
+
+  const lines = await listStatementLines(original.id)
+  const supabase = createAdminSupabaseClient()
+  const { data: copy, error } = await supabase
+    .from('analysed_companies')
+    .insert({
+      user_id: userId,
+      name: copyName(original.name, visibleCompanies),
+      industry: original.industry,
+      peer_group: original.peer_group ?? `user-${randomUUID()}`,
+      currency: original.currency,
+      amounts_in: original.amounts_in,
+      description: original.description,
+      source: `Your copy of ${original.name} (${original.source})`,
+    })
+    .select('*')
+    .single()
+
+  if (error || !copy) {
+    if (error?.code === '23505') {
+      throw new ApiError(409, 'CONFLICT', 'A company with that name was just added. Please try again.')
+    }
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Could not copy the company.')
+  }
+
+  if (lines.length === 0) return copy as AnalysedCompany
+
+  const rows = lines.map((line) => ({
+    company_id: copy.id,
+    fiscal_year_end: line.fiscal_year_end,
+    line_key: line.line_key,
+    segment: line.segment,
+    value: line.value,
+    source_page: line.source_page,
+  }))
+  const { error: linesError } = await supabase.from('company_statement_lines').insert(rows)
+
+  if (linesError) {
+    await supabase.from('analysed_companies').delete().eq('id', copy.id).eq('user_id', userId)
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Could not copy the figures, so nothing was saved. Please try again.')
+  }
+
+  return copy as AnalysedCompany
+}
+
+function copyName(name: string, companies: AnalysedCompany[]) {
+  const taken = new Set(companies.map((company) => normalizeCompanyName(company.name)))
+  for (let number = 1; ; number += 1) {
+    const suffix = number === 1 ? ' (copy)' : ` (copy ${number})`
+    const candidate = name.slice(0, 120 - suffix.length) + suffix
+    if (!taken.has(normalizeCompanyName(candidate))) return candidate
+  }
 }
 
 export async function deleteUserCompany(userId: string, companyId: string) {

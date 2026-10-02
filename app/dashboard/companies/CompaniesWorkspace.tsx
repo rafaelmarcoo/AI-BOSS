@@ -19,6 +19,7 @@ import {
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
 import BusinessCenterOutlinedIcon from "@mui/icons-material/BusinessCenterOutlined";
+import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
@@ -68,6 +69,25 @@ export function CompaniesWorkspace() {
   const [deleting, setDeleting] = useState(false);
   const [templateMenu, setTemplateMenu] = useState<HTMLElement | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [copyingId, setCopyingId] = useState<string | null>(null);
+
+  const copyCompany = async (company: CompanySummary) => {
+    setCopyingId(company.id);
+    setNotice(null);
+    try {
+      const response = await fetch(`/api/companies/${encodeURIComponent(company.id)}/copy`, { method: "POST" });
+      const payload = (await response.json()) as { success: boolean; message?: string; error?: { message?: string } };
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error?.message ?? "Could not copy the company.");
+      }
+      setNotice(payload.message ?? `${company.name} was copied.`);
+      void loadCompanies();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Could not copy the company.");
+    } finally {
+      setCopyingId(null);
+    }
+  };
 
   const downloadFigures = async (company: CompanySummary) => {
     setDownloadingId(company.id);
@@ -211,7 +231,7 @@ export function CompaniesWorkspace() {
                     </Typography>
                     <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
                       <Chip
-                        label={company.isOwn ? "Added by you" : "Case study"}
+                        label={company.isOwn ? "Added by you" : "Shared case study (read-only)"}
                         size="small"
                         variant="outlined"
                         sx={company.isOwn ? ownChipStyles : caseStudyChipStyles}
@@ -251,6 +271,16 @@ export function CompaniesWorkspace() {
                         Edit details
                       </Button>
                     </>
+                  ) : null}
+                  {!company.isOwn ? (
+                    <Button
+                      startIcon={<ContentCopyRoundedIcon />}
+                      disabled={copyingId === company.id}
+                      onClick={() => void copyCompany(company)}
+                      sx={{ borderRadius: 2, px: 1.25, whiteSpace: "nowrap", justifyContent: "flex-start" }}
+                    >
+                      {copyingId === company.id ? "Copying…" : "Copy to my companies"}
+                    </Button>
                   ) : null}
                   <Button
                     startIcon={<DownloadRoundedIcon />}

@@ -2,51 +2,12 @@ import { CIMA_CASE_STUDIES } from '@/lib/company-analysis/cima-case-studies'
 import type { CompanyDetails } from '@/lib/company-analysis/company-details'
 import { updateUserCompany } from '@/lib/company-analysis/persistence'
 import { linesFromStatements, statementsFromCaseStudy } from '@/lib/company-analysis/statement-analysis'
-import { createAdminSupabaseClient } from '@/lib/supabase'
 import type { AnalysedCompany } from '@/types/database'
+import { fakeDatabase, type Operation, type Result } from '@/test-support/fake-supabase'
 
 jest.mock('@/lib/supabase', () => ({
   createAdminSupabaseClient: jest.fn(),
 }))
-
-interface Operation {
-  table: string
-  action: 'select' | 'insert' | 'update' | 'delete'
-  payload?: unknown
-  filters: Array<[string, unknown]>
-}
-
-type Result = { data?: unknown; error?: { code?: string; message: string } | null }
-
-function fakeDatabase(respond: (operation: Operation, operations: Operation[]) => Result) {
-  const operations: Operation[] = []
-  const client = {
-    from(table: string) {
-      const operation: Operation = { table, action: 'select', filters: [] }
-      const builder = {
-        select: () => builder,
-        or: () => builder,
-        order: () => builder,
-        single: () => builder,
-        eq: (column: string, value: unknown) => {
-          operation.filters.push([column, value])
-          return builder
-        },
-        insert: (payload: unknown) => Object.assign(operation, { action: 'insert', payload }) && builder,
-        update: (payload: unknown) => Object.assign(operation, { action: 'update', payload }) && builder,
-        delete: () => Object.assign(operation, { action: 'delete' }) && builder,
-        then: (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) => {
-          operations.push(operation)
-          const result = respond(operation, operations)
-          return Promise.resolve({ data: result.data ?? null, error: result.error ?? null }).then(resolve, reject)
-        },
-      }
-      return builder
-    },
-  }
-  jest.mocked(createAdminSupabaseClient).mockReturnValue(client as unknown as ReturnType<typeof createAdminSupabaseClient>)
-  return operations
-}
 
 const companyId = '0b8f3a52-6a3e-4c1b-9d7e-2f4a5b6c7d8e'
 const kiwi: AnalysedCompany = {

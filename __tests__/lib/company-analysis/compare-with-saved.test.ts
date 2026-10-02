@@ -28,6 +28,12 @@ describe('compareWithSaved', () => {
       [cellKey('Operating profit', '2024-12-31')]: 74.1,
     })
     expect(describeComparison(comparison)).toBe('4 figures changed.')
+    expect(comparison.changes.map(({ label, was, now }) => `${label}: ${was} → ${now}`)).toEqual([
+      'Revenue: 237.2 → 247.2',
+      'Marketing: 26.8 → 26.5',
+      'Administrative expenses: 58.6 → 59.6',
+      'Operating profit: 74.1 → 78.1',
+    ])
   })
 
   it('shows a new year as added rather than as changed cells', () => {

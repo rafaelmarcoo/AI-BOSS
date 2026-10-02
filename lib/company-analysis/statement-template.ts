@@ -22,6 +22,7 @@ function csvCell(value: string) {
 }
 
 export interface StatementTableRow {
+  key: StatementLineKey
   label: string
   values: Array<number | null>
   isCost: boolean
@@ -36,6 +37,7 @@ export function statementTableRows(years: StatementYear[]): StatementTableRow[] 
   for (const key of companyKeys) {
     if (years.every((year) => year.lines[key] === undefined)) continue
     rows.push({
+      key,
       label: STATEMENT_LINE_LABELS[key],
       values: years.map((year) => year.lines[key] ?? null),
       isCost: COST_KEYS.has(key),
@@ -46,12 +48,14 @@ export function statementTableRows(years: StatementYear[]): StatementTableRow[] 
   for (const name of streamNames) {
     const streamIn = (year: StatementYear) => year.streams.find((stream) => stream.name === name)
     rows.push({
+      key: 'segment_revenue',
       label: `Revenue stream: ${name}`,
       values: years.map((year) => streamIn(year)?.revenue ?? null),
       isCost: false,
     })
     if (years.some((year) => streamIn(year)?.directCosts != null)) {
       rows.push({
+        key: 'segment_direct_costs',
         label: `Direct costs: ${name}`,
         values: years.map((year) => streamIn(year)?.directCosts ?? null),
         isCost: true,

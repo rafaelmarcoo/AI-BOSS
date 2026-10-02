@@ -35,6 +35,7 @@ import type { StatementUploadReview } from "@/lib/company-analysis/statement-upl
 import { statementTableRows } from "@/lib/company-analysis/statement-template";
 import { cellKey, compareWithSaved, describeComparison, type SavedComparison } from "@/lib/company-analysis/compare-with-saved";
 import type { StatementYear } from "@/lib/company-analysis/statement-analysis";
+import { yearOnYearChange, type YearChange } from "@/lib/company-analysis/year-change";
 import { dashboardTokens } from "@/app/theme";
 import { downloadStatementTemplate, type TemplateKind } from "@/lib/company-analysis/download-template";
 
@@ -510,7 +511,32 @@ function formatMoney(amount: number, currency: string) {
   return currency.endsWith("$") ? `${currency}${text}` : `${currency} ${text}`;
 }
 
+const MAX_LISTED_CHANGES = 10;
 const CHANGED_BACKGROUND = "rgba(245,158,11,0.18)";
+
+const TONE_STYLES = {
+  good: { color: "#86efac", bgcolor: "rgba(34,197,94,0.14)" },
+  bad: { color: "#fca5a5", bgcolor: "rgba(239,68,68,0.14)" },
+  neutral: { color: dashboardTokens.textMuted, bgcolor: "rgba(255,255,255,0.06)" },
+} as const;
+
+function ChangeBadge({ change, isCost }: { change: YearChange; isCost: boolean }) {
+  const arrow = change.direction === "up" ? "▲" : change.direction === "down" ? "▼" : "–";
+  const sign = change.amount > 0 ? "+" : change.amount < 0 ? "-" : "";
+  // Costs are stored positive, so the amount reads as "this cost went up by".
+  const amount = `${sign}${Math.abs(change.amount).toLocaleString("en-NZ", { maximumFractionDigits: 4 })}`;
+  const percent = change.percent === null || change.direction === "flat" ? "" : ` (${change.percent > 0 ? "+" : ""}${change.percent}%)`;
+
+  return (
+    <Box
+      component="span"
+      title={isCost ? "A cost: up means it grew" : undefined}
+      sx={{ ...TONE_STYLES[change.tone], display: "inline-block", px: 0.75, py: 0.25, borderRadius: 1, whiteSpace: "nowrap", fontWeight: 600 }}
+    >
+      {arrow} {change.direction === "flat" ? "no change" : `${amount}${percent}`}
+    </Box>
+  );
+}
 const CHANGED_TEXT = "#fcd34d";
 
 function ChangeSummary({ comparison }: { comparison: SavedComparison }) {
@@ -528,8 +554,22 @@ function ChangeSummary({ comparison }: { comparison: SavedComparison }) {
           <Box component="span" sx={{ bgcolor: CHANGED_BACKGROUND, color: CHANGED_TEXT, px: 0.5, borderRadius: 0.5 }}>
             highlighted
           </Box>{" "}
-          in the table, with the saved figure underneath.
+          in the table, with the saved figure underneath:
         </Typography>
+      ) : null}
+      {comparison.changes.length > 0 ? (
+        <Box component="ul" sx={{ m: 0, mt: 0.5, pl: 2.5 }}>
+          {comparison.changes.slice(0, MAX_LISTED_CHANGES).map((change) => (
+            <li key={cellKey(change.label, change.fiscalYearEnd)}>
+              {change.label} ({formatYear(change.fiscalYearEnd)}):{" "}
+              {change.was === null ? "blank" : formatValue(change.was, change.isCost)} →{" "}
+              <strong>{change.now === null ? "blank" : formatValue(change.now, change.isCost)}</strong>
+            </li>
+          ))}
+          {comparison.changes.length > MAX_LISTED_CHANGES ? (
+            <li>and {comparison.changes.length - MAX_LISTED_CHANGES} more, highlighted in the table.</li>
+          ) : null}
+        </Box>
       ) : null}
       {comparison.removedYears.length > 0 || comparison.removedLines.length > 0 ? (
         <Box component="ul" sx={{ m: 0, mt: 0.5, pl: 2.5 }}>
@@ -549,8 +589,19 @@ function ChangeSummary({ comparison }: { comparison: SavedComparison }) {
 
 function StatementTable({ review, comparison }: { review: StatementUploadReview; comparison: SavedComparison | null }) {
   const rows = statementTableRows(review.years);
+  // Change compares the latest year (first column) with the one before it.
+  const showChange = review.years.length >= 2;
 
   return (
+    <Stack spacing={0.75}>
+    {showChange ? (
+      <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
+        Change compares {formatYear(review.years[0].fiscalYearEnd)} with {formatYear(review.years[1].fiscalYearEnd)}.{" "}
+        <Box component="span" sx={{ color: TONE_STYLES.good.color }}>Green: better for the business.</Box>{" "}
+        <Box component="span" sx={{ color: TONE_STYLES.bad.color }}>Red: worth a look.</Box>{" "}
+        Grey: depends on context.
+      </Typography>
+    ) : null}
     <TableContainer sx={{ border: "1px solid", borderColor: dashboardTokens.border, borderRadius: 2, maxHeight: 360 }}>
       <Table size="small" stickyHeader>
         <TableHead>
@@ -564,6 +615,7 @@ function StatementTable({ review, comparison }: { review: StatementUploadReview;
                 ) : null}
               </TableCell>
             ))}
+            {showChange ? <TableCell align="right">Change</TableCell> : null}
           </TableRow>
         </TableHead>
         <TableBody>
@@ -590,11 +642,20 @@ function StatementTable({ review, comparison }: { review: StatementUploadReview;
                   </TableCell>
                 );
               })}
+              {showChange ? (
+                <TableCell align="right">
+                  {(() => {
+                    const change = yearOnYearChange(row.key, row.values[0], row.values[1]);
+                    return change ? <ChangeBadge change={change} isCost={row.isCost} /> : "–";
+                  })()}
+                </TableCell>
+              ) : null}
             </TableRow>
           ))}
         </TableBody>
       </Table>
     </TableContainer>
+    </Stack>
   );
 }
 

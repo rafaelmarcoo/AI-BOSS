@@ -3,6 +3,7 @@ import { statementTableRows } from '@/lib/company-analysis/statement-template'
 
 export interface SavedComparison {
   changed: Map<string, number | null>
+  changes: Array<{ label: string; fiscalYearEnd: string; was: number | null; now: number | null; isCost: boolean }>
   newYears: string[]
   removedYears: string[]
   removedLines: Array<{ label: string; fiscalYearEnd: string; was: number }>
@@ -24,13 +25,17 @@ export function compareWithSaved(fileYears: StatementYear[], savedYears: Stateme
   const fileYearEnds = new Set(fileYears.map((year) => year.fiscalYearEnd))
 
   const changed = new Map<string, number | null>()
+  const changes: SavedComparison['changes'] = []
   for (const row of fileRows) {
     const savedRow = savedRows.find((candidate) => candidate.label === row.label)
     fileYears.forEach((year, index) => {
       const savedIndex = savedYearIndex.get(year.fiscalYearEnd)
       if (savedIndex === undefined) return
       const was = savedRow?.values[savedIndex] ?? null
-      if (!sameFigure(row.values[index], was)) changed.set(cellKey(row.label, year.fiscalYearEnd), was)
+      if (!sameFigure(row.values[index], was)) {
+        changed.set(cellKey(row.label, year.fiscalYearEnd), was)
+        changes.push({ label: row.label, fiscalYearEnd: year.fiscalYearEnd, was, now: row.values[index], isCost: row.isCost })
+      }
     })
   }
 
@@ -47,6 +52,7 @@ export function compareWithSaved(fileYears: StatementYear[], savedYears: Stateme
 
   return {
     changed,
+    changes,
     newYears: fileYears.map((year) => year.fiscalYearEnd).filter((date) => !savedYearIndex.has(date)),
     removedYears: savedYears.map((year) => year.fiscalYearEnd).filter((date) => !fileYearEnds.has(date)),
     removedLines,

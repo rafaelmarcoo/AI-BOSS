@@ -19,6 +19,7 @@ import {
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
 import BusinessCenterOutlinedIcon from "@mui/icons-material/BusinessCenterOutlined";
+import CompareArrowsRoundedIcon from "@mui/icons-material/CompareArrowsRounded";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
@@ -190,6 +191,9 @@ export function CompaniesWorkspace() {
           </Stack>
         </Stack>
         <Stack direction="row" spacing={1} sx={{ flex: "0 0 auto" }}>
+          <Button variant="outlined" startIcon={<CompareArrowsRoundedIcon />} href="/dashboard/companies/compare" sx={{ borderRadius: 2, whiteSpace: "nowrap" }}>
+            Compare
+          </Button>
           <Button variant="outlined" startIcon={<DownloadRoundedIcon />} onClick={(event) => setTemplateMenu(event.currentTarget)} sx={{ borderRadius: 2, whiteSpace: "nowrap" }}>
             Template
           </Button>
@@ -272,6 +276,13 @@ export function CompaniesWorkspace() {
                       </Button>
                     </>
                   ) : null}
+                  <Button
+                    startIcon={<CompareArrowsRoundedIcon />}
+                    href={`/dashboard/companies/compare?first=${encodeURIComponent(company.id)}`}
+                    sx={{ borderRadius: 2, px: 1.25, whiteSpace: "nowrap", justifyContent: "flex-start" }}
+                  >
+                    Compare
+                  </Button>
                   {!company.isOwn ? (
                     <Button
                       startIcon={<ContentCopyRoundedIcon />}

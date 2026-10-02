@@ -14,7 +14,11 @@ import {
   deleteUserCompany,
   listCompanySummaries,
   updateUserCompany,
+  listVisibleCompanies,
+  listStatementLines,
 } from '@/lib/company-analysis/persistence'
+import { linesFromStatements } from '@/lib/company-analysis/statement-analysis'
+import type { AnalysedCompany, CompanyStatementLine } from '@/types/database'
 import { statementsFromCaseStudy } from '@/lib/company-analysis/statement-analysis'
 import { buildStatementTemplate } from '@/lib/company-analysis/statement-template'
 
@@ -29,6 +33,8 @@ jest.mock('@/lib/company-analysis/persistence', () => ({
   listCompanySummaries: jest.fn(),
   updateUserCompany: jest.fn(),
   copyCompanyForUser: jest.fn(),
+  listVisibleCompanies: jest.fn(),
+  listStatementLines: jest.fn(),
 }))
 
 const mockRequireAuthenticatedUser = jest.mocked(requireAuthenticatedUser)
@@ -78,6 +84,42 @@ describe('POST /api/companies/preview', () => {
     mockRequireAuthenticatedUser.mockRejectedValue(new ApiError(401, 'AUTH_REQUIRED', 'Authentication is required.'))
     const response = await previewCompany(uploadRequest('http://localhost/api/companies/preview', goodCsv))
     expect(response.status).toBe(401)
+  })
+})
+
+describe('POST /api/companies/preview when updating a company', () => {
+  const companyId = '0b8f3a52-6a3e-4c1b-9d7e-2f4a5b6c7d8e'
+  const own = { id: companyId, user_id: 'user-1', name: 'Kiwi Repairs', currency: 'NZD', amounts_in: 'millions' } as AnalysedCompany
+
+  beforeEach(() => {
+    jest.mocked(listStatementLines).mockResolvedValue(
+      linesFromStatements(ressett.years).map((line) => ({ ...line, company_id: companyId })) as CompanyStatementLine[]
+    )
+  })
+
+  it("returns the company's saved figures alongside the review", async () => {
+    jest.mocked(listVisibleCompanies).mockResolvedValue([own])
+    const response = await previewCompany(
+      uploadRequest('http://localhost/api/companies/preview', unbalancedCsv, { companyId })
+    )
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(body.data.saved).toEqual(ressett.years)
+    expect(body.data.review.years).toHaveLength(2)
+  })
+
+  it('returns no saved figures when adding a new company', async () => {
+    const body = await (await previewCompany(uploadRequest('http://localhost/api/companies/preview', goodCsv))).json()
+    expect(body.data.saved).toBeNull()
+  })
+
+  it("refuses to show another user's or a shared company's figures", async () => {
+    jest.mocked(listVisibleCompanies).mockResolvedValue([{ ...own, user_id: null }])
+    const response = await previewCompany(
+      uploadRequest('http://localhost/api/companies/preview', goodCsv, { companyId })
+    )
+    expect(response.status).toBe(404)
   })
 })
 

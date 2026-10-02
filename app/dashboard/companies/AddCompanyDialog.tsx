@@ -6,6 +6,7 @@ import {
   Box,
   Button,
   Checkbox,
+  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -32,6 +33,8 @@ import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import type { CompanySummary } from "@/lib/company-analysis/persistence";
 import type { StatementUploadReview } from "@/lib/company-analysis/statement-upload";
 import { statementTableRows } from "@/lib/company-analysis/statement-template";
+import { cellKey, compareWithSaved, describeComparison, type SavedComparison } from "@/lib/company-analysis/compare-with-saved";
+import type { StatementYear } from "@/lib/company-analysis/statement-analysis";
 import { dashboardTokens } from "@/app/theme";
 import { downloadStatementTemplate, type TemplateKind } from "@/lib/company-analysis/download-template";
 
@@ -74,16 +77,22 @@ function startingDetails(editing: CompanySummary | null, companies: CompanySumma
   };
 }
 
-async function fetchReview(file: File): Promise<StatementUploadReview> {
+interface PreviewResult {
+  review: StatementUploadReview;
+  saved: StatementYear[] | null;
+}
+
+async function fetchReview(file: File, companyId?: string): Promise<PreviewResult> {
   const body = new FormData();
   body.set("file", file);
+  if (companyId) body.set("companyId", companyId);
   const response = await fetch("/api/companies/preview", { method: "POST", body });
-  const payload = (await response.json()) as ApiPayload<{ review: StatementUploadReview }>;
+  const payload = (await response.json()) as ApiPayload<PreviewResult>;
 
   if (!response.ok || !payload.success || !payload.data) {
     throw new Error(payload.error?.message ?? "Could not read the file.");
   }
-  return payload.data.review;
+  return payload.data;
 }
 
 export function AddCompanyDialog({
@@ -96,6 +105,7 @@ export function AddCompanyDialog({
 }: AddCompanyDialogProps) {
   const [file, setFile] = useState<File | null>(initialFile);
   const [review, setReview] = useState<StatementUploadReview | null>(null);
+  const [saved, setSaved] = useState<StatementYear[] | null>(null);
   const [details, setDetails] = useState<DetailsForm>(() => startingDetails(editing, companies));
   const [confirmedChecks, setConfirmedChecks] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -111,14 +121,18 @@ export function AddCompanyDialog({
   useEffect(() => {
     if (!initialFile) return;
     let cancelled = false;
-    fetchReview(initialFile)
-      .then((result) => !cancelled && setReview(result))
+    fetchReview(initialFile, editing?.id)
+      .then((result) => {
+        if (cancelled) return;
+        setReview(result.review);
+        setSaved(result.saved);
+      })
       .catch((requestError) => !cancelled && setError(requestError instanceof Error ? requestError.message : "Could not read the file."))
       .finally(() => !cancelled && setChecking(false));
     return () => {
       cancelled = true;
     };
-  }, [initialFile]);
+  }, [initialFile, editing?.id]);
 
   const busy = checking || saving;
 
@@ -129,6 +143,7 @@ export function AddCompanyDialog({
   const reset = () => {
     setFile(null);
     setReview(null);
+    setSaved(null);
     setDetails(startingDetails(editing, companies));
     setConfirmedChecks(false);
     setFieldErrors({});
@@ -147,12 +162,15 @@ export function AddCompanyDialog({
     if (!chosen) return;
     setFile(chosen);
     setReview(null);
+    setSaved(null);
     setConfirmedChecks(false);
     setError(null);
     setChecking(true);
 
     try {
-      setReview(await fetchReview(chosen));
+      const result = await fetchReview(chosen, editing?.id);
+      setReview(result.review);
+      setSaved(result.saved);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Could not read the file.");
     } finally {
@@ -163,6 +181,7 @@ export function AddCompanyDialog({
   const keepCurrentFigures = () => {
     setFile(null);
     setReview(null);
+    setSaved(null);
     setConfirmedChecks(false);
     setError(null);
   };
@@ -283,7 +302,9 @@ export function AddCompanyDialog({
             </Stack>
           ) : null}
 
-          {review ? <ReviewSummary review={review} currency={details.currency} amountsIn={details.amountsIn} /> : null}
+          {review ? (
+            <ReviewSummary review={review} saved={saved} currency={details.currency} amountsIn={details.amountsIn} />
+          ) : null}
 
           {editing || (review && review.errors.length === 0) ? (
             <Stack spacing={2}>
@@ -393,7 +414,14 @@ interface ScaleProps {
   amountsIn: DetailsForm["amountsIn"];
 }
 
-function ReviewSummary({ review, currency, amountsIn }: { review: StatementUploadReview } & ScaleProps) {
+function ReviewSummary({
+  review,
+  saved,
+  currency,
+  amountsIn,
+}: { review: StatementUploadReview; saved: StatementYear[] | null } & ScaleProps) {
+  const comparison = saved && review.years.length > 0 ? compareWithSaved(review.years, saved) : null;
+
   return (
     <Stack spacing={2}>
       {review.errors.length > 0 ? (
@@ -435,10 +463,12 @@ function ReviewSummary({ review, currency, amountsIn }: { review: StatementUploa
         </Alert>
       ) : null}
 
+      {comparison ? <ChangeSummary comparison={comparison} /> : null}
+
       {review.years.length > 0 ? (
         <Stack spacing={1}>
           <ScaleCaption review={review} currency={currency} amountsIn={amountsIn} />
-          <StatementTable review={review} />
+          <StatementTable review={review} comparison={comparison} />
         </Stack>
       ) : null}
     </Stack>
@@ -480,7 +510,44 @@ function formatMoney(amount: number, currency: string) {
   return currency.endsWith("$") ? `${currency}${text}` : `${currency} ${text}`;
 }
 
-function StatementTable({ review }: { review: StatementUploadReview }) {
+const CHANGED_BACKGROUND = "rgba(245,158,11,0.18)";
+const CHANGED_TEXT = "#fcd34d";
+
+function ChangeSummary({ comparison }: { comparison: SavedComparison }) {
+  const hasChanges =
+    comparison.changed.size + comparison.newYears.length + comparison.removedYears.length + comparison.removedLines.length > 0;
+
+  return (
+    <Alert severity={hasChanges ? "info" : "success"}>
+      <Typography variant="body2" fontWeight={600}>
+        Compared with what&apos;s saved: {describeComparison(comparison)}
+      </Typography>
+      {comparison.changed.size > 0 ? (
+        <Typography variant="body2">
+          Changed figures are{" "}
+          <Box component="span" sx={{ bgcolor: CHANGED_BACKGROUND, color: CHANGED_TEXT, px: 0.5, borderRadius: 0.5 }}>
+            highlighted
+          </Box>{" "}
+          in the table, with the saved figure underneath.
+        </Typography>
+      ) : null}
+      {comparison.removedYears.length > 0 || comparison.removedLines.length > 0 ? (
+        <Box component="ul" sx={{ m: 0, mt: 0.5, pl: 2.5 }}>
+          {comparison.removedYears.map((year) => (
+            <li key={year}>{formatYear(year)}: this saved year isn&apos;t in the file and will be removed.</li>
+          ))}
+          {comparison.removedLines.map((line) => (
+            <li key={`${line.label}-${line.fiscalYearEnd}`}>
+              {line.label} ({formatYear(line.fiscalYearEnd)}): saved as {line.was}, missing from the file.
+            </li>
+          ))}
+        </Box>
+      ) : null}
+    </Alert>
+  );
+}
+
+function StatementTable({ review, comparison }: { review: StatementUploadReview; comparison: SavedComparison | null }) {
   const rows = statementTableRows(review.years);
 
   return (
@@ -492,6 +559,9 @@ function StatementTable({ review }: { review: StatementUploadReview }) {
             {review.years.map((year) => (
               <TableCell key={year.fiscalYearEnd} align="right" sx={{ whiteSpace: "nowrap" }}>
                 {formatYear(year.fiscalYearEnd)}
+                {comparison?.newYears.includes(year.fiscalYearEnd) ? (
+                  <Chip label="New" size="small" color="info" sx={{ ml: 1, height: 20 }} />
+                ) : null}
               </TableCell>
             ))}
           </TableRow>
@@ -500,11 +570,26 @@ function StatementTable({ review }: { review: StatementUploadReview }) {
           {rows.map((row) => (
             <TableRow key={row.label}>
               <TableCell>{row.label}</TableCell>
-              {row.values.map((value, index) => (
-                <TableCell key={review.years[index].fiscalYearEnd} align="right" sx={{ fontVariantNumeric: "tabular-nums" }}>
-                  {formatValue(value, row.isCost)}
-                </TableCell>
-              ))}
+              {row.values.map((value, index) => {
+                const key = cellKey(row.label, review.years[index].fiscalYearEnd);
+                const isChanged = Boolean(comparison?.changed.has(key));
+                const was = comparison?.changed.get(key) ?? null;
+
+                return (
+                  <TableCell
+                    key={review.years[index].fiscalYearEnd}
+                    align="right"
+                    sx={{ fontVariantNumeric: "tabular-nums", ...(isChanged ? { bgcolor: CHANGED_BACKGROUND } : {}) }}
+                  >
+                    {formatValue(value, row.isCost)}
+                    {isChanged ? (
+                      <Typography component="span" variant="caption" sx={{ display: "block", color: CHANGED_TEXT }}>
+                        was {was === null ? "blank" : formatValue(was, row.isCost)}
+                      </Typography>
+                    ) : null}
+                  </TableCell>
+                );
+              })}
             </TableRow>
           ))}
         </TableBody>

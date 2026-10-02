@@ -76,7 +76,7 @@ export function buildStatementTemplate(years: StatementYear[]) {
   return rows.map((row) => row.map(csvCell).join(',')).join('\n') + '\n'
 }
 export function buildBlankTemplate() {
-  const headings = ['Line', 'Latest year end (YYYY-MM-DD)', 'Previous year end (YYYY-MM-DD)']
+  const headings = ['Line', 'Latest year end (e.g. 31 Mar 2025 or 2025-03-31)', 'Previous year end (e.g. 31 Mar 2024 or 2024-03-31)']
   const companyKeys = STATEMENT_LINE_KEYS.filter(
     (key): key is CompanyLineKey => key !== 'segment_revenue' && key !== 'segment_direct_costs'
   )

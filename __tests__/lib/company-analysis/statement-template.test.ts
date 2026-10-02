@@ -22,7 +22,7 @@ describe('blank template', () => {
   })
 
   it('recognises every row once the year headings are filled in', () => {
-    const filled = text.replace('Latest year end (YYYY-MM-DD)', '2025-03-31').replace('Previous year end (YYYY-MM-DD)', '2024-03-31')
+    const filled = text.replace('Latest year end (e.g. 31 Mar 2025 or 2025-03-31)', '31 Mar 2025').replace('Previous year end (e.g. 31 Mar 2024 or 2024-03-31)', '31 Mar 2024')
     const result = parseStatementCsv(encode(filled))
 
     expect(result.unrecognised).toEqual([])
@@ -31,7 +31,7 @@ describe('blank template', () => {
 
   it('refuses the placeholder year headings if they are left unchanged', () => {
     const result = parseStatementCsv(encode(text))
-    expect(result.errors.join(' ')).toContain('"Latest year end (YYYY-MM-DD)" isn\'t a date')
+    expect(result.errors.join(' ')).toContain('"Latest year end (e.g. 31 Mar 2025 or 2025-03-31)" isn\'t a date')
   })
 })
 

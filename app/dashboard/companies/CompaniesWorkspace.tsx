@@ -23,7 +23,7 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import type { CompanySummary } from "@/lib/company-analysis/persistence";
 import { dashboardTokens } from "@/app/theme";
-import { downloadStatementTemplate, type TemplateKind } from "@/lib/company-analysis/download-template";
+import { downloadCompanyFigures, downloadStatementTemplate, type TemplateKind } from "@/lib/company-analysis/download-template";
 import { AddCompanyDialog } from "./AddCompanyDialog";
 
 interface CompaniesResponse {
@@ -41,6 +41,18 @@ export function CompaniesWorkspace() {
   const [companyToDelete, setCompanyToDelete] = useState<CompanySummary | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [templateMenu, setTemplateMenu] = useState<HTMLElement | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const downloadFigures = async (company: CompanySummary) => {
+    setDownloadingId(company.id);
+    try {
+      await downloadCompanyFigures(company.id);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Could not download the figures.");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const downloadTemplate = (kind: TemplateKind) => {
     setTemplateMenu(null);
@@ -195,16 +207,26 @@ export function CompaniesWorkspace() {
                     </Typography>
                   </Stack>
                 </Stack>
-                {company.isOwn ? (
+                <Stack direction={{ xs: "row", sm: "column" }} spacing={0.5} sx={{ alignSelf: { xs: "flex-start", sm: "center" }, flex: "0 0 auto" }}>
                   <Button
-                    color="error"
-                    startIcon={<DeleteOutlineRoundedIcon />}
-                    onClick={() => setCompanyToDelete(company)}
-                    sx={{ borderRadius: 2, px: 1.25, alignSelf: { xs: "flex-start", sm: "center" }, flex: "0 0 auto" }}
+                    startIcon={<DownloadRoundedIcon />}
+                    disabled={downloadingId === company.id}
+                    onClick={() => void downloadFigures(company)}
+                    sx={{ borderRadius: 2, px: 1.25, whiteSpace: "nowrap", justifyContent: "flex-start" }}
                   >
-                    Delete
+                    {downloadingId === company.id ? "Downloading…" : "Download figures"}
                   </Button>
-                ) : null}
+                  {company.isOwn ? (
+                    <Button
+                      color="error"
+                      startIcon={<DeleteOutlineRoundedIcon />}
+                      onClick={() => setCompanyToDelete(company)}
+                      sx={{ borderRadius: 2, px: 1.25, justifyContent: "flex-start" }}
+                    >
+                      Delete
+                    </Button>
+                  ) : null}
+                </Stack>
               </Stack>
             </Box>
           ))}

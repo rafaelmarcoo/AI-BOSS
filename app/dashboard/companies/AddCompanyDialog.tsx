@@ -15,6 +15,7 @@ import {
   FormControlLabel,
   FormHelperText,
   InputLabel,
+  Link,
   MenuItem,
   Select,
   Stack,
@@ -32,6 +33,7 @@ import type { CompanySummary } from "@/lib/company-analysis/persistence";
 import type { StatementUploadReview } from "@/lib/company-analysis/statement-upload";
 import { statementTableRows } from "@/lib/company-analysis/statement-template";
 import { dashboardTokens } from "@/app/theme";
+import { downloadStatementTemplate, type TemplateKind } from "@/lib/company-analysis/download-template";
 
 interface ApiPayload<T> {
   success: boolean;
@@ -72,6 +74,10 @@ export function AddCompanyDialog({ open, companies, onClose, onSaved }: AddCompa
   }, [error]);
 
   const busy = checking || saving;
+
+  const downloadTemplate = (kind: TemplateKind) => {
+    downloadStatementTemplate(kind).catch(() => setError("Could not create the template. Please try again."));
+  };
 
   const reset = () => {
     setFile(null);
@@ -181,6 +187,13 @@ export function AddCompanyDialog({ open, companies, onClose, onSaved }: AddCompa
           <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
             Upload the company&apos;s financial statements as a CSV file, using the template. Nothing is
             saved until you press Save.
+          </Typography>
+
+          <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
+            Don&apos;t have the template? Download the{" "}
+            <Link component="button" type="button" onClick={() => downloadTemplate("blank")}>blank template</Link>
+            {" "}or see{" "}
+            <Link component="button" type="button" onClick={() => downloadTemplate("example")}>an example</Link>.
           </Typography>
 
           <Stack direction="row" spacing={1.5} alignItems="center">

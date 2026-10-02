@@ -75,3 +75,17 @@ export function buildStatementTemplate(years: StatementYear[]) {
 
   return rows.map((row) => row.map(csvCell).join(',')).join('\n') + '\n'
 }
+export function buildBlankTemplate() {
+  const headings = ['Line', 'Latest year end (YYYY-MM-DD)', 'Previous year end (YYYY-MM-DD)']
+  const companyKeys = STATEMENT_LINE_KEYS.filter(
+    (key): key is CompanyLineKey => key !== 'segment_revenue' && key !== 'segment_direct_costs'
+  )
+  const rows: string[][] = [
+    headings,
+    ...companyKeys.map((key) => [STATEMENT_LINE_LABELS[key], '', '']),
+    ['Revenue stream: Stream name', '', ''],
+    ['Direct costs: Stream name', '', ''],
+  ]
+
+  return rows.map((row) => row.map(csvCell).join(',')).join('\n') + '\n'
+}

@@ -11,6 +11,8 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Menu,
+  MenuItem,
   Stack,
   Typography,
 } from "@mui/material";
@@ -18,8 +20,10 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
 import BusinessCenterOutlinedIcon from "@mui/icons-material/BusinessCenterOutlined";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import type { CompanySummary } from "@/lib/company-analysis/persistence";
 import { dashboardTokens } from "@/app/theme";
+import { downloadStatementTemplate, type TemplateKind } from "@/lib/company-analysis/download-template";
 import { AddCompanyDialog } from "./AddCompanyDialog";
 
 interface CompaniesResponse {
@@ -36,6 +40,12 @@ export function CompaniesWorkspace() {
   const [adding, setAdding] = useState(false);
   const [companyToDelete, setCompanyToDelete] = useState<CompanySummary | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [templateMenu, setTemplateMenu] = useState<HTMLElement | null>(null);
+
+  const downloadTemplate = (kind: TemplateKind) => {
+    setTemplateMenu(null);
+    downloadStatementTemplate(kind).catch(() => setError("Could not create the template. Please try again."));
+  };
 
   const loadCompanies = async () => {
     setLoading(true);
@@ -121,9 +131,18 @@ export function CompaniesWorkspace() {
             </Typography>
           </Stack>
         </Stack>
-        <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => { setNotice(null); setAdding(true); }} sx={{ borderRadius: 2, whiteSpace: "nowrap", flex: "0 0 auto" }}>
-          Add company
-        </Button>
+        <Stack direction="row" spacing={1} sx={{ flex: "0 0 auto" }}>
+          <Button variant="outlined" startIcon={<DownloadRoundedIcon />} onClick={(event) => setTemplateMenu(event.currentTarget)} sx={{ borderRadius: 2, whiteSpace: "nowrap" }}>
+            Template
+          </Button>
+          <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => { setNotice(null); setAdding(true); }} sx={{ borderRadius: 2, whiteSpace: "nowrap" }}>
+            Add company
+          </Button>
+        </Stack>
+        <Menu anchorEl={templateMenu} open={Boolean(templateMenu)} onClose={() => setTemplateMenu(null)}>
+          <MenuItem onClick={() => downloadTemplate("blank")}>Blank template (to fill in)</MenuItem>
+          <MenuItem onClick={() => downloadTemplate("example")}>Example: Ressett (to look at)</MenuItem>
+        </Menu>
       </Stack>
 
       {notice ? <Alert severity="success" onClose={() => setNotice(null)}>{notice}</Alert> : null}

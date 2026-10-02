@@ -4,14 +4,30 @@ export function runwayDaysFromMonths(months: number): number {
   return Math.floor(Number((months * DAYS_PER_MONTH).toFixed(6)))
 }
 
-/** "272 days (≈9.1 months)" — the single display format for a runway figure. */
+function plural(count: number, singular: string, pluralForm: string) {
+  return `${count} ${Math.abs(count) === 1 ? singular : pluralForm}`
+}
+
+
 export function formatRunway(months: number): string {
   if (!Number.isFinite(months)) {
     return 'unavailable'
   }
 
   const days = runwayDaysFromMonths(months)
-  const dayLabel = Math.abs(days) === 1 ? 'day' : 'days'
+  const asMonths = monthsAndDays(days)
+  return asMonths ? `${asMonths} (${days} days)` : plural(days, 'day', 'days')
+}
 
-  return `${days} ${dayLabel} (≈${months.toFixed(1)} months)`
+export function monthsAndDays(days: number): string | null {
+  const wholeMonths = Math.floor(days / DAYS_PER_MONTH)
+  if (wholeMonths <= 0) return null
+
+  const remainingDays = days % DAYS_PER_MONTH
+  return [
+    plural(wholeMonths, 'month', 'months'),
+    remainingDays > 0 ? plural(remainingDays, 'day', 'days') : null,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(' ')
 }

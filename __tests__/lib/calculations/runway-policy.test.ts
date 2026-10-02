@@ -13,7 +13,7 @@ describe('assessRunwayPolicy', () => {
 
   it('states the runway in days with months alongside', () => {
     expect(assessRunwayPolicy(9.09).message).toBe(
-      'Healthy: Your runway of 272 days (≈9.1 months) is above the 180-day (6-month) recommended minimum.'
+      'Healthy: Your runway of 9 months 2 days (272 days) is above the 180-day (6-month) recommended minimum.'
     )
   })
 
@@ -35,7 +35,7 @@ describe('assessRunwayPolicy', () => {
 
   it('names the threshold in both units when runway is urgent', () => {
     expect(assessRunwayPolicy(1.5).message).toContain(
-      '45 days (≈1.5 months) is critically low, below the 90-day (3-month) threshold'
+      '1 month 15 days (45 days) is critically low, below the 90-day (3-month) threshold'
     )
   })
 })

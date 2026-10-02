@@ -59,10 +59,10 @@ describe('calculateRunway', () => {
       const result = calculateRunway({ cash: 100000, ar: 0, ap: 0, burn: 10000 })
 
       expect(result.calculation_breakdown.formula).toBe(
-        '100000 / 10000 = 10 months × 30 = 300 days'
+        '100000 / 10000 = 10 months × 30 = 300 days = 10 months'
       )
       expect(result.calculation_breakdown.workingCapitalAdjustedFormula).toBe(
-        '(100000 + 0 - 0) / 10000 = 10 months × 30 = 300 days'
+        '(100000 + 0 - 0) / 10000 = 10 months × 30 = 300 days = 10 months'
       )
     })
   })

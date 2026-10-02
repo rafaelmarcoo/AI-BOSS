@@ -5,8 +5,14 @@ import {
 } from '@/lib/calculations/runway-policy'
 import {
   DAYS_PER_MONTH,
+  monthsAndDays,
   runwayDaysFromMonths,
 } from '@/lib/calculations/runway-display'
+
+function inMonthsAndDays(days: number) {
+  const text = monthsAndDays(days)
+  return text ? ` = ${text}` : ''
+}
 
 export const RunwayInputSchema = z.object({
   cash: z.number().nonnegative('Cash must be non-negative.'),
@@ -64,8 +70,8 @@ export function calculateRunway(input: RunwayInput): RunwayResult {
       accountsPayable: ap,
       monthlyBurnRate: burn,
       netAvailableCash,
-      formula: `${cash} / ${burn} = ${cashRunwayMonths} months × ${DAYS_PER_MONTH} = ${cashRunwayDays} days`,
-      workingCapitalAdjustedFormula: `(${cash} + ${ar} - ${ap}) / ${burn} = ${workingCapitalAdjustedRunwayMonths} months × ${DAYS_PER_MONTH} = ${workingCapitalAdjustedRunwayDays} days`,
+      formula: `${cash} / ${burn} = ${cashRunwayMonths} months × ${DAYS_PER_MONTH} = ${cashRunwayDays} days${inMonthsAndDays(cashRunwayDays)}`,
+      workingCapitalAdjustedFormula: `(${cash} + ${ar} - ${ap}) / ${burn} = ${workingCapitalAdjustedRunwayMonths} months × ${DAYS_PER_MONTH} = ${workingCapitalAdjustedRunwayDays} days${inMonthsAndDays(workingCapitalAdjustedRunwayDays)}`,
     },
     policy: assessRunwayPolicy(cashRunwayMonths),
     working_capital_adjusted_policy: assessRunwayPolicy(

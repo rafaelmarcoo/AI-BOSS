@@ -1,7 +1,10 @@
 import { NextRequest } from 'next/server'
 import { handleRouteError, successResponse } from '@/lib/api/responses'
 import { requireAuthenticatedUser } from '@/lib/auth'
-import { listProviders } from '@/lib/integrations/registry'
+import {
+  isProviderConfigured,
+  listProviders,
+} from '@/lib/integrations/registry'
 import { createAdminSupabaseClient } from '@/lib/supabase'
 
 export async function GET(request: NextRequest) {
@@ -24,7 +27,9 @@ export async function GET(request: NextRequest) {
 
       return {
         provider,
-        status: row?.status ?? 'available',
+        status: isProviderConfigured(provider)
+          ? row?.status ?? 'available'
+          : 'unavailable',
         displayName: row?.display_name ?? null,
         connectedAt: row?.connected_at ?? null,
         lastSyncedAt: row?.last_synced_at ?? null,

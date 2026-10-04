@@ -173,4 +173,25 @@ describe('document review service', () => {
       'user-1'
     )
   })
+
+  it('returns extracted text directly for TXT and DOCX previews', async () => {
+    mockGetAccessibleDocumentById.mockResolvedValue(
+      document({
+        file_name: 'notes.docx',
+        file_type: 'docx',
+        mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        raw_text: 'Revenue table\nCash 80000',
+      })
+    )
+
+    await expect(
+      getDocumentPreview({
+        documentId: 'document-1',
+        userId: 'user-1',
+        page: 1,
+        pageSize: 100,
+      })
+    ).resolves.toEqual({ type: 'text', text: 'Revenue table\nCash 80000' })
+    expect(mockDownloadDocumentFile).not.toHaveBeenCalled()
+  })
 })

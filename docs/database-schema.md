@@ -242,14 +242,14 @@ Stores uploaded user files and their ingestion state.
 | company_id | UUID (FK) | Company authorization boundary; nullable only for unmapped legacy rows |
 | conversation_id | UUID (FK) | Optional link to the conversation that uploaded/used the file |
 | file_name | TEXT | Original file name |
-| file_type | TEXT | `pdf`, `csv`, `xlsx`, or `image` |
+| file_type | TEXT | `pdf`, `csv`, `xlsx`, `image`, `text`, or `docx` |
 | mime_type | TEXT | Uploaded MIME type |
 | storage_path | TEXT | Path in Supabase Storage |
 | status | TEXT | `uploaded`, `processing`, `ready`, `failed` |
 | financial_review_status | TEXT | Separate calculation-trust state: `legacy`, `not_required`, `pending`, or `confirmed` |
 | document_type | TEXT | Optional business meaning like `policy`, `report`, `statement` |
 | raw_text | TEXT | Extracted text used for chunking |
-| metadata | JSONB | Flexible metadata such as page counts or CSV columns |
+| metadata | JSONB | Flexible metadata such as page counts, spreadsheet columns, AI-attempt warnings, and supplementary review items |
 | error_message | TEXT | Processing failure details if any |
 | created_at | TIMESTAMP | Upload time |
 | updated_at | TIMESTAMP | Last processing/update time |
@@ -269,6 +269,13 @@ Stores uploaded user files and their ingestion state.
 
 **Deletion behaviour:**
 - The server-only `delete_company_document_and_derived_metrics(document_id, requester_id)` function removes the document and all derived financial observations in one transaction. An uploader may delete their own unconfirmed document; a same-company administrator may also delete confirmed company documents. RAG chunks, extraction runs, and candidates are removed by foreign-key cascades. The private Storage object is removed immediately before the database transaction.
+
+**Extraction boundary:**
+- CSV and XLSX candidates are deterministic; XLSX worksheet selection and ingestion limits remain enforced.
+- PDF extraction is deterministic first. AI assistance runs automatically only when no canonical deterministic candidate is found or the server parser fails, and can also be requested explicitly.
+- TXT and DOCX may combine deterministic line matching with bounded AI assistance; DOCX table rows are preserved as source lines.
+- Images use bounded multimodal extraction. Every fixed metric from every format remains an untrusted candidate until the existing confirmation transaction publishes it.
+- Supplementary item metadata, including computed price × quantity totals, never affects calculations unless the value is separately promoted through the confirmed candidate workflow.
 
 ---
 
@@ -314,7 +321,7 @@ to supply calculation truth.
 | suggested_worksheet_names | TEXT[] | Deterministically suggested XLSX worksheets |
 | worksheet_metadata | JSONB | Sanitised worksheet names, visibility, dimensions, and preview metadata |
 | warnings | JSONB | Run-level extraction and data-quality warnings |
-| extractor_version | TEXT | Deterministic extractor version |
+| extractor_version | TEXT | Deterministic, AI-assisted, or hybrid extractor version |
 | error_message | TEXT | Processing failure details, if any |
 | started_at | TIMESTAMP | Attempt start time |
 | completed_at | TIMESTAMP | Extraction completion time |
@@ -386,7 +393,7 @@ uploaded, or made available. OAuth credential rows link back to this table.
 |--------|------|-------------|
 | id | UUID (PK) | Primary key |
 | user_id | UUID (FK) | References users(id) |
-| provider | TEXT | `xero`, `quickbooks`, `freshbooks`, `myob`, `csv`, `pdf`, `manual`, or `demo` |
+| provider | TEXT | Accounting: `xero`, `quickbooks`, `freshbooks`, `myob`, `zoho_books`, `freeagent`; document/manual/demo source types are also supported |
 | status | TEXT | `connected`, `disconnected`, `available`, or `error` |
 | display_name | TEXT | User-facing source name |
 | source_label | TEXT | Short provider/source label |
@@ -420,7 +427,7 @@ storage and are only decrypted server-side when calling or revoking a provider.
 | id | UUID (PK) | Primary key |
 | connection_id | UUID (FK) | References data_connections(id), unique |
 | user_id | UUID (FK) | References users(id) |
-| provider | TEXT | `xero`, `quickbooks`, `freshbooks`, or `myob` |
+| provider | TEXT | `xero`, `quickbooks`, `freshbooks`, `myob`, `zoho_books`, or `freeagent` |
 | tenant_id | TEXT | Provider tenant/company/organisation ID |
 | tenant_name | TEXT | Provider tenant/company/organisation display name |
 | access_token_enc | TEXT | Encrypted provider access token |
@@ -448,7 +455,7 @@ callback validation.
 |--------|------|-------------|
 | id | UUID (PK) | Primary key |
 | user_id | UUID (FK) | References users(id), unique per user |
-| provider | TEXT | OAuth provider such as `xero`, `quickbooks`, `freshbooks`, or `myob` |
+| provider | TEXT | OAuth provider: `xero`, `quickbooks`, `freshbooks`, `myob`, `zoho_books`, or `freeagent` |
 | state | TEXT | Random OAuth state value used for CSRF protection |
 | redirect_path | TEXT | Path to return to after OAuth completes |
 | created_at | TIMESTAMP | State creation time |
@@ -464,8 +471,8 @@ callback validation.
 
 ### 13. financial_metric_observations
 
-Stores normalized financial metric values from Xero, uploaded documents, manual
-inputs, and demo data. This table is the long-term source of truth for
+Stores normalized financial metric values from supported accounting providers,
+uploaded documents, manual inputs, and demo data. This table is the long-term source of truth for
 source-aware metric values. Each row is one observation for one metric key from
 one source/period, rather than a wide snapshot of all metrics.
 
@@ -486,7 +493,7 @@ are published only from included candidates through `confirm_document_extraction
 | period_start | DATE | Optional period start for period-based metrics |
 | period_end | DATE | Optional period end for period-based metrics |
 | as_of_date | DATE | Optional point-in-time date for balance metrics |
-| source_type | TEXT | `xero`, `quickbooks`, `freshbooks`, `myob`, `document`, `manual`, or `demo` |
+| source_type | TEXT | `xero`, `quickbooks`, `freshbooks`, `myob`, `zoho_books`, `freeagent`, `document`, `manual`, or `demo` |
 | source_label | TEXT | User-facing source label |
 | confidence | NUMERIC(4,3) | Confidence score from 0 to 1 |
 | evidence | JSONB | Evidence reference such as document page, row range, chunk, URL, or excerpt |
@@ -946,6 +953,7 @@ All schema changes are tracked in `db/migrations/`:
 - `026_stage5_balance_sheet_and_debt.sql` - Adds balance-sheet classifications, explicit quick-ratio treatment, debts, and stored repayment schedules
 - `027_stage6_customer_and_revenue_dimensions.sql` - Adds canonical customers, signed revenue entries, typed dimensions, RLS, and provider-safe deduplication for Stage 6 analytics
 - `028_stage7_dashboard_layouts.sql` - Adds versioned user-owned manual dashboard layouts, one-default enforcement, and RLS
+- `029_extended_documents_and_providers.sql` - Adds TXT/DOCX document types, retains MYOB, adds Zoho Books and FreeAgent, and synchronises provider/source constraints across trusted and detailed financial tables
 
 ---
 

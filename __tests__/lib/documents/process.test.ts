@@ -13,6 +13,14 @@ import {
   saveDocumentExtractionCandidates,
 } from '@/lib/documents/extraction-review-persistence'
 import { embedDocumentChunks } from '@/lib/documents/embeddings'
+import { extractAiAssistedDocument } from '@/lib/documents/ai-assisted-extraction'
+
+const mockGetPdfDocument = jest.fn()
+
+jest.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
+  VerbosityLevel: { ERRORS: 0 },
+  getDocument: (...args: unknown[]) => mockGetPdfDocument(...args),
+}))
 
 jest.mock('@/lib/documents/persistence', () => ({
   deleteDocumentFile: jest.fn(),
@@ -38,6 +46,10 @@ jest.mock('@/lib/documents/embeddings', () => ({
   embedDocumentChunks: jest.fn(),
 }))
 
+jest.mock('@/lib/documents/ai-assisted-extraction', () => ({
+  extractAiAssistedDocument: jest.fn(),
+}))
+
 const mockGetDocumentById = jest.mocked(getDocumentById)
 const mockDownloadDocumentFile = jest.mocked(downloadDocumentFile)
 const mockReplaceDocumentChunks = jest.mocked(replaceDocumentChunks)
@@ -52,6 +64,7 @@ const mockSaveDocumentExtractionCandidates = jest.mocked(
   saveDocumentExtractionCandidates
 )
 const mockEmbedDocumentChunks = jest.mocked(embedDocumentChunks)
+const mockExtractAiAssistedDocument = jest.mocked(extractAiAssistedDocument)
 
 describe('processDocument', () => {
   beforeEach(() => {
@@ -108,6 +121,26 @@ describe('processDocument', () => {
     mockSaveDocumentExtractionCandidates.mockResolvedValue([{ id: 'candidate-1' }])
     mockCompleteDocumentExtractionRun.mockResolvedValue(undefined)
     mockFailDocumentExtractionRun.mockResolvedValue(undefined)
+    mockExtractAiAssistedDocument.mockResolvedValue({ candidates: [], items: [] })
+    mockGetPdfDocument.mockReturnValue({
+      promise: Promise.resolve({
+        numPages: 1,
+        getPage: jest.fn(async () => ({
+          getTextContent: jest.fn(async () => ({
+            items: [
+              { str: 'As at 31 May 2026', transform: [1, 0, 0, 1, 0, 30] },
+              { str: 'Cash at bank: $120,000 NZD', transform: [1, 0, 0, 1, 0, 10] },
+            ],
+          })),
+          cleanup: jest.fn(),
+        })),
+      }),
+      destroy: jest.fn(async () => undefined),
+    })
+  })
+
+  afterEach(() => {
+    delete process.env.OPENAI_API_KEY
   })
 
   it('stores extracted CSV metrics as pending review candidates', async () => {
@@ -235,6 +268,105 @@ describe('processDocument', () => {
         status: 'ready',
         financial_review_status: 'not_required',
         metadata: expect.objectContaining({ metricCandidateCount: 0 }),
+      })
+    )
+  })
+
+  it('does not call AI when deterministic PDF extraction returns a canonical candidate', async () => {
+    process.env.OPENAI_API_KEY = 'test-key'
+    mockGetDocumentById.mockResolvedValue({
+      id: 'document-123', user_id: 'user-123', company_id: 'company-1',
+      conversation_id: null, file_name: 'statement.pdf', file_type: 'pdf',
+      mime_type: 'application/pdf', storage_path: 'user-123/statement.pdf',
+      status: 'processing', financial_review_status: 'pending', document_type: null,
+      raw_text: null, metadata: null, error_message: null,
+      created_at: '2026-05-12T00:00:00.000Z', updated_at: '2026-05-12T00:00:00.000Z',
+    })
+    mockDownloadDocumentFile.mockResolvedValue(Buffer.from('mock PDF'))
+
+    await processDocument('document-123', 'user-123')
+
+    expect(mockExtractAiAssistedDocument).not.toHaveBeenCalled()
+    expect(mockSaveDocumentExtractionCandidates).toHaveBeenCalledWith(
+      expect.objectContaining({
+        candidates: expect.arrayContaining([
+          expect.objectContaining({ metricKey: 'cash', value: 120000 }),
+        ]),
+      })
+    )
+  })
+
+  it('uses AI fallback when deterministic PDF extraction fails and keeps the original recoverable', async () => {
+    process.env.OPENAI_API_KEY = 'test-key'
+    mockGetPdfDocument.mockReturnValue({
+      promise: Promise.reject(new Error('DOMMatrix unavailable')),
+      destroy: jest.fn(async () => undefined),
+    })
+    mockGetDocumentById.mockResolvedValue({
+      id: 'document-123', user_id: 'user-123', company_id: 'company-1',
+      conversation_id: null, file_name: 'statement.pdf', file_type: 'pdf',
+      mime_type: 'application/pdf', storage_path: 'user-123/statement.pdf',
+      status: 'processing', financial_review_status: 'pending', document_type: null,
+      raw_text: null, metadata: null, error_message: null,
+      created_at: '2026-05-12T00:00:00.000Z', updated_at: '2026-05-12T00:00:00.000Z',
+    })
+    mockDownloadDocumentFile.mockResolvedValue(Buffer.from('mock PDF'))
+    mockExtractAiAssistedDocument.mockResolvedValue({
+      candidates: [{
+        originalPayload: { metricKey: 'cash', value: 90000 },
+        metricKey: 'cash', value: 90000, currency: 'NZD',
+        reportingDate: '2026-05-31', confidence: 0.7,
+        evidence: { excerpt: 'Cash at bank NZD 90,000' }, warnings: [],
+        extractorVersion: 'openai_assisted_v1',
+      }],
+      items: [],
+    })
+
+    await processDocument('document-123', 'user-123')
+
+    expect(mockExtractAiAssistedDocument).toHaveBeenCalled()
+    expect(mockUpdateDocumentRecord).toHaveBeenCalledWith(
+      'document-123',
+      'user-123',
+      expect.objectContaining({ status: 'ready', financial_review_status: 'pending' })
+    )
+    expect(mockFailDocumentExtractionRun).not.toHaveBeenCalled()
+  })
+
+  it('retains deterministic output and the original when AI assistance fails', async () => {
+    process.env.OPENAI_API_KEY = 'test-key'
+    mockGetDocumentById.mockResolvedValue({
+      id: 'document-123', user_id: 'user-123', company_id: 'company-1',
+      conversation_id: null, file_name: 'notes.txt', file_type: 'text',
+      mime_type: 'text/plain', storage_path: 'user-123/notes.txt',
+      status: 'processing', financial_review_status: 'pending', document_type: null,
+      raw_text: null, metadata: null, error_message: null,
+      created_at: '2026-05-12T00:00:00.000Z', updated_at: '2026-05-12T00:00:00.000Z',
+    })
+    mockDownloadDocumentFile.mockResolvedValue(
+      Buffer.from('Statement date: 31/05/2026\nCash: 80000 NZD')
+    )
+    mockExtractAiAssistedDocument.mockRejectedValue(new Error('model unavailable'))
+
+    await processDocument('document-123', 'user-123')
+
+    expect(mockSaveDocumentExtractionCandidates).toHaveBeenCalledWith(
+      expect.objectContaining({
+        candidates: expect.arrayContaining([
+          expect.objectContaining({ metricKey: 'cash', value: 80000 }),
+        ]),
+      })
+    )
+    expect(mockUpdateDocumentRecord).toHaveBeenCalledWith(
+      'document-123',
+      'user-123',
+      expect.objectContaining({
+        status: 'ready',
+        metadata: expect.objectContaining({
+          extractionWarnings: expect.arrayContaining([
+            expect.objectContaining({ code: 'ai_assisted_failed' }),
+          ]),
+        }),
       })
     )
   })

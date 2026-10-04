@@ -4,6 +4,7 @@ import { Box, Button, Chip, Paper, Stack, Typography } from "@mui/material";
 import DescriptionIcon from "@mui/icons-material/Description";
 import GridOnRoundedIcon from "@mui/icons-material/GridOnRounded";
 import TableChartIcon from "@mui/icons-material/TableChart";
+import NotesRoundedIcon from "@mui/icons-material/NotesRounded";
 import { dashboardTokens } from "@/app/theme";
 
 const DOCUMENT_SOURCES = [
@@ -11,6 +12,11 @@ const DOCUMENT_SOURCES = [
     label: "CSV files",
     description: "Deterministic table parsing with explicit metric review.",
     icon: TableChartIcon,
+  },
+  {
+    label: "DOCX and text",
+    description: "Text and tables become review candidates; AI assistance remains untrusted until approval.",
+    icon: NotesRoundedIcon,
   },
   {
     label: "XLSX workbooks",
@@ -60,7 +66,7 @@ export function DataSourcesPanel() {
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" },
+            gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)" },
             gap: 1.25,
           }}
         >

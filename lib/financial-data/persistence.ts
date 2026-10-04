@@ -3,6 +3,8 @@ import { mapObservationRowToMetric } from '@/lib/financial-data/observation-mapp
 import { selectLatestFinancialMetricObservations } from '@/lib/financial-data/latest-observation'
 import { createAdminSupabaseClient } from '@/lib/supabase'
 import { requireCompanyAdmin } from '@/lib/companies'
+import { getFinancialObservationSourceKey } from '@/lib/financial-data/source-key'
+import { isSupportedFinancialCurrency } from '@/lib/financial-data/currency'
 import type {
   AvailableFinancialMetricValue,
   FinancialMetricSet,
@@ -195,6 +197,88 @@ export async function listFinancialMetricObservations(userId: string) {
   }
 
   return rows
+}
+
+export interface FinancialMetricBySource {
+  id: string
+  sourceKey: string
+  sourceLabel: string
+  sourceType: FinancialMetricObservation['source_type']
+  metricKey: FinancialMetricObservation['metric_key']
+  value: number
+  currency: string | null
+  reportingDate: string
+  confidence: number
+  documentId: string | null
+  connectionId: string | null
+}
+
+function observationReportingDate(row: FinancialMetricObservation) {
+  return row.as_of_date ?? row.period_end ?? row.updated_at.slice(0, 10)
+}
+
+/**
+ * Builds the read-only source-comparison rows from trusted observations only.
+ * Each source/currency/metric intersection keeps the newest reporting period.
+ */
+export function buildLatestFinancialMetricsBySource(
+  observations: FinancialMetricObservation[]
+): FinancialMetricBySource[] {
+  const latest = new Map<string, FinancialMetricObservation>()
+
+  for (const observation of observations) {
+    if (
+      observation.metric_key === 'runway_months'
+        ? observation.currency !== null
+        : !isSupportedFinancialCurrency(observation.currency)
+    ) {
+      continue
+    }
+
+    const key = JSON.stringify([
+      getFinancialObservationSourceKey(observation),
+      observation.currency,
+      observation.metric_key,
+    ])
+    const current = latest.get(key)
+    const candidateDate = observationReportingDate(observation)
+    const currentDate = current ? observationReportingDate(current) : ''
+
+    if (
+      !current ||
+      candidateDate > currentDate ||
+      (candidateDate === currentDate && observation.updated_at > current.updated_at)
+    ) {
+      latest.set(key, observation)
+    }
+  }
+
+  return [...latest.values()]
+    .map((row) => ({
+      id: row.id,
+      sourceKey: getFinancialObservationSourceKey(row),
+      sourceLabel: row.source_label,
+      sourceType: row.source_type,
+      metricKey: row.metric_key,
+      value: row.value,
+      currency: row.currency,
+      reportingDate: observationReportingDate(row),
+      confidence: row.confidence,
+      documentId: row.document_id,
+      connectionId: row.connection_id,
+    }))
+    .sort(
+      (left, right) =>
+        left.sourceLabel.localeCompare(right.sourceLabel) ||
+        left.metricKey.localeCompare(right.metricKey) ||
+        left.reportingDate.localeCompare(right.reportingDate)
+    )
+}
+
+export async function listLatestFinancialMetricsBySource(userId: string) {
+  return buildLatestFinancialMetricsBySource(
+    await listFinancialMetricObservations(userId)
+  )
 }
 
 export async function listFinancialMetricObservationsForDocuments(params: {

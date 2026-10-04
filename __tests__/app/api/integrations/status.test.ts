@@ -42,6 +42,20 @@ describe('/api/integrations/status', () => {
         email: 'owner@example.com',
       },
     })
+    for (const key of [
+      'XERO_CLIENT_ID', 'XERO_CLIENT_SECRET', 'XERO_REDIRECT_URI',
+      'QUICKBOOKS_CLIENT_ID', 'QUICKBOOKS_CLIENT_SECRET', 'QUICKBOOKS_REDIRECT_URI',
+      'FRESHBOOKS_CLIENT_ID', 'FRESHBOOKS_CLIENT_SECRET', 'FRESHBOOKS_REDIRECT_URI',
+      'MYOB_CLIENT_ID', 'MYOB_CLIENT_SECRET', 'MYOB_REDIRECT_URI',
+    ]) {
+      process.env[key] = 'configured-for-test'
+    }
+    delete process.env.ZOHO_CLIENT_ID
+    delete process.env.ZOHO_CLIENT_SECRET
+    delete process.env.ZOHO_REDIRECT_URI
+    delete process.env.FREEAGENT_CLIENT_ID
+    delete process.env.FREEAGENT_CLIENT_SECRET
+    delete process.env.FREEAGENT_REDIRECT_URI
   })
 
   it('returns connected rows plus available defaults for supported providers', async () => {
@@ -73,6 +87,8 @@ describe('/api/integrations/status', () => {
       'quickbooks',
       'freshbooks',
       'myob',
+      'zoho_books',
+      'freeagent',
     ])
     expect(payload.data).toEqual([
       {
@@ -99,6 +115,20 @@ describe('/api/integrations/status', () => {
       {
         provider: 'myob',
         status: 'available',
+        displayName: null,
+        connectedAt: null,
+        lastSyncedAt: null,
+      },
+      {
+        provider: 'zoho_books',
+        status: 'unavailable',
+        displayName: null,
+        connectedAt: null,
+        lastSyncedAt: null,
+      },
+      {
+        provider: 'freeagent',
+        status: 'unavailable',
         displayName: null,
         connectedAt: null,
         lastSyncedAt: null,

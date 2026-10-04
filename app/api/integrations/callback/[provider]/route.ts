@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { handleRouteError } from '@/lib/api/responses'
 import { consumeOAuthState, storeConnection } from '@/lib/integrations/connections'
-import { getAdapter } from '@/lib/integrations/registry'
+import {
+  getAdapter,
+  requireProviderConfigured,
+} from '@/lib/integrations/registry'
 import { saveAccountingSnapshot } from '@/lib/integrations/sync'
 
 function redirectTo(request: NextRequest, path: string, key: string, provider: string) {
@@ -26,6 +29,7 @@ export async function GET(
   try {
     const stateRecord = await consumeOAuthState(state)
     const adapter = getAdapter(provider)
+    requireProviderConfigured(adapter.provider)
 
     if (stateRecord.provider !== adapter.provider) {
       return redirectTo(request, stateRecord.redirectPath, 'integration_error', provider)

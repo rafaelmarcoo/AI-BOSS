@@ -11,6 +11,7 @@ const navigation = [
   { label: "Dashboard", href: "/dashboard", exact: true },
   { label: "Analysis", href: "/dashboard/analysis" },
   { label: "Scenarios", href: "/dashboard/scenarios" },
+  { label: "Connections", href: "/dashboard/data-connectors" },
   { label: "Documents", href: "/dashboard/documents" },
   { label: "Settings", href: "/dashboard/settings" },
 ];

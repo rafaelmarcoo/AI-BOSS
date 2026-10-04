@@ -4,7 +4,14 @@ export const DOCUMENTS_STORAGE_BUCKET = 'documents'
 // storage and metadata flow before supporting larger ingestion workloads.
 export const MAX_DOCUMENT_SIZE_BYTES = 15 * 1024 * 1024
 
-export const SUPPORTED_DOCUMENT_TYPES = ['pdf', 'csv', 'xlsx', 'image'] as const
+export const SUPPORTED_DOCUMENT_TYPES = [
+  'pdf',
+  'csv',
+  'xlsx',
+  'image',
+  'text',
+  'docx',
+] as const
 
 export const IMAGE_MIME_TYPES = [
   'image/jpeg',

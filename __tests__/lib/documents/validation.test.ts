@@ -49,8 +49,20 @@ describe('document upload validation', () => {
       fileType: 'image',
     })
     expect(() => validateDocumentUpload(mismatch)).toThrow(
-      'Only PDF, CSV, XLSX, JPEG, PNG, and WebP uploads are supported.'
+      'Only PDF, CSV, XLSX, TXT, DOCX, JPEG, PNG, and WebP uploads are supported.'
     )
+  })
+
+  it('accepts plain text and DOCX files', () => {
+    const text = new File(['Cash: 1000 NZD'], 'notes.txt', {
+      type: 'text/plain',
+    })
+    const docx = new File(['word package'], 'report.docx', {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    })
+
+    expect(validateDocumentUpload(text)).toMatchObject({ fileType: 'text' })
+    expect(validateDocumentUpload(docx)).toMatchObject({ fileType: 'docx' })
   })
 
   it('does not treat legacy xls files as csv based on a broad MIME type', () => {
@@ -62,13 +74,13 @@ describe('document upload validation', () => {
   })
 
   it('rejects unsupported uploads', () => {
-    const file = new File(['hello'], 'notes.txt', {
-      type: 'text/plain',
+    const file = new File(['hello'], 'notes.exe', {
+      type: 'application/octet-stream',
     })
 
     expect(() => validateDocumentUpload(file)).toThrow(ApiError)
     expect(() => validateDocumentUpload(file)).toThrow(
-      'Only PDF, CSV, XLSX, JPEG, PNG, and WebP uploads are supported.'
+      'Only PDF, CSV, XLSX, TXT, DOCX, JPEG, PNG, and WebP uploads are supported.'
     )
   })
 

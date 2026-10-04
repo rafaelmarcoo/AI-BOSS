@@ -5,6 +5,7 @@ import {
   createImageChunks,
   createPdfChunks,
   createTabularChunks,
+  createTextChunks,
 } from '@/lib/documents/chunking'
 import { extractImageDocument } from '@/lib/documents/image-extraction'
 import {
@@ -31,6 +32,18 @@ const PDFJS_STANDARD_FONT_DATA_PATH = `${join(
   process.cwd(),
   'node_modules/pdfjs-dist/standard_fonts'
 )}/`
+
+// pdfjs-dist's legacy build still reads these browser globals during module
+// initialization. @napi-rs/canvas supplies server-safe implementations for
+// Node and Vercel without changing the deterministic text extraction itself.
+async function ensurePdfCanvasPolyfills() {
+  if (typeof (globalThis as Record<string, unknown>).DOMMatrix !== 'undefined') {
+    return
+  }
+
+  const { DOMMatrix, Path2D, ImageData, DOMRect } = await import('@napi-rs/canvas')
+  Object.assign(globalThis, { DOMMatrix, Path2D, ImageData, DOMRect })
+}
 
 export function createPdfParsingError(error: unknown, fileName: string) {
   if (error instanceof Error && error.name === 'PasswordException') {
@@ -199,7 +212,133 @@ export async function parseDocumentContent(
     )
   }
 
+  if (document.file_type === 'text') {
+    return parseTextDocument(document, fileBytes)
+  }
+
+  if (document.file_type === 'docx') {
+    return parseDocxDocument(document, fileBytes)
+  }
+
   throw new ApiError(400, 'BAD_REQUEST', 'Unsupported document type.')
+}
+
+function buildTextDocumentResult(
+  document: Pick<Document, 'id' | 'user_id' | 'file_name'>,
+  decoded: string,
+  source: 'text' | 'docx',
+  warnings: Array<{ code: string; message: string }> = []
+): ParsedDocumentResult {
+  const text = normalizeWhitespace(decoded)
+  if (!text) {
+    throw new ApiError(
+      400,
+      'BAD_REQUEST',
+      `No readable text was found in ${document.file_name}.`
+    )
+  }
+
+  const lines = text.split('\n').filter(Boolean)
+  return {
+    rawText: text,
+    metadata: { sourceType: source, warnings },
+    chunks: createTextChunks({
+      documentId: document.id,
+      userId: document.user_id,
+      text,
+      source,
+    }),
+    // Reuse the deterministic line-based metric extractor. This is evidence
+    // plumbing only; candidates still require the normal human confirmation.
+    pdfPages: [{ pageNumber: 1, text, lines }],
+    extractionState: 'text',
+  }
+}
+
+function parseTextDocument(
+  document: Pick<Document, 'id' | 'user_id' | 'file_name'>,
+  fileBytes: Uint8Array
+) {
+  return buildTextDocumentResult(
+    document,
+    Buffer.from(fileBytes).toString('utf8'),
+    'text'
+  )
+}
+
+function decodeHtmlEntities(value: string) {
+  return value
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+}
+
+function stripHtmlTags(value: string) {
+  return decodeHtmlEntities(value.replace(/<[^>]+>/g, ' '))
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function tableHtmlToLines(tableHtml: string) {
+  const rows = tableHtml.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) ?? []
+  return rows
+    .map((row) => {
+      const cells = row.match(/<t[dh][^>]*>[\s\S]*?<\/t[dh]>/gi) ?? []
+      return cells.map(stripHtmlTags).filter(Boolean).join(': ')
+    })
+    .filter(Boolean)
+}
+
+export function mammothHtmlToLines(html: string) {
+  const segments = html.split(/(<table[^>]*>[\s\S]*?<\/table>)/gi)
+  const lines: string[] = []
+
+  for (const segment of segments) {
+    if (/^<table/i.test(segment)) {
+      lines.push(...tableHtmlToLines(segment))
+      continue
+    }
+
+    const paragraphs = segment.match(/<p[^>]*>[\s\S]*?<\/p>/gi) ?? [segment]
+    for (const paragraph of paragraphs) {
+      const text = stripHtmlTags(paragraph)
+      if (text) lines.push(text)
+    }
+  }
+
+  return lines
+}
+
+async function parseDocxDocument(
+  document: Pick<Document, 'id' | 'user_id' | 'file_name'>,
+  fileBytes: Uint8Array
+) {
+  try {
+    const mammoth = await import('mammoth')
+    const result = await mammoth.convertToHtml({ buffer: Buffer.from(fileBytes) })
+    const warnings = result.messages.map((message) => ({
+      code: `docx_${message.type}`,
+      message: message.message,
+    }))
+
+    return buildTextDocumentResult(
+      document,
+      mammothHtmlToLines(result.value).join('\n'),
+      'docx',
+      warnings
+    )
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    console.error(`Failed to parse DOCX ${document.file_name}.`, error)
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      `Failed to parse DOCX ${document.file_name}.`
+    )
+  }
 }
 
 async function parseImageDocument(
@@ -236,6 +375,7 @@ async function parsePdfDocument(
   document: Pick<Document, 'id' | 'user_id' | 'file_type' | 'file_name'>,
   fileBytes: Uint8Array
 ) {
+  await ensurePdfCanvasPolyfills()
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
   const loadingTask = pdfjs.getDocument({
     data: fileBytes,

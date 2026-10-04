@@ -99,6 +99,13 @@ export async function getDocumentPreview(params: {
       : { type: 'image', ...preview, alt: document.file_name }
   }
 
+  if (document.file_type === 'text' || document.file_type === 'docx') {
+    return {
+      type: 'text',
+      text: document.raw_text ?? '',
+    }
+  }
+
   const fileBytes = await downloadDocumentFile(document.storage_path)
   const review =
     document.file_type === 'xlsx'

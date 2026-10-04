@@ -20,7 +20,7 @@ export type UserType = 'admin' | 'employee'
 export type ConversationVisibility = 'private' | 'company' | 'admins'
 export type ScenarioVisibility = 'private' | 'company'
 export type ScenarioStatus = 'draft' | 'calculated'
-export type DocumentFileType = 'pdf' | 'csv' | 'xlsx' | 'image'
+export type DocumentFileType = 'pdf' | 'csv' | 'xlsx' | 'image' | 'text' | 'docx'
 export type DocumentProcessingStatus =
   | 'uploaded'
   | 'processing'
@@ -206,11 +206,21 @@ export interface DocumentDeletionResult {
   deleted: boolean
 }
 
-export type AccountingProvider = 'xero' | 'quickbooks' | 'freshbooks' | 'myob'
+export type AccountingProvider =
+  | 'xero'
+  | 'quickbooks'
+  | 'freshbooks'
+  | 'myob'
+  | 'zoho_books'
+  | 'freeagent'
 export type DataConnectionProvider =
   | AccountingProvider
   | 'csv'
   | 'pdf'
+  | 'xlsx'
+  | 'image'
+  | 'text'
+  | 'docx'
   | 'manual'
   | 'demo'
 export type DataConnectionStatus =

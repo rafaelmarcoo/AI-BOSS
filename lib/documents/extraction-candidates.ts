@@ -10,6 +10,8 @@ const EXTRACTOR_VERSIONS = {
   xlsx: 'deterministic_xlsx_v1',
   pdf: 'deterministic_pdf_v1',
   image: 'openai_image_invoice_v1',
+  text: 'hybrid_text_v1',
+  docx: 'hybrid_docx_v1',
 } as const
 
 function candidateWarnings(metric: AvailableFinancialMetricValue) {
@@ -171,7 +173,11 @@ export function extractDocumentCandidates(params: {
     } satisfies DocumentExtractionCandidateDraft]
   }
 
-  if (params.document.file_type === 'pdf') {
+  if (
+    params.document.file_type === 'pdf' ||
+    params.document.file_type === 'text' ||
+    params.document.file_type === 'docx'
+  ) {
     const metrics = params.parsedDocument.pdfPages
       ? extractPdfFinancialMetrics({
           pages: params.parsedDocument.pdfPages,
@@ -182,7 +188,7 @@ export function extractDocumentCandidates(params: {
       : []
 
     return metrics.map((metric) =>
-      metricToCandidate(metric, EXTRACTOR_VERSIONS.pdf)
+      metricToCandidate(metric, EXTRACTOR_VERSIONS[params.document.file_type])
     )
   }
 

@@ -1,11 +1,24 @@
 import { randomUUID } from 'crypto'
 import { ApiError } from '@/lib/api/errors'
 import { createAdminSupabaseClient } from '@/lib/supabase'
-import { DOCUMENTS_STORAGE_BUCKET } from '@/lib/documents/constants'
+import {
+  DOCUMENTS_STORAGE_BUCKET,
+  IMAGE_MIME_TYPES,
+} from '@/lib/documents/constants'
 import { getUserCompany } from '@/lib/companies'
 import type { Document, DocumentChunk, DocumentDeletionResult } from '@/types/database'
 import type { DocumentChunkInsert, DocumentSummary } from '@/lib/documents/types'
 import type { SupportedDocumentType } from '@/lib/documents/constants'
+import {
+  applyItemAppend,
+  applyItemAttributeEdit,
+  applyItemValueEdit,
+  type AttributeChanges,
+} from '@/lib/financial-data/item-matrix'
+import {
+  resolveItemValue,
+  type ItemAttributes,
+} from '@/lib/financial-data/attributes'
 
 const DOCUMENT_SUMMARY_SELECT = `
   id,
@@ -109,9 +122,9 @@ async function ensureDocumentsBucketExists() {
       'application/csv',
       'application/vnd.ms-excel',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'image/jpeg',
-      'image/png',
-      'image/webp',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+      ...IMAGE_MIME_TYPES,
     ],
   }
   const { data, error } = await supabase.storage.listBuckets()
@@ -433,6 +446,116 @@ export async function updateDocumentRecord(
     requesterId,
     company.userType,
     'You'
+  )
+}
+
+async function getEditableDocument(documentId: string, requesterId: string) {
+  const document = await getAccessibleDocumentById(documentId, requesterId)
+  const company = await getUserCompany(requesterId)
+  const access = documentAccess(document, requesterId, company.userType)
+
+  if (!access.canSaveDraft) {
+    throw new ApiError(
+      403,
+      'FORBIDDEN',
+      'You are not allowed to edit this document.'
+    )
+  }
+
+  return document
+}
+
+export async function updateDocumentExtractedItem(params: {
+  documentId: string
+  requesterId: string
+  index: number
+  value?: number
+  attributes?: AttributeChanges
+}) {
+  const document = await getEditableDocument(params.documentId, params.requesterId)
+  let metadata: Record<string, unknown> | null = null
+
+  if (params.value !== undefined) {
+    metadata = applyItemValueEdit(
+      document.metadata,
+      params.index,
+      params.value
+    )
+  }
+
+  if (params.attributes !== undefined) {
+    metadata = applyItemAttributeEdit(
+      metadata ?? document.metadata,
+      params.index,
+      params.attributes
+    )
+  }
+
+  if (!metadata) {
+    throw new ApiError(404, 'NOT_FOUND', 'That item no longer exists.')
+  }
+
+  return updateDocumentRecord(
+    document.id,
+    document.user_id,
+    { metadata },
+    params.requesterId
+  )
+}
+
+export async function addDocumentExtractedItem(params: {
+  documentId: string
+  requesterId: string
+  label: string
+  value: number | null
+  attributes?: ItemAttributes
+}) {
+  const document = await getEditableDocument(params.documentId, params.requesterId)
+  const resolved = resolveItemValue({
+    value: params.value,
+    attributes: params.attributes,
+  })
+
+  if (resolved.value === null) {
+    throw new ApiError(
+      400,
+      'VALIDATION_ERROR',
+      'Provide a value or numeric price and quantity attributes.'
+    )
+  }
+
+  const metadata = applyItemAppend(document.metadata, {
+    label: params.label,
+    value: resolved.value,
+    attributes: resolved.attributes,
+  })
+
+  return updateDocumentRecord(
+    document.id,
+    document.user_id,
+    { metadata },
+    params.requesterId
+  )
+}
+
+export async function updateDocumentCurrency(params: {
+  documentId: string
+  requesterId: string
+  currency: 'NZD' | 'AUD'
+}) {
+  const document = await getEditableDocument(params.documentId, params.requesterId)
+  const metadata =
+    document.metadata &&
+    typeof document.metadata === 'object' &&
+    !Array.isArray(document.metadata)
+      ? (document.metadata as Record<string, unknown>)
+      : {}
+
+  return updateDocumentRecord(
+    document.id,
+    document.user_id,
+    { metadata: { ...metadata, itemCurrency: params.currency } },
+    params.requesterId
   )
 }
 

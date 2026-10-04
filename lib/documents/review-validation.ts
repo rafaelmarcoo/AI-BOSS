@@ -20,6 +20,7 @@ function isIsoDate(value: string) {
 
 export interface ReprocessDocumentPayload {
   selectedWorksheetNames?: string[]
+  extractionMode?: 'auto' | 'ai_assisted'
 }
 
 export function validateReprocessDocumentPayload(
@@ -28,8 +29,27 @@ export function validateReprocessDocumentPayload(
   const details: Record<string, string> = {}
   const input = isObject(payload) ? payload : {}
   const rawNames = input.selectedWorksheetNames
+  const rawExtractionMode = input.extractionMode
+  const extractionMode =
+    rawExtractionMode === 'auto' || rawExtractionMode === 'ai_assisted'
+      ? rawExtractionMode
+      : undefined
 
-  if (rawNames === undefined) return { success: true, data: {} }
+  if (
+    rawExtractionMode !== undefined &&
+    extractionMode === undefined
+  ) {
+    details.extractionMode = 'Extraction mode must be auto or ai_assisted.'
+  }
+
+  if (rawNames === undefined) {
+    return Object.keys(details).length > 0
+      ? { success: false, details }
+      : {
+          success: true,
+          data: extractionMode ? { extractionMode } : {},
+        }
+  }
 
   if (!Array.isArray(rawNames)) {
     return {
@@ -63,7 +83,10 @@ export function validateReprocessDocumentPayload(
 
   return {
     success: true,
-    data: { selectedWorksheetNames: names },
+    data: {
+      selectedWorksheetNames: names,
+      ...(extractionMode ? { extractionMode } : {}),
+    },
   }
 }
 

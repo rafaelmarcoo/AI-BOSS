@@ -207,3 +207,56 @@ export async function deactivateConnection(userId: string, provider: AccountingP
     throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to disconnect provider.')
   }
 }
+
+/**
+ * Disconnects user-private OAuth credentials and removes the live provider
+ * observations that fed calculations. Immutable saved analysis reports remain
+ * available because they store their own confirmed baseline snapshot.
+ */
+export async function disconnectProviderConnection(
+  userId: string,
+  provider: AccountingProvider
+) {
+  const supabase = createAdminSupabaseClient()
+  const { data: connection, error: connectionError } = await supabase
+    .from('data_connections')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('provider', provider)
+    .maybeSingle()
+
+  if (connectionError) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to load the data connection.')
+  }
+
+  if (connection) {
+    const { error: observationError } = await supabase
+      .from('financial_metric_observations')
+      .delete()
+      .eq('connection_id', connection.id)
+      .eq('user_id', userId)
+
+    if (observationError) {
+      throw new ApiError(
+        500,
+        'INTERNAL_ERROR',
+        'Failed to remove disconnected provider observations.'
+      )
+    }
+  }
+
+  // Remove credentials after live observations. If cleanup fails, the
+  // connection can still be retried instead of leaving live metrics behind
+  // after its refresh credentials have already gone.
+  const { error: tokenError } = await supabase
+    .from('oauth_tokens')
+    .delete()
+    .eq('user_id', userId)
+    .eq('provider', provider)
+
+  if (tokenError) {
+    throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to remove OAuth credentials.')
+  }
+
+  await deactivateConnection(userId, provider)
+}

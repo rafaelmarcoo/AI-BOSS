@@ -76,6 +76,11 @@ export interface ImageDocumentPreviewResponse {
   alt: string
 }
 
+export interface TextDocumentPreviewResponse {
+  type: 'text'
+  text: string
+}
+
 export interface TabularDocumentPreviewResponse {
   type: 'table'
   sheetName: string
@@ -99,6 +104,7 @@ export interface TabularDocumentPreviewResponse {
 export type DocumentPreviewResponse =
   | PdfDocumentPreviewResponse
   | ImageDocumentPreviewResponse
+  | TextDocumentPreviewResponse
   | TabularDocumentPreviewResponse
 
 export interface ReprocessDocumentResponse {
@@ -198,6 +204,10 @@ export interface ParsedTabularData {
 
 export interface ParseDocumentOptions {
   selectedWorksheetNames?: string[]
+}
+
+export interface ProcessDocumentOptions extends ParseDocumentOptions {
+  extractionMode?: 'auto' | 'ai_assisted'
 }
 
 export interface DocumentExtractionCandidateDraft {

@@ -2,7 +2,10 @@ import { NextRequest } from 'next/server'
 import { handleRouteError, successResponse } from '@/lib/api/responses'
 import { requireAuthenticatedUser } from '@/lib/auth'
 import { getValidTokens } from '@/lib/integrations/connections'
-import { getAdapter } from '@/lib/integrations/registry'
+import {
+  getAdapter,
+  requireProviderConfigured,
+} from '@/lib/integrations/registry'
 import { saveAccountingSnapshot } from '@/lib/integrations/sync'
 
 export async function POST(
@@ -13,6 +16,7 @@ export async function POST(
     const { provider } = await params
     const { user } = await requireAuthenticatedUser(request)
     const adapter = getAdapter(provider)
+    requireProviderConfigured(adapter.provider)
     const tokens = await getValidTokens(user.id, adapter.provider)
     const snapshot = await adapter.getFinancialSnapshot(tokens)
 

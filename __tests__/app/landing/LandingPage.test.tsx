@@ -74,7 +74,7 @@ describe('LandingPage quick actions', () => {
 
     expect(input).toHaveAttribute(
       'accept',
-      '.pdf,.csv,.xlsx,.jpg,.jpeg,.png,.webp,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/webp',
+      '.pdf,.csv,.xlsx,.txt,.docx,.jpg,.jpeg,.png,.webp,application/pdf,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/webp',
     )
     await user.upload(input, file)
 

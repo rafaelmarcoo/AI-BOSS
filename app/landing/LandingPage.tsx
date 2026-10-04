@@ -62,7 +62,7 @@ const QUICK_ACTIONS = [
     id: "upload" as const,
     title: "Upload files",
     description: "Add statements, reports or financial documents.",
-    meta: "PDF, CSV, XLSX and invoice images",
+    meta: "PDF, CSV, XLSX, DOCX, text and images",
     ariaLabel: "Upload files",
     icon: CloudUploadOutlinedIcon,
   },
@@ -319,7 +319,7 @@ export function LandingPage({ fullName, email, companyName }: LandingPageProps) 
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf,.csv,.xlsx,.jpg,.jpeg,.png,.webp,application/pdf,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/jpeg,image/png,image/webp"
+            accept=".pdf,.csv,.xlsx,.txt,.docx,.jpg,.jpeg,.png,.webp,application/pdf,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/webp"
             hidden
             onChange={(event) => void handleFileChange(event)}
           />

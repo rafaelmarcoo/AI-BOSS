@@ -58,6 +58,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     after(async () => {
       await processDocument(document.id, document.user_id, {
         selectedWorksheetNames: payload.selectedWorksheetNames,
+        extractionMode: payload.extractionMode,
       })
     })
 

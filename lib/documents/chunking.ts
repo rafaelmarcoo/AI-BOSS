@@ -94,6 +94,23 @@ export function createImageChunks(params: {
   })) satisfies DocumentChunkInsert[]
 }
 
+export function createTextChunks(params: {
+  documentId: string
+  userId: string
+  text: string
+  source: 'text' | 'docx'
+}) {
+  return splitTextIntoWindows(params.text).map((content, chunkIndex) => ({
+    document_id: params.documentId,
+    user_id: params.userId,
+    chunk_index: chunkIndex,
+    content,
+    source_page: null,
+    metadata: { source: params.source },
+    embedding: null,
+  })) satisfies DocumentChunkInsert[]
+}
+
 export function createCsvChunks(params: {
   documentId: string
   userId: string

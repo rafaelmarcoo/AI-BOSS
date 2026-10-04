@@ -27,7 +27,7 @@ AI-BOSS helps small business founders make better financial decisions through:
 - **Backend:** Next.js API Routes
 - **AI:** LangChain.js and configurable OpenAI models
 - **Database:** Supabase (PostgreSQL)
-- **Document processing:** PDF.js and server-side ExcelJS
+- **Document processing:** PDF.js, server-side ExcelJS, Mammoth DOCX parsing, and bounded multimodal extraction
 - **Deployment:** Vercel
 
 ---

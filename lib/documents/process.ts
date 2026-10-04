@@ -4,6 +4,7 @@ import {
   embedDocumentChunks,
 } from '@/lib/documents/embeddings'
 import { logDocumentIngestion } from '@/lib/documents/log-document-ingestion'
+import { extractAiAssistedDocument } from '@/lib/documents/ai-assisted-extraction'
 import { parseDocumentContent } from '@/lib/documents/parsing'
 import {
   extractDocumentCandidates,
@@ -21,7 +22,12 @@ import {
   replaceDocumentChunks,
   updateDocumentRecord,
 } from '@/lib/documents/persistence'
-import type { ParseDocumentOptions } from '@/lib/documents/types'
+import type {
+  DocumentExtractionCandidateDraft,
+  ParsedDocumentResult,
+  ProcessDocumentOptions,
+} from '@/lib/documents/types'
+import type { ExtractedItem } from '@/lib/financial-data/attributes'
 
 function addExtractionMetadata(
   metadata: unknown,
@@ -29,6 +35,10 @@ function addExtractionMetadata(
     metricCandidateCount: number
     extractionRunId: string
     embeddingModel: string
+    extractionMethod: 'deterministic' | 'ai_assisted' | 'hybrid'
+    aiAssistedAttempted: boolean
+    extractedItems?: ExtractedItem[]
+    extractionWarnings?: Array<{ code: string; message: string }>
   }
 ) {
   if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
@@ -39,6 +49,45 @@ function addExtractionMetadata(
   }
 
   return params
+}
+
+function mergeCandidates(
+  deterministic: DocumentExtractionCandidateDraft[],
+  aiAssisted: DocumentExtractionCandidateDraft[]
+) {
+  const merged = new Map<string, DocumentExtractionCandidateDraft>()
+
+  for (const candidate of [...deterministic, ...aiAssisted]) {
+    const key = JSON.stringify([
+      candidate.metricKey,
+      candidate.value,
+      candidate.currency,
+      candidate.reportingDate,
+    ])
+    if (!merged.has(key)) merged.set(key, candidate)
+  }
+
+  return [...merged.values()]
+}
+
+function parsedPdfFallback(error: unknown): ParsedDocumentResult {
+  return {
+    rawText: '',
+    metadata: {
+      sourceType: 'pdf',
+      deterministicExtractionFailed: true,
+      warnings: [{
+        code: 'deterministic_pdf_failed',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Deterministic PDF extraction failed.',
+      }],
+    },
+    chunks: [],
+    pdfPages: [],
+    extractionState: 'scanned',
+  }
 }
 
 function metadataWarnings(metadata: unknown) {
@@ -53,7 +102,7 @@ function metadataWarnings(metadata: unknown) {
 export async function processDocument(
   documentId: string,
   userId: string,
-  options: ParseDocumentOptions = {}
+  options: ProcessDocumentOptions = {}
 ) {
   const startedAt = Date.now()
   const document = await getDocumentById(documentId, userId)
@@ -67,11 +116,77 @@ export async function processDocument(
     })
     extractionRunId = extractionRun.id
     const fileBytes = await downloadDocumentFile(document.storage_path)
-    const parsedDocument = await parseDocumentContent(document, fileBytes, options)
+    let parsedDocument: ParsedDocumentResult
+    try {
+      parsedDocument = await parseDocumentContent(document, fileBytes, options)
+    } catch (error) {
+      // Password-protected or otherwise invalid PDFs remain explicit failures.
+      // Server/runtime extraction failures fall through to the bounded PDF
+      // file fallback while the original storage object remains untouched.
+      if (
+        document.file_type !== 'pdf' ||
+        (error instanceof ApiError && error.status < 500)
+      ) {
+        throw error
+      }
+      parsedDocument = parsedPdfFallback(error)
+    }
+
+    const deterministicCandidates = extractDocumentCandidates({
+      document,
+      parsedDocument,
+      extractedAt: new Date().toISOString(),
+    })
+    const supportsAiAssistance =
+      document.file_type === 'pdf' ||
+      document.file_type === 'text' ||
+      document.file_type === 'docx'
+    const shouldAttemptAi =
+      supportsAiAssistance &&
+      (options.extractionMode === 'ai_assisted' ||
+        document.file_type === 'text' ||
+        document.file_type === 'docx' ||
+        deterministicCandidates.length === 0)
+    const aiWarnings: Array<{ code: string; message: string }> = []
+    let aiCandidates: DocumentExtractionCandidateDraft[] = []
+    let extractedItems: ExtractedItem[] = []
+
+    if (shouldAttemptAi) {
+      if (!process.env.OPENAI_API_KEY) {
+        aiWarnings.push({
+          code: 'ai_assisted_unavailable',
+          message:
+            'AI-assisted extraction was not available. Deterministic results and the original document were retained.',
+        })
+      } else {
+        try {
+          const result = await extractAiAssistedDocument({
+            document,
+            parsedDocument,
+            fileBytes,
+          })
+          aiCandidates = result.candidates
+          extractedItems = result.items
+        } catch (error) {
+          console.error(
+            `AI-assisted extraction failed for ${document.file_name}.`,
+            error
+          )
+          aiWarnings.push({
+            code: 'ai_assisted_failed',
+            message:
+              'AI-assisted extraction failed. Deterministic results and the original document were retained.',
+          })
+        }
+      }
+    }
+
+    const candidates = mergeCandidates(deterministicCandidates, aiCandidates)
 
     if (
       parsedDocument.chunks.length === 0 &&
-      parsedDocument.extractionState !== 'scanned'
+      parsedDocument.extractionState !== 'scanned' &&
+      candidates.length === 0
     ) {
       throw new ApiError(
         400,
@@ -88,11 +203,6 @@ export async function processDocument(
     // Reprocessing replaces retrieval evidence even when a scanned PDF has no
     // extractable text, so stale chunks from an earlier run cannot be cited.
     await replaceDocumentChunks(document.id, document.user_id, embeddedChunks)
-    const candidates = extractDocumentCandidates({
-      document,
-      parsedDocument,
-      extractedAt: new Date().toISOString(),
-    })
     await saveDocumentExtractionCandidates({
       extractionRunId,
       documentId: document.id,
@@ -108,7 +218,10 @@ export async function processDocument(
       selectedWorksheetNames: tabularData?.selectedSheetNames ?? [],
       suggestedWorksheetNames: tabularData?.suggestedSheetNames ?? [],
       worksheetMetadata: tabularData?.worksheetMetadata ?? [],
-      warnings: tabularData?.warnings ?? metadataWarnings(parsedDocument.metadata),
+      warnings: [
+        ...(tabularData?.warnings ?? metadataWarnings(parsedDocument.metadata)),
+        ...aiWarnings,
+      ],
     })
 
     const financialReviewStatus =
@@ -123,6 +236,15 @@ export async function processDocument(
         metricCandidateCount: candidates.length,
         extractionRunId,
         embeddingModel: DOCUMENT_EMBEDDING_MODEL,
+        extractionMethod:
+          aiCandidates.length > 0
+            ? deterministicCandidates.length > 0
+              ? 'hybrid'
+              : 'ai_assisted'
+            : 'deterministic',
+        aiAssistedAttempted: shouldAttemptAi,
+        ...(extractedItems.length > 0 ? { extractedItems } : {}),
+        ...(aiWarnings.length > 0 ? { extractionWarnings: aiWarnings } : {}),
       }
     )
 

@@ -1,4 +1,5 @@
 import type { AccountingProvider, NormalizedFinancialData } from '@/lib/integrations/types'
+import { ApiError } from '@/lib/api/errors'
 import { requireCompanyAdmin } from '@/lib/companies'
 import { createAdminSupabaseClient } from '@/lib/supabase'
 import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
@@ -24,6 +25,14 @@ export async function saveAccountingSnapshot(params: {
   sourceLabel: string
   snapshot: NormalizedFinancialData
 }) {
+  if (params.snapshot.currency !== 'NZD' && params.snapshot.currency !== 'AUD') {
+    throw new ApiError(
+      422,
+      'VALIDATION_ERROR',
+      `AI-BOSS currently supports NZD and AUD financial calculations. ${params.snapshot.currency || 'Unknown currency'} data was not imported.`
+    )
+  }
+
   const company = await requireCompanyAdmin(params.userId)
   const supabase = createAdminSupabaseClient()
   const now = new Date().toISOString()

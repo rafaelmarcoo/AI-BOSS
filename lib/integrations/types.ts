@@ -4,7 +4,7 @@ export type { AccountingProvider }
 
 export interface ProviderStatus {
   provider: AccountingProvider
-  status: 'connected' | 'disconnected' | 'available' | 'error'
+  status: 'connected' | 'disconnected' | 'available' | 'unavailable' | 'error'
   displayName: string | null
   connectedAt: string | null
   lastSyncedAt: string | null

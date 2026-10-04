@@ -161,4 +161,16 @@ describe('document review validation', () => {
       }).success
     ).toBe(false)
   })
+
+  it('accepts an explicit AI-assisted reprocess mode and rejects unknown modes', () => {
+    expect(
+      validateReprocessDocumentPayload({ extractionMode: 'ai_assisted' })
+    ).toEqual({
+      success: true,
+      data: { extractionMode: 'ai_assisted' },
+    })
+    expect(
+      validateReprocessDocumentPayload({ extractionMode: 'autonomous' }).success
+    ).toBe(false)
+  })
 })

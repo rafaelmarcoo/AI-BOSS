@@ -9,6 +9,7 @@ import {
   Checkbox,
   Chip,
   CircularProgress,
+  Divider,
   FormControl,
   FormControlLabel,
   InputLabel,
@@ -24,6 +25,8 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Tab,
+  Tabs,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
@@ -33,6 +36,8 @@ import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
+import AddCircleOutlineRoundedIcon from "@mui/icons-material/AddCircleOutlineRounded";
+import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
 import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
 import {
   FINANCIAL_METRIC_KEYS,
@@ -47,6 +52,10 @@ import type {
   ReviewedDocumentCandidateInput,
 } from "@/lib/documents/types";
 import { getDocumentStatusPresentation } from "@/lib/documents/presentation";
+import {
+  buildItemMatrix,
+  readExtractedItemsWithIndex,
+} from "@/lib/financial-data/item-matrix";
 
 type CandidateDecision = "pending" | "included" | "excluded";
 
@@ -156,6 +165,7 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [reviewAcknowledged, setReviewAcknowledged] = useState(false);
+  const [reviewSection, setReviewSection] = useState<"values" | "items">("values");
 
   const loadDetails = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -224,6 +234,10 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
   }, [details?.document.status, loadDetails]);
 
   const candidates = useMemo(() => details?.candidates ?? [], [details?.candidates]);
+  const itemCount = useMemo(
+    () => readExtractedItemsWithIndex(details?.document.metadata).length,
+    [details?.document.metadata],
+  );
   const confirmed = details?.document.financial_review_status === "confirmed";
   const reviewable = details?.extractionRun?.status === "extracted" && !confirmed;
   const summary = useMemo(() => {
@@ -387,7 +401,7 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
     }
   };
 
-  const reprocess = async () => {
+  const reprocess = async (extractionMode: "auto" | "ai_assisted" = "auto") => {
     if (!details) return;
     setReprocessing(true);
     setError(null);
@@ -401,6 +415,7 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
           body: JSON.stringify({
             selectedWorksheetNames:
               details.document.file_type === "xlsx" ? selectedSheets : undefined,
+            extractionMode,
           }),
         },
       );
@@ -408,7 +423,9 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
       if (!response.ok || !payload.success) {
         throw new Error(payload.error?.message ?? "Could not reprocess this document.");
       }
-      setNotice("Reprocessing started. Existing User-confirmed values remain available until a new review is approved.");
+      setNotice(
+        `${extractionMode === "ai_assisted" ? "AI-assisted reprocessing" : "Reprocessing"} started. Existing User-confirmed values remain available until a new review is approved.`,
+      );
       await loadDetails(false);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Could not reprocess this document.");
@@ -459,15 +476,25 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
             {details.document.status === "processing" ? <CircularProgress size={20} aria-label="Processing document" /> : null}
           </Stack>
         </Stack>
-        <Button
-          variant="outlined"
-          startIcon={<RefreshRoundedIcon />}
-          disabled={reprocessing || details.document.status === "processing" || (details.document.file_type === "xlsx" && selectedSheets.length === 0)}
-          onClick={() => void reprocess()}
-          sx={{ alignSelf: { xs: "stretch", sm: "center" } }}
-        >
-          {reprocessing ? "Starting…" : "Reprocess document"}
-        </Button>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignSelf: { sm: "center" } }}>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshRoundedIcon />}
+            disabled={reprocessing || details.document.status === "processing" || (details.document.file_type === "xlsx" && selectedSheets.length === 0)}
+            onClick={() => void reprocess()}
+          >
+            {reprocessing ? "Starting…" : "Reprocess document"}
+          </Button>
+          {["pdf", "text", "docx"].includes(details.document.file_type) ? (
+            <Button
+              variant="text"
+              disabled={reprocessing || details.document.status === "processing"}
+              onClick={() => void reprocess("ai_assisted")}
+            >
+              Try AI-assisted extraction
+            </Button>
+          ) : null}
+        </Stack>
       </Stack>
 
       {error ? <Alert severity="error" onClose={() => setError(null)}>{error}</Alert> : null}
@@ -541,10 +568,21 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
               <Stack>
                 <Typography component="h2" variant="h6" fontWeight={750}>Extraction review</Typography>
                 <Typography variant="body2" sx={{ mt: 0.5, color: dashboardTokens.textMuted }}>
-                  Valid candidates are preselected for convenience but remain unreviewed. Compare them with the original, correct any value, and explicitly confirm the final selection.
+                  {reviewSection === "values"
+                    ? "Compare candidate financial values with the original, correct them, and explicitly confirm the final selection."
+                    : "Review supplementary line items and attributes. These notes never become trusted calculation inputs."}
                 </Typography>
               </Stack>
-              {reviewable && details.document.access.canSaveDraft && candidates.length > 0 ? (
+              <Tabs
+                value={reviewSection}
+                onChange={(_, value: "values" | "items") => setReviewSection(value)}
+                aria-label="Document review sections"
+                variant="fullWidth"
+              >
+                <Tab value="values" label={`Values (${candidates.length})`} />
+                <Tab value="items" label={`Items (${itemCount})`} />
+              </Tabs>
+              {reviewSection === "values" && reviewable && details.document.access.canSaveDraft && candidates.length > 0 ? (
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                   <Button variant="outlined" size="small" onClick={() => setAllCandidateDecisions("included_valid")}>
                     Include all valid
@@ -560,6 +598,8 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
             </Stack>
           </Paper>
 
+          {reviewSection === "values" ? (
+            <>
           {candidates.length === 0 ? (
             <Paper variant="outlined" sx={{ ...panelStyles, textAlign: "center", py: 6 }}>
               <Typography fontWeight={700}>No financial metrics found</Typography>
@@ -641,9 +681,310 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
               </Stack>
             </Paper>
           ) : null}
+            </>
+          ) : (
+            <SupplementaryItemsPanel
+              documentId={documentId}
+              metadata={details.document.metadata}
+              editable={details.document.access.canSaveDraft}
+              onSaved={() => loadDetails(false)}
+              onError={setError}
+              onNotice={setNotice}
+            />
+          )}
         </Stack>
       </Box>
     </Stack>
+  );
+}
+
+interface ItemDraft {
+  value: string;
+  attributes: Record<string, string>;
+}
+
+function metadataCurrency(metadata: unknown): "NZD" | "AUD" {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return "NZD";
+  return Reflect.get(metadata, "itemCurrency") === "AUD" ? "AUD" : "NZD";
+}
+
+function SupplementaryItemsPanel({
+  documentId,
+  metadata,
+  editable,
+  onSaved,
+  onError,
+  onNotice,
+}: {
+  documentId: string;
+  metadata: unknown;
+  editable: boolean;
+  onSaved: () => Promise<void>;
+  onError: (message: string | null) => void;
+  onNotice: (message: string | null) => void;
+}) {
+  const matrix = useMemo(
+    () => buildItemMatrix(readExtractedItemsWithIndex(metadata)),
+    [metadata],
+  );
+  const [drafts, setDrafts] = useState<Record<number, ItemDraft>>({});
+  const [customColumns, setCustomColumns] = useState<string[]>([]);
+  const [newColumn, setNewColumn] = useState("");
+  const [newLabel, setNewLabel] = useState("");
+  const [newValue, setNewValue] = useState("");
+  const [newPrice, setNewPrice] = useState("");
+  const [newQuantity, setNewQuantity] = useState("");
+  const [currency, setCurrency] = useState<"NZD" | "AUD">(
+    metadataCurrency(metadata),
+  );
+  const [savingRow, setSavingRow] = useState<number | "new" | "currency" | null>(null);
+
+  useEffect(() => {
+    setDrafts(Object.fromEntries(matrix.rows.map((row) => [
+      row.index,
+      {
+        value: String(row.value),
+        attributes: Object.fromEntries(
+          Object.entries(row.attributes).map(([key, value]) => [key, String(value)]),
+        ),
+      },
+    ])));
+    setCurrency(metadataCurrency(metadata));
+  }, [matrix.rows, metadata]);
+
+  const columns = [...matrix.columns];
+  for (const column of customColumns) {
+    if (!columns.includes(column)) columns.push(column);
+  }
+
+  const request = async (path: string, body: unknown, method: "POST" | "PATCH") => {
+    const response = await fetch(path, {
+      method,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const payload = (await response.json()) as ApiEnvelope<unknown>;
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.error?.message ?? "Could not save the item changes.");
+    }
+  };
+
+  const saveRow = async (index: number) => {
+    const draft = drafts[index];
+    const value = Number(draft?.value);
+    if (!draft || draft.value.trim() === "" || !Number.isFinite(value)) {
+      onError("Each item value must be a valid number.");
+      return;
+    }
+
+    setSavingRow(index);
+    onError(null);
+    try {
+      await request(
+        `/api/documents/${encodeURIComponent(documentId)}/items`,
+        { index, value, attributes: draft.attributes },
+        "PATCH",
+      );
+      await onSaved();
+      onNotice("Supplementary item saved. Trusted financial values were not changed.");
+    } catch (requestError) {
+      onError(requestError instanceof Error ? requestError.message : "Could not save the item.");
+    } finally {
+      setSavingRow(null);
+    }
+  };
+
+  const addItem = async () => {
+    if (!newLabel.trim()) {
+      onError("Enter a label for the new item.");
+      return;
+    }
+    const attributes: Record<string, string> = {};
+    if (newPrice.trim()) attributes.price = newPrice;
+    if (newQuantity.trim()) attributes.quantity = newQuantity;
+    const parsedValue = newValue.trim() === "" ? undefined : Number(newValue);
+    if (parsedValue !== undefined && !Number.isFinite(parsedValue)) {
+      onError("The new item value must be a valid number.");
+      return;
+    }
+
+    setSavingRow("new");
+    onError(null);
+    try {
+      await request(
+        `/api/documents/${encodeURIComponent(documentId)}/items`,
+        { label: newLabel.trim(), value: parsedValue, attributes },
+        "POST",
+      );
+      setNewLabel("");
+      setNewValue("");
+      setNewPrice("");
+      setNewQuantity("");
+      await onSaved();
+      onNotice("Supplementary item added. Price × quantity is used when value is blank.");
+    } catch (requestError) {
+      onError(requestError instanceof Error ? requestError.message : "Could not add the item.");
+    } finally {
+      setSavingRow(null);
+    }
+  };
+
+  const saveCurrency = async (nextCurrency: "NZD" | "AUD") => {
+    setCurrency(nextCurrency);
+    setSavingRow("currency");
+    onError(null);
+    try {
+      await request(
+        `/api/documents/${encodeURIComponent(documentId)}/currency`,
+        { currency: nextCurrency },
+        "PATCH",
+      );
+      await onSaved();
+      onNotice("Supplementary item currency saved. Confirmed metric currencies were not changed.");
+    } catch (requestError) {
+      onError(requestError instanceof Error ? requestError.message : "Could not save the currency.");
+    } finally {
+      setSavingRow(null);
+    }
+  };
+
+  return (
+    <Paper variant="outlined" sx={panelStyles}>
+      <Stack spacing={2}>
+        <Alert severity="info">
+          Items are supporting document metadata only. Editing them does not change confirmed observations, dashboards, analysis, forecasts, or scenarios.
+        </Alert>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="space-between">
+          <FormControl size="small" sx={{ minWidth: 150 }} disabled={!editable || savingRow !== null}>
+            <InputLabel id="item-currency-label">Item currency</InputLabel>
+            <Select
+              labelId="item-currency-label"
+              label="Item currency"
+              value={currency}
+              onChange={(event) => void saveCurrency(event.target.value as "NZD" | "AUD")}
+            >
+              <MenuItem value="NZD">NZD</MenuItem>
+              <MenuItem value="AUD">AUD</MenuItem>
+            </Select>
+          </FormControl>
+          {editable ? (
+            <Stack direction="row" spacing={1}>
+              <TextField
+                size="small"
+                label="New attribute column"
+                value={newColumn}
+                onChange={(event) => setNewColumn(event.target.value)}
+              />
+              <Button
+                variant="outlined"
+                startIcon={<AddCircleOutlineRoundedIcon />}
+                onClick={() => {
+                  const column = newColumn.trim();
+                  if (column && !columns.includes(column)) setCustomColumns((current) => [...current, column]);
+                  setNewColumn("");
+                }}
+              >
+                Add column
+              </Button>
+            </Stack>
+          ) : null}
+        </Stack>
+
+        {matrix.rows.length === 0 ? (
+          <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
+            No supplementary items were extracted. You can add rows manually without affecting trusted financial values.
+          </Typography>
+        ) : (
+          <TableContainer sx={{ overflowX: "auto" }}>
+            <Table size="small" aria-label="Supplementary document items">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ minWidth: 170 }}>Item</TableCell>
+                  <TableCell sx={{ minWidth: 120 }}>Value ({currency})</TableCell>
+                  {columns.map((column) => <TableCell key={column} sx={{ minWidth: 140 }}>{column}</TableCell>)}
+                  {editable ? <TableCell align="right">Action</TableCell> : null}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {matrix.rows.map((row) => {
+                  const draft = drafts[row.index] ?? { value: String(row.value), attributes: {} };
+                  return (
+                    <TableRow key={row.index} hover>
+                      <TableCell component="th" scope="row">{row.label}</TableCell>
+                      <TableCell>
+                        <TextField
+                          size="small"
+                          inputMode="decimal"
+                          value={draft.value}
+                          disabled={!editable}
+                          onChange={(event) => setDrafts((current) => ({
+                            ...current,
+                            [row.index]: { ...draft, value: event.target.value },
+                          }))}
+                        />
+                      </TableCell>
+                      {columns.map((column) => (
+                        <TableCell key={column}>
+                          <TextField
+                            size="small"
+                            value={draft.attributes[column] ?? ""}
+                            disabled={!editable || column.toLowerCase() === "total"}
+                            onChange={(event) => setDrafts((current) => ({
+                              ...current,
+                              [row.index]: {
+                                ...draft,
+                                attributes: { ...draft.attributes, [column]: event.target.value },
+                              },
+                            }))}
+                          />
+                        </TableCell>
+                      ))}
+                      {editable ? (
+                        <TableCell align="right">
+                          <Button
+                            size="small"
+                            startIcon={<SaveRoundedIcon />}
+                            disabled={savingRow !== null}
+                            onClick={() => void saveRow(row.index)}
+                          >
+                            Save
+                          </Button>
+                        </TableCell>
+                      ) : null}
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+
+        {editable ? (
+          <>
+            <Divider />
+            <Typography fontWeight={700}>Add supplementary row</Typography>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" }, gap: 1 }}>
+              <TextField size="small" label="Label" value={newLabel} onChange={(event) => setNewLabel(event.target.value)} />
+              <TextField size="small" label="Value (optional)" inputMode="decimal" value={newValue} onChange={(event) => setNewValue(event.target.value)} />
+              <TextField size="small" label="Price (optional)" inputMode="decimal" value={newPrice} onChange={(event) => setNewPrice(event.target.value)} />
+              <TextField size="small" label="Quantity (optional)" inputMode="decimal" value={newQuantity} onChange={(event) => setNewQuantity(event.target.value)} />
+            </Box>
+            <Button
+              variant="contained"
+              startIcon={<AddCircleOutlineRoundedIcon />}
+              disabled={savingRow !== null}
+              onClick={() => void addItem()}
+              sx={{ alignSelf: "flex-start" }}
+            >
+              {savingRow === "new" ? "Adding…" : "Add item"}
+            </Button>
+            <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
+              Leave value blank and provide numeric price and quantity to calculate the row total deterministically.
+            </Typography>
+          </>
+        ) : null}
+      </Stack>
+    </Paper>
   );
 }
 
@@ -736,6 +1077,27 @@ function OriginalPreview({
               bgcolor: "white",
             }}
           />
+        ) : preview?.type === "text" ? (
+          <Box
+            component="pre"
+            sx={{
+              m: 0,
+              p: 2,
+              maxHeight: { xs: 620, lg: "calc(100vh - 220px)" },
+              overflow: "auto",
+              whiteSpace: "pre-wrap",
+              overflowWrap: "anywhere",
+              border: "1px solid",
+              borderColor: dashboardTokens.border,
+              borderRadius: 1.5,
+              bgcolor: dashboardTokens.surfaceAlt,
+              color: dashboardTokens.textSoft,
+              fontFamily: "monospace",
+              fontSize: 13,
+            }}
+          >
+            {preview.text || "No text could be extracted for preview."}
+          </Box>
         ) : preview?.type === "table" ? (
           <>
             {preview.totalColumnCount > preview.displayedColumnCount ? (

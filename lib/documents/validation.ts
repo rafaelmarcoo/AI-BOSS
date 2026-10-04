@@ -15,6 +15,10 @@ const CSV_MIME_TYPES = [
 const XLSX_MIME_TYPES = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ]
+const TEXT_MIME_TYPES = ['text/plain']
+const DOCX_MIME_TYPES = [
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+]
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp']
 const IMAGE_MIME_BY_EXTENSION: Record<string, (typeof IMAGE_MIME_TYPES)[number]> = {
   jpg: 'image/jpeg',
@@ -36,6 +40,8 @@ function detectDocumentType(file: File): SupportedDocumentType | null {
   if (extension === 'pdf') return 'pdf'
   if (extension === 'csv') return 'csv'
   if (extension === 'xlsx') return 'xlsx'
+  if (extension === 'txt') return 'text'
+  if (extension === 'docx') return 'docx'
   if (
     IMAGE_EXTENSIONS.includes(extension) &&
     IMAGE_MIME_BY_EXTENSION[extension] === mimeType
@@ -48,6 +54,8 @@ function detectDocumentType(file: File): SupportedDocumentType | null {
   if (PDF_MIME_TYPES.includes(mimeType)) return 'pdf'
   if (CSV_MIME_TYPES.includes(mimeType)) return 'csv'
   if (XLSX_MIME_TYPES.includes(mimeType)) return 'xlsx'
+  if (TEXT_MIME_TYPES.includes(mimeType)) return 'text'
+  if (DOCX_MIME_TYPES.includes(mimeType)) return 'docx'
   if (IMAGE_MIME_TYPES.includes(mimeType as (typeof IMAGE_MIME_TYPES)[number])) {
     return 'image'
   }
@@ -99,7 +107,7 @@ export function validateDocumentUpload(
     throw new ApiError(
       400,
       'BAD_REQUEST',
-      'Only PDF, CSV, XLSX, JPEG, PNG, and WebP uploads are supported.'
+      'Only PDF, CSV, XLSX, TXT, DOCX, JPEG, PNG, and WebP uploads are supported.'
     )
   }
 

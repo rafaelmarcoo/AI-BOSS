@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import {
-  Box,
   Button,
   FormControl,
   FormControlLabel,
@@ -19,10 +18,6 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
 import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
 import { GEN_UI_WIDGET_CATALOG_ENTRIES } from "@/lib/gen-ui/catalog";
-import type {
-  DashboardLayoutPayload,
-  DashboardRiskThresholds,
-} from "@/lib/gen-ui/dashboard-layout-types";
 import type { GenUiWidgetType } from "@/lib/gen-ui/types";
 
 const CONVERSATION_ONLY_WIDGETS = new Set<GenUiWidgetType>([
@@ -34,13 +29,11 @@ const CONVERSATION_ONLY_WIDGETS = new Set<GenUiWidgetType>([
 interface DashboardCustomizationPanelProps {
   name: string;
   isDefault: boolean;
-  payload: DashboardLayoutPayload;
   saving: boolean;
   hasAiPlan: boolean;
   canDelete: boolean;
   onNameChange: (name: string) => void;
   onDefaultChange: (isDefault: boolean) => void;
-  onRiskThresholdsChange: (thresholds: DashboardRiskThresholds) => void;
   onAddWidget: (widgetType: GenUiWidgetType) => void;
   onResetToAi: () => void;
   onSave: () => void;
@@ -51,13 +44,11 @@ interface DashboardCustomizationPanelProps {
 export function DashboardCustomizationPanel({
   name,
   isDefault,
-  payload,
   saving,
   hasAiPlan,
   canDelete,
   onNameChange,
   onDefaultChange,
-  onRiskThresholdsChange,
   onAddWidget,
   onResetToAi,
   onSave,
@@ -74,18 +65,6 @@ export function DashboardCustomizationPanel({
   const [widgetType, setWidgetType] = useState<GenUiWidgetType>(
     widgetOptions[0].type,
   );
-  const threshold = (
-    key: keyof DashboardRiskThresholds,
-    value: string,
-  ) => {
-    const number = Number(value);
-    if (!Number.isFinite(number)) return;
-    onRiskThresholdsChange({
-      ...payload.riskThresholds,
-      [key]: number,
-    });
-  };
-
   return (
     <Paper
       elevation={0}
@@ -153,29 +132,6 @@ export function DashboardCustomizationPanel({
           </Button>
         </Stack>
 
-        <Box>
-          <Typography fontWeight={650} sx={{ mb: 0.4 }}>
-            Risk thresholds
-          </Typography>
-          <Typography variant="body2" sx={{ color: dashboardTokens.textMuted, mb: 1.25 }}>
-            These thresholds apply only to this layout&apos;s runway and customer-concentration risk widgets.
-          </Typography>
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", xl: "repeat(3, 1fr)" },
-              gap: 1.25,
-            }}
-          >
-            <ThresholdField label="Runway caution (months)" value={payload.riskThresholds.runwayCautionMonths} onChange={(value) => threshold("runwayCautionMonths", value)} />
-            <ThresholdField label="Runway urgent (months)" value={payload.riskThresholds.runwayUrgentMonths} onChange={(value) => threshold("runwayUrgentMonths", value)} />
-            <ThresholdField label="Top customer elevated (%)" value={payload.riskThresholds.customerTopOneElevatedPercent} onChange={(value) => threshold("customerTopOneElevatedPercent", value)} />
-            <ThresholdField label="Top customer high (%)" value={payload.riskThresholds.customerTopOneHighPercent} onChange={(value) => threshold("customerTopOneHighPercent", value)} />
-            <ThresholdField label="Top three elevated (%)" value={payload.riskThresholds.customerTopThreeElevatedPercent} onChange={(value) => threshold("customerTopThreeElevatedPercent", value)} />
-            <ThresholdField label="Top three high (%)" value={payload.riskThresholds.customerTopThreeHighPercent} onChange={(value) => threshold("customerTopThreeHighPercent", value)} />
-          </Box>
-        </Box>
-
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
           <Button
             variant="contained"
@@ -203,26 +159,5 @@ export function DashboardCustomizationPanel({
         </Stack>
       </Stack>
     </Paper>
-  );
-}
-
-function ThresholdField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <TextField
-      label={label}
-      type="number"
-      size="small"
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      inputProps={{ min: 0, max: 100, step: 0.5 }}
-    />
   );
 }

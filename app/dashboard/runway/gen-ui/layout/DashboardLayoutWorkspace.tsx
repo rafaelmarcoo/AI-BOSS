@@ -378,17 +378,11 @@ export function DashboardLayoutWorkspace({
         <DashboardCustomizationPanel
           name={draftName}
           isDefault={draftDefault}
-          payload={payload}
           saving={saving}
           hasAiPlan={Boolean(plan?.widgets.length)}
           canDelete={selectedLayoutId !== null}
           onNameChange={setDraftName}
           onDefaultChange={setDraftDefault}
-          onRiskThresholdsChange={(riskThresholds) =>
-            setPayload((current) =>
-              current ? { ...current, riskThresholds } : current,
-            )
-          }
           onAddWidget={addWidget}
           onResetToAi={resetToAi}
           onSave={saveLayout}

@@ -125,11 +125,13 @@ export function GenUiCanvas({
     <Paper
       elevation={0}
       sx={{
-        p: 0,
-        borderRadius: 0,
-        bgcolor: "transparent",
+        p: { xs: 2, sm: 3 },
+        borderRadius: "20px",
+        bgcolor: dashboardTokens.surface,
         color: dashboardTokens.text,
-        border: 0,
+        border: "1px solid",
+        borderColor: dashboardTokens.border,
+        boxShadow: "0 18px 50px rgba(10, 28, 44, 0.18)",
         overflow: "hidden",
       }}
     >
@@ -139,11 +141,11 @@ export function GenUiCanvas({
           alignItems={{ xs: "flex-start", sm: "center" }}
           justifyContent="space-between"
           spacing={1}
-          sx={{ pb: 3 }}
+          sx={{ pb: 2.5 }}
         >
           <Stack direction="row" spacing={1.5} alignItems="center">
             <Box sx={{ minWidth: 0 }}>
-              <Typography component="h1" sx={{ fontSize: { xs: 20, sm: 22 }, fontWeight: 600, letterSpacing: "-0.02em" }}>
+              <Typography component="h1" sx={{ fontSize: { xs: 22, sm: 26 }, fontWeight: 600, letterSpacing: "-0.025em" }}>
                 {workspaceTitle}
               </Typography>
               <Typography
@@ -232,6 +234,10 @@ export function GenUiCanvas({
                     borderColor: dashboardTokens.borderMuted,
                     bgcolor: dashboardTokens.surfaceAlt,
                     color: dashboardTokens.text,
+                  },
+                  "&:focus-visible": {
+                    outline: `2px solid ${dashboardTokens.accent}`,
+                    outlineOffset: 2,
                   },
                 }}
               >

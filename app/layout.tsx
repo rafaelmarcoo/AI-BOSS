@@ -1,13 +1,7 @@
 import type { Metadata } from 'next'
-import { Manrope, Poppins } from 'next/font/google'
+import { Poppins } from 'next/font/google'
 import { Providers } from './providers'
 import './globals.css'
-
-const manrope = Manrope({
-  subsets: ['latin'],
-  variable: '--font-manrope',
-  display: 'swap',
-})
 
 const poppins = Poppins({
   subsets: ['latin'],
@@ -27,7 +21,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${manrope.variable} ${poppins.variable}`}>
+    <html lang="en" className={poppins.variable}>
       <body>
         <Providers>{children}</Providers>
       </body>

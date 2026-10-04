@@ -368,8 +368,8 @@ export function ChatSidebar({
           sx: {
             width: { xs: "100vw", sm: 380 },
             maxWidth: "100vw",
-            bgcolor: "#080910",
-            color: "common.white",
+            bgcolor: dashboardTokens.sidebar,
+            color: dashboardTokens.text,
             borderRight: "1px solid",
             borderRightColor: dashboardTokens.border,
             p: { xs: 1, sm: 1.5 },
@@ -403,7 +403,7 @@ export function ChatSidebar({
                   flex: "0 0 auto",
                 }}
               >
-                <ForumRoundedIcon sx={{ color: "common.white", fontSize: 20 }} />
+                <ForumRoundedIcon sx={{ color: dashboardTokens.accent, fontSize: 20 }} />
               </Box>
               <Box sx={{ minWidth: 0 }}>
                 <Typography variant="subtitle1" fontWeight={700} lineHeight={1.2}>
@@ -617,8 +617,8 @@ export function ChatSidebar({
         onClose={closeConversationMenu}
         PaperProps={{
           sx: {
-            bgcolor: "#111218",
-            color: "common.white",
+            bgcolor: dashboardTokens.surface,
+            color: dashboardTokens.text,
             border: "1px solid",
             borderColor: dashboardTokens.border,
           },
@@ -639,8 +639,8 @@ export function ChatSidebar({
         maxWidth="xs"
         PaperProps={{
           sx: {
-            bgcolor: "#111218",
-            color: "common.white",
+            bgcolor: dashboardTokens.surface,
+            color: dashboardTokens.text,
             border: "1px solid",
             borderColor: dashboardTokens.border,
           },
@@ -667,7 +667,7 @@ export function ChatSidebar({
               mt: 1,
               "& .MuiOutlinedInput-root": {
                 borderRadius: 2.5,
-                color: "common.white",
+                color: dashboardTokens.text,
                 bgcolor: "rgba(255,255,255,0.04)",
               },
             }}
@@ -697,8 +697,8 @@ export function ChatSidebar({
         maxWidth="xs"
         PaperProps={{
           sx: {
-            bgcolor: "#111218",
-            color: "common.white",
+            bgcolor: dashboardTokens.surface,
+            color: dashboardTokens.text,
             border: "1px solid",
             borderColor: dashboardTokens.border,
           },

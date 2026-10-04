@@ -148,7 +148,7 @@ export function ChatInput({
         sx={{
           "& .MuiOutlinedInput-root": {
             minHeight: 38,
-            borderRadius: `${dashboardTokens.radiusSm}px`,
+            borderRadius: `${dashboardTokens.radiusMd}px`,
             bgcolor: dashboardTokens.surface,
             color: dashboardTokens.text,
             fontSize: 14,
@@ -156,7 +156,7 @@ export function ChatInput({
           "& .MuiOutlinedInput-notchedOutline": {
             borderColor: dashboardTokens.borderInput,
           },
-          "& input": { color: "common.white" },
+          "& input": { color: dashboardTokens.text },
         }}
       />
 

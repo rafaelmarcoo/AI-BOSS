@@ -174,8 +174,8 @@ export function RecentActivity({ tone = "dark" }: RecentActivityProps) {
                   height: 32,
                   flex: "0 0 auto",
                   borderRadius: 1.5,
-                  bgcolor: light ? "#E2EEF6" : "rgba(79,125,243,0.14)",
-                  color: light ? "#2B6A9B" : "#93c5fd",
+                  bgcolor: light ? "#FFF0E8" : "rgba(242,140,91,0.16)",
+                  color: light ? "#9B4825" : dashboardTokens.accent,
                 }}
               >
                 <ActivityIcon kind={activity.kind} />

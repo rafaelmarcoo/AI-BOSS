@@ -110,6 +110,7 @@ export function ResizablePanels({
               : `${chatWidth}px ${RESIZER_WIDTH}px minmax(0, 1fr)`,
         },
         overflow: { md: "hidden" },
+        background: `linear-gradient(145deg, ${dashboardTokens.shell} 0%, #31536E 100%)`,
       }}
     >
       <Box
@@ -174,6 +175,7 @@ export function ResizablePanels({
           flex: { xs: "0 0 auto", md: undefined },
           overflow: { xs: "visible", md: "auto" },
           bgcolor: dashboardTokens.shell,
+          background: "linear-gradient(145deg, #29465F 0%, #31536E 100%)",
           minWidth: 0,
         }}
       >

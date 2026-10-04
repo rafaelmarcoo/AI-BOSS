@@ -3,6 +3,7 @@
 import { Button } from '@mui/material'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { dashboardTokens } from '@/app/theme'
 
 export function SignOutButton() {
   const router = useRouter()
@@ -27,14 +28,14 @@ export function SignOutButton() {
       sx={{
         minHeight: 32,
         minWidth: 0,
-        borderRadius: '8px',
+        borderRadius: `${dashboardTokens.radiusSm}px`,
         px: 1.25,
-        color: '#9DA7B5',
+        color: dashboardTokens.textMuted,
         fontSize: 13,
         textTransform: 'none',
         '&:hover': {
-          color: '#F4F6F8',
-          backgroundColor: '#151A24',
+          color: dashboardTokens.text,
+          backgroundColor: 'rgba(255,255,255,0.08)',
         },
       }}
     >

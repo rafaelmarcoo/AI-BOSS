@@ -16,7 +16,7 @@ export function RunwaySection({
   onAskChatbot,
 }: RunwaySectionProps) {
   return (
-    <Box sx={{ p: { xs: 2, sm: 3 }, minHeight: "100%" }}>
+    <Box sx={{ p: { xs: 2, sm: 3, lg: 4 }, minHeight: "100%" }}>
       <Box
         sx={{
           display: "grid",

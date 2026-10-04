@@ -16,10 +16,11 @@ export function WidgetFrame({
   return (
     <Box
       sx={{
-        py: { xs: 2.5, sm: 3 },
-        color: "common.white",
+        p: { xs: 2, sm: 2.5 },
+        color: dashboardTokens.text,
         minWidth: 0,
         height: "100%",
+        bgcolor: "rgba(255,255,255,0.025)",
       }}
     >
       <Stack spacing={1.75}>
@@ -50,4 +51,3 @@ export function WidgetFrame({
     </Box>
   );
 }
-

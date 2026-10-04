@@ -40,6 +40,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       component="main"
       sx={{
         bgcolor: dashboardTokens.shell,
+        color: dashboardTokens.text,
+        fontFamily: 'var(--font-poppins), Poppins, "Segoe UI", sans-serif',
+        "& .MuiTypography-root, & .MuiButtonBase-root, & .MuiInputBase-root, & .MuiFormLabel-root": {
+          fontFamily: 'var(--font-poppins), Poppins, "Segoe UI", sans-serif',
+        },
         // Desktop: locked to viewport, no page scroll
         height: { md: "100vh" },
         overflow: { md: "hidden" },

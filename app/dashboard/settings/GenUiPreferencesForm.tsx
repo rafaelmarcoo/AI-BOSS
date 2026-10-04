@@ -138,8 +138,8 @@ export function GenUiPreferencesForm({
               borderRadius: 2,
               display: "grid",
               placeItems: "center",
-              bgcolor: "rgba(79,125,243,0.16)",
-              color: "#AFC6FF",
+              bgcolor: "rgba(242,140,91,0.16)",
+              color: "#FFD1C3",
               flexShrink: 0,
             }}
           >
@@ -254,12 +254,12 @@ export function GenUiPreferencesForm({
                   onClick={() => togglePriority(topic)}
                   variant={selected ? "filled" : "outlined"}
                   sx={{
-                    color: selected ? "#EAF0FF" : dashboardTokens.textSoft,
-                    bgcolor: selected ? "rgba(79,125,243,0.24)" : "transparent",
-                    borderColor: selected ? "rgba(111,149,247,0.7)" : dashboardTokens.borderSoft,
+                    color: selected ? dashboardTokens.text : dashboardTokens.textSoft,
+                    bgcolor: selected ? "rgba(242,140,91,0.22)" : "transparent",
+                    borderColor: selected ? "rgba(242,140,91,0.72)" : dashboardTokens.borderSoft,
                     "&:hover": {
                       bgcolor: selected
-                        ? "rgba(79,125,243,0.32)"
+                        ? "rgba(242,140,91,0.30)"
                         : "rgba(255,255,255,0.06)",
                     },
                   }}
@@ -378,9 +378,9 @@ const toggleGroupStyles = {
     textTransform: "none",
     fontWeight: 600,
     "&.Mui-selected": {
-      color: "#EAF0FF",
-      bgcolor: "rgba(79,125,243,0.24)",
-      borderColor: "rgba(111,149,247,0.7) !important",
+      color: dashboardTokens.text,
+      bgcolor: "rgba(242,140,91,0.22)",
+      borderColor: "rgba(242,140,91,0.72) !important",
     },
   },
 };

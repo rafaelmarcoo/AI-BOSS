@@ -179,8 +179,7 @@ export function DashboardWidgetGrid({
         display: "grid",
         gridTemplateColumns: { xs: "1fr", xl: "repeat(2, minmax(0, 1fr))" },
         gridAutoRows: { xs: "auto", xl: "minmax(240px, auto)" },
-        columnGap: { xs: 0, xl: 4 },
-        rowGap: 0,
+        gap: 2,
       }}
     >
       {items.map(({ key, item, widget, error }) => {
@@ -208,8 +207,11 @@ export function DashboardWidgetGrid({
               height: "100%",
               gridColumn: { xs: "span 1", xl: `span ${dimensions.columnSpan}` },
               gridRow: { xs: "auto", xl: `span ${dimensions.rowSpan}` },
-              borderBottom: "1px solid",
+              border: "1px solid",
               borderColor: dashboardTokens.border,
+              borderRadius: "16px",
+              overflow: "hidden",
+              bgcolor: "rgba(255,255,255,0.025)",
               opacity: item?.isHidden ? 0.58 : 1,
               outline: editing ? `1px dashed ${dashboardTokens.borderSoft}` : "none",
               outlineOffset: -1,

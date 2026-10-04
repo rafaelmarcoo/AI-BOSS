@@ -25,13 +25,14 @@ export function DashboardHeader({ onOpenPastChats }: DashboardHeaderProps = {}) 
     <Box
       component="header"
       sx={{
-        px: { xs: 1.5, sm: 2.5 },
-        height: 56,
+        px: { xs: 2, sm: 4, lg: 6 },
+        height: 68,
         display: "flex",
         alignItems: "center",
-        bgcolor: dashboardTokens.sidebar,
+        bgcolor: dashboardTokens.shell,
         borderBottom: "1px solid",
-        borderBottomColor: dashboardTokens.border,
+        borderBottomColor: "rgba(255,255,255,0.08)",
+        boxShadow: "0 8px 28px rgba(10, 28, 44, 0.12)",
       }}
     >
       <Stack
@@ -42,7 +43,7 @@ export function DashboardHeader({ onOpenPastChats }: DashboardHeaderProps = {}) 
       >
         <Stack
           direction="row"
-          spacing={{ xs: 1, sm: 2.5 }}
+          spacing={{ xs: 1, sm: 3.5 }}
           alignItems="center"
           sx={{ minWidth: 0 }}
         >
@@ -52,13 +53,13 @@ export function DashboardHeader({ onOpenPastChats }: DashboardHeaderProps = {}) 
               size="small"
               onClick={onOpenPastChats}
               sx={{
-                width: 34,
-                height: 34,
+                width: 38,
+                height: 38,
                 borderRadius: `${dashboardTokens.radiusSm}px`,
                 color: dashboardTokens.textMuted,
                 "&:hover": {
                   color: dashboardTokens.text,
-                  bgcolor: dashboardTokens.surfaceAlt,
+                  bgcolor: "rgba(255,255,255,0.08)",
                 },
               }}
             >
@@ -73,9 +74,8 @@ export function DashboardHeader({ onOpenPastChats }: DashboardHeaderProps = {}) 
             title="Home"
             sx={{
               color: dashboardTokens.text,
-              fontSize: 17,
-              fontWeight: 650,
-              letterSpacing: "-0.02em",
+              fontSize: 16,
+              fontWeight: 600,
               whiteSpace: "nowrap",
               textDecoration: "none",
             }}
@@ -83,9 +83,7 @@ export function DashboardHeader({ onOpenPastChats }: DashboardHeaderProps = {}) 
             AI-BOSS
           </Typography>
 
-          <Box sx={{ width: "1px", height: 20, bgcolor: dashboardTokens.border }} />
-
-          <Stack direction="row" spacing={0.25}>
+          <Stack direction="row" spacing={0.25} sx={{ height: 68, alignItems: "stretch" }}>
             {navigation.map((item) => {
               const active = item.exact
                 ? pathname === item.href
@@ -100,20 +98,35 @@ export function DashboardHeader({ onOpenPastChats }: DashboardHeaderProps = {}) 
                   sx={{
                     minHeight: 32,
                     minWidth: 0,
-                    px: 1.25,
-                    borderRadius: `${dashboardTokens.radiusSm}px`,
+                    px: 1.5,
+                    position: "relative",
+                    borderRadius: 0,
                     color: active ? dashboardTokens.text : dashboardTokens.textMuted,
-                    bgcolor: active ? dashboardTokens.surfaceAlt : "transparent",
+                    bgcolor: "transparent",
                     display: {
                       xs: item.exact ? "inline-flex" : "none",
                       sm: "inline-flex",
                     },
                     textTransform: "none",
                     fontSize: 13,
-                    fontWeight: active ? 600 : 500,
+                    fontWeight: 500,
+                    "&::after": {
+                      content: '\"\"',
+                      position: "absolute",
+                      right: 12,
+                      bottom: 3,
+                      left: 12,
+                      height: 2,
+                      borderRadius: 999,
+                      bgcolor: active ? dashboardTokens.accent : "transparent",
+                    },
                     "&:hover": {
-                      bgcolor: dashboardTokens.surfaceAlt,
+                      bgcolor: "transparent",
                       color: dashboardTokens.text,
+                    },
+                    "&:focus-visible": {
+                      outline: `2px solid ${dashboardTokens.accent}`,
+                      outlineOffset: -4,
                     },
                   }}
                 >

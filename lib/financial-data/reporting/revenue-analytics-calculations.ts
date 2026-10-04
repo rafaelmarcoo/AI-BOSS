@@ -102,7 +102,16 @@ export function summarizeCustomerRevenue(data: Stage3FinancialData, period: Reve
   })
 }
 
-export function summarizeCustomerConcentration(data: Stage3FinancialData, period: RevenueAnalyticsPeriod) {
+export function summarizeCustomerConcentration(
+  data: Stage3FinancialData,
+  period: RevenueAnalyticsPeriod,
+  thresholds = {
+    topOneElevated: 30,
+    topOneHigh: 50,
+    topThreeElevated: 60,
+    topThreeHigh: 80,
+  },
+) {
   return summarizeCustomerRevenue(data, period).map((group) => {
     const hasNegativeCustomerRevenue = group.items.some((item) => item.revenue < 0) || group.unallocatedRevenue < 0
     const status = group.totalRevenue <= 0
@@ -122,9 +131,9 @@ export function summarizeCustomerConcentration(data: Stage3FinancialData, period
     const topFivePercentage = concentration(5)
     const riskLevel = topCustomerPercentage === null || topThreePercentage === null
       ? 'unavailable' as const
-      : topCustomerPercentage >= 50 || topThreePercentage >= 80
+      : topCustomerPercentage >= thresholds.topOneHigh || topThreePercentage >= thresholds.topThreeHigh
         ? 'high' as const
-        : topCustomerPercentage >= 30 || topThreePercentage >= 60
+        : topCustomerPercentage >= thresholds.topOneElevated || topThreePercentage >= thresholds.topThreeElevated
           ? 'elevated' as const
           : 'diversified' as const
     return {
@@ -135,8 +144,8 @@ export function summarizeCustomerConcentration(data: Stage3FinancialData, period
       topThreePercentage,
       topFivePercentage,
       thresholds: {
-        elevated: 'Top customer ≥30% or top three ≥60%',
-        high: 'Top customer ≥50% or top three ≥80%',
+        elevated: `Top customer ≥${thresholds.topOneElevated}% or top three ≥${thresholds.topThreeElevated}%`,
+        high: `Top customer ≥${thresholds.topOneHigh}% or top three ≥${thresholds.topThreeHigh}%`,
       },
     }
   })

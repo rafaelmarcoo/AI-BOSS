@@ -736,6 +736,40 @@ data still take priority over these preferences.
 
 ---
 
+### 18. user_dashboard_layouts
+
+Stores each user&apos;s manual dashboard layouts separately from immutable
+AI-generated conversation UI plans. The versioned `layout_payload` contains
+widget types, order, size, visibility, pinning, supported period/forecast/
+currency selections, and risk thresholds. It does not store financial values;
+saved layouts are hydrated from trusted current records when opened.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID (PK) | Saved layout identifier |
+| user_id | UUID (FK) | Layout owner |
+| name | TEXT | User-facing layout name, unique per user ignoring case |
+| is_default | BOOLEAN | Whether this layout opens by default; at most one per user |
+| source_plan_version | INTEGER | Optional AI plan version copied when the layout was created or reset |
+| source_generated_at | TIMESTAMP | Optional generation time of that source AI plan |
+| layout_payload | JSONB | Versioned, server-validated layout configuration; maximum 20 widgets |
+| created_at | TIMESTAMP | Creation time |
+| updated_at | TIMESTAMP | Last saved change |
+
+**RLS Policies:**
+- Users can view, insert, update, and delete only their own layouts
+
+**Indexes:**
+- Unique `(user_id, lower(trim(name)))` layout names
+- Partial unique default-layout index on `user_id` where `is_default = true`
+- `idx_user_dashboard_layouts_user_updated` on `(user_id, updated_at DESC)`
+
+Setting a layout as default runs a `BEFORE INSERT OR UPDATE` trigger that clears
+the previous default in the same transaction. The partial unique index remains
+the final one-default-per-user guard.
+
+---
+
 ## Relationships
 ```
 users (1) ──< (many) conversations
@@ -776,6 +810,7 @@ financial_revenue_dimensions (1) ──< (many) financial_revenue_entry_dimensio
 users (1) ──< (many) scenarios
 companies (1) ──< (many) scenarios
 users (1) ──< (one) user_gen_ui_preferences
+users (1) ──< (many) user_dashboard_layouts
 ```
 
 ---
@@ -806,6 +841,7 @@ All schema changes are tracked in `db/migrations/`:
 - `021_stage4_invoices_and_bills.sql` - Adds canonical sales invoices, supplier bills, line items, payments, due-date indexes, RLS, and provider-safe deduplication for Stage 4 widgets
 - `022_stage5_balance_sheet_and_debt.sql` - Adds balance-sheet classifications, explicit quick-ratio treatment, debts, and stored repayment schedules
 - `023_stage6_customer_and_revenue_dimensions.sql` - Adds canonical customers, signed revenue entries, typed dimensions, RLS, and provider-safe deduplication for Stage 6 analytics
+- `024_stage7_dashboard_layouts.sql` - Adds versioned user-owned manual dashboard layouts, one-default enforcement, and RLS
 
 ---
 

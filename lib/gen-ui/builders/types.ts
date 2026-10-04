@@ -6,6 +6,7 @@ import type { RunwayTrendSummary } from "@/lib/financial-data/runway-history";
 import type { ScenarioAnalysisResult } from "@/lib/scenarios/calculation";
 import type { GenUiSource, GenUiWidgetType } from "@/lib/gen-ui/types";
 import type { Stage3FinancialData } from "@/lib/financial-data/reporting/types";
+import type { DashboardRiskThresholds } from "@/lib/gen-ui/dashboard-layout-types";
 
 export interface PlannerWidget {
   type: GenUiWidgetType;
@@ -24,4 +25,5 @@ export interface GenUiDataContext {
   metricForecasts: MetricForecastSummary[];
   scenarioResult: ScenarioAnalysisResult | null;
   stage3Data: Stage3FinancialData;
+  riskThresholds?: DashboardRiskThresholds;
 }

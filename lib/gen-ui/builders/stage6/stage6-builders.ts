@@ -8,6 +8,7 @@ import type { FinancialRevenueDimensionType } from '@/types/database'
 import type { GenUiWidget, GenUiWidgetType } from '@/lib/gen-ui/types'
 import { widgetId } from '../shared'
 import type { GenUiDataContext, PlannerWidget } from '../types'
+import { DEFAULT_DASHBOARD_RISK_THRESHOLDS } from '@/lib/gen-ui/dashboard-layout-types'
 
 function title(spec: PlannerWidget, fallback: string) {
   return spec.title ?? fallback
@@ -68,7 +69,13 @@ export function buildCustomerConcentrationRiskWidget(
   context: GenUiDataContext,
 ): GenUiWidget {
   const period = resolveRevenueAnalyticsPeriod(context.userMessage, currentDate())
-  const groups = summarizeCustomerConcentration(context.stage3Data, period)
+  const thresholds = context.riskThresholds ?? DEFAULT_DASHBOARD_RISK_THRESHOLDS
+  const groups = summarizeCustomerConcentration(context.stage3Data, period, {
+    topOneElevated: thresholds.customerTopOneElevatedPercent,
+    topOneHigh: thresholds.customerTopOneHighPercent,
+    topThreeElevated: thresholds.customerTopThreeElevatedPercent,
+    topThreeHigh: thresholds.customerTopThreeHighPercent,
+  })
   const widget: GenUiWidget = {
     id: widgetId('customer_concentration_risk', index),
     type: 'customer_concentration_risk',

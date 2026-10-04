@@ -8,15 +8,15 @@ import {
   widgetId,
 } from "../shared";
 import type { GenUiDataContext, PlannerWidget } from "../types";
-
-const CAUTION_THRESHOLD = 6;
-const URGENT_THRESHOLD = 3;
+import { DEFAULT_DASHBOARD_RISK_THRESHOLDS } from "@/lib/gen-ui/dashboard-layout-types";
 
 export function buildPlanningChecklistWidget(
   spec: PlannerWidget,
   index: number,
   context: GenUiDataContext
 ): GenUiWidget {
+  const { runwayUrgentMonths: urgentThreshold } =
+    context.riskThresholds ?? DEFAULT_DASHBOARD_RISK_THRESHOLDS
   const currentRunway = getMetricNumber(
     context.snapshot.metrics,
     'runway_months'
@@ -27,7 +27,7 @@ export function buildPlanningChecklistWidget(
   const items = [
     {
       label:
-        currentRunway !== null && currentRunway < URGENT_THRESHOLD
+        currentRunway !== null && currentRunway < urgentThreshold
           ? 'Treat runway as urgent'
           : 'Review runway buffer',
       detail:
@@ -35,7 +35,7 @@ export function buildPlanningChecklistWidget(
           ? `Current runway is ${formatNumber(currentRunway)} months.`
           : 'Cash runway is unavailable, so collect compatible cash and burn first.',
       tone:
-        currentRunway !== null && currentRunway < URGENT_THRESHOLD
+        currentRunway !== null && currentRunway < urgentThreshold
           ? ('urgent' as const)
           : ('watch' as const),
     },
@@ -76,6 +76,10 @@ export function buildRiskThresholdTimelineWidget(
   index: number,
   context: GenUiDataContext
 ): GenUiWidget {
+  const {
+    runwayCautionMonths: cautionThreshold,
+    runwayUrgentMonths: urgentThreshold,
+  } = context.riskThresholds ?? DEFAULT_DASHBOARD_RISK_THRESHOLDS
   const currentRunway = getMetricNumber(
     context.snapshot.metrics,
     'runway_months'
@@ -103,14 +107,14 @@ export function buildRiskThresholdTimelineWidget(
 
     return Number(((currentRunway - threshold) / decliningChange).toFixed(1))
   }
-  const monthsUntilCaution = monthsUntil(CAUTION_THRESHOLD)
-  const monthsUntilUrgent = monthsUntil(URGENT_THRESHOLD)
+  const monthsUntilCaution = monthsUntil(cautionThreshold)
+  const monthsUntilUrgent = monthsUntil(urgentThreshold)
   const status =
     currentRunway === null
       ? 'unknown'
-      : currentRunway < URGENT_THRESHOLD
+      : currentRunway < urgentThreshold
         ? 'urgent'
-        : currentRunway < CAUTION_THRESHOLD
+        : currentRunway < cautionThreshold
           ? 'caution'
           : 'healthy'
   const message =
@@ -181,4 +185,3 @@ export function buildHighlightExplainerWidget(
     },
   }
 }
-

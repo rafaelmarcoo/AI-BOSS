@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { Alert, Box, Button, Chip, Paper, Stack, Typography } from "@mui/material";
 import { dashboardTokens } from "@/app/theme";
-import { GEN_UI_WIDGET_CATALOG, GEN_UI_WIDGET_SIZE_DIMENSIONS } from "@/lib/gen-ui/catalog";
 import type { GenUiPlan } from "@/lib/gen-ui/types";
 import { GenUiWidgetRenderer } from "./GenUiWidgetRenderer";
+import { DashboardLayoutWorkspace } from "./layout/DashboardLayoutWorkspace";
 import type { AskChatbotMode } from "./types";
 
 export { GenUiWidgetRenderer };
@@ -200,53 +200,11 @@ export function GenUiCanvas({
           </Alert>
         ) : null}
 
-        {hasPlan ? (
-          <Box
-            sx={{
-              py: 3,
-              borderTop: "1px solid",
-              borderColor: dashboardTokens.border,
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", xl: "repeat(2, minmax(0, 1fr))" },
-              gridAutoRows: { xs: "auto", xl: "minmax(240px, auto)" },
-              columnGap: { xs: 0, xl: 4 },
-              rowGap: 0,
-              "& > *": {
-                borderBottom: "1px solid",
-                borderColor: dashboardTokens.border,
-              },
-            }}
-          >
-            {plan?.widgets.map((widget) => {
-              const size = GEN_UI_WIDGET_CATALOG[widget.type].defaultSize;
-              const dimensions = GEN_UI_WIDGET_SIZE_DIMENSIONS[size];
-
-              return (
-                <Box
-                  key={widget.id}
-                  data-widget-size={size}
-                  sx={{
-                    minWidth: 0,
-                    height: "100%",
-                    gridColumn: {
-                      xs: "span 1",
-                      xl: `span ${dimensions.columnSpan}`,
-                    },
-                    gridRow: {
-                      xs: "auto",
-                      xl: `span ${dimensions.rowSpan}`,
-                    },
-                  }}
-                >
-                  <GenUiWidgetRenderer
-                    widget={widget}
-                    onAskChatbot={onAskChatbot}
-                  />
-                </Box>
-              );
-            })}
-          </Box>
-        ) : null}
+        <DashboardLayoutWorkspace
+          plan={plan}
+          customizationEnabled={!documentReviewMode}
+          onAskChatbot={onAskChatbot}
+        />
 
         <Stack spacing={1.25}>
           <Typography sx={{ fontSize: 16, fontWeight: 600 }}>

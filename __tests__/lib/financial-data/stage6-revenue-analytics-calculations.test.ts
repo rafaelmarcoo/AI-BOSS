@@ -99,6 +99,23 @@ describe('Stage 6 revenue analytics calculations', () => {
     })
   })
 
+  it('uses layout-specific customer concentration thresholds', () => {
+    const result = summarizeCustomerConcentration(data([
+      revenueEntry({ id: 'a', amount: 250, customer: { id: 'a', name: 'Alpha' } }),
+      revenueEntry({ id: 'b', amount: 250, customer: { id: 'b', name: 'Beta' } }),
+      revenueEntry({ id: 'c', amount: 250, customer: { id: 'c', name: 'Gamma' } }),
+      revenueEntry({ id: 'd', amount: 250, customer: { id: 'd', name: 'Delta' } }),
+    ]), period, {
+      topOneElevated: 45,
+      topOneHigh: 70,
+      topThreeElevated: 90,
+      topThreeHigh: 95,
+    })[0]
+
+    expect(result.riskLevel).toBe('diversified')
+    expect(result.thresholds.elevated).toContain('≥45%')
+  })
+
   it('never combines sources or currencies', () => {
     const groups = summarizeCustomerRevenue(data([
       revenueEntry({ id: 'nzd', amount: 100, customer: { id: 'a', name: 'Alpha' } }),

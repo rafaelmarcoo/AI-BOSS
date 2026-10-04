@@ -1,6 +1,7 @@
 import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
 import type { FinancialMetricSourceType } from '@/lib/financial-data/types'
 import type { GenUiPlan } from '@/lib/gen-ui/types'
+import type { DashboardLayoutPayload } from '@/lib/gen-ui/dashboard-layout-types'
 import type { ScenarioAnalysisInput } from '@/lib/scenarios/schema'
 import type { ScenarioAnalysisResult } from '@/lib/scenarios/calculation'
 
@@ -262,6 +263,18 @@ export interface FinancialMetricObservation {
   confidence: number
   evidence: unknown
   raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface UserDashboardLayout {
+  id: string
+  user_id: string
+  name: string
+  is_default: boolean
+  source_plan_version: number | null
+  source_generated_at: string | null
+  layout_payload: DashboardLayoutPayload
   created_at: string
   updated_at: string
 }

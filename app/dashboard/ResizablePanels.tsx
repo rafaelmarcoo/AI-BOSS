@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Box } from "@mui/material";
-import { dashboardTokens } from "@/app/theme";
+import { dashboardCanvasTokens, dashboardTokens } from "@/app/theme";
 import { ChatSidebar } from "./chat/sidebar";
 import { RunwaySection } from "./runway";
 import type { GenUiPlan } from "@/lib/gen-ui/types";
@@ -110,6 +110,7 @@ export function ResizablePanels({
               : `${chatWidth}px ${RESIZER_WIDTH}px minmax(0, 1fr)`,
         },
         overflow: { md: "hidden" },
+        background: `linear-gradient(145deg, ${dashboardTokens.shell} 0%, #31536E 100%)`,
       }}
     >
       <Box
@@ -173,7 +174,8 @@ export function ResizablePanels({
           minHeight: { xs: "80vh", md: 0 },
           flex: { xs: "0 0 auto", md: undefined },
           overflow: { xs: "visible", md: "auto" },
-          bgcolor: dashboardTokens.shell,
+          bgcolor: dashboardCanvasTokens.shell,
+          background: `linear-gradient(145deg, ${dashboardCanvasTokens.shell} 0%, #FBFAF7 100%)`,
           minWidth: 0,
         }}
       >

@@ -22,11 +22,17 @@ describe('Gen UI accountant widget recipes', () => {
     }
   })
 
-  it('keeps recipes without a current renderer explicitly unavailable', () => {
+  it('maps implemented invoice recipes while keeping future recipes unavailable', () => {
     const overdueInvoices = GEN_UI_WIDGET_RECIPE_BY_ID.overdue_invoices
+    const receivablesAgeing = GEN_UI_WIDGET_RECIPE_BY_ID.receivables_ageing
+    const upcomingBills = GEN_UI_WIDGET_RECIPE_BY_ID.upcoming_bills_timeline
+    const expectedPayments = GEN_UI_WIDGET_RECIPE_BY_ID.expected_customer_payments
     const budgetVariance = GEN_UI_WIDGET_RECIPE_BY_ID.budget_variance_table
 
-    expect(overdueInvoices.renderer).toBeNull()
+    expect(overdueInvoices.renderer).toBe('overdue_invoices')
+    expect(receivablesAgeing.renderer).toBe('invoice_ageing')
+    expect(upcomingBills.renderer).toBe('bills_due')
+    expect(expectedPayments.renderer).toBe('expected_payments')
     expect(overdueInvoices.requirements.futureCapabilities).toContain(
       'sales_invoices'
     )

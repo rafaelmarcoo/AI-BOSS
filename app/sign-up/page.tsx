@@ -1,12 +1,12 @@
 import { Box } from '@mui/material'
 import { AuthForm } from '@/components/auth-form'
-import { authPageStyles } from '@/components/auth-ui'
+import { authEntryPageStyles } from '@/components/auth-ui'
 
 export default function SignUpPage() {
   return (
     <Box
       component="main"
-      sx={authPageStyles}
+      sx={authEntryPageStyles}
     >
       <AuthForm
         mode="sign-up"

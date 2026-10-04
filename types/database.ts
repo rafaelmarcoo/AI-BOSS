@@ -1,6 +1,7 @@
 import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
 import type { FinancialMetricSourceType } from '@/lib/financial-data/types'
 import type { GenUiPlan } from '@/lib/gen-ui/types'
+import type { DashboardLayoutPayload } from '@/lib/gen-ui/dashboard-layout-types'
 import type { ScenarioAnalysisInput } from '@/lib/scenarios/schema'
 import type { ScenarioAnalysisResult } from '@/lib/scenarios/calculation'
 import type {
@@ -274,6 +275,416 @@ export interface FinancialMetricObservation {
   source_label: string
   confidence: number
   evidence: unknown
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface UserDashboardLayout {
+  id: string
+  user_id: string
+  name: string
+  is_default: boolean
+  source_plan_version: number | null
+  source_generated_at: string | null
+  layout_payload: DashboardLayoutPayload
+  created_at: string
+  updated_at: string
+}
+
+export type FinancialSyncStatus = 'running' | 'completed' | 'partial' | 'failed'
+export type FinancialAccountClass =
+  | 'asset'
+  | 'liability'
+  | 'equity'
+  | 'revenue'
+  | 'expense'
+  | 'other'
+export type FinancialCostBehavior = 'fixed' | 'variable' | 'mixed' | 'unclassified'
+export type FinancialStatementType = 'profit_loss' | 'cash_flow' | 'balance_sheet'
+export type FinancialStatementClassification =
+  | 'revenue'
+  | 'cost_of_sales'
+  | 'operating_expense'
+  | 'other_income'
+  | 'other_expense'
+  | 'gross_profit'
+  | 'operating_profit'
+  | 'net_profit'
+  | 'cash_inflow'
+  | 'cash_outflow'
+  | 'net_cash_flow'
+  | 'current_asset'
+  | 'non_current_asset'
+  | 'current_liability'
+  | 'non_current_liability'
+  | 'equity'
+  | 'total_assets'
+  | 'total_liabilities'
+  | 'total_equity'
+  | 'other'
+export type FinancialQuickRatioTreatment = 'include' | 'exclude' | 'unclassified' | 'not_applicable'
+export type FinancialTransactionType =
+  | 'receipt'
+  | 'payment'
+  | 'purchase'
+  | 'sale'
+  | 'transfer'
+  | 'journal'
+  | 'other'
+export type FinancialTransactionStatus = 'draft' | 'posted' | 'voided' | 'deleted'
+export type FinancialTransactionDirection = 'inflow' | 'outflow' | 'transfer'
+export type FinancialBudgetStatus = 'draft' | 'approved' | 'archived'
+export type FinancialBudgetLineKind = 'revenue' | 'expense' | 'cash_inflow' | 'cash_outflow'
+export type FinancialInvoiceKind = 'sales_invoice' | 'supplier_bill'
+export type FinancialInvoiceStatus =
+  | 'draft'
+  | 'submitted'
+  | 'authorised'
+  | 'partially_paid'
+  | 'paid'
+  | 'voided'
+  | 'deleted'
+export type FinancialInvoicePaymentStatus = 'posted' | 'voided' | 'deleted'
+export type FinancialDebtType = 'loan' | 'credit_card' | 'line_of_credit' | 'lease' | 'other'
+export type FinancialDebtStatus = 'active' | 'paid' | 'refinanced' | 'closed'
+export type FinancialDebtRepaymentStatus = 'scheduled' | 'paid' | 'missed' | 'cancelled'
+export type FinancialCustomerStatus = 'active' | 'inactive'
+export type FinancialRevenueEntryStatus = 'draft' | 'posted' | 'voided' | 'deleted'
+export type FinancialRevenueDimensionType =
+  | 'product_service'
+  | 'subscription'
+  | 'department'
+  | 'business_unit'
+  | 'tracking'
+
+export interface FinancialSyncRun {
+  id: string
+  user_id: string
+  company_id: string
+  connection_id: string
+  provider: AccountingProvider
+  status: FinancialSyncStatus
+  started_at: string
+  completed_at: string | null
+  source_as_of_date: string | null
+  capabilities: string[]
+  record_counts: Record<string, number>
+  error_message: string | null
+  created_at: string
+}
+
+export interface FinancialAccount {
+  id: string
+  user_id: string
+  company_id: string
+  connection_id: string | null
+  sync_run_id: string | null
+  source_type: FinancialMetricSourceType
+  source_label: string
+  provider_account_id: string
+  account_code: string | null
+  account_name: string
+  account_class: FinancialAccountClass
+  account_subtype: string | null
+  canonical_category: string | null
+  cost_behavior: FinancialCostBehavior
+  currency: string | null
+  is_active: boolean
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialReportingPeriod {
+  id: string
+  user_id: string
+  company_id: string
+  connection_id: string | null
+  document_id: string | null
+  sync_run_id: string | null
+  source_type: FinancialMetricSourceType
+  source_label: string
+  statement_type: FinancialStatementType
+  period_start: string
+  period_end: string
+  currency: string
+  generated_at: string | null
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialStatementLine {
+  id: string
+  reporting_period_id: string
+  user_id: string
+  company_id: string
+  account_id: string | null
+  parent_line_id: string | null
+  line_key: string
+  label: string
+  classification: FinancialStatementClassification
+  quick_ratio_treatment: FinancialQuickRatioTreatment
+  canonical_category: string | null
+  amount: number
+  cost_behavior: FinancialCostBehavior
+  is_total: boolean
+  sort_order: number
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialTransaction {
+  id: string
+  user_id: string
+  company_id: string
+  connection_id: string | null
+  document_id: string | null
+  sync_run_id: string | null
+  source_type: FinancialMetricSourceType
+  source_label: string
+  provider_transaction_id: string
+  transaction_type: FinancialTransactionType
+  transaction_date: string
+  status: FinancialTransactionStatus
+  direction: FinancialTransactionDirection
+  reference: string | null
+  counterparty_name: string | null
+  description: string | null
+  currency: string
+  total_amount: number
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialTransactionLine {
+  id: string
+  transaction_id: string
+  user_id: string
+  company_id: string
+  account_id: string | null
+  line_key: string
+  description: string | null
+  canonical_category: string | null
+  amount: number
+  tax_amount: number
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialBudget {
+  id: string
+  user_id: string
+  company_id: string
+  connection_id: string | null
+  document_id: string | null
+  sync_run_id: string | null
+  source_type: FinancialMetricSourceType
+  source_label: string
+  provider_budget_id: string
+  name: string
+  status: FinancialBudgetStatus
+  period_start: string
+  period_end: string
+  currency: string
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialBudgetLine {
+  id: string
+  budget_id: string
+  user_id: string
+  company_id: string
+  account_id: string | null
+  line_key: string
+  label: string
+  kind: FinancialBudgetLineKind
+  canonical_category: string | null
+  period_start: string
+  period_end: string
+  amount: number
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialInvoice {
+  id: string
+  user_id: string
+  company_id: string
+  connection_id: string | null
+  document_id: string | null
+  sync_run_id: string | null
+  source_type: FinancialMetricSourceType
+  source_label: string
+  provider_invoice_id: string
+  invoice_kind: FinancialInvoiceKind
+  status: FinancialInvoiceStatus
+  invoice_number: string | null
+  counterparty_name: string | null
+  issue_date: string
+  due_date: string
+  currency: string
+  total_amount: number
+  amount_paid: number
+  outstanding_amount: number
+  fully_paid_at: string | null
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialInvoiceLine {
+  id: string
+  invoice_id: string
+  user_id: string
+  company_id: string
+  account_id: string | null
+  line_key: string
+  description: string | null
+  canonical_category: string | null
+  quantity: number | null
+  unit_amount: number | null
+  tax_amount: number
+  line_amount: number
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialInvoicePayment {
+  id: string
+  invoice_id: string
+  user_id: string
+  company_id: string
+  provider_payment_id: string
+  payment_date: string
+  status: FinancialInvoicePaymentStatus
+  currency: string
+  amount: number
+  reference: string | null
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialDebt {
+  id: string
+  user_id: string
+  company_id: string
+  connection_id: string | null
+  document_id: string | null
+  sync_run_id: string | null
+  source_type: FinancialMetricSourceType
+  source_label: string
+  provider_debt_id: string
+  debt_name: string
+  lender_name: string | null
+  debt_type: FinancialDebtType
+  status: FinancialDebtStatus
+  currency: string
+  original_principal: number | null
+  current_balance: number
+  annual_interest_rate: number | null
+  start_date: string | null
+  maturity_date: string | null
+  minimum_payment: number | null
+  account_id: string | null
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialDebtRepayment {
+  id: string
+  debt_id: string
+  user_id: string
+  company_id: string
+  provider_repayment_id: string
+  due_date: string
+  status: FinancialDebtRepaymentStatus
+  principal_amount: number
+  interest_amount: number
+  total_amount: number
+  paid_at: string | null
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialCustomer {
+  id: string
+  user_id: string
+  company_id: string
+  connection_id: string | null
+  document_id: string | null
+  sync_run_id: string | null
+  source_type: FinancialMetricSourceType
+  source_label: string
+  provider_customer_id: string
+  customer_name: string
+  status: FinancialCustomerStatus
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialRevenueDimension {
+  id: string
+  user_id: string
+  company_id: string
+  connection_id: string | null
+  document_id: string | null
+  sync_run_id: string | null
+  source_type: FinancialMetricSourceType
+  source_label: string
+  provider_dimension_id: string
+  dimension_type: FinancialRevenueDimensionType
+  dimension_group: string
+  dimension_name: string
+  status: FinancialCustomerStatus
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialRevenueEntry {
+  id: string
+  user_id: string
+  company_id: string
+  connection_id: string | null
+  document_id: string | null
+  sync_run_id: string | null
+  source_type: FinancialMetricSourceType
+  source_label: string
+  provider_revenue_id: string
+  revenue_date: string
+  status: FinancialRevenueEntryStatus
+  currency: string
+  amount: number
+  customer_id: string | null
+  invoice_id: string | null
+  transaction_id: string | null
+  description: string | null
+  raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+export interface FinancialRevenueEntryDimension {
+  id: string
+  revenue_entry_id: string
+  user_id: string
+  company_id: string
+  dimension_id: string
+  dimension_type: FinancialRevenueDimensionType
+  dimension_group: string
   raw_data: unknown
   created_at: string
   updated_at: string

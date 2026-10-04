@@ -25,7 +25,7 @@ import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutl
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import type { DocumentSummary } from "@/lib/documents/types";
 import { getDocumentStatusPresentation } from "@/lib/documents/presentation";
-import { dashboardTokens } from "@/app/theme";
+import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
 
 type FileFilter = "all" | "pdf" | "csv" | "xlsx" | "image";
 type StatusFilter = "all" | DocumentSummary["status"];
@@ -130,18 +130,18 @@ export function DocumentsWorkspace() {
   return (
     <Stack spacing={3}>
       <Stack direction="row" spacing={1.5} alignItems="flex-start">
-        <Box sx={{ display: "grid", placeItems: "center", width: 44, height: 44, borderRadius: 2.5, bgcolor: "rgba(59,130,246,0.16)", color: "#93c5fd", flex: "0 0 auto" }}>
+        <Box sx={{ display: "grid", placeItems: "center", width: 44, height: 44, borderRadius: 2.5, bgcolor: "rgba(43,106,155,0.10)", color: "#2B6A9B", flex: "0 0 auto" }}>
           <DescriptionRoundedIcon />
         </Box>
         <Stack spacing={0.5}>
-          <Typography variant="h5" fontWeight={700} color="common.white">Documents</Typography>
+          <Typography variant="h5" fontWeight={700} color={dashboardTokens.text}>Documents</Typography>
           <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
             Manage uploaded PDF, CSV, XLSX and invoice image files and their calculation-ready data.
           </Typography>
         </Stack>
       </Stack>
 
-      <Box sx={{ p: { xs: 1.25, sm: 1.5 }, border: "1px solid", borderColor: dashboardTokens.border, borderRadius: 3, bgcolor: "rgba(255,255,255,0.025)" }}>
+      <Box sx={{ p: { xs: 1.25, sm: 1.5 }, border: "1px solid", borderColor: dashboardTokens.border, borderRadius: 3, bgcolor: dashboardTokens.surface, boxShadow: "0 8px 24px rgba(32,58,80,0.06)" }}>
       <Stack direction={{ xs: "column", lg: "row" }} spacing={1.25}>
         <TextField
           label="Search documents"
@@ -164,7 +164,7 @@ export function DocumentsWorkspace() {
       ) : visibleDocuments.length === 0 ? (
         <Box sx={emptyStateStyles}>
           <DescriptionRoundedIcon sx={{ fontSize: 36, color: dashboardTokens.textMuted }} />
-          <Typography color="common.white" fontWeight={600}>
+          <Typography color={dashboardTokens.text} fontWeight={600}>
             {documents.length === 0 ? "No documents uploaded yet" : "No documents match these filters"}
           </Typography>
           <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
@@ -183,11 +183,11 @@ export function DocumentsWorkspace() {
               <Box key={document.id} sx={documentCardStyles}>
                 <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={2}>
                   <Stack direction="row" spacing={1.5} sx={{ minWidth: 0 }}>
-                    <Box sx={{ width: 40, height: 40, display: "grid", placeItems: "center", borderRadius: 2, color: "#bfdbfe", bgcolor: "rgba(59,130,246,0.13)", flex: "0 0 auto" }}>
+                    <Box sx={{ width: 40, height: 40, display: "grid", placeItems: "center", borderRadius: 2, color: "#2B6A9B", bgcolor: "rgba(43,106,155,0.10)", flex: "0 0 auto" }}>
                       <InsertDriveFileOutlinedIcon fontSize="small" />
                     </Box>
                     <Stack spacing={0.6} sx={{ minWidth: 0 }}>
-                      <Typography color="common.white" fontWeight={700} sx={{ overflowWrap: "anywhere" }}>
+                      <Typography color={dashboardTokens.text} fontWeight={700} sx={{ overflowWrap: "anywhere" }}>
                         {document.file_name}
                       </Typography>
                       <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
@@ -248,7 +248,7 @@ export function DocumentsWorkspace() {
 }
 
 const fieldStyles = {
-  "& .MuiOutlinedInput-root": { bgcolor: "rgba(255,255,255,0.055)", color: "common.white", borderRadius: 2.25 },
+  "& .MuiOutlinedInput-root": { bgcolor: dashboardTokens.surfaceAlt, color: dashboardTokens.text, borderRadius: 2.25 },
   "& .MuiInputLabel-root": { color: dashboardTokens.textMuted },
 };
 
@@ -268,14 +268,15 @@ const documentCardStyles = {
   borderRadius: 3,
   border: "1px solid",
   borderColor: dashboardTokens.border,
-  bgcolor: "rgba(255,255,255,0.035)",
+  bgcolor: dashboardTokens.surface,
+  boxShadow: "0 8px 24px rgba(32,58,80,0.06)",
   transition: "border-color 160ms ease, background-color 160ms ease",
-  "&:hover": { borderColor: "rgba(147,197,253,0.30)", bgcolor: "rgba(255,255,255,0.05)" },
+  "&:hover": { borderColor: dashboardTokens.borderMuted, bgcolor: dashboardTokens.surfaceAlt },
 };
 
 const fileTypeChipStyles = {
-  bgcolor: "rgba(255,255,255,0.065)",
-  color: "rgba(255,255,255,0.72)",
+  bgcolor: dashboardTokens.surfaceAlt,
+  color: dashboardTokens.textSoft,
 };
 
 function FilterSelect({ label, value, onChange, options }: {

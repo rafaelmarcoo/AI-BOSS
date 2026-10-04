@@ -4,7 +4,7 @@ import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Paper, Stack, Typography } from '@mui/material'
-import { dashboardTokens } from '@/app/theme'
+import { dashboardCanvasTokens as dashboardTokens } from '@/app/theme'
 
 interface CompanyJoinCodeCardProps {
   code: string
@@ -61,10 +61,11 @@ export function CompanyJoinCodeCard({ code, expiresAt }: CompanyJoinCodeCardProp
       elevation={0}
       sx={{
         p: { xs: 2, sm: 3 },
-        bgcolor: 'rgba(255,255,255,0.03)',
+        bgcolor: dashboardTokens.surface,
         border: '1px solid',
         borderColor: dashboardTokens.border,
-        color: 'common.white',
+        color: dashboardTokens.text,
+        boxShadow: '0 8px 24px rgba(32,58,80,0.06)',
       }}
     >
       <Stack spacing={2}>

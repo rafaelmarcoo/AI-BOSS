@@ -1,6 +1,8 @@
 import type { AccountingProvider, NormalizedFinancialData } from '@/lib/integrations/types'
+import { requireCompanyAdmin } from '@/lib/companies'
 import { createAdminSupabaseClient } from '@/lib/supabase'
 import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
+import { saveAccountingReadModels } from '@/lib/financial-data/reporting/persistence'
 
 type SnapshotMetricKey = Extract<
   FinancialMetricKey,
@@ -22,6 +24,7 @@ export async function saveAccountingSnapshot(params: {
   sourceLabel: string
   snapshot: NormalizedFinancialData
 }) {
+  const company = await requireCompanyAdmin(params.userId)
   const supabase = createAdminSupabaseClient()
   const now = new Date().toISOString()
   const today = new Date()
@@ -30,6 +33,7 @@ export async function saveAccountingSnapshot(params: {
   const { error } = await supabase.from('financial_metric_observations').insert(
     METRIC_MAP.map(({ key, field }) => ({
       user_id: params.userId,
+      company_id: company.id,
       connection_id: params.connectionId,
       metric_key: key,
       value: params.snapshot[field] as number,
@@ -48,6 +52,11 @@ export async function saveAccountingSnapshot(params: {
   if (error) {
     throw new Error(`Failed to write accounting observations: ${error.message}`)
   }
+
+  await saveAccountingReadModels({
+    ...params,
+    companyId: company.id,
+  })
 
   await supabase
     .from('data_connections')

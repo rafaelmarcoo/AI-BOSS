@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Box } from "@mui/material";
-import { dashboardTokens } from "@/app/theme";
+import { dashboardCanvasTokens } from "@/app/theme";
+import { DashboardContentTheme } from "../../DashboardContentTheme";
 import { getCurrentUserProfile } from "@/lib/auth";
 import { COOKIE_ACCESS_TOKEN } from "@/lib/supabase";
 import { DashboardHeader } from "../../header";
@@ -23,11 +24,13 @@ export default async function DocumentReviewPage({
   const { documentId } = await params;
 
   return (
-    <Box component="main" sx={{ minHeight: "100vh", bgcolor: dashboardTokens.shell }}>
+    <Box component="main" sx={{ minHeight: "100vh", bgcolor: dashboardCanvasTokens.shell }}>
       <DashboardHeader />
-      <Box sx={{ maxWidth: 1500, mx: "auto", px: { xs: 1.5, sm: 3 }, py: { xs: 2, sm: 3 } }}>
-        <DocumentReviewWorkspace documentId={documentId} />
-      </Box>
+      <DashboardContentTheme>
+        <Box sx={{ maxWidth: 1500, mx: "auto", px: { xs: 1.5, sm: 3 }, py: { xs: 2, sm: 3 } }}>
+          <DocumentReviewWorkspace documentId={documentId} />
+        </Box>
+      </DashboardContentTheme>
     </Box>
   );
 }

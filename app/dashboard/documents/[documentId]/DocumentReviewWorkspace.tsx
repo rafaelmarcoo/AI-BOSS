@@ -33,7 +33,7 @@ import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
-import { dashboardTokens } from "@/app/theme";
+import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
 import {
   FINANCIAL_METRIC_KEYS,
   FINANCIAL_METRIC_LABELS,
@@ -825,7 +825,7 @@ function CandidateReviewCard({
           </ToggleButtonGroup>
         </Stack>
 
-        {excerpt ? <Box component="blockquote" sx={{ m: 0, px: 1.5, py: 1, borderLeft: "3px solid", borderColor: dashboardTokens.accent, bgcolor: "rgba(79,125,243,0.08)", color: dashboardTokens.textSoft, fontSize: 13 }}>{excerpt}</Box> : null}
+        {excerpt ? <Box component="blockquote" sx={{ m: 0, px: 1.5, py: 1, borderLeft: "3px solid", borderColor: dashboardTokens.accent, bgcolor: "rgba(242,140,91,0.10)", color: dashboardTokens.textSoft, fontSize: 13 }}>{excerpt}</Box> : null}
 
         {warnings.length > 0 ? (
           <Alert severity="warning" icon={<WarningAmberRoundedIcon />}>
@@ -881,7 +881,7 @@ function CandidateReviewCard({
 
 function OriginalField({ label, value }: { label: string; value: string }) {
   return (
-    <Box sx={{ px: 1.5, py: 1, borderRadius: 1.5, border: "1px solid", borderColor: dashboardTokens.border, bgcolor: "rgba(255,255,255,0.025)" }}>
+    <Box sx={{ px: 1.5, py: 1, borderRadius: 1.5, border: "1px solid", borderColor: dashboardTokens.border, bgcolor: dashboardTokens.surfaceAlt }}>
       <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>{label}</Typography>
       <Typography variant="body2" sx={{ mt: 0.25, color: dashboardTokens.textSoft, overflowWrap: "anywhere" }}>{value}</Typography>
     </Box>

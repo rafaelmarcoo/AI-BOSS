@@ -23,7 +23,7 @@ import {
 import AddRoundedIcon from '@mui/icons-material/AddRounded'
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded'
-import { dashboardTokens } from '@/app/theme'
+import { dashboardCanvasTokens as dashboardTokens } from '@/app/theme'
 import { GenUiWidgetRenderer } from '@/app/dashboard/runway/gen-ui/GenUiCanvas'
 import { addScenarioMonths } from '@/lib/scenarios/calculation'
 import type { ScenarioAnalysisResult } from '@/lib/scenarios/calculation'
@@ -517,7 +517,7 @@ export function ScenariosWorkspace() {
   return (
     <Stack spacing={3}>
       <Box>
-        <Typography component="h1" variant="h4" fontWeight={700} color="common.white">Scenarios</Typography>
+        <Typography component="h1" variant="h4" fontWeight={700} color={dashboardTokens.text}>Scenarios</Typography>
         <Typography sx={{ color: dashboardTokens.textMuted, mt: 0.5 }}>
           Compare deterministic current-run-rate and historical-trend outcomes. Scenario work never changes your uploaded financial observations.
         </Typography>
@@ -823,7 +823,7 @@ export function ScenariosWorkspace() {
         >
           <Stack spacing={1.5}>
             <Box>
-              <Typography variant="h5" fontWeight={700}>Comparison results</Typography>
+              <Typography variant="h5" fontWeight={700} sx={{ color: dashboardTokens.text }}>Comparison results</Typography>
               <Typography variant="body2" sx={{ color: dashboardTokens.textMuted, mt: 0.5 }}>
                 Run the assumptions on the left to compare the baseline with up to three scenarios.
               </Typography>
@@ -836,10 +836,21 @@ export function ScenariosWorkspace() {
             </Alert>
           ) : null}
           {result ? (
-            <GenUiWidgetRenderer
-              widget={{ id: 'workspace-scenario-result', type: 'scenario_analysis', title: 'Scenario comparison results', reason: 'Calculated from the assumptions on the left using trusted deterministic code.', data: { result, editHref: '/dashboard/scenarios' } }}
-              onAskChatbot={() => undefined}
-            />
+            <Paper
+              variant="outlined"
+              sx={{
+                bgcolor: dashboardTokens.surface,
+                borderColor: dashboardTokens.border,
+                borderRadius: 3,
+                boxShadow: '0 10px 30px rgba(32,58,80,0.08)',
+                overflow: 'hidden',
+              }}
+            >
+              <GenUiWidgetRenderer
+                widget={{ id: 'workspace-scenario-result', type: 'scenario_analysis', title: 'Scenario comparison results', reason: 'Calculated from the assumptions on the left using trusted deterministic code.', data: { result, editHref: '/dashboard/scenarios' } }}
+                onAskChatbot={() => undefined}
+              />
+            </Paper>
           ) : (
             <Paper
               variant="outlined"

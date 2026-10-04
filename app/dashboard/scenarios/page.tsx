@@ -3,7 +3,8 @@ import { redirect } from 'next/navigation'
 import { Box } from '@mui/material'
 import { COOKIE_ACCESS_TOKEN } from '@/lib/supabase'
 import { getCurrentUserProfile } from '@/lib/auth'
-import { dashboardTokens } from '@/app/theme'
+import { dashboardCanvasTokens } from '@/app/theme'
+import { DashboardContentTheme } from '../DashboardContentTheme'
 import { DashboardHeader } from '../header'
 import { ScenariosWorkspace } from './ScenariosWorkspace'
 
@@ -16,11 +17,13 @@ export default async function ScenariosPage() {
   if (!currentUser) redirect('/sign-in')
 
   return (
-    <Box component="main" sx={{ minHeight: '100vh', bgcolor: dashboardTokens.shell }}>
+    <Box component="main" sx={{ minHeight: '100vh', bgcolor: dashboardCanvasTokens.shell }}>
       <DashboardHeader />
-      <Box sx={{ maxWidth: 1800, mx: 'auto', px: { xs: 2, sm: 4 }, py: { xs: 3, sm: 5 } }}>
-        <ScenariosWorkspace />
-      </Box>
+      <DashboardContentTheme>
+        <Box sx={{ maxWidth: 1800, mx: 'auto', px: { xs: 2, sm: 4 }, py: { xs: 3, sm: 5 } }}>
+          <ScenariosWorkspace />
+        </Box>
+      </DashboardContentTheme>
     </Box>
   )
 }

@@ -56,7 +56,11 @@ describe('LandingPage quick actions', () => {
 
   function renderLandingPage() {
     return render(
-      <LandingPage fullName="Rafael Marco" email="rafael@example.com" />,
+      <LandingPage
+        fullName="Rafael Marco"
+        email="rafael@example.com"
+        companyName="Harbour Studio"
+      />,
     )
   }
 
@@ -101,6 +105,29 @@ describe('LandingPage quick actions', () => {
     expect(clickSpy).toHaveBeenCalledTimes(2)
   })
 
+  it('shows the welcome header and opens the navigation menu', async () => {
+    const user = userEvent.setup()
+    renderLandingPage()
+
+    expect(screen.getByRole('link', { name: 'AI-BOSS home' })).toBeInTheDocument()
+    expect(screen.getByText('Rafael Marco')).toBeInTheDocument()
+    expect(screen.getByText('Harbour Studio')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute(
+      'href',
+      '/landing',
+    )
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
+      'href',
+      '/dashboard',
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Open profile menu' }))
+    expect(screen.getByRole('menuitem', { name: 'Settings' })).toHaveAttribute(
+      'href',
+      '/dashboard/settings',
+    )
+  })
+
   it('opens the document workspace from Manage documents', async () => {
     renderLandingPage()
 
@@ -118,6 +145,16 @@ describe('LandingPage quick actions', () => {
     await user.click(screen.getByRole('button', { name: 'Scenarios' }))
 
     expect(mockPush).toHaveBeenCalledWith('/dashboard/scenarios')
+  })
+
+  it('shows the recent conversations section at the bottom', async () => {
+    renderLandingPage()
+
+    expect(
+      screen.getByRole('heading', { name: 'Recent conversations' }),
+    ).toBeInTheDocument()
+    expect(await screen.findByText('No conversations yet')).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith('/api/chat/conversations')
   })
 
   it('shows upload failures without navigating away', async () => {

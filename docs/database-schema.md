@@ -509,7 +509,193 @@ are published only from included candidates through `confirm_document_extraction
 
 ---
 
-### 14. scenarios
+### 14. Stage 3 canonical financial read models
+
+Detailed accounting data is normalized separately from
+`financial_metric_observations`. Provider payloads remain available in
+`raw_data` for audit, but application calculations use the canonical columns.
+Every table is company-owned and protected by administrator-only company RLS.
+The `user_id` column records the importing user for audit, while `company_id`
+is the access, query, and deduplication boundary. Source connection and sync-run
+provenance are retained where applicable.
+
+#### financial_sync_runs
+
+Tracks each detailed accounting import, its provider capabilities, source date,
+record counts, completion state, and any error. This makes partial provider
+support explicit and keeps sync failures from masquerading as zero values.
+
+#### financial_accounts
+
+Stores the canonical chart of accounts. Account class and category drive
+profit and expense calculations. `cost_behavior` is one of `fixed`, `variable`,
+`mixed`, or `unclassified`; break-even widgets may not treat unclassified costs
+as fixed or variable.
+
+#### financial_reporting_periods and financial_statement_lines
+
+Stores distinct `profit_loss` and `cash_flow` reports by reporting period and
+currency. Repeated syncs upsert the same period instead of creating another
+month. Statement lines identify revenue, cost of sales, operating expenses,
+profit totals, cash inflows, cash outflows, and net cash flow.
+
+Component revenue and cost lines use positive magnitudes. Derived profit and net
+cash-flow totals may be negative. This avoids interpreting revenue minus
+expenses as cash flow.
+
+#### financial_transactions and financial_transaction_lines
+
+Stores posted receipts, payments, purchases, sales, transfers, journals, and
+other canonical transactions. Provider transaction IDs prevent repeated syncs
+from duplicating transactions. Lines retain account/category links for expense
+breakdowns and largest-expense analysis.
+
+#### financial_budgets and financial_budget_lines
+
+Stores draft, approved, or archived budgets and their dated revenue, expense,
+cash-inflow, and cash-outflow lines. Actual-versus-budget calculations align
+lines by currency, category/account, and overlapping reporting period.
+
+**RLS Policies:**
+- Company administrators can view, update, and delete only rows for `current_company_id()`
+- Inserts must also record the authenticated administrator as `user_id`
+- Server-side provider synchronization resolves and verifies the authenticated administrator's company before using the administrative client
+
+**Deduplication:**
+- Accounts: `(company_id, source_type, provider_account_id)`
+- Reporting periods: `(company_id, source_type, statement_type, period_start, period_end, currency)`
+- Statement lines: `(reporting_period_id, line_key)`
+- Transactions: `(company_id, source_type, provider_transaction_id)`
+- Transaction lines: `(transaction_id, line_key)`
+- Budgets: `(company_id, source_type, provider_budget_id)`
+- Budget lines: `(budget_id, line_key, period_start, period_end)`
+
+---
+
+### 15. Stage 4 invoices, bills, and payments
+
+Stage 4 stores invoice-level due dates and outstanding balances separately from
+aggregate accounts receivable and accounts payable. Widgets never reconstruct
+invoice ageing from aggregate totals.
+
+#### financial_invoices
+
+Stores both customer invoices (`sales_invoice`) and supplier bills
+(`supplier_bill`). Canonical status, issue date, due date, currency, total,
+paid amount, and outstanding amount are explicit columns. Provider payloads are
+retained in `raw_data` for audit and future provider-specific troubleshooting.
+
+Only invoices with a positive `outstanding_amount` and a non-terminal status
+are used for overdue, ageing, expected-payment, and bills-due calculations.
+Calculations group records by source and currency; no implicit currency
+conversion occurs.
+
+#### financial_invoice_lines
+
+Stores canonical invoice or bill line items, including optional chart-of-account
+links, descriptions, categories, quantity, unit amount, tax, and line amount.
+Stage 4 widgets primarily use invoice headers, while these lines preserve the
+normalized detail required by later customer and product analytics.
+
+#### financial_invoice_payments
+
+Stores posted, voided, or deleted payments linked to an invoice or bill.
+Provider payment IDs make repeated synchronization idempotent. The header-level
+`amount_paid` and `outstanding_amount` remain the source of truth for current
+open balances.
+
+**RLS Policies:**
+- Company administrators can access only invoice, line, and payment rows for `current_company_id()`
+- Inserts must record the authenticated administrator as the importing `user_id`
+- Provider synchronization resolves and verifies the authenticated administrator's company before administrative writes
+
+**Deduplication:**
+- Invoices: `(company_id, source_type, provider_invoice_id)`
+- Invoice lines: `(invoice_id, line_key)`
+- Payments: `(invoice_id, provider_payment_id)`
+
+**Ageing boundaries:**
+- Age is measured from the stored due date to the displayed as-of date
+- Buckets are 0–30, 31–60, 61–90, and 90+ days overdue
+- Not-yet-due invoices are excluded from overdue ageing and handled by Expected Payments
+
+---
+
+### 16. Stage 5 balance sheet and debt
+
+Balance-sheet reports reuse `financial_reporting_periods` and
+`financial_statement_lines` with `statement_type = balance_sheet`. Lines are
+classified as current/non-current assets and liabilities, equity, or explicit
+statement totals. Component lines and total lines are stored separately so
+calculations do not double count them.
+
+`quick_ratio_treatment` records whether each current-asset component is
+included, excluded, or still unclassified for the quick ratio. The application
+does not calculate that ratio while any component remains unclassified.
+
+#### financial_debts and financial_debt_repayments
+
+`financial_debts` stores lender, balance, currency, interest rate, and optional
+start/maturity details for a specific debt. `financial_debt_repayments` stores
+provider- or user-supplied repayment dates and amounts. A balance or maturity
+date is never expanded into an invented repayment schedule.
+
+Debt overview calculations group records by source and currency. Repayment
+timelines use only stored repayment rows with a scheduled status, preserving
+the distinction between contractual dates and estimates.
+
+**RLS Policies:**
+- Company administrators can access only debt and repayment rows for `current_company_id()`
+- Provider synchronization verifies the administrator's company before administrative writes
+
+**Deduplication:**
+- Debts: `(company_id, source_type, provider_debt_id)`
+- Repayments: `(debt_id, provider_repayment_id)`
+
+---
+
+### 17. Stage 6 customer and dimensional revenue analytics
+
+Stage 6 stores each dated revenue value once in `financial_revenue_entries` and
+links it to an optional canonical customer plus zero or more typed dimensions.
+Customer, product, service, department, business-unit, and provider tracking
+analytics therefore share the same revenue source without duplicating amounts.
+
+#### financial_customers
+
+Stores provider-neutral customer identities with source identifiers and active
+status. Revenue without a resolved customer remains valid and is reported as
+unallocated rather than assigned to a fabricated customer.
+
+#### financial_revenue_entries
+
+Stores signed, dated revenue values with currency, lifecycle status, and provenance. Entries may
+link back to their canonical invoice or transaction. Analytics group every
+source and currency independently; currency conversion requires a separately
+stored exchange rate and conversion date and is not performed by Stage 6.
+
+#### financial_revenue_dimensions and financial_revenue_entry_dimensions
+
+Stores reusable typed dimensions and their links to revenue entries. Supported
+types are `product_service`, `subscription`, `department`, `business_unit`, and
+`tracking`. Provider tracking categories remain `tracking` unless the source
+explicitly classifies them more specifically. `dimension_group` separates
+independent axes, so one revenue entry cannot be counted twice inside the same
+dimension group.
+
+**RLS Policies:**
+- Company administrators can access only customer, dimension, revenue, and link rows for `current_company_id()`
+- Provider synchronization verifies the administrator's company before administrative writes
+
+**Deduplication:**
+- Customers: `(company_id, source_type, provider_customer_id)`
+- Revenue entries: `(company_id, source_type, provider_revenue_id)`
+- Dimensions: `(company_id, source_type, dimension_type, dimension_group, provider_dimension_id)`
+- Entry dimensions: `(revenue_entry_id, dimension_type, dimension_group)`
+
+---
+
+### 18. scenarios
 
 Stores reusable what-if drafts and the latest explicitly calculated result. The
 application validates both JSON payloads. A baseline fingerprint lets AI-BOSS
@@ -545,7 +731,7 @@ decision analysis.
 
 ---
 
-### 15. user_gen_ui_preferences
+### 19. user_gen_ui_preferences
 
 Stores explicit, user-controlled signals that help AI-BOSS choose useful Gen UI
 widgets. Business size is stored on `companies` because it is shared; these
@@ -568,7 +754,7 @@ data still take priority over these preferences.
 
 ---
 
-### 16. financial_analysis_runs
+### 20. financial_analysis_runs
 
 Stores immutable, owner-private snapshots of completed full financial analyses.
 The selected source set, selection mode, reporting period, and currency are
@@ -613,7 +799,7 @@ evidence queryable.
 
 ---
 
-### 17. financial_decision_tests
+### 21. financial_decision_tests
 
 Stores each decision test as a new append-only record linked to one immutable
 analysis snapshot. The six-month scenario output and `mvp-v1` policy evaluation
@@ -644,6 +830,40 @@ the allow/block/override decision.
 
 ---
 
+### 22. user_dashboard_layouts
+
+Stores each user&apos;s manual dashboard layouts separately from immutable
+AI-generated conversation UI plans. The versioned `layout_payload` contains
+widget types, order, size, visibility, pinning, supported period/forecast/
+currency selections, and risk thresholds. It does not store financial values;
+saved layouts are hydrated from trusted current records when opened.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID (PK) | Saved layout identifier |
+| user_id | UUID (FK) | Layout owner |
+| name | TEXT | User-facing layout name, unique per user ignoring case |
+| is_default | BOOLEAN | Whether this layout opens by default; at most one per user |
+| source_plan_version | INTEGER | Optional AI plan version copied when the layout was created or reset |
+| source_generated_at | TIMESTAMP | Optional generation time of that source AI plan |
+| layout_payload | JSONB | Versioned, server-validated layout configuration; maximum 20 widgets |
+| created_at | TIMESTAMP | Creation time |
+| updated_at | TIMESTAMP | Last saved change |
+
+**RLS Policies:**
+- Users can view, insert, update, and delete only their own layouts
+
+**Indexes:**
+- Unique `(user_id, lower(trim(name)))` layout names
+- Partial unique default-layout index on `user_id` where `is_default = true`
+- `idx_user_dashboard_layouts_user_updated` on `(user_id, updated_at DESC)`
+
+Setting a layout as default runs a `BEFORE INSERT OR UPDATE` trigger that clears
+the previous default in the same transaction. The partial unique index remains
+the final one-default-per-user guard.
+
+---
+
 ## Relationships
 ```
 users (1) ──< (many) conversations
@@ -664,12 +884,33 @@ users (1) ──< (many) financial_metric_observations
 companies (1) ──< (many) financial_metric_observations
 data_connections (1) ──< (many) financial_metric_observations
 documents (1) ──< (many) financial_metric_observations
+companies (1) ──< (many) financial_sync_runs
+data_connections (1) ──< (many) financial_sync_runs
+companies (1) ──< (many) financial_accounts
+companies (1) ──< (many) financial_reporting_periods
+financial_reporting_periods (1) ──< (many) financial_statement_lines
+companies (1) ──< (many) financial_transactions
+financial_transactions (1) ──< (many) financial_transaction_lines
+companies (1) ──< (many) financial_budgets
+financial_budgets (1) ──< (many) financial_budget_lines
+companies (1) ──< (many) financial_invoices
+financial_invoices (1) ──< (many) financial_invoice_lines
+financial_invoices (1) ──< (many) financial_invoice_payments
+companies (1) ──< (many) financial_debts
+financial_debts (1) ──< (many) financial_debt_repayments
+companies (1) ──< (many) financial_customers
+companies (1) ──< (many) financial_revenue_entries
+companies (1) ──< (many) financial_revenue_dimensions
+financial_customers (1) ──< (many) financial_revenue_entries
+financial_revenue_entries (1) ──< (many) financial_revenue_entry_dimensions
+financial_revenue_dimensions (1) ──< (many) financial_revenue_entry_dimensions
 users (1) ──< (many) scenarios
 companies (1) ──< (many) scenarios
 users (1) ──< (one) user_gen_ui_preferences
 users (1) ──< (many) financial_analysis_runs
 financial_analysis_runs (1) ──< (many) financial_decision_tests
 users (1) ──< (many) financial_decision_tests
+users (1) ──< (many) user_dashboard_layouts
 ```
 
 ---
@@ -700,6 +941,11 @@ All schema changes are tracked in `db/migrations/`:
 - `021_financial_analysis_timeline.sql` - Adds single/timeline selection metadata, selected source snapshots, and immutable reporting-period bounds to analysis runs
 - `022_company_financial_review.sql` - Adds company ownership to documents and trusted observations, an employee-to-admin review queue, admin-only publication, and company-aware document deletion
 - `023_document_image_support.sql` - Allows JPEG, PNG, and WebP invoice images in the document pipeline
+- `024_stage3_financial_read_models.sql` - Adds canonical accounts, financial statements, transactions, budgets, sync provenance, RLS, and provider-safe deduplication for Stage 3 widgets
+- `025_stage4_invoices_and_bills.sql` - Adds canonical sales invoices, supplier bills, line items, payments, due-date indexes, RLS, and provider-safe deduplication for Stage 4 widgets
+- `026_stage5_balance_sheet_and_debt.sql` - Adds balance-sheet classifications, explicit quick-ratio treatment, debts, and stored repayment schedules
+- `027_stage6_customer_and_revenue_dimensions.sql` - Adds canonical customers, signed revenue entries, typed dimensions, RLS, and provider-safe deduplication for Stage 6 analytics
+- `028_stage7_dashboard_layouts.sql` - Adds versioned user-owned manual dashboard layouts, one-default enforcement, and RLS
 
 ---
 

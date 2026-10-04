@@ -21,6 +21,7 @@ export default async function LandingRoute() {
     <LandingPage
       fullName={currentUser.profile.full_name}
       email={currentUser.profile.email}
+      companyName={currentUser.profile.company_name}
     />
   );
 }

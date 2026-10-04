@@ -108,7 +108,7 @@ export function ChatContainer({
       >
         <Box
           sx={{
-            px: 1.5,
+            px: { xs: 2, sm: 2.5 },
             py: 1.1,
             borderBottom: "1px solid",
             borderBottomColor: dashboardTokens.border,
@@ -173,7 +173,7 @@ export function ChatContainer({
             flex: "1 1 0",
             minHeight: 0,
             overflow: "auto",
-            px: 1.5,
+            px: { xs: 2, sm: 2.5 },
             py: 1.5,
           }}
         >
@@ -195,7 +195,7 @@ export function ChatContainer({
               </Stack>
             </Stack>
           ) : (
-            <Stack spacing={1} sx={{ pb: 1 }}>
+            <Stack spacing={1.5} sx={{ pb: 1 }}>
               {error ? (
                 <Alert
                   severity="error"
@@ -228,7 +228,7 @@ export function ChatContainer({
         <Box
           sx={{
             flex: "0 0 auto",
-            px: 1.5,
+            px: { xs: 2, sm: 2.5 },
             py: 1.25,
             borderTop: "1px solid",
             borderTopColor: dashboardTokens.border,

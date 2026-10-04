@@ -4,6 +4,7 @@ import { readSourceAwareMetrics } from '@/lib/financial-data/read-service'
 import { readRunwayObservationHistory } from '@/lib/financial-data/runway-history'
 import { readFinancialMetricHistorySeries } from '@/lib/financial-data/metric-history'
 import { readFinancialMetricForecastSeries } from '@/lib/financial-data/metric-forecast'
+import { readStage3FinancialData } from '@/lib/financial-data/reporting/read-service'
 import { getGenUiPersonalization } from '@/lib/gen-ui/preferences-persistence'
 import { planGenUi } from '@/lib/gen-ui/plan-gen-ui'
 
@@ -33,6 +34,10 @@ jest.mock('@/lib/financial-data/metric-history', () => ({
 jest.mock('@/lib/financial-data/metric-forecast', () => ({
   readFinancialMetricForecastSeries: jest.fn(),
 }))
+jest.mock('@/lib/financial-data/reporting/read-service', () => ({
+  EMPTY_STAGE3_FINANCIAL_DATA: { capabilities: [], accounts: [], reportingPeriods: [], transactions: [], budgets: [], invoices: [], debts: [], revenueEntries: [] },
+  readStage3FinancialData: jest.fn(),
+}))
 jest.mock('@/lib/gen-ui/preferences-persistence', () => ({
   getGenUiPersonalization: jest.fn(),
 }))
@@ -44,6 +49,7 @@ const mockReadRunwayObservationHistory = jest.mocked(
 )
 const mockReadFinancialMetricHistorySeries = jest.mocked(readFinancialMetricHistorySeries)
 const mockReadFinancialMetricForecastSeries = jest.mocked(readFinancialMetricForecastSeries)
+const mockReadStage3FinancialData = jest.mocked(readStage3FinancialData)
 const mockGetGenUiPersonalization = jest.mocked(getGenUiPersonalization)
 const originalApiKey = process.env.OPENAI_API_KEY
 
@@ -99,6 +105,16 @@ describe('planGenUi', () => {
       metricKey: 'cash', label: 'Cash', range: 'all', horizon: 3,
       }],
     } as never)
+    mockReadStage3FinancialData.mockResolvedValue({
+      capabilities: [],
+      accounts: [],
+      reportingPeriods: [],
+      transactions: [],
+      budgets: [],
+      invoices: [],
+      debts: [],
+      revenueEntries: [],
+    })
     mockGetGenUiPersonalization.mockResolvedValue({
       businessSize: null,
       canEditBusinessSize: false,
@@ -193,9 +209,9 @@ describe('planGenUi', () => {
     expect(plan?.widgets).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          type: 'metric_snapshot',
+          type: 'cash_balance',
           title: 'Available cash',
-          data: { metrics: [expect.objectContaining({ key: 'cash' })] },
+          data: expect.objectContaining({ metricKey: 'cash', value: 120000 }),
         }),
         expect.objectContaining({
           type: 'metric_snapshot',
@@ -629,6 +645,167 @@ describe('planGenUi', () => {
     expect(plan?.widgets).toContainEqual(
       expect.objectContaining({ type: 'metric_forecast_chart' })
     )
+  })
+
+  it('uses the latest distinct revenue periods for deterministic revenue growth', async () => {
+    const metrics = fillUnavailableMetrics({
+      monthly_revenue: {
+        status: 'available', key: 'monthly_revenue', value: 150, currency: 'NZD',
+        periodStart: '2026-08-01', periodEnd: '2026-08-31', asOfDate: null,
+        provenance: { sourceType: 'document', sourceLabel: 'August.csv' },
+        confidence: 0.95, updatedAt: '2026-09-01T00:00:00.000Z',
+      },
+    })
+    mockReadSourceAwareMetrics.mockResolvedValue({
+      metrics,
+      availableMetricCount: 1,
+      unavailableMetricCount: 6,
+      runwayInput: null,
+      workingCapitalAdjustedRunway: metrics.runway_months,
+    })
+    mockReadFinancialMetricHistorySeries.mockResolvedValue({
+      metricKey: 'monthly_revenue', label: 'Monthly revenue', range: 'all',
+      recordLimit: 'all', selectedCurrency: null, selectedSourceKey: null,
+      availableCurrencies: ['NZD'], availableSources: [],
+      excludedCurrencyObservationCount: 0, hasMissingCurrencyObservations: false,
+      unsupportedCurrencies: [],
+      series: [{
+        metricKey: 'monthly_revenue', label: 'Monthly revenue', range: 'all',
+        points: [
+          { date: '2026-06-30', dateSource: 'period_end', value: 100, currency: 'NZD', sourceLabel: 'June.csv', sourceType: 'document', confidence: 0.95, updatedAt: '2026-07-01T00:00:00.000Z' },
+          { date: '2026-07-31', dateSource: 'period_end', value: 120, currency: 'NZD', sourceLabel: 'July.csv', sourceType: 'document', confidence: 0.95, updatedAt: '2026-08-01T00:00:00.000Z' },
+          { date: '2026-08-31', dateSource: 'period_end', value: 150, currency: 'NZD', sourceLabel: 'August.csv', sourceType: 'document', confidence: 0.95, updatedAt: '2026-09-01T00:00:00.000Z' },
+        ],
+        movement: 'increased', direction: 'improving', firstValue: 100,
+        latestValue: 150, totalChange: 50, percentageChange: 50,
+        averageChange: 25, currency: 'NZD',
+        sourceLabels: ['June.csv', 'July.csv', 'August.csv'],
+        hasMixedSources: true, hasRecordedDateFallback: false,
+        hasIncompatibleCurrencies: false, excludedCurrencyObservationCount: 0,
+        hasMissingCurrencyObservations: false, unsupportedCurrencies: [],
+      }],
+    } as never)
+    mockPlannerInvoke.mockResolvedValue({ widgets: [] })
+
+    const plan = await planGenUi({
+      userId: 'user-123',
+      userMessage: 'What is our month-on-month revenue growth?',
+      assistantMessage: 'Revenue grew in the latest period.',
+      toolsUsed: [],
+    })
+
+    expect(mockReadFinancialMetricHistorySeries).toHaveBeenCalledWith({
+      userId: 'user-123', metricKey: 'monthly_revenue', range: 'all', recordLimit: 'all',
+    })
+    expect(plan?.widgets).toContainEqual(expect.objectContaining({
+      type: 'revenue_growth',
+      data: expect.objectContaining({ previousValue: 120, currentValue: 150, growthPercentage: 25 }),
+    }))
+  })
+
+  it('builds the AI financial brief from verified metric facts', async () => {
+    const metrics = fillUnavailableMetrics({
+      cash: {
+        status: 'available', key: 'cash', value: 120000, currency: 'NZD',
+        periodStart: null, periodEnd: null, asOfDate: '2026-08-31',
+        provenance: { sourceType: 'document', sourceLabel: 'verified.csv' },
+        confidence: 0.95, updatedAt: '2026-09-01T00:00:00.000Z',
+      },
+      monthly_revenue: {
+        status: 'available', key: 'monthly_revenue', value: 80000, currency: 'NZD',
+        periodStart: '2026-08-01', periodEnd: '2026-08-31', asOfDate: null,
+        provenance: { sourceType: 'document', sourceLabel: 'verified.csv' },
+        confidence: 0.95, updatedAt: '2026-09-01T00:00:00.000Z',
+      },
+    })
+    mockReadSourceAwareMetrics.mockResolvedValue({
+      metrics,
+      availableMetricCount: 2,
+      unavailableMetricCount: 5,
+      runwayInput: null,
+      workingCapitalAdjustedRunway: metrics.runway_months,
+    })
+    mockPlannerInvoke.mockResolvedValue({
+      widgets: [{
+        widgetId: 'existing_data_ai_financial_brief',
+        title: 'Financial brief',
+        reason: 'A concise verified overview.',
+      }],
+    })
+
+    const plan = await planGenUi({
+      userId: 'user-123',
+      userMessage: 'Give me a financial health overview',
+      assistantMessage: 'Here is the verified overview.',
+      toolsUsed: [],
+    })
+
+    expect(plan?.widgets).toContainEqual(expect.objectContaining({
+      type: 'ai_financial_brief',
+      data: expect.objectContaining({
+        facts: expect.arrayContaining([
+          expect.objectContaining({ label: 'Cash balance', sourceLabel: 'verified.csv' }),
+          expect.objectContaining({ label: 'Monthly revenue', sourceLabel: 'verified.csv' }),
+        ]),
+      }),
+    }))
+  })
+
+  it('keeps a directly requested Stage 4 widget with an honest unavailable state', async () => {
+    mockPlannerInvoke.mockResolvedValue({ widgets: [] })
+
+    const plan = await planGenUi({
+      userId: 'user-123',
+      userMessage: 'Show me overdue customer invoices',
+      assistantMessage: 'Invoice detail is not connected yet.',
+      toolsUsed: [],
+    })
+
+    expect(plan?.widgets).toContainEqual(expect.objectContaining({
+      type: 'overdue_invoices',
+      state: {
+        status: 'unavailable',
+        message: 'Detailed customer invoices are required for overdue analysis.',
+      },
+    }))
+  })
+
+  it('keeps a directly requested Stage 5 ratio with an honest unavailable state', async () => {
+    mockPlannerInvoke.mockResolvedValue({ widgets: [] })
+
+    const plan = await planGenUi({
+      userId: 'user-123',
+      userMessage: 'What is our current ratio?',
+      assistantMessage: 'A classified balance sheet is not connected yet.',
+      toolsUsed: [],
+    })
+
+    expect(plan?.widgets).toContainEqual(expect.objectContaining({
+      type: 'current_ratio',
+      state: {
+        status: 'unavailable',
+        message: 'A classified balance sheet is required for this calculation.',
+      },
+    }))
+  })
+
+  it('keeps a directly requested Stage 6 widget with an honest unavailable state', async () => {
+    mockPlannerInvoke.mockResolvedValue({ widgets: [] })
+
+    const plan = await planGenUi({
+      userId: 'user-123',
+      userMessage: 'Show revenue by customer',
+      assistantMessage: 'Customer-linked revenue is not connected yet.',
+      toolsUsed: [],
+    })
+
+    expect(plan?.widgets).toContainEqual(expect.objectContaining({
+      type: 'customer_revenue_breakdown',
+      state: {
+        status: 'unavailable',
+        message: 'Customer-linked revenue entries are required for this breakdown.',
+      },
+    }))
   })
 
   it('hydrates scenario UI from the exact validated tool result and ignores legacy model comparisons', async () => {

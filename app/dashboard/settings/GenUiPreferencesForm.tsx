@@ -37,7 +37,7 @@ import {
   type GenUiPlanningHorizon,
   type GenUiPriorityTopic,
 } from "@/lib/gen-ui/preferences-types";
-import { dashboardTokens } from "@/app/theme";
+import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
 
 interface PreferencesApiResponse {
   success: boolean;
@@ -124,9 +124,10 @@ export function GenUiPreferencesForm({
       elevation={0}
       sx={{
         p: { xs: 2, sm: 3 },
-        bgcolor: "rgba(255,255,255,0.03)",
+        bgcolor: dashboardTokens.surface,
         border: "1px solid",
         borderColor: dashboardTokens.border,
+        boxShadow: "0 8px 24px rgba(32,58,80,0.06)",
       }}
     >
       <Stack spacing={3}>
@@ -138,8 +139,8 @@ export function GenUiPreferencesForm({
               borderRadius: 2,
               display: "grid",
               placeItems: "center",
-              bgcolor: "rgba(79,125,243,0.16)",
-              color: "#AFC6FF",
+              bgcolor: "rgba(242,140,91,0.16)",
+              color: "#9B4825",
               flexShrink: 0,
             }}
           >
@@ -254,13 +255,13 @@ export function GenUiPreferencesForm({
                   onClick={() => togglePriority(topic)}
                   variant={selected ? "filled" : "outlined"}
                   sx={{
-                    color: selected ? "#EAF0FF" : dashboardTokens.textSoft,
-                    bgcolor: selected ? "rgba(79,125,243,0.24)" : "transparent",
-                    borderColor: selected ? "rgba(111,149,247,0.7)" : dashboardTokens.borderSoft,
+                    color: selected ? dashboardTokens.text : dashboardTokens.textSoft,
+                    bgcolor: selected ? "rgba(242,140,91,0.22)" : "transparent",
+                    borderColor: selected ? "rgba(242,140,91,0.72)" : dashboardTokens.borderSoft,
                     "&:hover": {
                       bgcolor: selected
-                        ? "rgba(79,125,243,0.32)"
-                        : "rgba(255,255,255,0.06)",
+                        ? "rgba(242,140,91,0.30)"
+                        : dashboardTokens.surfaceAlt,
                     },
                   }}
                 />
@@ -302,7 +303,7 @@ export function GenUiPreferencesForm({
               borderRadius: 2,
               border: "1px solid",
               borderColor: dashboardTokens.border,
-              bgcolor: "rgba(255,255,255,0.02)",
+              bgcolor: dashboardTokens.surfaceAlt,
             }}
           >
             <Stack spacing={0.35}>
@@ -378,9 +379,9 @@ const toggleGroupStyles = {
     textTransform: "none",
     fontWeight: 600,
     "&.Mui-selected": {
-      color: "#EAF0FF",
-      bgcolor: "rgba(79,125,243,0.24)",
-      borderColor: "rgba(111,149,247,0.7) !important",
+      color: dashboardTokens.text,
+      bgcolor: "rgba(242,140,91,0.22)",
+      borderColor: "rgba(242,140,91,0.72) !important",
     },
   },
 };

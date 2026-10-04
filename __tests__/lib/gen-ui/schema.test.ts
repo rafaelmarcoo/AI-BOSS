@@ -83,7 +83,7 @@ describe('Gen UI plan schema', () => {
     ).toBe(false)
   })
 
-  it('allows at most five generated widgets', () => {
+  it('allows at most four generated widgets', () => {
     const widget = {
       id: 'connections-1',
       type: 'data_connections' as const,
@@ -101,7 +101,7 @@ describe('Gen UI plan schema', () => {
     expect(
       GenUiPlanSchema.safeParse({
         ...plan,
-        widgets: Array.from({ length: 5 }, (_, index) => ({
+        widgets: Array.from({ length: 4 }, (_, index) => ({
           ...widget,
           id: `connections-${index}`,
         })),
@@ -110,7 +110,7 @@ describe('Gen UI plan schema', () => {
     expect(
       GenUiPlanSchema.safeParse({
         ...plan,
-        widgets: Array.from({ length: 6 }, (_, index) => ({
+        widgets: Array.from({ length: 5 }, (_, index) => ({
           ...widget,
           id: `connections-${index}`,
         })),

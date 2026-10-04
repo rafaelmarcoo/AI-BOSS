@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Alert, Button, Paper, Stack, TextField, Typography } from "@mui/material";
+import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
 
 export function PasswordSettingsForm() {
   const router = useRouter();
@@ -45,11 +46,11 @@ export function PasswordSettingsForm() {
   };
 
   return (
-    <Paper component="form" onSubmit={submit} elevation={0} sx={{ p: { xs: 2, sm: 3 }, bgcolor: "rgba(255,255,255,0.03)", border: "1px solid", borderColor: "rgba(255,255,255,0.10)", color: "common.white" }}>
+    <Paper component="form" onSubmit={submit} elevation={0} sx={{ p: { xs: 2, sm: 3 }, bgcolor: dashboardTokens.surface, border: "1px solid", borderColor: dashboardTokens.border, color: dashboardTokens.text, boxShadow: "0 8px 24px rgba(32,58,80,0.06)" }}>
       <Stack spacing={2}>
         <Stack spacing={0.4}>
           <Typography variant="h6" fontWeight={700}>Change password</Typography>
-          <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.65)" }}>For security, enter your current password. You’ll then sign in again with the new one.</Typography>
+          <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>For security, enter your current password. You’ll then sign in again with the new one.</Typography>
         </Stack>
         {error ? <Alert severity="error">{error}</Alert> : null}
         {success ? <Alert severity="success">{success}</Alert> : null}
@@ -63,6 +64,6 @@ export function PasswordSettingsForm() {
 }
 
 const fieldStyles = {
-  "& .MuiOutlinedInput-root": { color: "common.white", bgcolor: "rgba(255,255,255,0.05)" },
-  "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.70)" },
+  "& .MuiOutlinedInput-root": { color: dashboardTokens.text, bgcolor: dashboardTokens.surfaceAlt },
+  "& .MuiInputLabel-root": { color: dashboardTokens.textMuted },
 };

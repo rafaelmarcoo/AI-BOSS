@@ -37,7 +37,7 @@ import {
   type GenUiPlanningHorizon,
   type GenUiPriorityTopic,
 } from "@/lib/gen-ui/preferences-types";
-import { dashboardTokens } from "@/app/theme";
+import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
 
 interface PreferencesApiResponse {
   success: boolean;
@@ -124,9 +124,10 @@ export function GenUiPreferencesForm({
       elevation={0}
       sx={{
         p: { xs: 2, sm: 3 },
-        bgcolor: "rgba(255,255,255,0.03)",
+        bgcolor: dashboardTokens.surface,
         border: "1px solid",
         borderColor: dashboardTokens.border,
+        boxShadow: "0 8px 24px rgba(32,58,80,0.06)",
       }}
     >
       <Stack spacing={3}>
@@ -139,7 +140,7 @@ export function GenUiPreferencesForm({
               display: "grid",
               placeItems: "center",
               bgcolor: "rgba(242,140,91,0.16)",
-              color: "#FFD1C3",
+              color: "#9B4825",
               flexShrink: 0,
             }}
           >
@@ -260,7 +261,7 @@ export function GenUiPreferencesForm({
                     "&:hover": {
                       bgcolor: selected
                         ? "rgba(242,140,91,0.30)"
-                        : "rgba(255,255,255,0.06)",
+                        : dashboardTokens.surfaceAlt,
                     },
                   }}
                 />
@@ -302,7 +303,7 @@ export function GenUiPreferencesForm({
               borderRadius: 2,
               border: "1px solid",
               borderColor: dashboardTokens.border,
-              bgcolor: "rgba(255,255,255,0.02)",
+              bgcolor: dashboardTokens.surfaceAlt,
             }}
           >
             <Stack spacing={0.35}>

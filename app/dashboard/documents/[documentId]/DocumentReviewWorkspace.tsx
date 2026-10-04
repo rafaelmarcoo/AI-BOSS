@@ -33,7 +33,7 @@ import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
-import { dashboardTokens } from "@/app/theme";
+import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
 import {
   FINANCIAL_METRIC_KEYS,
   FINANCIAL_METRIC_LABELS,
@@ -786,7 +786,7 @@ function CandidateReviewCard({
 
 function OriginalField({ label, value }: { label: string; value: string }) {
   return (
-    <Box sx={{ px: 1.5, py: 1, borderRadius: 1.5, border: "1px solid", borderColor: dashboardTokens.border, bgcolor: "rgba(255,255,255,0.025)" }}>
+    <Box sx={{ px: 1.5, py: 1, borderRadius: 1.5, border: "1px solid", borderColor: dashboardTokens.border, bgcolor: dashboardTokens.surfaceAlt }}>
       <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>{label}</Typography>
       <Typography variant="body2" sx={{ mt: 0.25, color: dashboardTokens.textSoft, overflowWrap: "anywhere" }}>{value}</Typography>
     </Box>

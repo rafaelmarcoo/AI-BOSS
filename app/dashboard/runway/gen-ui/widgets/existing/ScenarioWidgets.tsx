@@ -118,7 +118,8 @@ export function ScenarioComparisonWidgetView({
   );
 }
 
-const SCENARIO_COLORS = ["#38bdf8", "#a78bfa", "#f59e0b", "#22c55e"];
+// Darker series colours keep chart lines and keys legible on the light canvas.
+const SCENARIO_COLORS = ["#2563EB", "#7C3AED", "#C2410C", "#15803D"];
 
 export function ScenarioAnalysisWidgetView({
   widget,
@@ -162,7 +163,7 @@ export function ScenarioAnalysisWidgetView({
             ["Accounts payable", -result.openingBridge.accountsPayable],
             ["Opening liquidity", result.openingLiquidity],
           ].map(([label, value]) => (
-            <Box key={String(label)} sx={{ p: 1.25, borderRadius: 1, bgcolor: dashboardTokens.surfaceAlt }}>
+            <Box key={String(label)} sx={{ p: 1.25, borderRadius: 1.5, bgcolor: dashboardTokens.surfaceAlt, border: "1px solid", borderColor: dashboardTokens.border }}>
               <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>{label}</Typography>
               <Typography variant="body2" fontWeight={700}>{formatCurrency(Number(value), result.currency)}</Typography>
             </Box>
@@ -222,7 +223,7 @@ export function ScenarioAnalysisWidgetView({
           {result.panels.map((panel) => {
             if (!panel.available) {
               return (
-                <Paper key={panel.method} variant="outlined" sx={{ p: 2, bgcolor: "transparent", borderColor: dashboardTokens.border }}>
+                <Paper key={panel.method} variant="outlined" sx={{ p: 2, bgcolor: dashboardTokens.surfaceAlt, borderColor: dashboardTokens.border }}>
                   <Typography fontWeight={700}>{panel.label}</Typography>
                   <Alert severity="info" sx={{ mt: 1 }}>{panel.unavailableReason}</Alert>
                 </Paper>
@@ -235,7 +236,7 @@ export function ScenarioAnalysisWidgetView({
             })) ?? [];
 
             return (
-              <Paper key={panel.method} variant="outlined" sx={{ p: 1.5, bgcolor: "transparent", borderColor: dashboardTokens.border }}>
+              <Paper key={panel.method} variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, bgcolor: dashboardTokens.surface, borderColor: dashboardTokens.border, boxShadow: "0 6px 18px rgba(32,58,80,0.05)" }}>
                 <Typography fontWeight={700}>
                   {panel.method === "current_run_rate"
                     ? "Current run rate (latest monthly burn)"
@@ -256,11 +257,13 @@ export function ScenarioAnalysisWidgetView({
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData} margin={{ top: 12, right: 14, left: 8, bottom: 26 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke={dashboardTokens.border} />
-                      <XAxis dataKey="month" stroke={dashboardTokens.textMuted} style={{ fontSize: "0.7rem" }} />
-                      <YAxis width={72} stroke={dashboardTokens.textMuted} style={{ fontSize: "0.7rem" }} tickFormatter={(value) => formatAxisNumber(Number(value), false)} />
-                      <Legend />
+                      <XAxis dataKey="month" stroke={dashboardTokens.textSoft} tick={{ fill: dashboardTokens.textSoft, fontSize: 12 }} />
+                      <YAxis width={72} stroke={dashboardTokens.textSoft} tick={{ fill: dashboardTokens.textSoft, fontSize: 12 }} tickFormatter={(value) => formatAxisNumber(Number(value), false)} />
+                      <Legend wrapperStyle={{ color: dashboardTokens.text, fontSize: 12, paddingTop: 8 }} />
                       <Tooltip
-                        contentStyle={{ backgroundColor: dashboardTokens.surface, border: `1px solid ${dashboardTokens.border}`, borderRadius: 4 }}
+                        contentStyle={{ backgroundColor: dashboardTokens.surface, color: dashboardTokens.text, border: `1px solid ${dashboardTokens.border}`, borderRadius: 8, boxShadow: "0 8px 24px rgba(32,58,80,0.12)" }}
+                        labelStyle={{ color: dashboardTokens.text, fontWeight: 700 }}
+                        itemStyle={{ color: dashboardTokens.textSoft }}
                         formatter={(value, name) => [formatCurrency(Number(value), result.currency), panel.series.find((series) => series.id === name)?.label ?? name]}
                       />
                       {panel.series.map((series, index) => (
@@ -282,7 +285,10 @@ export function ScenarioAnalysisWidgetView({
                   {panel.series.map((series, index) => (
                     <Box key={series.id}>
                       <Stack direction="row" justifyContent="space-between" spacing={1}>
-                        <Typography variant="caption" sx={{ color: SCENARIO_COLORS[index], fontWeight: 700 }}>{series.label}</Typography>
+                        <Stack direction="row" spacing={0.75} alignItems="center">
+                          <Box sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: SCENARIO_COLORS[index], flexShrink: 0 }} />
+                          <Typography variant="caption" sx={{ color: dashboardTokens.text, fontWeight: 700 }}>{series.label}</Typography>
+                        </Stack>
                         <Typography variant="caption" sx={{ color: dashboardTokens.textMuted, textAlign: "right" }}>
                           End {formatCurrency(series.summary.endingLiquidity, result.currency)} · {series.summary.cashOutMonth ? `cash-out ${series.summary.cashOutMonth}` : "no cash-out in horizon"}
                         </Typography>
@@ -318,9 +324,9 @@ export function ScenarioAnalysisWidgetView({
             <Typography fontWeight={700}>View month-by-month values</Typography>
           </AccordionSummary>
           <AccordionDetails>
-            <TableContainer>
-              <Table size="small" aria-label="Monthly scenario comparison">
-                <TableHead><TableRow><TableCell>Method</TableCell><TableCell>Series</TableCell><TableCell>Month</TableCell><TableCell align="right">Liquidity</TableCell><TableCell align="right">Net movement</TableCell></TableRow></TableHead>
+            <TableContainer sx={{ border: "1px solid", borderColor: dashboardTokens.border, borderRadius: 1.5 }}>
+              <Table size="small" aria-label="Monthly scenario comparison" sx={{ minWidth: 720 }}>
+                <TableHead sx={{ bgcolor: dashboardTokens.surfaceAlt }}><TableRow><TableCell sx={{ fontWeight: 700 }}>Method</TableCell><TableCell sx={{ fontWeight: 700 }}>Series</TableCell><TableCell sx={{ fontWeight: 700 }}>Month</TableCell><TableCell align="right" sx={{ fontWeight: 700 }}>Liquidity</TableCell><TableCell align="right" sx={{ fontWeight: 700 }}>Net movement</TableCell></TableRow></TableHead>
                 <TableBody>
                   {result.panels.flatMap((panel) => panel.series.flatMap((series) => series.points.map((point) => (
                     <TableRow key={`${panel.method}-${series.id}-${point.month}`}>

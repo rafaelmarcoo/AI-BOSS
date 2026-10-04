@@ -2,7 +2,7 @@
 
 import { Box, Chip, LinearProgress, Stack, Typography } from "@mui/material";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { dashboardTokens } from "@/app/theme";
+import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
 import type {
   BreakEvenAnalysisWidget,
   BreakEvenProgressWidget,
@@ -38,7 +38,7 @@ function SummaryView({ title, reason, data }: { title: string; reason: string; d
         </Stack>
         <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, minmax(0, 1fr))" }, gap: 1 }}>
           {data.metrics.map((metric) => (
-            <Box key={metric.label} sx={{ p: 1.25, bgcolor: "rgba(255,255,255,0.025)", borderLeft: "3px solid", borderColor: metric.tone === "positive" ? dashboardTokens.positive : metric.tone === "warning" ? dashboardTokens.warning : dashboardTokens.border }}>
+            <Box key={metric.label} sx={{ p: 1.25, bgcolor: dashboardTokens.surfaceAlt, borderLeft: "3px solid", borderColor: metric.tone === "positive" ? dashboardTokens.positive : metric.tone === "warning" ? dashboardTokens.warning : dashboardTokens.border }}>
               <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>{metric.label}</Typography>
               <Typography fontWeight={700} sx={{ mt: 0.25 }}>
                 {metric.percentage !== undefined && metric.percentage !== null

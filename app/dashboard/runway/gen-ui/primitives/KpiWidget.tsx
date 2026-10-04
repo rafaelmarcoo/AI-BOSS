@@ -1,7 +1,7 @@
 "use client";
 
 import { Box, Chip, Stack, Typography } from "@mui/material";
-import { dashboardTokens } from "@/app/theme";
+import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
 import type { FinancialKpiData } from "@/lib/gen-ui/types";
 import { WidgetFrame } from "../shared/WidgetFrame";
 import { formatCurrency, formatDate } from "../shared/formatting";

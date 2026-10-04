@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { dashboardTokens } from "@/app/theme";
+import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
 import type { FinancialTrendData } from "@/lib/gen-ui/types";
 import { WidgetFrame } from "../shared/WidgetFrame";
 import {

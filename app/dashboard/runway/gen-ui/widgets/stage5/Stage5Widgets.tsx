@@ -1,7 +1,7 @@
 "use client";
 
 import { Box, Chip, LinearProgress, Stack, Typography } from "@mui/material";
-import { dashboardTokens } from "@/app/theme";
+import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
 import type {
   AssetSummaryWidget,
   BalanceSheetCategoryGroupData,

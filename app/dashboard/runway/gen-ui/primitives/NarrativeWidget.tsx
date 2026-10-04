@@ -1,14 +1,14 @@
 "use client";
 
 import { Box, Stack, Typography } from "@mui/material";
-import { dashboardTokens } from "@/app/theme";
+import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
 import type { AiFinancialBriefWidget } from "@/lib/gen-ui/types";
 import { WidgetFrame } from "../shared/WidgetFrame";
 
 const toneColor = {
   positive: dashboardTokens.positive,
   warning: dashboardTokens.warning,
-  neutral: "#38bdf8",
+  neutral: "#2B6A9B",
 } as const;
 
 export function NarrativeWidget({ widget }: { widget: AiFinancialBriefWidget }) {
@@ -22,7 +22,7 @@ export function NarrativeWidget({ widget }: { widget: AiFinancialBriefWidget }) 
           {widget.data.facts.map((fact) => (
             <Box
               key={`${fact.label}:${fact.value}`}
-              sx={{ p: 1.25, borderLeft: "3px solid", borderColor: toneColor[fact.tone], bgcolor: "rgba(255,255,255,0.025)" }}
+              sx={{ p: 1.25, borderLeft: "3px solid", borderColor: toneColor[fact.tone], bgcolor: dashboardTokens.surfaceAlt }}
             >
               <Stack direction="row" justifyContent="space-between" spacing={1}>
                 <Typography variant="body2" fontWeight={700}>{fact.label}</Typography>

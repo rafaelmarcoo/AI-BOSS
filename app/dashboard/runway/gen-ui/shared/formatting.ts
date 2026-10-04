@@ -1,4 +1,4 @@
-import { dashboardTokens } from "@/app/theme";
+import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
 import {
   formatFinancialCurrency,
   isSupportedFinancialCurrency,
@@ -88,7 +88,7 @@ export function metricContextLabel(metric: {
 }
 
 export const chartContextChipSx = {
-  color: "#dbeafe",
+  color: "#2B6A9B",
   bgcolor: "rgba(59, 130, 246, 0.14)",
   border: "1px solid rgba(96, 165, 250, 0.3)",
   fontWeight: 600,
@@ -100,4 +100,3 @@ export function trendDirectionColor(direction: string) {
   if (direction === "stable") return "#fbbf24";
   return dashboardTokens.textSoft;
 }
-

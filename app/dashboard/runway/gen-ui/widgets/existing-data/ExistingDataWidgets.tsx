@@ -1,7 +1,7 @@
 "use client";
 
 import { Box, Chip, Stack, Typography } from "@mui/material";
-import { dashboardTokens } from "@/app/theme";
+import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
 import type {
   AccountsPayableWidget as AccountsPayableWidgetModel,
   AccountsReceivableWidget as AccountsReceivableWidgetModel,
@@ -20,31 +20,31 @@ import { WidgetFrame } from "../../shared/WidgetFrame";
 import { formatCurrency, formatDate } from "../../shared/formatting";
 
 export function CashBalanceWidgetView({ widget }: { widget: CashBalanceWidgetModel }) {
-  return <KpiWidget title={widget.title} reason={widget.reason} data={widget.data} accent="#34d399" />;
+  return <KpiWidget title={widget.title} reason={widget.reason} data={widget.data} accent="#16825D" />;
 }
 
 export function RevenueSnapshotWidgetView({ widget }: { widget: RevenueSnapshotWidgetModel }) {
-  return <KpiWidget title={widget.title} reason={widget.reason} data={widget.data} accent="#22c55e" />;
+  return <KpiWidget title={widget.title} reason={widget.reason} data={widget.data} accent="#16825D" />;
 }
 
 export function ExpenseSummaryWidgetView({ widget }: { widget: ExpenseSummaryWidgetModel }) {
-  return <KpiWidget title={widget.title} reason={widget.reason} data={widget.data} accent="#fb7185" />;
+  return <KpiWidget title={widget.title} reason={widget.reason} data={widget.data} accent="#B43C50" />;
 }
 
 export function AccountsReceivableWidgetView({ widget }: { widget: AccountsReceivableWidgetModel }) {
-  return <KpiWidget title={widget.title} reason={widget.reason} data={widget.data} accent="#38bdf8" />;
+  return <KpiWidget title={widget.title} reason={widget.reason} data={widget.data} accent="#2B6A9B" />;
 }
 
 export function AccountsPayableWidgetView({ widget }: { widget: AccountsPayableWidgetModel }) {
-  return <KpiWidget title={widget.title} reason={widget.reason} data={widget.data} accent="#f97316" />;
+  return <KpiWidget title={widget.title} reason={widget.reason} data={widget.data} accent="#C7652E" />;
 }
 
 export function RevenueTrendWidgetView({ widget }: { widget: RevenueTrendWidgetModel }) {
-  return <TrendChartWidget title={widget.title} reason={widget.reason} data={widget.data} accent="#22c55e" />;
+  return <TrendChartWidget title={widget.title} reason={widget.reason} data={widget.data} accent="#16825D" />;
 }
 
 export function ExpenseTrendWidgetView({ widget }: { widget: ExpenseTrendWidgetModel }) {
-  return <TrendChartWidget title={widget.title} reason={widget.reason} data={widget.data} accent="#fb7185" />;
+  return <TrendChartWidget title={widget.title} reason={widget.reason} data={widget.data} accent="#B43C50" />;
 }
 
 export function RevenueGrowthWidgetView({ widget }: { widget: RevenueGrowthWidgetModel }) {

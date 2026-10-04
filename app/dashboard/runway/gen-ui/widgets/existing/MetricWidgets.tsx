@@ -16,7 +16,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { dashboardTokens } from "@/app/theme";
+import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
 import {
   formatFinancialCurrency,
   isSupportedFinancialCurrency,
@@ -39,13 +39,13 @@ import {
 } from "../../shared/formatting";
 
 const METRIC_COLORS: Record<string, string> = {
-  cash: "#00e5a0",
-  accounts_receivable: "#38bdf8",
-  accounts_payable: "#f97316",
-  runway_months: "#4da6ff",
-  burn_rate: "#ff4d6d",
-  monthly_revenue: "#22c55e",
-  monthly_expenses: "#f43f5e",
+  cash: "#16825D",
+  accounts_receivable: "#2B6A9B",
+  accounts_payable: "#C7652E",
+  runway_months: "#3276B1",
+  burn_rate: "#B43C50",
+  monthly_revenue: "#16825D",
+  monthly_expenses: "#B43C50",
 };
 
 export function MetricSnapshotWidgetView({
@@ -89,13 +89,13 @@ export function MetricSourceEvidenceWidgetView({
   widget: MetricSourceEvidenceWidgetModel;
 }) {
   const tonePresentation = {
-    available: { label: "available", color: "#bbf7d0", background: "rgba(34, 197, 94, 0.12)" },
-    derived: { label: "calculated", color: "#bae6fd", background: "rgba(56, 189, 248, 0.12)" },
-    unavailable: { label: "unavailable", color: "#fecdd3", background: "rgba(244, 63, 94, 0.12)" },
+    available: { label: "available", color: "#16825D", background: "rgba(22, 130, 93, 0.10)" },
+    derived: { label: "calculated", color: "#2B6A9B", background: "rgba(43, 106, 155, 0.10)" },
+    unavailable: { label: "unavailable", color: "#B43C50", background: "rgba(180, 60, 80, 0.10)" },
   } as const;
   const contextOnlyPresentation = {
     label: "context only",
-    color: "#fde68a",
+    color: "#9A6512",
     background: "rgba(245, 158, 11, 0.12)",
   } as const;
 
@@ -119,7 +119,7 @@ export function MetricSourceEvidenceWidgetView({
                 borderRadius: 1,
                 border: "1px solid",
                 borderColor: dashboardTokens.border,
-                bgcolor: "rgba(255,255,255,0.025)",
+                bgcolor: dashboardTokens.surfaceAlt,
               }}
             >
             <Box sx={{ minWidth: 0 }}>
@@ -130,7 +130,7 @@ export function MetricSourceEvidenceWidgetView({
                 {metric.sourceLabel}
               </Typography>
               {metricContextLabel(metric) ? (
-                <Typography variant="caption" sx={{ color: "#bae6fd", display: "block", mt: 0.25 }}>
+                <Typography variant="caption" sx={{ color: "#2B6A9B", display: "block", mt: 0.25 }}>
                   {metricContextLabel(metric)}
                 </Typography>
               ) : null}
@@ -141,7 +141,7 @@ export function MetricSourceEvidenceWidgetView({
               ) : null}
             </Box>
             <Stack direction="row" spacing={1} alignItems="center">
-              <Typography variant="body2" sx={{ color: "common.white" }}>
+              <Typography variant="body2" sx={{ color: dashboardTokens.text }}>
                 {metric.value}
               </Typography>
               <Chip
@@ -193,7 +193,7 @@ export function MetricTrendChartWidgetView({
         <Chip label={`Observations: ${widget.data.points.length}`} size="small" sx={chartContextChipSx} />
       </Stack>
       <Typography variant="body2" fontWeight={700} sx={{ color: dashboardTokens.text }}>
-        Value axis: <Box component="span" sx={{ color: "#bae6fd" }}>{isRunway ? "Runway (months)" : `${widget.data.label} (${widget.data.currency})`}</Box>
+        Value axis: <Box component="span" sx={{ color: "#2B6A9B" }}>{isRunway ? "Runway (months)" : `${widget.data.label} (${widget.data.currency})`}</Box>
       </Typography>
       <Box sx={{ height: 250 }}>
         <ResponsiveContainer width="100%" height="100%">
@@ -244,7 +244,7 @@ export function MetricTrendChartWidgetView({
         {widget.data.note}
       </Typography>
       {widget.data.hasRecordedDateFallback ? (
-        <Typography variant="caption" sx={{ color: "#fde68a" }}>
+        <Typography variant="caption" sx={{ color: "#9A6512" }}>
           Some points use upload dates because reporting dates were unavailable.
         </Typography>
       ) : null}
@@ -304,7 +304,7 @@ export function MetricForecastChartWidgetView({
         <Chip label={`Forecast period: Next ${widget.data.horizon} months`} size="small" sx={chartContextChipSx} />
       </Stack>
       <Typography variant="body2" fontWeight={700} sx={{ color: dashboardTokens.text }}>
-        Value axis: <Box component="span" sx={{ color: "#bae6fd" }}>{isRunway ? "Runway (months)" : `${widget.data.label} (${widget.data.currency})`}</Box>
+        Value axis: <Box component="span" sx={{ color: "#2B6A9B" }}>{isRunway ? "Runway (months)" : `${widget.data.label} (${widget.data.currency})`}</Box>
       </Typography>
       <Box sx={{ height: 250 }}>
         <ResponsiveContainer width="100%" height="100%">
@@ -336,12 +336,12 @@ export function MetricForecastChartWidgetView({
         </ResponsiveContainer>
       </Box>
       <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-        <Chip label={`Latest ${formatValue(latestActual?.value ?? 0)}`} size="small" sx={{ color: "#bae6fd", bgcolor: "rgba(14, 165, 233, 0.12)" }} />
-        <Chip label={`${widget.data.monthlySlope >= 0 ? "+" : ""}${formatValue(widget.data.monthlySlope)} / month`} size="small" sx={{ color: "#fde68a", bgcolor: "rgba(251, 191, 36, 0.12)" }} />
-        <Chip label={`${widget.data.horizon}-month estimate`} size="small" sx={{ color: "#bbf7d0", bgcolor: "rgba(34, 197, 94, 0.12)" }} />
+        <Chip label={`Latest ${formatValue(latestActual?.value ?? 0)}`} size="small" sx={{ color: "#2B6A9B", bgcolor: "rgba(43, 106, 155, 0.10)" }} />
+        <Chip label={`${widget.data.monthlySlope >= 0 ? "+" : ""}${formatValue(widget.data.monthlySlope)} / month`} size="small" sx={{ color: "#9A6512", bgcolor: "rgba(154, 101, 18, 0.10)" }} />
+        <Chip label={`${widget.data.horizon}-month estimate`} size="small" sx={{ color: "#16825D", bgcolor: "rgba(22, 130, 93, 0.10)" }} />
       </Stack>
       <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>{widget.data.note}</Typography>
-      {widget.data.hasRecordedDateFallback ? <Typography variant="caption" sx={{ color: "#fde68a" }}>Some points use upload dates because reporting dates were unavailable.</Typography> : null}
+      {widget.data.hasRecordedDateFallback ? <Typography variant="caption" sx={{ color: "#9A6512" }}>Some points use upload dates because reporting dates were unavailable.</Typography> : null}
     </WidgetFrame>
   );
 }

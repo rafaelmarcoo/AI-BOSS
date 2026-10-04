@@ -1,7 +1,7 @@
 "use client";
 
 import { Typography } from "@mui/material";
-import { dashboardTokens } from "@/app/theme";
+import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
 import { DataSourcesPanel } from "@/components/data-sources-panel";
 import type { DataConnectionsWidget as DataConnectionsWidgetModel } from "@/lib/gen-ui/types";
 import { WidgetFrame } from "../../shared/WidgetFrame";
@@ -20,4 +20,3 @@ export function DataConnectionsWidgetView({
     </WidgetFrame>
   );
 }
-

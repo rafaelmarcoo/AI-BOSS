@@ -18,7 +18,7 @@ import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
 import PushPinRoundedIcon from "@mui/icons-material/PushPinRounded";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
-import { dashboardTokens } from "@/app/theme";
+import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
 import {
   GEN_UI_WIDGET_CATALOG,
   GEN_UI_WIDGET_SIZE_DIMENSIONS,
@@ -173,18 +173,23 @@ export function DashboardWidgetGrid({
   return (
     <Box
       sx={{
-        py: 3,
-        borderTop: "1px solid",
-        borderColor: dashboardTokens.border,
+        pt: 2,
+        pb: 3,
         display: "grid",
-        gridTemplateColumns: { xs: "1fr", xl: "repeat(2, minmax(0, 1fr))" },
-        gridAutoRows: { xs: "auto", xl: "minmax(240px, auto)" },
-        gap: 2,
+        gridTemplateColumns: {
+          xs: "minmax(0, 1fr)",
+          md: "repeat(2, minmax(0, 1fr))",
+          xl: "repeat(12, minmax(0, 1fr))",
+        },
+        gridAutoRows: { xs: "auto", xl: "minmax(210px, auto)" },
+        gridAutoFlow: { xl: "dense" },
+        gap: { xs: 1.5, sm: 2 },
       }}
     >
       {items.map(({ key, item, widget, error }) => {
         const size = item?.size ?? GEN_UI_WIDGET_CATALOG[widget!.type].defaultSize;
         const dimensions = GEN_UI_WIDGET_SIZE_DIMENSIONS[size];
+        const wideColumnSpan = size === "1x1" ? 4 : 8;
         const catalog = item ? GEN_UI_WIDGET_CATALOG[item.widgetType] : null;
         const horizons = item ? horizonOptions(item.widgetType) : [];
 
@@ -205,16 +210,26 @@ export function DashboardWidgetGrid({
             sx={{
               minWidth: 0,
               height: "100%",
-              gridColumn: { xs: "span 1", xl: `span ${dimensions.columnSpan}` },
+              gridColumn: {
+                xs: "1 / -1",
+                md: `span ${dimensions.columnSpan}`,
+                xl: `span ${wideColumnSpan}`,
+              },
               gridRow: { xs: "auto", xl: `span ${dimensions.rowSpan}` },
               border: "1px solid",
               borderColor: dashboardTokens.border,
-              borderRadius: "16px",
+              borderRadius: "14px",
               overflow: "hidden",
-              bgcolor: "rgba(255,255,255,0.025)",
+              bgcolor: dashboardTokens.surface,
+              boxShadow: "0 8px 24px rgba(32, 58, 80, 0.08)",
               opacity: item?.isHidden ? 0.58 : 1,
               outline: editing ? `1px dashed ${dashboardTokens.borderSoft}` : "none",
               outlineOffset: -1,
+              transition: "border-color 150ms ease, box-shadow 150ms ease",
+              "&:hover": {
+                borderColor: dashboardTokens.borderMuted,
+                boxShadow: "0 12px 30px rgba(32, 58, 80, 0.12)",
+              },
             }}
           >
             {editing && item && catalog ? (
@@ -222,7 +237,7 @@ export function DashboardWidgetGrid({
                 spacing={1}
                 sx={{
                   p: 1.25,
-                  bgcolor: "rgba(255,255,255,0.025)",
+                  bgcolor: dashboardTokens.surfaceAlt,
                   borderBottom: "1px solid",
                   borderColor: dashboardTokens.border,
                 }}

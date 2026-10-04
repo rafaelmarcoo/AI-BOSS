@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Alert, Box, Button, Chip, Paper, Stack, Typography } from "@mui/material";
-import { dashboardTokens } from "@/app/theme";
+import { Alert, Box, Button, Chip, Paper, Stack, ThemeProvider, Typography } from "@mui/material";
+import {
+  dashboardCanvasTheme,
+  dashboardCanvasTokens as dashboardTokens,
+} from "@/app/theme";
 import type { GenUiPlan } from "@/lib/gen-ui/types";
 import { GenUiWidgetRenderer } from "./GenUiWidgetRenderer";
 import { DashboardLayoutWorkspace } from "./layout/DashboardLayoutWorkspace";
@@ -122,6 +125,7 @@ export function GenUiCanvas({
       : "Financial context generated from your current AI-BOSS conversation.";
 
   return (
+    <ThemeProvider theme={dashboardCanvasTheme}>
     <Paper
       elevation={0}
       sx={{
@@ -140,11 +144,11 @@ export function GenUiCanvas({
           alignItems={{ xs: "flex-start", sm: "center" }}
           justifyContent="space-between"
           spacing={1}
-          sx={{ pb: 2.5 }}
+          sx={{ pb: 1.75 }}
         >
           <Stack direction="row" spacing={1.5} alignItems="center">
             <Box sx={{ minWidth: 0 }}>
-              <Typography component="h1" sx={{ fontSize: { xs: 22, sm: 26 }, fontWeight: 600, letterSpacing: "-0.025em" }}>
+              <Typography component="h1" sx={{ fontSize: { xs: 20, sm: 22 }, fontWeight: 600, letterSpacing: "-0.025em" }}>
                 {workspaceTitle}
               </Typography>
               <Typography
@@ -172,7 +176,7 @@ export function GenUiCanvas({
               sx={{
                 height: 24,
                 color: historicalDocumentSnapshot
-                  ? "#bae6fd"
+                  ? "#2B6A9B"
                   : documentReviewMode
                     ? dashboardTokens.warning
                     : dashboardTokens.positive,
@@ -207,8 +211,8 @@ export function GenUiCanvas({
           onAskChatbot={onAskChatbot}
         />
 
-        <Stack spacing={1.25}>
-          <Typography sx={{ fontSize: 16, fontWeight: 600 }}>
+        <Stack spacing={1.25} sx={{ pt: 0.5 }}>
+          <Typography sx={{ fontSize: 14, fontWeight: 600 }}>
             Ask a follow-up
           </Typography>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -247,5 +251,6 @@ export function GenUiCanvas({
         </Stack>
       </Stack>
     </Paper>
+    </ThemeProvider>
   );
 }

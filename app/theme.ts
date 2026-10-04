@@ -30,6 +30,30 @@ export const dashboardTokens = {
   runwayV2: "#354F66",
 };
 
+export const dashboardCanvasTokens = {
+  shell: "#F3F1ED",
+  sidebar: "#FFFFFF",
+  surface: "#FFFFFF",
+  surfaceAlt: "#F7F7F4",
+  surfaceSoft: "rgba(22, 58, 90, 0.045)",
+  border: "#E2E1DE",
+  borderInput: "#C8D6E2",
+  borderMuted: "#B7C9D7",
+  borderSoft: "#9EB3C4",
+  text: "#163A5A",
+  textMuted: "#66788C",
+  textSoft: "#405D74",
+  textSubtle: "#7B8A9A",
+  accent: "#F28C5B",
+  accentHover: "#E57D4C",
+  positive: "#16825D",
+  warning: "#B55330",
+  radiusSm: 10,
+  radiusMd: 14,
+  controlHeight: 38,
+  contentMaxWidth: 1120,
+} as const;
+
 export const theme = createTheme({
   palette: {
     mode: "dark",
@@ -235,6 +259,118 @@ export const theme = createTheme({
           fontWeight: 600,
           textTransform: "none",
           borderRadius: dashboardTokens.radiusSm,
+        },
+      },
+    },
+  },
+});
+
+export const dashboardCanvasTheme = createTheme({
+  palette: {
+    mode: "light",
+    primary: {
+      main: dashboardCanvasTokens.accent,
+      dark: dashboardCanvasTokens.accentHover,
+      contrastText: dashboardCanvasTokens.text,
+    },
+    background: {
+      default: dashboardCanvasTokens.shell,
+      paper: dashboardCanvasTokens.surface,
+    },
+    text: {
+      primary: dashboardCanvasTokens.text,
+      secondary: dashboardCanvasTokens.textMuted,
+    },
+    divider: dashboardCanvasTokens.border,
+    action: {
+      hover: "rgba(22, 58, 90, 0.05)",
+      selected: "rgba(242, 140, 91, 0.14)",
+    },
+  },
+  shape: {
+    borderRadius: dashboardCanvasTokens.radiusMd,
+  },
+  typography: {
+    fontFamily,
+    allVariants: { fontFamily },
+    button: { fontWeight: 600, letterSpacing: "-0.005em" },
+  },
+  components: {
+    MuiPaper: {
+      styleOverrides: { root: { backgroundImage: "none" } },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: dashboardCanvasTokens.radiusSm,
+          fontWeight: 600,
+          textTransform: "none",
+        },
+      },
+    },
+    MuiOutlinedInput: {
+      styleOverrides: {
+        root: {
+          backgroundColor: dashboardCanvasTokens.surface,
+          color: dashboardCanvasTokens.text,
+          "& .MuiOutlinedInput-notchedOutline": {
+            borderColor: dashboardCanvasTokens.borderInput,
+          },
+          "&:hover .MuiOutlinedInput-notchedOutline": {
+            borderColor: dashboardCanvasTokens.borderMuted,
+          },
+          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+            borderColor: dashboardCanvasTokens.accent,
+          },
+        },
+      },
+    },
+    MuiInputLabel: {
+      styleOverrides: {
+        root: {
+          color: dashboardCanvasTokens.textMuted,
+          "&.Mui-focused": { color: dashboardCanvasTokens.text },
+        },
+      },
+    },
+    MuiSelect: {
+      styleOverrides: {
+        select: { color: dashboardCanvasTokens.text },
+        icon: { color: dashboardCanvasTokens.textMuted },
+      },
+    },
+    MuiMenu: {
+      styleOverrides: {
+        paper: {
+          color: dashboardCanvasTokens.text,
+          backgroundColor: dashboardCanvasTokens.surface,
+          border: `1px solid ${dashboardCanvasTokens.border}`,
+        },
+      },
+    },
+    MuiMenuItem: {
+      styleOverrides: {
+        root: {
+          "&.Mui-selected, &.Mui-selected:hover": {
+            backgroundColor: "rgba(242, 140, 91, 0.14)",
+          },
+        },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        root: {
+          color: dashboardCanvasTokens.text,
+          borderColor: dashboardCanvasTokens.border,
+        },
+      },
+    },
+    MuiAccordion: {
+      styleOverrides: {
+        root: {
+          color: dashboardCanvasTokens.text,
+          backgroundColor: dashboardCanvasTokens.surface,
+          backgroundImage: "none",
         },
       },
     },

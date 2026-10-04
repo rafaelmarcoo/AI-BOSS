@@ -15,7 +15,7 @@ import {
 import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import ViewQuiltRoundedIcon from "@mui/icons-material/ViewQuiltRounded";
-import { dashboardTokens } from "@/app/theme";
+import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
 import {
   createDashboardLayoutWidget,
   dashboardPayloadFromPlan,
@@ -294,7 +294,18 @@ export function DashboardLayoutWorkspace({
   return (
     <Box>
       {customizationEnabled ? (
-        <Stack spacing={1.25} sx={{ mb: 2 }}>
+        <Stack
+          spacing={1.25}
+          sx={{
+            mb: 1,
+            p: 1.25,
+            border: "1px solid",
+            borderColor: dashboardTokens.border,
+            borderRadius: "12px",
+            bgcolor: dashboardTokens.surface,
+            boxShadow: "0 5px 16px rgba(32, 58, 80, 0.06)",
+          }}
+        >
           <Stack
             direction={{ xs: "column", sm: "row" }}
             spacing={1}
@@ -331,7 +342,7 @@ export function DashboardLayoutWorkspace({
                 size="small"
                 icon={mode === "ai" ? <AutoAwesomeRoundedIcon /> : <ViewQuiltRoundedIcon />}
                 label={mode === "ai" ? "AI plan" : "Saved layout"}
-                sx={{ color: mode === "ai" ? "#bae6fd" : "#c4b5fd" }}
+                sx={{ color: mode === "ai" ? "#2B6A9B" : "#6C58A6" }}
               />
               {hydrating ? (
                 <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>

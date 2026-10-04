@@ -30,7 +30,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { dashboardTokens } from "@/app/theme";
+import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
 import type {
   ScenarioComparisonWidget as ScenarioComparisonWidgetModel,
   ScenarioAnalysisWidget as ScenarioAnalysisWidgetModel,
@@ -59,7 +59,7 @@ export function ScenarioComparisonWidgetView({
       <Chip
         label={`Currency: ${widget.data.currency}`}
         size="small"
-        sx={{ alignSelf: "flex-start", color: "#bae6fd", bgcolor: "rgba(14, 165, 233, 0.12)" }}
+        sx={{ alignSelf: "flex-start", color: "#2B6A9B", bgcolor: "rgba(43, 106, 155, 0.10)" }}
       />
       <Stack spacing={1.25}>
         {rows.map((row) => {
@@ -86,7 +86,7 @@ export function ScenarioComparisonWidgetView({
                     sx={{
                       height: 8,
                       borderRadius: 999,
-                      bgcolor: "rgba(255,255,255,0.08)",
+                      bgcolor: dashboardTokens.surfaceAlt,
                       overflow: "hidden",
                     }}
                   >
@@ -102,7 +102,7 @@ export function ScenarioComparisonWidgetView({
                 </Box>
                 <Typography
                   variant="body2"
-                  sx={{ width: 74, textAlign: "right", color: "common.white" }}
+                  sx={{ width: 74, textAlign: "right", color: dashboardTokens.text }}
                 >
                   {formatNumber(row.runwayMonths)} mo
                 </Typography>
@@ -162,7 +162,7 @@ export function ScenarioAnalysisWidgetView({
             ["Accounts payable", -result.openingBridge.accountsPayable],
             ["Opening liquidity", result.openingLiquidity],
           ].map(([label, value]) => (
-            <Box key={String(label)} sx={{ p: 1.25, borderRadius: 1, bgcolor: "rgba(255,255,255,0.035)" }}>
+            <Box key={String(label)} sx={{ p: 1.25, borderRadius: 1, bgcolor: dashboardTokens.surfaceAlt }}>
               <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>{label}</Typography>
               <Typography variant="body2" fontWeight={700}>{formatCurrency(Number(value), result.currency)}</Typography>
             </Box>

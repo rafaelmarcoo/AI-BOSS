@@ -1,7 +1,7 @@
 "use client";
 
 import { Skeleton, Stack, Typography } from "@mui/material";
-import { dashboardTokens } from "@/app/theme";
+import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
 
 export function WidgetLoadingState({ message = "Loading widget data…" }: { message?: string }) {
   return (
@@ -9,7 +9,7 @@ export function WidgetLoadingState({ message = "Loading widget data…" }: { mes
       <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
         {message}
       </Typography>
-      <Skeleton variant="rounded" height={72} sx={{ bgcolor: "rgba(255,255,255,0.06)" }} />
+      <Skeleton variant="rounded" height={72} sx={{ bgcolor: dashboardTokens.surfaceAlt }} />
     </Stack>
   );
 }

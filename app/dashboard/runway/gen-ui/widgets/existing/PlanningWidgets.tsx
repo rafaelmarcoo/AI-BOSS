@@ -2,7 +2,7 @@
 
 import { Box, Button, Chip, Stack, Typography } from "@mui/material";
 import ChatBubbleRoundedIcon from "@mui/icons-material/ChatBubbleRounded";
-import { dashboardTokens } from "@/app/theme";
+import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
 import type {
   HighlightExplainerWidget as HighlightExplainerWidgetModel,
   MissingDataPanelWidget as MissingDataPanelWidgetModel,
@@ -42,7 +42,7 @@ export function PlanningChecklistWidgetView({
             sx={{
               p: 1.25,
               borderRadius: 1,
-              bgcolor: "rgba(255,255,255,0.03)",
+              bgcolor: dashboardTokens.surfaceAlt,
               border: "1px solid",
               borderColor: dashboardTokens.border,
             }}
@@ -103,7 +103,7 @@ export function RiskThresholdTimelineWidgetView({
           sx={{
             height: 10,
             borderRadius: 999,
-            bgcolor: "rgba(255,255,255,0.08)",
+            bgcolor: dashboardTokens.surfaceAlt,
             overflow: "hidden",
           }}
         >
@@ -131,7 +131,7 @@ export function RiskThresholdTimelineWidgetView({
           sx={{
             height: 10,
             borderRadius: 999,
-            bgcolor: "rgba(255,255,255,0.08)",
+            bgcolor: dashboardTokens.surfaceAlt,
             overflow: "hidden",
           }}
         >
@@ -152,7 +152,7 @@ export function RiskThresholdTimelineWidgetView({
           }}
         >
           <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "rgba(251,191,36,0.08)" }}>
-            <Typography variant="caption" sx={{ color: "#fde68a" }}>
+            <Typography variant="caption" sx={{ color: "#9A6512" }}>
               Caution
             </Typography>
             <Typography variant="body2" fontWeight={700}>
@@ -162,7 +162,7 @@ export function RiskThresholdTimelineWidgetView({
             </Typography>
           </Box>
           <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "rgba(251,113,133,0.08)" }}>
-            <Typography variant="caption" sx={{ color: "#fecdd3" }}>
+            <Typography variant="caption" sx={{ color: "#B43C50" }}>
               Urgent
             </Typography>
             <Typography variant="body2" fontWeight={700}>
@@ -198,7 +198,7 @@ export function MissingDataPanelWidgetView({
               label={metric}
               size="small"
               sx={{
-                color: "#fecdd3",
+                color: "#B43C50",
                 bgcolor: "rgba(244, 63, 94, 0.12)",
               }}
             />
@@ -228,7 +228,7 @@ export function HighlightExplainerWidgetView({
             borderColor: "rgba(96, 165, 250, 0.22)",
           }}
         >
-          <Typography variant="body2" sx={{ color: "common.white", lineHeight: 1.6 }}>
+          <Typography variant="body2" sx={{ color: dashboardTokens.text, lineHeight: 1.6 }}>
             {widget.data.selectedText}
           </Typography>
         </Box>
@@ -240,7 +240,7 @@ export function HighlightExplainerWidgetView({
           sx={{
             alignSelf: "flex-start",
             borderRadius: 999,
-            color: "common.white",
+            color: dashboardTokens.text,
             borderColor: dashboardTokens.borderMuted,
             textTransform: "none",
           }}

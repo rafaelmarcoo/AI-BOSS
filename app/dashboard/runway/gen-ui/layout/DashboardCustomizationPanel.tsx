@@ -17,7 +17,7 @@ import {
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
-import { dashboardTokens } from "@/app/theme";
+import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
 import { GEN_UI_WIDGET_CATALOG_ENTRIES } from "@/lib/gen-ui/catalog";
 import type {
   DashboardLayoutPayload,
@@ -92,7 +92,8 @@ export function DashboardCustomizationPanel({
       sx={{
         p: { xs: 2, sm: 2.5 },
         mb: 2,
-        bgcolor: "rgba(255,255,255,0.025)",
+        bgcolor: dashboardTokens.surface,
+        boxShadow: "0 5px 16px rgba(32, 58, 80, 0.06)",
         border: "1px solid",
         borderColor: dashboardTokens.border,
       }}
@@ -225,4 +226,3 @@ function ThresholdField({
     />
   );
 }
-

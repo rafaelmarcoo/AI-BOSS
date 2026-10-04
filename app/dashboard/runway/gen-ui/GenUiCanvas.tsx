@@ -125,13 +125,12 @@ export function GenUiCanvas({
     <Paper
       elevation={0}
       sx={{
-        p: { xs: 2, sm: 3 },
-        borderRadius: "20px",
-        bgcolor: dashboardTokens.surface,
+        p: 0,
+        borderRadius: 0,
+        bgcolor: "transparent",
         color: dashboardTokens.text,
-        border: "1px solid",
-        borderColor: dashboardTokens.border,
-        boxShadow: "0 18px 50px rgba(10, 28, 44, 0.18)",
+        border: 0,
+        boxShadow: "none",
         overflow: "hidden",
       }}
     >

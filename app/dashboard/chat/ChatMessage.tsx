@@ -1,4 +1,4 @@
-import { Box, Paper, Stack } from "@mui/material";
+import { Box, Paper, Stack, Typography } from "@mui/material";
 import { keyframes } from "@mui/system";
 import ReactMarkdown from "react-markdown";
 import { dashboardTokens } from "@/app/theme";
@@ -53,23 +53,40 @@ export function ChatMessage({
   const isUser = role === "user";
 
   return (
-    <Box
+    <Stack
+      spacing={0.5}
       sx={{
-        display: "flex",
-        justifyContent: isUser ? "flex-end" : "flex-start",
+        width: "100%",
+        alignItems: isUser ? "flex-end" : "flex-start",
       }}
     >
+      {!isUser ? (
+        <Typography
+          component="span"
+          sx={{
+            pl: 0.25,
+            color: dashboardTokens.textMuted,
+            fontSize: 11,
+            fontWeight: 600,
+            letterSpacing: "0.02em",
+          }}
+        >
+          AI-BOSS
+        </Typography>
+      ) : null}
       <Paper
         elevation={0}
         sx={{
-          px: 1.5,
-          py: 1.1,
-          maxWidth: "88%",
-          borderRadius: `${dashboardTokens.radiusSm}px`,
+          px: 1.75,
+          py: 1.25,
+          width: "fit-content",
+          maxWidth: "80%",
+          boxSizing: "border-box",
+          borderRadius: `${dashboardTokens.radiusMd}px`,
           border: "1px solid",
-          borderColor: isUser ? "rgba(242, 140, 91, 0.38)" : dashboardTokens.border,
-          bgcolor: isUser ? "rgba(242, 140, 91, 0.18)" : dashboardTokens.surface,
-          color: dashboardTokens.text,
+          borderColor: isUser ? dashboardTokens.accentHover : dashboardTokens.border,
+          bgcolor: isUser ? dashboardTokens.accent : dashboardTokens.surface,
+          color: isUser ? "#163A5A" : dashboardTokens.text,
           fontSize: 14,
           wordBreak: "break-word",
           lineHeight: 1.45,
@@ -113,7 +130,7 @@ export function ChatMessage({
                 component="span"
                 sx={{
                   fontSize: 12,
-                  color: "rgba(255,255,255,0.78)",
+                  color: isUser ? "#713619" : "rgba(255,255,255,0.78)",
                 }}
               >
                 Failed to send
@@ -122,6 +139,6 @@ export function ChatMessage({
           </Stack>
         )}
       </Paper>
-    </Box>
+    </Stack>
   );
 }

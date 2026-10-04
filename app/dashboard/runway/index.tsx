@@ -1,5 +1,4 @@
 import { Box } from "@mui/material";
-import { dashboardTokens } from "@/app/theme";
 import type { GenUiPlan } from "@/lib/gen-ui/types";
 import { GenUiCanvas } from "./gen-ui/GenUiCanvas";
 import { SelectableRunwayWorkspace } from "./selection-prompt";
@@ -21,8 +20,8 @@ export function RunwaySection({
         sx={{
           display: "grid",
           gap: 3,
-          width: "100%",
-          maxWidth: dashboardTokens.contentMaxWidth,
+          width: { xs: "100%", md: "90%" },
+          maxWidth: "none",
           mx: "auto",
         }}
       >

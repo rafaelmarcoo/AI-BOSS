@@ -6,6 +6,7 @@ import { getCurrentUserProfile } from "@/lib/auth";
 import { dashboardTokens } from "@/app/theme";
 import { DashboardHeader } from "../header";
 import { CompaniesWorkspace } from "./CompaniesWorkspace";
+import { CompanyChatShell } from "./CompanyChatShell";
 
 export default async function CompaniesPage() {
   const cookieStore = await cookies();
@@ -20,7 +21,13 @@ export default async function CompaniesPage() {
     <Box component="main" sx={{ minHeight: "100vh", bgcolor: dashboardTokens.shell }}>
       <DashboardHeader />
       <Box sx={{ maxWidth: 1120, mx: "auto", px: { xs: 2, sm: 4 }, py: { xs: 3, sm: 5 } }}>
-        <CompaniesWorkspace />
+        <CompanyChatShell
+          fullName={currentUser.profile.full_name}
+          email={currentUser.profile.email}
+          userType={currentUser.profile.user_type}
+        >
+          <CompaniesWorkspace />
+        </CompanyChatShell>
       </Box>
     </Box>
   );

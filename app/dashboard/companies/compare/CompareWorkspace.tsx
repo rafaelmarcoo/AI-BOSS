@@ -41,6 +41,7 @@ import {
   workingFor,
 } from "@/lib/company-analysis/compare-view";
 import { dashboardTokens } from "@/app/theme";
+import { useCompanyChat } from "../CompanyChatShell";
 
 interface ComparedCompany {
   id: string;
@@ -129,9 +130,14 @@ export function CompareWorkspace({ initialFirst, initialSecond }: { initialFirst
 
   const comparison = result?.comparison ?? null;
   const names = result ? { first: result.companies.first.name, second: result.companies.second.name } : null;
-  const explainHref = names
-    ? `/dashboard?initialMessage=${encodeURIComponent(`Compare ${names.first} with ${names.second}`)}`
-    : null;
+
+  const { setCompanies: setChatCompanies, ask: askChat } = useCompanyChat();
+  const firstName = names?.first ?? null;
+  const secondName = names?.second ?? null;
+  useEffect(() => {
+    setChatCompanies([firstName, secondName].filter((name): name is string => name !== null));
+  }, [firstName, secondName, setChatCompanies]);
+
 
   return (
     <Stack spacing={3}>
@@ -170,16 +176,20 @@ export function CompareWorkspace({ initialFirst, initialSecond }: { initialFirst
         <Stack spacing={3} sx={{ opacity: loading ? 0.6 : 1 }}>
           <Header result={result} />
 
-          {explainHref ? (
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
-              <Button variant="outlined" href={explainHref} startIcon={<ForumRoundedIcon />} sx={{ borderRadius: 2, whiteSpace: "nowrap", alignSelf: "flex-start" }}>
-                Explain this in chat
-              </Button>
-              <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
-                Opens the chat and asks the AI to explain this comparison (this uses AI).
-              </Typography>
-            </Stack>
-          ) : null}
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
+            <Button
+              variant="outlined"
+              onClick={() => askChat(`Compare ${names.first} with ${names.second}`)}
+              startIcon={<ForumRoundedIcon />}
+              sx={{ borderRadius: 2, whiteSpace: "nowrap", alignSelf: "flex-start" }}
+            >
+              Explain this in chat
+            </Button>
+            <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
+              Opens the chat on this page and asks the AI to explain this comparison (this uses AI). You can
+              also highlight any figure and click &quot;Ask chatbot&quot;.
+            </Typography>
+          </Stack>
 
           <Section title="Ratios" caption="Click a ratio to see how it was worked out for each company. Green marks the stronger company on that ratio; there is no overall score, because ratios don't all matter equally.">
             <TableContainer sx={tableStyles}>

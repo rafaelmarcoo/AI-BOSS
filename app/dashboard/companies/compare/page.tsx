@@ -6,6 +6,7 @@ import { getCurrentUserProfile } from "@/lib/auth";
 import { dashboardTokens } from "@/app/theme";
 import { DashboardHeader } from "../../header";
 import { CompareWorkspace } from "./CompareWorkspace";
+import { CompanyChatShell } from "../CompanyChatShell";
 
 interface ComparePageProps {
   searchParams?: Promise<{ first?: string; second?: string }>;
@@ -25,7 +26,13 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
     <Box component="main" sx={{ minHeight: "100vh", bgcolor: dashboardTokens.shell }}>
       <DashboardHeader />
       <Box sx={{ maxWidth: 1120, mx: "auto", px: { xs: 2, sm: 4 }, py: { xs: 3, sm: 5 } }}>
-        <CompareWorkspace initialFirst={params?.first ?? null} initialSecond={params?.second ?? null} />
+        <CompanyChatShell
+          fullName={currentUser.profile.full_name}
+          email={currentUser.profile.email}
+          userType={currentUser.profile.user_type}
+        >
+          <CompareWorkspace initialFirst={params?.first ?? null} initialSecond={params?.second ?? null} />
+        </CompanyChatShell>
       </Box>
     </Box>
   );

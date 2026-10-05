@@ -55,7 +55,7 @@ function mentionsAnalysedCompany(value: string, companyNames: string[]) {
   )
 }
 
-const MAX_CLARIFYING_QUESTION_LENGTH = 600
+const MAX_CLARIFYING_QUESTION_LENGTH = 1500
 
 export function routeFinancialQuestion(query: string, companyNames: string[] = []): FinancialSpecialist {
   const value = normalize(query)

@@ -1,4 +1,5 @@
 import type { BaseMessage } from '@langchain/core/messages'
+import { scenarioQuestionFor, type ScenarioNeedsInput } from '@/lib/agents/scenario-question'
 import { runAgent, type AgentRunResult } from '@/lib/ai/agent'
 import { DEFAULT_MODEL, isModelName, type ModelName } from '@/lib/ai/models'
 import { AGENT_SYSTEM_PROMPT } from '@/lib/chat/system-prompt'
@@ -41,15 +42,15 @@ You are handling historical review and deterministic forecasts only. Use get_fin
 ## Assigned specialist
 You are handling deterministic what-if scenarios only. Use model_scenario for up to three alternatives containing fixed one-off or recurring cash flows, or fixed/compounding percentage changes to revenue, expenses, or burn. Never calculate financial results yourself.
 
-Call model_scenario immediately when the user has supplied the decision, amount, recurrence, and timing. Do not ask the user to confirm facts already stated. Omit sourceKey when the user has not named a statement so the tool can auto-select the only valid source or return the exact source choices. Leave manualBaseline empty unless the user explicitly asks to replace a stored baseline value; never copy source values into manualBaseline. Use the default six-month horizon unless the user requests another supported horizon. Treat an explicitly monthly employer cost for a hire as a recurring outflow. Treat a confirmed monthly employer cost or saving for firing/dismissal as the recurring saving created by removing that cost, which is an inflow. Treat an equipment purchase as a one-off outflow. Resolve an unambiguous named month to its next occurrence inside the projection horizon. Never add depreciation, tax, legal, HR, redundancy, equipment, recruitment, or payroll assumptions unless the user supplied them.
+Call model_scenario immediately when the user has supplied the decision, amount, recurrence, and timing. Do not ask the user to confirm facts already stated. Omit sourceKey when the user has not named a statement so the tool can auto-select the only valid source or return the exact source choices. Leave manualBaseline empty unless the user explicitly asks to replace a stored baseline value; never copy source values into manualBaseline. Use the default six-month horizon unless the user requests another supported horizon. Treat an explicitly monthly employer cost for a hire as a recurring outflow. Treat a confirmed monthly employer cost or saving for firing/dismissal as the recurring saving created by removing that cost, which is an inflow. Treat an equipment purchase as a one-off outflow. Resolve an unambiguous named month to its next occurrence inside the projection horizon. Only set endMonth when the user has given an end month; with no end date, or none mentioned, leave endMonth out so the change runs to the end of the projection. Never invent an end month. Never add depreciation, tax, legal, HR, redundancy, equipment, recruitment, or payroll assumptions unless the user supplied them.
 
-A plain percentage is a fixed step; compounding requires explicit every-month wording. For hiring or firing, require confirmed total monthly employer cost or saving rather than converting annual salary. Ask only one focused question at a time in this order: source/currency, missing baseline values, amount/percentage, fixed/compounding, one-off/recurring, then start/end timing. If the tool requests source, currency, baseline, or assumptions, use its message and options. A financial answer is forbidden unless model_scenario returned status ready.`,
+A plain percentage is a fixed step; compounding requires explicit every-month wording. For hiring or firing, require confirmed total monthly employer cost or saving rather than converting annual salary. Ask only one focused question at a time in this order: source/currency, missing baseline values, amount/percentage, fixed/compounding, one-off/recurring, then start/end timing. If the tool requests source, currency, baseline, or assumptions, use its message and options. When the user picks a data source from a list you showed, pass that source's file name as sourceKey and its currency as currency. A financial answer is forbidden unless model_scenario returned status ready.`,
   company_analysis: `${AGENT_SYSTEM_PROMPT}
 
 ## Assigned specialist
 You are handling analysis of other companies from their published annual statements, such as the CIMA case-study companies (Trimayr and its competitor Pallo & Troo, Ressett and its competitor Fixxupp). These are not the user's business: never mix their figures with the user's own metrics, runway or scenarios.
 
-Use analyse_company for one company and compare_companies for two; omit competitor to use the company's competitor on record. Use list_analysed_companies when the user asks what is available or names a company the tools cannot find. Every figure in your answer must come from a tool result: never calculate, estimate or recall a figure yourself. If a tool says a company is not available, say so and offer the available companies. For a follow-up question (for example "what about gearing?"), work out from the conversation which company or companies are meant and call the tool again for the figures; never decline because the figures were in an earlier answer. A company the user uploaded has its file name as its source; a file name that mentions another company does not mean the figures belong to that company. Use each company's name and source exactly as the tool gives them: a copy such as "Ressett (copy)" is a separate company from its original, so never shorten it to the original's name or cite only the original's source.
+Use analyse_company for one company and compare_companies for two; omit competitor to use the company's competitor on record. Use list_analysed_companies when the user asks what is available or names a company the tools cannot find. Every figure in your answer must come from a tool result: never calculate, estimate or recall a figure yourself. If a tool says a company is not available, say so and offer the available companies. For a follow-up question (for example "what about gearing?"), work out from the conversation which company or companies are meant and call the tool again for the figures; never decline because the figures were in an earlier answer. A company the user uploaded has its file name as its source; a file name that mentions another company does not mean the figures belong to that company. Use each company's name and source exactly as the tool gives them, even when the user typed a shorter or different name (write "momo new", not "Momo"): a copy such as "Ressett (copy)" is a separate company from its original, so never shorten it to the original's name or cite only the original's source.
 
 ### How to analyse
 Write as a CIMA-qualified management accountant briefing a busy manager.
@@ -98,12 +99,23 @@ function missingStaffReductionStartMonth(
 function scenarioToolOutcome(result: AgentRunResult) {
   for (const execution of result.toolExecutions ?? []) {
     if (execution.tool !== 'model_scenario' || !execution.result || typeof execution.result !== 'object') continue
-    const toolResult = execution.result as { status?: unknown; result?: unknown; message?: unknown }
+    const toolResult = execution.result as {
+      status?: unknown
+      result?: unknown
+      message?: unknown
+      field?: unknown
+      options?: ScenarioNeedsInput['options']
+    }
     if (toolResult.status === 'ready' && isScenarioAnalysisResult(toolResult.result)) {
       return { status: 'ready' as const, result: toolResult.result }
     }
     if (toolResult.status === 'needs_input' && typeof toolResult.message === 'string') {
-      return { status: 'needs_input' as const, message: toolResult.message }
+      return {
+        status: 'needs_input' as const,
+        message: toolResult.message,
+        field: typeof toolResult.field === 'string' ? toolResult.field : undefined,
+        options: Array.isArray(toolResult.options) ? toolResult.options : undefined,
+      }
     }
   }
   return null
@@ -259,9 +271,10 @@ export async function runMultiAgent(
         content: formatScenarioAnalysisForChat(toolOutcome.result),
       }
     } else if (toolOutcome?.status === 'needs_input') {
+      // The tool's message is written for the AI; the user gets a real question.
       result = {
         ...result,
-        content: toolOutcome.message,
+        content: scenarioQuestionFor(toolOutcome),
       }
     }
   }

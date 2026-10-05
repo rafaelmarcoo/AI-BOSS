@@ -133,10 +133,10 @@ describe('a long briefing is not a scenario question (6d)', () => {
     'Liquidity also improved. The main tension is that momo paid out almost all of its profit as dividends, leaving less profit retained in the business.',
     'Marketing as a percentage of revenue was not calculable because marketing expense data was unavailable.',
     'Questions management should investigate next: 1. What drove the improvement in margins? 2. Can revenue growth accelerate without increasing inventory or receivable days? 3. Is the 96.2% dividend payout compatible with investment needs?',
-  ].join(' ')
+  ].join(' ').repeat(3) // real briefings run to 2,800+ characters
 
   it('does not treat the next message as a scenario answer', () => {
-    expect(briefing.length).toBeGreaterThan(600)
+    expect(briefing.length).toBeGreaterThan(1500)
     expect(
       routeFinancialConversation('so in detail tell me how good the company momo is', [
         { role: 'user', content: 'can you tell me about the company momo' },

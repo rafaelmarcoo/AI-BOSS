@@ -52,4 +52,22 @@ describe('CompanyChatShell', () => {
 
     expect(screen.getByTestId('chat')).toHaveTextContent('asked: Compare Ressett with Fixxupp')
   })
+
+  it('swaps the suggestions for follow-ups once one is asked', () => {
+    renderShell()
+    fireEvent.click(screen.getByRole('button', { name: /ask ai-boss/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Compare Ressett with Fixxupp' }))
+
+    expect(screen.queryByRole('button', { name: 'Compare Ressett with Fixxupp' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Which of Ressett and Fixxupp keeps more of each sale?' })).toBeInTheDocument()
+    expect(screen.getByText('Ask next')).toBeInTheDocument()
+  })
+
+  it('greets once, and the greeting can be dismissed', () => {
+    renderShell()
+    expect(screen.getByText('Hi! 👋')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss greeting' }))
+    expect(screen.queryByText('Hi! 👋')).not.toBeInTheDocument()
+  })
 })

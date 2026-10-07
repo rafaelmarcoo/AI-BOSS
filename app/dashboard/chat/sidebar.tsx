@@ -52,6 +52,8 @@ interface ChatSidebarProps {
   selectionPrompt?: SelectionChatPrompt | null;
   onSelectionPromptHandled?: () => void;
   onGenUiPlan?: (plan: GenUiPlan | null) => void;
+  /** Called with each message the user types, e.g. so the Companies chat can suggest follow-ups. */
+  onUserMessage?: (text: string) => void;
 }
 
 function getConversationGroupLabel(updatedAt: string) {
@@ -86,6 +88,7 @@ export function ChatSidebar({
   selectionPrompt,
   onSelectionPromptHandled,
   onGenUiPlan,
+  onUserMessage,
 }: ChatSidebarProps) {
   const [selectedConversationId, setSelectedConversationId] = useState<
     string | null
@@ -363,7 +366,10 @@ export function ChatSidebar({
               activeConversation.title,
             );
           }}
-          onSendMessage={sendMessage}
+          onSendMessage={(input) => {
+            onUserMessage?.(input);
+            return sendMessage(input);
+          }}
           onUploadDocument={uploadDocument}
           onRetryMessage={retryMessage}
         />

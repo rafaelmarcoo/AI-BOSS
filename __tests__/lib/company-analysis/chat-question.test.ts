@@ -10,13 +10,53 @@ describe('companyChatSuggestions', () => {
     ])
   })
 
+  it('changes after a chip is clicked and never repeats it', () => {
+    const next = companyChatSuggestions(['Ressett', 'Fixxupp'], ['Compare Ressett with Fixxupp'])
+
+    expect(next).toEqual([
+      'Which of Ressett and Fixxupp is safer if sales drop?',
+      'Which of Ressett and Fixxupp keeps more of each sale?',
+      'Which of Ressett and Fixxupp is growing faster?',
+    ])
+  })
+
+  it('follows the topic of the last question, here safety', () => {
+    const next = companyChatSuggestions(['Ressett', 'Fixxupp'], ['Which of Ressett and Fixxupp is safer if sales drop?'])
+    expect(next[0]).toBe('How much does Ressett rely on borrowing compared with Fixxupp?')
+    expect(next).not.toContain('Which of Ressett and Fixxupp is safer if sales drop?')
+  })
+
+  it('reads the topic from a highlighted figure, here a margin', () => {
+    const highlight = companyChatQuestion('Operating margin 14.0% 11.0%', ['Ressett', 'Fixxupp'])
+    expect(companyChatSuggestions(['Ressett', 'Fixxupp'], [highlight])[0]).toBe("How do Ressett's and Fixxupp's running costs compare?")
+  })
+
+  it('learns from typed questions too', () => {
+    expect(companyChatSuggestions(['Ressett', 'Fixxupp'], ['how long do their customers take to pay?'])[0]).toBe(
+      "How quickly do Ressett's customers pay compared with Fixxupp's?"
+    )
+  })
+
+  it('always offers three, even after many questions', () => {
+    const asked: string[] = []
+    for (let round = 0; round < 6; round += 1) {
+      const next = companyChatSuggestions(['Ressett', 'Fixxupp'], asked)
+      expect(next).toHaveLength(3)
+      asked.push(next[0])
+    }
+  })
+
   it.each([
     ['the Companies page', [], []],
     ['the Compare page', ['Ressett', 'Fixxupp'], []],
+    ['two uploaded companies', ['Kiwi Salons', 'momo new'], ['Kiwi Salons', 'momo new']],
     ['one uploaded company', ['Kiwi Salons'], ['Kiwi Salons']],
-  ])('every suggestion on %s reaches the company analyst', (_case, onScreen, uploaded) => {
-    for (const suggestion of companyChatSuggestions(onScreen)) {
-      expect(routeFinancialQuestion(suggestion, uploaded)).toBe('company_analysis')
+  ])('every suggestion on %s, in every topic, reaches the company analyst', (_case, onScreen, uploaded) => {
+    const lastQuestions = ['', 'compare', 'is it safe', 'margins', 'growth', 'customers pay', 'dividends']
+    for (const last of lastQuestions) {
+      for (const suggestion of companyChatSuggestions(onScreen, last ? [last] : [])) {
+        expect(routeFinancialQuestion(suggestion, uploaded)).toBe('company_analysis')
+      }
     }
   })
 })

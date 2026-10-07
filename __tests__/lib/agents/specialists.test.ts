@@ -25,6 +25,9 @@ jest.mock('@/lib/tools/financial/model-scenario', () => ({
 jest.mock('@/lib/tools/financial/calculate-ratios', () => ({
   createCalculateRatiosTool: jest.fn(() => ({ name: 'calculate_ratios' })),
 }))
+jest.mock('@/lib/tools/financial/combine-financial-sources', () => ({
+  createCombineFinancialSourcesTool: jest.fn(() => ({ name: 'combine_financial_sources' })),
+}))
 jest.mock('@/lib/tools/financial/list-analysed-companies', () => ({
   createListAnalysedCompaniesTool: jest.fn(() => ({ name: 'list_analysed_companies' })),
 }))

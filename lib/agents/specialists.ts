@@ -9,6 +9,7 @@ import {
   type FinancialSpecialist,
 } from '@/lib/agents/router'
 import { calculateRunwayTool } from '@/lib/tools/financial/calculate-runway'
+import { createCombineFinancialSourcesTool } from '@/lib/tools/financial/combine-financial-sources'
 import { createCalculateRatiosTool } from '@/lib/tools/financial/calculate-ratios'
 import { createGetFinancialForecastTool } from '@/lib/tools/financial/get-financial-forecast'
 import { createGetFinancialHistoryTool } from '@/lib/tools/financial/get-financial-history'
@@ -152,6 +153,7 @@ function specialistTools(userId: string, specialist: FinancialSpecialist): AppTo
       createGetLatestSnapshotTool(userId),
       calculateRunwayTool,
       createCalculateRatiosTool(userId),
+      createCombineFinancialSourcesTool(userId),
     ]
   }
 

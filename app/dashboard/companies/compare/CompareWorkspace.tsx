@@ -164,7 +164,7 @@ export function CompareWorkspace({ initialFirst, initialSecond }: { initialFirst
           <Stack spacing={0.5}>
             <Typography variant="h5" fontWeight={700} color="common.white">Compare companies</Typography>
             <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
-              Two companies side by side, from their latest statements. Calculated by AI-BOSS, with no AI involved.
+              Two companies side by side, from their latest statements.
             </Typography>
           </Stack>
         </Stack>

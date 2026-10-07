@@ -24,7 +24,9 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
 
   return (
     <Box component="main" sx={{ minHeight: "100vh", bgcolor: dashboardTokens.shell }}>
-      <DashboardHeader />
+      <Box className="no-print">
+        <DashboardHeader />
+      </Box>
       <Box sx={{ maxWidth: 1120, mx: "auto", px: { xs: 2, sm: 4 }, py: { xs: 3, sm: 5 } }}>
         <CompanyChatShell
           fullName={currentUser.profile.full_name}

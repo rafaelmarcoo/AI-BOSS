@@ -9,6 +9,7 @@ import {
   Chip,
   CircularProgress,
   FormControl,
+  GlobalStyles,
   InputLabel,
   MenuItem,
   Select,
@@ -26,6 +27,7 @@ import CompareArrowsRoundedIcon from "@mui/icons-material/CompareArrowsRounded";
 import ExpandLessRoundedIcon from "@mui/icons-material/ExpandLessRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import ForumRoundedIcon from "@mui/icons-material/ForumRounded";
+import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
 import type { CompanySummary } from "@/lib/company-analysis/persistence";
 import {
   formatAmount,
@@ -141,7 +143,20 @@ export function CompareWorkspace({ initialFirst, initialSecond }: { initialFirst
 
   return (
     <Stack spacing={3}>
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "flex-start" }}>
+      <GlobalStyles styles={PRINT_STYLES} />
+
+      {names ? (
+        <Box className="print-only" sx={{ display: "none" }}>
+          <Typography variant="h5" fontWeight={700}>AI-BOSS comparison report: {names.first} vs {names.second}</Typography>
+          <Typography variant="body2">
+            Prepared {new Date().toLocaleDateString("en-NZ", { day: "numeric", month: "long", year: "numeric" })} from the
+            companies&apos; published statements. Every figure is calculated by AI-BOSS, and the working for each ratio is shown
+            beneath it.
+          </Typography>
+        </Box>
+      ) : null}
+
+      <Stack className="no-print" direction={{ xs: "column", sm: "row" }} spacing={2} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "flex-start" }}>
         <Stack direction="row" spacing={1.5} alignItems="flex-start">
           <Box sx={{ display: "grid", placeItems: "center", width: 44, height: 44, borderRadius: 2.5, bgcolor: "rgba(59,130,246,0.16)", color: "#93c5fd", flex: "0 0 auto" }}>
             <CompareArrowsRoundedIcon />
@@ -158,7 +173,7 @@ export function CompareWorkspace({ initialFirst, initialSecond }: { initialFirst
         </Button>
       </Stack>
 
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }}>
+      <Stack className="no-print" direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }}>
         <CompanyPicker label="First company" value={first} onChange={setFirst} companies={companies} exclude={second} />
         <Button onClick={swap} disabled={!first || !second} sx={{ borderRadius: 2, minWidth: 0 }} aria-label="Swap companies">
           <CompareArrowsRoundedIcon />
@@ -176,7 +191,7 @@ export function CompareWorkspace({ initialFirst, initialSecond }: { initialFirst
         <Stack spacing={3} sx={{ opacity: loading ? 0.6 : 1 }}>
           <Header result={result} />
 
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
+          <Stack className="no-print" direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
             <Button
               variant="outlined"
               onClick={() => askChat(`Compare ${names.first} with ${names.second}`)}
@@ -184,6 +199,14 @@ export function CompareWorkspace({ initialFirst, initialSecond }: { initialFirst
               sx={{ borderRadius: 2, whiteSpace: "nowrap", alignSelf: "flex-start" }}
             >
               Explain this in chat
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => window.print()}
+              startIcon={<PictureAsPdfRoundedIcon />}
+              sx={{ borderRadius: 2, whiteSpace: "nowrap", alignSelf: "flex-start" }}
+            >
+              Save as PDF
             </Button>
             <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
               Opens the chat on this page and asks the AI to explain this comparison (this uses AI). You can
@@ -241,9 +264,9 @@ export function CompareWorkspace({ initialFirst, initialSecond }: { initialFirst
                                 />
                               </TableCell>
                             </TableRow>
-                            {isOpen ? (
-                              <TableRow>
-                                <TableCell colSpan={4} sx={{ bgcolor: "rgba(255,255,255,0.03)" }}>
+                            {/* The working shows when clicked on screen, and always in the PDF. */}
+                            <TableRow className={isOpen ? undefined : "print-only-row"} sx={isOpen ? undefined : { display: "none" }}>
+                              <TableCell colSpan={4} sx={{ bgcolor: "rgba(255,255,255,0.03)" }}>
                                   <Stack spacing={0.5}>
                                     <Typography variant="body2"><strong>{names.first}:</strong> {workingFor(comparison, "first", ratio.key) ?? "–"}</Typography>
                                     <Typography variant="body2"><strong>{names.second}:</strong> {workingFor(comparison, "second", ratio.key) ?? "–"}</Typography>
@@ -255,7 +278,6 @@ export function CompareWorkspace({ initialFirst, initialSecond }: { initialFirst
                                   </Stack>
                                 </TableCell>
                               </TableRow>
-                            ) : null}
                           </Fragment>
                         );
                       })}
@@ -459,6 +481,26 @@ function formatYear(fiscalYearEnd: string) {
 }
 
 const tableStyles = { border: "1px solid", borderColor: dashboardTokens.border, borderRadius: 2 };
+
+const PRINT_STYLES = {
+  "@media print": {
+    "html, body": { background: "#fff !important" },
+    ".no-print": { display: "none !important" },
+    ".print-only": { display: "block !important", marginBottom: "12px" },
+    ".print-only-row": { display: "table-row !important" },
+    main: { background: "#fff !important", minHeight: "auto !important" },
+    "main *": {
+      color: "#111 !important",
+      backgroundColor: "transparent !important",
+      boxShadow: "none !important",
+      borderColor: "#d0d4da !important",
+    },
+    "main .MuiChip-root": { border: "1px solid #999 !important" },
+    "main .MuiTableContainer-root": { overflow: "visible !important" },
+    "main tr": { breakInside: "avoid" },
+  },
+  "@page": { margin: "14mm" },
+};
 
 const cardStyles = {
   p: 1.5,

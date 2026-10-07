@@ -25,7 +25,7 @@ describe('CompanyChatShell', () => {
     renderShell()
     fireEvent.click(screen.getByRole('button', { name: /ask ai-boss/i }))
 
-    expect(screen.getByText('AI-BOSS chat')).toBeVisible()
+    expect(screen.getByText('Ask about these companies')).toBeVisible()
     expect(screen.getByTestId('chat')).toHaveTextContent('chat ready')
   })
 
@@ -33,7 +33,7 @@ describe('CompanyChatShell', () => {
     renderShell()
     fireEvent.click(screen.getByRole('button', { name: 'Explain this in chat' }))
 
-    expect(screen.getByText('AI-BOSS chat')).toBeVisible()
+    expect(screen.getByText('Ask about these companies')).toBeVisible()
     expect(screen.getByTestId('chat')).toHaveTextContent('asked: Compare Ressett with Fixxupp')
   })
 
@@ -43,5 +43,13 @@ describe('CompanyChatShell', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close chat' }))
 
     expect(screen.getByRole('button', { name: /ask ai-boss/i })).toBeInTheDocument()
+  })
+
+  it('asks a suggested question when its chip is clicked', () => {
+    renderShell()
+    fireEvent.click(screen.getByRole('button', { name: /ask ai-boss/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Compare Ressett with Fixxupp' }))
+
+    expect(screen.getByTestId('chat')).toHaveTextContent('asked: Compare Ressett with Fixxupp')
   })
 })

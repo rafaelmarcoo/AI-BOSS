@@ -1,5 +1,25 @@
 import { routeFinancialQuestion } from '@/lib/agents/router'
-import { companyChatQuestion } from '@/lib/company-analysis/chat-question'
+import { companyChatQuestion, companyChatSuggestions } from '@/lib/company-analysis/chat-question'
+
+describe('companyChatSuggestions', () => {
+  it('suggests questions about the two companies being compared', () => {
+    expect(companyChatSuggestions(['Ressett', 'Fixxupp'])).toEqual([
+      'Compare Ressett with Fixxupp',
+      'Which of Ressett and Fixxupp is safer if sales drop?',
+      "What should Ressett's managers investigate next?",
+    ])
+  })
+
+  it.each([
+    ['the Companies page', [], []],
+    ['the Compare page', ['Ressett', 'Fixxupp'], []],
+    ['one uploaded company', ['Kiwi Salons'], ['Kiwi Salons']],
+  ])('every suggestion on %s reaches the company analyst', (_case, onScreen, uploaded) => {
+    for (const suggestion of companyChatSuggestions(onScreen)) {
+      expect(routeFinancialQuestion(suggestion, uploaded)).toBe('company_analysis')
+    }
+  })
+})
 
 describe('companyChatQuestion', () => {
   it('names the companies being compared', () => {

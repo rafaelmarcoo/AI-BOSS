@@ -24,6 +24,53 @@ export interface CombinedSources {
   clashes: CombinedClash[]
   duplicatesMerged: number
   runwayRowsLeftOut: number
+  warnings: string[]
+}
+
+const NEVER_NEGATIVE = new Set<CombinableObservation['metric_key']>([
+  'cash',
+  'accounts_receivable',
+  'accounts_payable',
+  'monthly_revenue',
+  'monthly_expenses',
+  'cost_of_sales',
+  'current_assets',
+  'current_liabilities',
+  'total_debt',
+])
+
+function money(value: number, currency: string | null) {
+  return `${currency ? `${currency} ` : ''}${value.toLocaleString('en-NZ')}`
+}
+
+function checkFigures(kept: CombinableObservation[]) {
+  const warnings: string[] = []
+
+  for (const row of kept) {
+    if (row.value < 0 && NEVER_NEGATIVE.has(row.metric_key)) {
+      warnings.push(
+        `${FINANCIAL_METRIC_LABELS[row.metric_key]} is negative (${money(row.value, row.currency)}) on ${readableDate(dateOf(row))} in ${row.source_label}, but it can't be below zero.`
+      )
+    }
+  }
+
+  const sameMonth = new Map<string, Partial<Record<CombinableObservation['metric_key'], CombinableObservation>>>()
+  for (const row of kept) {
+    const key = [row.source_label, dateOf(row), row.currency ?? ''].join('|')
+    sameMonth.set(key, { ...(sameMonth.get(key) ?? {}), [row.metric_key]: row })
+  }
+  for (const group of sameMonth.values()) {
+    const { burn_rate: burn, monthly_revenue: revenue, monthly_expenses: expenses } = group
+    if (!burn || !revenue || !expenses) continue
+    const expected = expenses.value - revenue.value
+    if (Math.abs(burn.value - expected) > Math.max(1, Math.abs(expected) * 0.01)) {
+      warnings.push(
+        `Burn rate is ${money(burn.value, burn.currency)} on ${readableDate(dateOf(burn))} in ${burn.source_label}, but monthly expenses − monthly revenue = ${money(expected, burn.currency)}.`
+      )
+    }
+  }
+
+  return warnings
 }
 
 const METRIC_ORDER = new Map(FINANCIAL_METRIC_KEYS.map((key, index) => [key, index]))
@@ -109,6 +156,7 @@ export function combineSources(rows: CombinableObservation[]): CombinedSources {
     clashes,
     duplicatesMerged,
     runwayRowsLeftOut,
+    warnings: checkFigures(kept),
   }
 }
 
@@ -118,7 +166,6 @@ export function describeCombinedSources(combined: CombinedSources, downloadPath:
     return 'There are no confirmed figures to combine yet. Upload a file in the Documents tab and confirm its figures first.'
   }
 
-  const money = (value: number, currency: string | null) => `${currency ? `${currency} ` : ''}${value.toLocaleString('en-NZ')}`
   const lines = [
     `Combined ${combined.rowCount} figures from ${combined.sources.length} source${combined.sources.length === 1 ? '' : 's'} into one CSV:`,
     ...combined.sources.map((source) => `- ${source.label}: ${source.figures} figures (${source.kept} kept)`),
@@ -133,6 +180,14 @@ export function describeCombinedSources(combined: CombinedSources, downloadPath:
           .join(', ')}`
     ),
   ]
+  if (combined.warnings.length > 0) {
+    lines.push(
+      '',
+      `Worth checking (${combined.warnings.length}): these figures look wrong. They were copied as they are, so fix the original file if needed:`,
+      ...combined.warnings.map((warning) => `- ${warning}`),
+      ''
+    )
+  }
   if (combined.duplicatesMerged > 0) lines.push(`Identical figures found in more than one source were kept once (${combined.duplicatesMerged}).`)
   if (combined.runwayRowsLeftOut > 0) lines.push(`Runway rows were left out (${combined.runwayRowsLeftOut}), because AI-BOSS recalculates runway from cash and burn.`)
   lines.push('', `[Download combined CSV](${downloadPath})`)

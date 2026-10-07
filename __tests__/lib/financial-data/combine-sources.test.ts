@@ -134,6 +134,41 @@ describe('period columns', () => {
   })
 })
 
+describe('data checks', () => {
+  const month = (source: string, date: string, revenue: number, expenses: number, burn: number) => [
+    figure('monthly_revenue', revenue, date, source, '2026-09-17T00:00:00Z'),
+    figure('monthly_expenses', expenses, date, source, '2026-09-17T00:00:00Z'),
+    figure('burn_rate', burn, date, source, '2026-09-17T00:00:00Z'),
+  ]
+
+  it('accepts a month where burn equals expenses minus revenue', () => {
+    expect(combineSources(month('full.csv', '2026-07-31', 39000, 61000, 22000)).warnings).toEqual([])
+  })
+
+  it('flags my real June figures: burn -21,000 when expenses − revenue = 21,000', () => {
+    expect(combineSources(month('ai-boss-demo-full-statements.csv', '2026-06-29', 40000, 61000, -21000)).warnings).toEqual([
+      'Burn rate is NZD -21,000 on 29 Jun 2026 in ai-boss-demo-full-statements.csv, but monthly expenses − monthly revenue = NZD 21,000.',
+    ])
+  })
+
+  it('flags my real financial-data.csv snapshot: burn 23,000 when expenses − revenue = -38,000', () => {
+    const [warning] = combineSources(month('financial-data.csv', '2026-05-18', 61000, 23000, 23000)).warnings
+    expect(warning).toContain('monthly expenses − monthly revenue = NZD -38,000')
+  })
+
+  it('flags a balance that cannot be negative', () => {
+    expect(combineSources([figure('cash', -500, '2026-05-31', 'x.csv', '2026-09-01T00:00:00Z')]).warnings).toEqual([
+      "Cash is negative (NZD -500) on 31 May 2026 in x.csv, but it can't be below zero.",
+    ])
+  })
+
+  it('still copies the flagged figures as they are, and says so in the summary', () => {
+    const combined = combineSources(month('full.csv', '2026-06-29', 40000, 61000, -21000))
+    expect(combined.csv).toContain('Burn rate,-21000,NZD,2026-06-29,full.csv')
+    expect(describeCombinedSources(combined, '/x')).toContain('Worth checking (1): these figures look wrong.')
+  })
+})
+
 describe('describeCombinedSources', () => {
   it('summarises the sources and ends with the download link', () => {
     const text = describeCombinedSources(combineSources([...statements, ...snapshot, ...consistent]), '/api/financial-data/combined-csv')

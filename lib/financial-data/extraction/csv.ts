@@ -1,3 +1,4 @@
+import { parseYearEnd } from '@/lib/company-analysis/year-end-date'
 import type { ParsedCsvData, ParsedCsvRow } from '@/lib/documents/types'
 import type {
   AvailableFinancialMetricValue,
@@ -81,6 +82,13 @@ function normalizeCurrency(value: string) {
   return /^[A-Z]{3}$/.test(currency) ? currency : null
 }
 
+/**
+ * Reads a date as text, never through the computer's clock: new Date("5/18/2026")
+ * is local midnight, which in New Zealand is the day before in UTC, so every
+ * Excel-saved date came out one day early. US (5/18/2026), NZ (18/05/2026) and
+ * written-out (18 May 2026) dates are all accepted; a date that could be read
+ * either way, like 05/06/2026, is read the New Zealand way (5 June).
+ */
 function normalizeDate(value: string) {
   const trimmed = value.trim()
 
@@ -88,13 +96,12 @@ function normalizeDate(value: string) {
     return null
   }
 
-  const parsed = new Date(trimmed)
+  // A full timestamp such as 2026-05-18T00:00:00Z: the date part is the date.
+  const timestamp = trimmed.match(/^(\d{4}-\d{2}-\d{2})T/)
+  if (timestamp) return timestamp[1]
 
-  if (Number.isNaN(parsed.getTime())) {
-    return null
-  }
-
-  return parsed.toISOString().slice(0, 10)
+  const result = parseYearEnd(trimmed, { ambiguous: 'day-first' })
+  return result.ok ? result.date : null
 }
 
 function matchMetricLabel(value: string): MetricLabelMatch | null {

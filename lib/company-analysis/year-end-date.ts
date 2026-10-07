@@ -28,7 +28,11 @@ function notADate(heading: string): YearEndResult {
   return { ok: false, message: `The column heading "${heading}" isn't a date. Write it like 2025-03-31.` }
 }
 
-export function parseYearEnd(heading: string): YearEndResult {
+/**
+ * ambiguous: 'refuse' (the default) asks the user to rewrite a date like
+ * 3/4/2025; 'day-first' reads it the New Zealand way, as 3 April.
+ */
+export function parseYearEnd(heading: string, options: { ambiguous?: 'refuse' | 'day-first' } = {}): YearEndResult {
   const text = heading.trim()
 
   // 2025-03-31, the template's own format.
@@ -48,6 +52,7 @@ export function parseYearEnd(heading: string): YearEndResult {
     const monthFirst = toIso(year, first, second)
 
     if (dayFirst && monthFirst && dayFirst !== monthFirst) {
+      if (options.ambiguous === 'day-first') return { ok: true, date: dayFirst }
       return {
         ok: false,
         message:

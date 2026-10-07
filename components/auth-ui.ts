@@ -123,11 +123,16 @@ export const authEntryFieldStyles = {
       boxShadow: "0 0 0 3px rgba(242, 140, 91, 0.16)",
     },
   },
+  "& .MuiInputBase-input": {
+    color: authEntryColors.text,
+    WebkitTextFillColor: authEntryColors.text,
+    caretColor: authEntryColors.text,
+  },
   "& .MuiInputBase-input::placeholder": {
     color: authEntryColors.subtle,
     opacity: 1,
   },
-  "& .MuiInputBase-input:-webkit-autofill": {
+  "& .MuiInputBase-input:-webkit-autofill, & .MuiInputBase-input:-webkit-autofill:hover, & .MuiInputBase-input:-webkit-autofill:focus": {
     WebkitBoxShadow: `0 0 0 1000px ${authEntryColors.input} inset`,
     WebkitTextFillColor: authEntryColors.text,
     caretColor: authEntryColors.text,

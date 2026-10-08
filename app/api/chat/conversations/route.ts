@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { handleRouteError, successResponse } from '@/lib/api/responses'
 import { requireAuthenticatedUser } from '@/lib/auth'
 import { listUserConversations } from '@/lib/chat/persistence'
+import { parseStoredModel } from '@/lib/ai/models'
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,6 +16,7 @@ export async function GET(request: NextRequest) {
         created_at: conversation.created_at,
         updated_at: conversation.updated_at,
         visibility: conversation.visibility,
+        selectedModel: parseStoredModel(conversation.selected_model) ?? null,
         isOwner: conversation.user_id === user.id,
       })),
     })

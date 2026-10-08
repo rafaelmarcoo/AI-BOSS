@@ -1,4 +1,5 @@
 import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
+import type { StatementLineKey } from '@/lib/company-analysis/statement-lines'
 import type { FinancialMetricSourceType } from '@/lib/financial-data/types'
 import type { GenUiPlan } from '@/lib/gen-ui/types'
 import type { DashboardLayoutPayload } from '@/lib/gen-ui/dashboard-layout-types'
@@ -113,6 +114,7 @@ export interface Conversation {
   company_id: string
   visibility: ConversationVisibility
   title: string | null
+  selected_model: string | null
   created_at: string
   updated_at: string
 }
@@ -286,6 +288,33 @@ export interface FinancialMetricObservation {
   confidence: number
   evidence: unknown
   raw_data: unknown
+  created_at: string
+  updated_at: string
+}
+
+/** A user-private or shared reference company analysed from annual statements. */
+export interface AnalysedCompany {
+  id: string
+  user_id: string | null
+  name: string
+  industry: string | null
+  peer_group: string | null
+  currency: string
+  amounts_in: 'units' | 'thousands' | 'millions'
+  description: string | null
+  source: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CompanyStatementLine {
+  id: string
+  company_id: string
+  fiscal_year_end: string
+  line_key: StatementLineKey
+  segment: string
+  value: number
+  source_page: number | null
   created_at: string
   updated_at: string
 }

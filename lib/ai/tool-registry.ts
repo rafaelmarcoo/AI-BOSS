@@ -1,4 +1,5 @@
 import { calculateRunwayTool } from '@/lib/tools/financial/calculate-runway'
+import { createCombineFinancialSourcesTool } from '@/lib/tools/financial/combine-financial-sources'
 import { createGetFinancialForecastTool } from '@/lib/tools/financial/get-financial-forecast'
 import { createGetFinancialHistoryTool } from '@/lib/tools/financial/get-financial-history'
 import { createGetLatestSnapshotTool } from '@/lib/tools/financial/get-latest-snapshot'
@@ -14,5 +15,6 @@ export function getAgentTools(userId: string): AppTool[] {
     createGetRunwayHistoryTool(userId),
     createGetFinancialHistoryTool(userId),
     createGetFinancialForecastTool(userId),
+    createCombineFinancialSourcesTool(userId),
   ]
 }

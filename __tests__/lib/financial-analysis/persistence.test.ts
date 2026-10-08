@@ -6,7 +6,7 @@ import {
   saveFinancialAnalysisRun,
 } from '@/lib/financial-analysis/persistence'
 import {
-  FINANCIAL_ANALYSIS_SECTION_IDS,
+  FINANCIAL_ANALYSIS_LEGACY_SECTION_IDS,
   normalizeFinancialAnalysisResult,
 } from '@/lib/financial-analysis/types'
 import type { FinancialAnalysisResultV1 } from '@/lib/financial-analysis/types'
@@ -38,7 +38,7 @@ const legacyResult: FinancialAnalysisResultV1 = {
     historicalObservationCount: 1,
     reasons: ['Additional data is required.'],
   },
-  sections: FINANCIAL_ANALYSIS_SECTION_IDS.map((sectionId) => ({
+  sections: FINANCIAL_ANALYSIS_LEGACY_SECTION_IDS.map((sectionId) => ({
     sectionId,
     status: 'limited' as const,
     reason: 'Additional data is required.',
@@ -258,8 +258,9 @@ describe('financial analysis persistence', () => {
     mockCreateAdminClient.mockReturnValue({ from: jest.fn().mockReturnValue(query) } as never)
 
     const loaded = await getFinancialAnalysisRun('analysis-legacy', 'owner-1')
-    expect(loaded.result.version).toBe('financial-analysis-v2')
+    expect(loaded.result.version).toBe('financial-analysis-v3')
     expect(loaded.result.selectedBaseline.mode).toBe('single')
+    expect(loaded.result.facts.runway?.cashRunwayDays).toBe(120)
     expect(loaded.result.facts.periodComparisons).toHaveLength(8)
   })
 

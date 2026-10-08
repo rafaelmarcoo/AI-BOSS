@@ -1,4 +1,5 @@
 import { SystemMessage, type BaseMessage } from '@langchain/core/messages'
+import { formatRunway } from '@/lib/calculations/runway-display'
 import { FINANCIAL_METRIC_KEYS } from '@/lib/financial-data/metric-keys'
 import { listFinancialMetricObservationsForDocuments } from '@/lib/financial-data/persistence'
 import { isAvailableMetric } from '@/lib/financial-data/metrics'
@@ -61,6 +62,10 @@ function formatDateRange(metric: AvailableFinancialMetricValue) {
 
 function formatAvailableMetric(metric: AvailableFinancialMetricValue) {
   const currency = metric.currency ? ` ${metric.currency}` : ''
+  const value =
+    metric.key === 'runway_months'
+      ? formatRunway(metric.value)
+      : `${metric.value}${currency}`
   const evidence = metric.provenance.evidence
   const evidenceParts = [
     evidence?.documentId ? `documentId=${evidence.documentId}` : null,
@@ -70,7 +75,7 @@ function formatAvailableMetric(metric: AvailableFinancialMetricValue) {
   ].filter(Boolean)
 
   return [
-    `- ${metric.key}: ${metric.value}${currency}`,
+    `- ${metric.key}: ${value}`,
     `(${formatDateRange(metric)}`,
     `source=${metric.provenance.sourceType}:${metric.provenance.sourceLabel}`,
     `confidence=${metric.confidence}`,

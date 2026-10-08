@@ -33,7 +33,7 @@ const report: FinancialAnalysisRunView = {
   dataReadiness: 'ready',
   createdAt: '2026-07-01T00:00:00.000Z',
   result: {
-    version: 'financial-analysis-v2',
+    version: 'financial-analysis-v3',
     runStatus: 'complete',
     generatedAt: '2026-07-01T00:00:00.000Z',
     selectedBaseline: {
@@ -71,10 +71,12 @@ const report: FinancialAnalysisRunView = {
         cash: 85000,
         monthlyBurnRate: 17000,
         cashRunwayMonths: 5,
+        cashRunwayDays: 150,
         cashRunwayFormula: '85000 / 17000 = 5 months',
         accountsReceivable: null,
         accountsPayable: null,
         workingCapitalAdjustedRunwayMonths: null,
+        workingCapitalAdjustedRunwayDays: null,
         workingCapitalAdjustedRunwayFormula: null,
       },
       history: [{
@@ -112,6 +114,11 @@ const report: FinancialAnalysisRunView = {
               unavailableReason: 'Comparison unavailable.',
             }
       ),
+      ratios: {
+        calculated: [],
+        unavailable: [],
+        limitations: ['No ratio inputs in this fixture.'],
+      },
     },
     narrative: {
       executiveSummary: 'Cash runway needs attention.',
@@ -277,6 +284,7 @@ describe('financial analysis report view', () => {
     expect(within(navigation).getAllByRole('link').map((link) => link.textContent)).toEqual([
       'Summary',
       'Position',
+      'Ratios',
       'Period comparison',
       'History and forecast',
       'Risks',

@@ -66,10 +66,12 @@ const collection: FinancialAnalysisCollection = {
       cash: 85000,
       monthlyBurnRate: 17000,
       cashRunwayMonths: 5,
+      cashRunwayDays: 150,
       cashRunwayFormula: '85000 / 17000 = 5 months',
       accountsReceivable: 16000,
       accountsPayable: 14000,
       workingCapitalAdjustedRunwayMonths: 5.12,
+      workingCapitalAdjustedRunwayDays: 153,
       workingCapitalAdjustedRunwayFormula:
         '(85000 + 16000 - 14000) / 17000 = 5.12 months',
     },
@@ -105,6 +107,11 @@ const collection: FinancialAnalysisCollection = {
       previousToLatestChange: null,
       unavailableReason: 'Comparison unavailable.',
     })),
+    ratios: {
+      calculated: [],
+      unavailable: [],
+      limitations: ['No ratio inputs in this fixture.'],
+    },
   },
   evidence: [{
     observationId: 'cash-current',

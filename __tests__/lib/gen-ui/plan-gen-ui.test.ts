@@ -390,13 +390,13 @@ describe('planGenUi', () => {
         metrics: expect.arrayContaining([
           expect.objectContaining({
             label: 'Cash runway',
-            value: '4.71 months',
+            value: '4 months 21 days (141 days)',
             sourceLabel: '01-valid-nzd-history.csv (cash runway calculated)',
             tone: 'derived',
           }),
           expect.objectContaining({
             label: 'Working-capital-adjusted runway',
-            value: '4.82 months',
+            value: '4 months 24 days (144 days)',
             tone: 'derived',
           }),
         ]),

@@ -6,7 +6,7 @@ import type { ScenarioAnalysisResult } from '@/lib/scenarios/calculation'
 
 const ModelScenarioInputSchema = LegacyScenarioAnalysisInputSchema.extend({
   sourceKey: z.string().min(1).optional().describe(
-    'Exact source key when already confirmed. Omit it when the user has not selected a source; the tool will use a unique valid source or request clarification.'
+    'Exact source key, or the file name of the source the user chose from the listed options. Omit it when the user has not selected a source; the tool will use a unique valid source or request clarification.'
   ),
   currency: z.enum(['NZD', 'AUD']).optional().describe(
     'Confirmed scenario currency. Omit it when not confirmed; the tool will use a unique valid currency or request clarification.'
@@ -61,7 +61,9 @@ export function createModelScenarioTool(
     async handler(input) {
       const options = await listScenarioBaselineOptions(userId)
       const candidates = options.filter((option) =>
-        (!input.sourceKey || option.sourceKey === input.sourceKey) &&
+        (!input.sourceKey ||
+          option.sourceKey === input.sourceKey ||
+          option.sourceLabel.toLowerCase() === input.sourceKey.toLowerCase()) &&
         (!input.currency || option.currency === input.currency)
       )
 

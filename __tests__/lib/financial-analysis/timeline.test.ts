@@ -171,6 +171,31 @@ describe('financial analysis statement timeline', () => {
     })
   })
 
+  it('does not calculate a ratio from inputs belonging to different sources', () => {
+    const observations = [
+      observation({ id: 'revenue', documentId: 'doc-1', metricKey: 'monthly_revenue', value: 60000, date: '2026-06-30' }),
+      observation({ id: 'cost-of-sales', documentId: 'doc-2', metricKey: 'cost_of_sales', value: 24000, date: '2026-06-30' }),
+    ]
+
+    const collection = collectFinancialAnalysisFromObservations({
+      request: {
+        mode: 'timeline',
+        sourceKeys,
+        currency: 'NZD',
+        asOfDate: '2026-06-30',
+        conflictResolutions: {},
+      },
+      observations,
+    })
+
+    expect(collection.facts.ratios.calculated).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ key: 'gross_margin' })])
+    )
+    expect(collection.facts.ratios.unavailable).toEqual(
+      expect.arrayContaining([expect.objectContaining({ key: 'gross_margin' })])
+    )
+  })
+
   it('deduplicates identical values and never carries older gaps forward', () => {
     const older = [
       observation({ id: 'cash-old', documentId: 'doc-1', metricKey: 'cash', value: 100000, date: '2026-05-31' }),

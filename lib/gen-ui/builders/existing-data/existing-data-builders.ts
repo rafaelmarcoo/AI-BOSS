@@ -3,6 +3,7 @@ import {
   type FinancialMetricKey,
 } from '@/lib/financial-data/metric-keys'
 import { isAvailableMetric } from '@/lib/financial-data/metrics'
+import { formatRunway } from '@/lib/calculations/runway-display'
 import type { MetricHistorySummary } from '@/lib/financial-data/metric-history'
 import type {
   AiFinancialBriefWidget,
@@ -11,7 +12,7 @@ import type {
   GenUiWidget,
   RevenueGrowthWidget,
 } from '@/lib/gen-ui/types'
-import { formatCurrency, formatNumber, widgetId } from '../shared'
+import { formatCurrency, widgetId } from '../shared'
 import type { GenUiDataContext, PlannerWidget } from '../types'
 
 type ExistingDataKpiType =
@@ -288,7 +289,7 @@ export function buildAiFinancialBriefWidget(
     facts.push({
       label,
       value: key === 'runway_months'
-        ? `${formatNumber(metric.value, 1)} months`
+        ? formatRunway(metric.value)
         : formatCurrency(metric.value, metric.currency),
       detail: `${detail(metric.value)} Reporting date: ${reportingDate(metric)}.`,
       tone,

@@ -29,10 +29,11 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ForumRoundedIcon from "@mui/icons-material/ForumRounded";
 import { dashboardTokens } from "@/app/theme";
 import { ChatContainer } from "./ChatContainer";
+import type { ModelName } from "@/lib/ai/models";
 import { useChatConversation } from "./useChatConversation";
 import { useDocuments } from "./useDocuments";
 import type { GenUiPlan } from "@/lib/gen-ui/types";
-import type { UserType } from "@/types/database";
+import type { ConversationVisibility, UserType } from "@/types/database";
 
 interface SelectionChatPrompt {
   id: string;
@@ -45,11 +46,15 @@ interface ChatSidebarProps {
   userType: UserType | null;
   initialConversationId?: string | null;
   initialMessage?: string | null;
+  initialModel?: ModelName | null;
+  forcedVisibility?: ConversationVisibility;
   onDocumentsProcessed?: () => void;
   onInitialMessageHandled?: () => void;
   selectionPrompt?: SelectionChatPrompt | null;
   onSelectionPromptHandled?: () => void;
   onGenUiPlan?: (plan: GenUiPlan | null) => void;
+  /** Called with each message the user types, e.g. so the Companies chat can suggest follow-ups. */
+  onUserMessage?: (text: string) => void;
 }
 
 function getConversationGroupLabel(updatedAt: string) {
@@ -78,11 +83,14 @@ export function ChatSidebar({
   userType,
   initialConversationId = null,
   initialMessage = null,
+  initialModel = null,
+  forcedVisibility,
   onDocumentsProcessed,
   onInitialMessageHandled,
   selectionPrompt,
   onSelectionPromptHandled,
   onGenUiPlan,
+  onUserMessage,
 }: ChatSidebarProps) {
   const [selectedConversationId, setSelectedConversationId] = useState<
     string | null
@@ -110,6 +118,8 @@ export function ChatSidebar({
     isReadOnly,
     visibility,
     changeVisibility,
+    model,
+    changeModel,
     conversationMessages,
     loading,
     error,
@@ -123,6 +133,8 @@ export function ChatSidebar({
     deleteConversation,
   } = useChatConversation({
     initialConversationId,
+    initialModel,
+    forcedVisibility,
     startEmpty: Boolean(initialMessage) && !initialConversationId,
     onGenUiPlan,
   });
@@ -337,9 +349,13 @@ export function ChatSidebar({
           canManageConversation={Boolean(activeConversation?.isOwner)}
           readOnly={isReadOnly}
           visibility={visibility}
-          visibilityLocked={isReadOnly}
+          visibilityLocked={isReadOnly || Boolean(forcedVisibility)}
           onVisibilityChange={(nextVisibility) => {
             void changeVisibility(nextVisibility).catch(() => undefined)
+          }}
+          model={model}
+          onModelChange={(nextModel) => {
+            void changeModel(nextModel).catch(() => undefined)
           }}
           conversationMessages={conversationMessages}
           historyLoading={historyLoading}
@@ -355,7 +371,10 @@ export function ChatSidebar({
               activeConversation.title,
             );
           }}
-          onSendMessage={sendMessage}
+          onSendMessage={(input) => {
+            onUserMessage?.(input);
+            return sendMessage(input);
+          }}
           onUploadDocument={uploadDocument}
           onRetryMessage={retryMessage}
         />

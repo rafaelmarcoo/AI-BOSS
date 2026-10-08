@@ -46,6 +46,7 @@ describe('listRecentActivity', () => {
         company_id: 'company-1',
         visibility: 'company',
         title: 'Shared runway review',
+        selected_model: null,
         created_at: '2026-08-27T00:00:00.000Z',
         updated_at: '2026-08-28T02:00:00.000Z',
       },

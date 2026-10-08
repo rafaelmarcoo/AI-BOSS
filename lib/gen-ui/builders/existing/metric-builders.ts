@@ -3,12 +3,12 @@ import {
   type FinancialMetricKey,
 } from "@/lib/financial-data/metric-keys";
 import { isAvailableMetric } from "@/lib/financial-data/metrics";
+import { formatRunway } from "@/lib/calculations/runway-display";
 import type { MetricForecastSummary } from "@/lib/financial-data/metric-forecast";
 import type { MetricHistorySummary } from "@/lib/financial-data/metric-history";
 import type { GenUiWidget, MetricSnapshotWidget } from "@/lib/gen-ui/types";
 import {
   formatCurrency,
-  formatNumber,
   metricDisplayContext,
   widgetId,
 } from "../shared";
@@ -54,7 +54,7 @@ export function buildMetricSnapshotWidget(
         key,
         label: key === 'runway_months' ? 'Cash runway' : FINANCIAL_METRIC_LABELS[key],
         value: '-',
-        unit: key === 'runway_months' ? 'months' : null,
+        unit: null,
         sourceLabel: metric.sourceLabel ?? 'Unavailable',
         sourceTone: 'unavailable' as const,
         ...displayContext,
@@ -73,9 +73,9 @@ export function buildMetricSnapshotWidget(
       label: key === 'runway_months' ? 'Cash runway' : FINANCIAL_METRIC_LABELS[key],
       value:
         key === 'runway_months'
-          ? formatNumber(metric.value, 2)
+          ? formatRunway(metric.value)
           : formatCurrency(metric.value, metric.currency),
-      unit: key === 'runway_months' ? 'months' : null,
+      unit: null,
       sourceLabel,
       sourceTone:
         displayContext.calculationRole === 'derived'
@@ -99,8 +99,8 @@ export function buildMetricSnapshotWidget(
             key: 'runway_months',
             runwayVariant: 'working_capital_adjusted',
             label: 'Working-capital-adjusted runway',
-            value: formatNumber(adjusted.value, 2),
-            unit: 'months',
+            value: formatRunway(adjusted.value),
+            unit: null,
             sourceLabel: adjusted.provenance.sourceLabel,
             sourceTone: 'derived',
             ...adjustedContext,
@@ -110,7 +110,7 @@ export function buildMetricSnapshotWidget(
             runwayVariant: 'working_capital_adjusted',
             label: 'Working-capital-adjusted runway',
             value: '-',
-            unit: 'months',
+            unit: null,
             sourceLabel: adjusted.sourceLabel ?? 'Unavailable',
             sourceTone: 'unavailable',
             ...adjustedContext,
@@ -299,7 +299,7 @@ export function buildMetricSourceEvidenceWidget(
     if (isAvailableMetric(metric)) {
       const value =
         key === 'runway_months'
-          ? `${formatNumber(metric.value, 2)} months`
+          ? formatRunway(metric.value)
           : formatCurrency(metric.value, metric.currency)
       const isCalculatedRunway =
         key === 'runway_months' &&
@@ -336,7 +336,7 @@ export function buildMetricSourceEvidenceWidget(
     isAvailableMetric(adjustedRunway)
       ? {
           label: 'Working-capital-adjusted runway',
-          value: `${formatNumber(adjustedRunway.value, 2)} months`,
+          value: formatRunway(adjustedRunway.value),
           sourceLabel: adjustedRunway.provenance.sourceLabel,
           sourceType: adjustedRunway.provenance.sourceType,
           confidence: adjustedRunway.confidence,

@@ -19,6 +19,7 @@ describe('logChatDecision', () => {
       messages: [{ role: 'user', content: 'Forecast cash for 3 months' }],
       aiResponse: 'Forecast result',
       modelUsed: 'gpt-4o-mini',
+      providerUsed: 'openai',
       tokensUsed: 12,
       toolsUsed: [{ tool: 'get_financial_forecast', args: { metricKey: 'cash' } }],
       responseTimeMs: 100,
@@ -29,6 +30,7 @@ describe('logChatDecision', () => {
       tools_used: [
         { tool: 'get_financial_forecast', args: { metricKey: 'cash' } },
         { tool: 'specialist_router', args: { specialist: 'historical_forecast' } },
+        { tool: 'model_provider', args: { provider: 'openai' } },
       ],
     }))
   })

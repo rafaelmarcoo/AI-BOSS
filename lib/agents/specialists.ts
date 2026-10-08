@@ -1,5 +1,12 @@
 import type { BaseMessage } from '@langchain/core/messages'
+import { scenarioQuestionFor, type ScenarioNeedsInput } from '@/lib/agents/scenario-question'
 import { runAgent, type AgentRunResult } from '@/lib/ai/agent'
+import {
+  assertModelAvailable,
+  DEFAULT_MODEL,
+  isModelName,
+  type ModelName,
+} from '@/lib/ai/models'
 import { AGENT_SYSTEM_PROMPT } from '@/lib/chat/system-prompt'
 import {
   getScenarioPreflightClarification,
@@ -7,10 +14,15 @@ import {
   type FinancialSpecialist,
 } from '@/lib/agents/router'
 import { calculateRunwayTool } from '@/lib/tools/financial/calculate-runway'
+import { createCombineFinancialSourcesTool } from '@/lib/tools/financial/combine-financial-sources'
+import { createCalculateRatiosTool } from '@/lib/tools/financial/calculate-ratios'
 import { createGetFinancialForecastTool } from '@/lib/tools/financial/get-financial-forecast'
 import { createGetFinancialHistoryTool } from '@/lib/tools/financial/get-financial-history'
 import { createGetLatestSnapshotTool } from '@/lib/tools/financial/get-latest-snapshot'
 import { createModelScenarioTool } from '@/lib/tools/financial/model-scenario'
+import { createAnalyseCompanyTool } from '@/lib/tools/financial/analyse-company'
+import { createCompareCompaniesTool } from '@/lib/tools/financial/compare-companies'
+import { createListAnalysedCompaniesTool } from '@/lib/tools/financial/list-analysed-companies'
 import type { AppTool } from '@/lib/tools/contracts'
 import { isScenarioAnalysisResult } from '@/lib/scenarios/calculation'
 import { formatScenarioAnalysisForChat } from '@/lib/scenarios/chat-summary'
@@ -19,7 +31,14 @@ const SPECIALIST_PROMPTS: Record<FinancialSpecialist, string> = {
   financial_position: `${AGENT_SYSTEM_PROMPT}
 
 ## Assigned specialist
-You are handling current financial position and runway only. Use get_latest_snapshot for current values. Use calculate_runway only from confirmed snapshot values. If the request is about history, forecasting, or a scenario, explain that this request needs the appropriate analysis instead of inventing an answer.`,
+You are handling current financial position, runway and financial ratios. Use get_latest_snapshot for current values. Use calculate_runway only from confirmed snapshot values. Use calculate_ratios for any question about margins, profitability, liquidity or leverage — never work a ratio out yourself, and never substitute a near-enough input such as treating cash plus receivables as current assets. If calculate_ratios reports a ratio as unavailable, state exactly which figures are missing. If the request is about history, forecasting, or a scenario, explain that this request needs the appropriate analysis instead of inventing an answer.
+
+### Reporting ratios
+Always carry through the status the tool assigned and the threshold it used. Never restate a ratio without its band, and never upgrade, soften or re-judge a status the tool has set.
+
+When the tool returns more than one ratio, read them together instead of listing them one by one. Say what the combination means for the business, and name the tension explicitly whenever one ratio is strong and another is weak — for example, healthy margins alongside a current ratio below 1 mean the business is profitable but may not be able to meet its short-term obligations, while strong liquidity alongside a weak operating margin means it can pay its bills but is not converting revenue into profit. Where two ratios point the same way, say so plainly rather than repeating the same conclusion twice.
+
+Do not introduce benchmarks the tool did not supply, and do not compare the business to an industry average — no industry data is available to you.`,
   historical_forecast: `${AGENT_SYSTEM_PROMPT}
 
 ## Assigned specialist
@@ -29,9 +48,28 @@ You are handling historical review and deterministic forecasts only. Use get_fin
 ## Assigned specialist
 You are handling deterministic what-if scenarios only. Use model_scenario for up to three alternatives containing fixed one-off or recurring cash flows, or fixed/compounding percentage changes to revenue, expenses, or burn. Never calculate financial results yourself.
 
-Call model_scenario immediately when the user has supplied the decision, amount, recurrence, and timing. Do not ask the user to confirm facts already stated. Omit sourceKey when the user has not named a statement so the tool can auto-select the only valid source or return the exact source choices. Leave manualBaseline empty unless the user explicitly asks to replace a stored baseline value; never copy source values into manualBaseline. Use the default six-month horizon unless the user requests another supported horizon. Treat an explicitly monthly employer cost for a hire as a recurring outflow. Treat a confirmed monthly employer cost or saving for firing/dismissal as the recurring saving created by removing that cost, which is an inflow. Treat an equipment purchase as a one-off outflow. Resolve an unambiguous named month to its next occurrence inside the projection horizon. Never add depreciation, tax, legal, HR, redundancy, equipment, recruitment, or payroll assumptions unless the user supplied them.
+Call model_scenario immediately when the user has supplied the decision, amount, recurrence, and timing. Do not ask the user to confirm facts already stated. Omit sourceKey when the user has not named a statement so the tool can auto-select the only valid source or return the exact source choices. Leave manualBaseline empty unless the user explicitly asks to replace a stored baseline value; never copy source values into manualBaseline. Use the default six-month horizon unless the user requests another supported horizon. Treat an explicitly monthly employer cost for a hire as a recurring outflow. Treat a confirmed monthly employer cost or saving for firing/dismissal as the recurring saving created by removing that cost, which is an inflow. Treat an equipment purchase as a one-off outflow. Resolve an unambiguous named month to its next occurrence inside the projection horizon. Only set endMonth when the user has given an end month; with no end date, or none mentioned, leave endMonth out so the change runs to the end of the projection. Never invent an end month. Never add depreciation, tax, legal, HR, redundancy, equipment, recruitment, or payroll assumptions unless the user supplied them.
 
-A plain percentage is a fixed step; compounding requires explicit every-month wording. For hiring or firing, require confirmed total monthly employer cost or saving rather than converting annual salary. Ask only one focused question at a time in this order: source/currency, missing baseline values, amount/percentage, fixed/compounding, one-off/recurring, then start/end timing. If the tool requests source, currency, baseline, or assumptions, use its message and options. A financial answer is forbidden unless model_scenario returned status ready.`,
+A plain percentage is a fixed step; compounding requires explicit every-month wording. For hiring or firing, require confirmed total monthly employer cost or saving rather than converting annual salary. Ask only one focused question at a time in this order: source/currency, missing baseline values, amount/percentage, fixed/compounding, one-off/recurring, then start/end timing. If the tool requests source, currency, baseline, or assumptions, use its message and options. When the user picks a data source from a list you showed, pass that source's file name as sourceKey and its currency as currency. A financial answer is forbidden unless model_scenario returned status ready.`,
+  company_analysis: `${AGENT_SYSTEM_PROMPT}
+
+## Assigned specialist
+You are handling a separate annual-statement analysis workspace, including shared CIMA case studies and, only in a private chat, companies uploaded by the signed-in user. Never mix these annual statement figures with trusted business metrics, runway, dashboards, financial analysis, or scenarios.
+
+Use analyse_company for one company and compare_companies for two; omit competitor to use the company's competitor on record. Use list_analysed_companies when the user asks what is available or names a company the tools cannot find. Every figure in your answer must come from a tool result: never calculate, estimate or recall a figure yourself. If a tool says a company is not available, say so and offer the available companies. For a follow-up question (for example "what about gearing?"), work out from the conversation which company or companies are meant and call the tool again for the figures; never decline because the figures were in an earlier answer. A company the user uploaded has its file name as its source; a file name that mentions another company does not mean the figures belong to that company. Use each company's name and source exactly as the tool gives them, even when the user typed a shorter or different name (write "momo new", not "Momo"): a copy such as "Ressett (copy)" is a separate company from its original, so never shorten it to the original's name or cite only the original's source.
+
+### How to analyse
+Write as a CIMA-qualified management accountant briefing a busy manager.
+- Lead with the story, not a list. Say what the ratios mean together and name the tensions, for example a company that is more profitable but growing more slowly than its competitor, or one whose margins rose while its liquidity fell.
+- Support each point with the figures and prior-year movements the tool gave. Quote the working for any figure the user asks about.
+- The tool gives every change already worked out (for example "+D$21.0m, +9.7%" or "+2.7 points"). Quote those; never subtract, divide or otherwise calculate figures yourself.
+- Size is context, not performance. Larger revenue, assets or equity does not make a company stronger; judge strength only on the ratios and growth the tool marks as stronger or improved.
+- The tool marks payable days, dividend payout and marketing spend as trade-offs. Discuss what their level suggests instead of calling them good or bad.
+- Use the revenue streams where the tool provides them: which streams drive revenue, which carry the margin, and which are growing.
+- Respect the bases the tool reports. Margin after direct costs is not gross margin; ratios use year-end balances; amounts in different currencies are never compared, only ratios.
+- Cite the source the tool gives, for example "CIMA pre-seen material, pages 17–18".
+- No industry data is available. Compare only with the prior year and with the named competitor, never with an industry average or typical benchmark.
+- Finish with two or three questions a manager should investigate next. The statements show what changed, not why, so frame them as questions rather than conclusions.`,
 }
 
 const SCENARIO_RETRY_INSTRUCTION = `
@@ -67,20 +105,65 @@ function missingStaffReductionStartMonth(
 function scenarioToolOutcome(result: AgentRunResult) {
   for (const execution of result.toolExecutions ?? []) {
     if (execution.tool !== 'model_scenario' || !execution.result || typeof execution.result !== 'object') continue
-    const toolResult = execution.result as { status?: unknown; result?: unknown; message?: unknown }
+    const toolResult = execution.result as {
+      status?: unknown
+      result?: unknown
+      message?: unknown
+      field?: unknown
+      options?: ScenarioNeedsInput['options']
+    }
     if (toolResult.status === 'ready' && isScenarioAnalysisResult(toolResult.result)) {
       return { status: 'ready' as const, result: toolResult.result }
     }
     if (toolResult.status === 'needs_input' && typeof toolResult.message === 'string') {
-      return { status: 'needs_input' as const, message: toolResult.message }
+      return {
+        status: 'needs_input' as const,
+        message: toolResult.message,
+        field: typeof toolResult.field === 'string' ? toolResult.field : undefined,
+        options: Array.isArray(toolResult.options) ? toolResult.options : undefined,
+      }
     }
   }
   return null
 }
 
-function specialistTools(userId: string, specialist: FinancialSpecialist): AppTool[] {
+const SPECIALIST_MODELS: Record<FinancialSpecialist, ModelName> = {
+  financial_position: DEFAULT_MODEL,
+  historical_forecast: DEFAULT_MODEL,
+  scenario: DEFAULT_MODEL,
+  company_analysis: DEFAULT_MODEL,
+}
+
+export function modelForSpecialist(specialist: FinancialSpecialist): ModelName {
+  const override = process.env[`AI_MODEL_${specialist.toUpperCase()}`]
+
+  if (!override) {
+    return SPECIALIST_MODELS[specialist]
+  }
+
+  if (!isModelName(override)) {
+    console.warn(
+      `Unknown model "${override}" in AI_MODEL_${specialist.toUpperCase()}; ` +
+        `using ${SPECIALIST_MODELS[specialist]} instead.`
+    )
+    return SPECIALIST_MODELS[specialist]
+  }
+
+  return override
+}
+
+function specialistTools(
+  userId: string,
+  specialist: FinancialSpecialist,
+  allowPrivateCompanies: boolean
+): AppTool[] {
   if (specialist === 'financial_position') {
-    return [createGetLatestSnapshotTool(userId), calculateRunwayTool]
+    return [
+      createGetLatestSnapshotTool(userId),
+      calculateRunwayTool,
+      createCalculateRatiosTool(userId),
+      createCombineFinancialSourcesTool(userId),
+    ]
   }
 
   if (specialist === 'historical_forecast') {
@@ -90,27 +173,42 @@ function specialistTools(userId: string, specialist: FinancialSpecialist): AppTo
     ]
   }
 
+  if (specialist === 'company_analysis') {
+    return [
+      createListAnalysedCompaniesTool(userId, allowPrivateCompanies),
+      createAnalyseCompanyTool(userId, allowPrivateCompanies),
+      createCompareCompaniesTool(userId, allowPrivateCompanies),
+    ]
+  }
+
   return [createModelScenarioTool(userId)]
 }
 
 export interface MultiAgentRunResult extends AgentRunResult {
   specialist: FinancialSpecialist
+  modelName: ModelName
 }
 
 export async function runMultiAgent(
   userId: string,
   input: string,
   chatHistory: BaseMessage[] = [],
-  contextMessages: BaseMessage[] = []
+  contextMessages: BaseMessage[] = [],
+  modelOverride?: ModelName,
+  companyNames: string[] = [],
+  allowPrivateCompanies = false
 ): Promise<MultiAgentRunResult> {
   const routingHistory = chatHistory.flatMap((message) => {
     const role = message._getType()
-    const content = typeof message.content === 'string' ? message.content : ''
+    // Past replies are stored as Responses API content blocks, not strings;
+    // .text reads both. Reading only strings dropped every assistant turn, so a
+    // reply to a clarifying question was routed without the question.
+    const content = message.text
     return (role === 'human' || role === 'ai') && content
       ? [{ role: role === 'human' ? 'user' as const : 'assistant' as const, content }]
       : []
   })
-  const specialist = routeFinancialConversation(input, routingHistory)
+  const specialist = routeFinancialConversation(input, routingHistory, companyNames)
   const preflightClarification = getScenarioPreflightClarification(input)
 
   if (preflightClarification) {
@@ -120,8 +218,11 @@ export async function runMultiAgent(
       toolsUsed: [],
       toolExecutions: [],
       specialist,
+      modelName: modelOverride ?? modelForSpecialist(specialist),
     }
   }
+
+  const modelName = modelOverride ?? modelForSpecialist(specialist)
 
   if (specialist === 'scenario' && missingStaffReductionStartMonth(input, chatHistory)) {
     return {
@@ -130,16 +231,23 @@ export async function runMultiAgent(
       toolsUsed: [],
       toolExecutions: [],
       specialist,
+      modelName,
     }
   }
 
-  const tools = specialistTools(userId, specialist)
+  // Validate the model selected after specialist routing. This keeps
+  // deterministic clarification replies available without a provider call,
+  // while ensuring a missing specialist-provider key fails before runAgent.
+  assertModelAvailable(modelName)
+
+  const tools = specialistTools(userId, specialist, allowPrivateCompanies)
   let result = await runAgent(
     input,
     chatHistory,
     tools,
     contextMessages,
-    SPECIALIST_PROMPTS[specialist]
+    SPECIALIST_PROMPTS[specialist],
+    modelName
   )
 
   if (specialist === 'scenario') {
@@ -150,12 +258,15 @@ export async function runMultiAgent(
       !usedScenarioTool &&
       (questionCount !== 1 || appearsReadyForScenarioTool(input))
     ) {
+      // The retry runs on the same model as the first attempt, so a user who
+      // picked a model is not silently switched to the default mid-answer.
       result = await runAgent(
         input,
         chatHistory,
         tools,
         contextMessages,
-        `${SPECIALIST_PROMPTS.scenario}${SCENARIO_RETRY_INSTRUCTION}`
+        `${SPECIALIST_PROMPTS.scenario}${SCENARIO_RETRY_INSTRUCTION}`,
+        modelName
       )
     }
 
@@ -177,12 +288,13 @@ export async function runMultiAgent(
         content: formatScenarioAnalysisForChat(toolOutcome.result),
       }
     } else if (toolOutcome?.status === 'needs_input') {
+      // The tool's message is written for the AI; the user gets a real question.
       result = {
         ...result,
-        content: toolOutcome.message,
+        content: scenarioQuestionFor(toolOutcome),
       }
     }
   }
 
-  return { ...result, specialist }
+  return { ...result, specialist, modelName }
 }

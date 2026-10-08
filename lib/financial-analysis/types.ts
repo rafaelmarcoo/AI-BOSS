@@ -1,9 +1,11 @@
 import { z } from 'zod'
 import { SUPPORTED_FINANCIAL_CURRENCIES } from '@/lib/financial-data/currency'
 import { FINANCIAL_METRIC_KEYS } from '@/lib/financial-data/metric-keys'
+import { runwayDaysFromMonths } from '@/lib/calculations/runway-display'
 
 export const FINANCIAL_ANALYSIS_RESULT_V1_VERSION = 'financial-analysis-v1' as const
-export const FINANCIAL_ANALYSIS_RESULT_VERSION = 'financial-analysis-v2' as const
+export const FINANCIAL_ANALYSIS_RESULT_V2_VERSION = 'financial-analysis-v2' as const
+export const FINANCIAL_ANALYSIS_RESULT_VERSION = 'financial-analysis-v3' as const
 export const FINANCIAL_ANALYSIS_POLICY_VERSION = 'mvp-v1' as const
 
 export const FinancialAnalysisSelectionModeSchema = z.enum([
@@ -31,12 +33,26 @@ export type FinancialAnalysisReadinessStatus = z.infer<
   typeof FinancialAnalysisReadinessStatusSchema
 >
 
+export const FINANCIAL_ANALYSIS_LEGACY_SECTION_IDS = [
+  'executive_summary',
+  'readiness_and_limitations',
+  'current_runway',
+  'operating_balance',
+  'working_capital',
+  'history',
+  'forecast',
+  'risks_and_policies',
+  'recommendations',
+  'evidence_and_trace',
+] as const
+
 export const FINANCIAL_ANALYSIS_SECTION_IDS = [
   'executive_summary',
   'readiness_and_limitations',
   'current_runway',
   'operating_balance',
   'working_capital',
+  'financial_ratios',
   'history',
   'forecast',
   'risks_and_policies',
@@ -50,6 +66,10 @@ export const FinancialAnalysisSectionIdSchema = z.enum(
 export type FinancialAnalysisSectionId = z.infer<
   typeof FinancialAnalysisSectionIdSchema
 >
+
+const FinancialAnalysisLegacySectionIdSchema = z.enum(
+  FINANCIAL_ANALYSIS_LEGACY_SECTION_IDS
+)
 
 export const FinancialAnalysisSectionAvailabilityStatusSchema = z.enum([
   'available',
@@ -81,6 +101,23 @@ export const FinancialAnalysisSectionsSchema = z.array(
   }
 })
 
+const FinancialAnalysisLegacySectionAvailabilitySchema = z.object({
+  sectionId: FinancialAnalysisLegacySectionIdSchema,
+  status: FinancialAnalysisSectionAvailabilityStatusSchema,
+  reason: z.string().trim().min(1).nullable(),
+}).strict()
+
+const FinancialAnalysisLegacySectionsSchema = z.array(
+  FinancialAnalysisLegacySectionAvailabilitySchema
+).length(FINANCIAL_ANALYSIS_LEGACY_SECTION_IDS.length).superRefine((sections, context) => {
+  if (new Set(sections.map((section) => section.sectionId)).size !== sections.length) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Each legacy financial analysis section must appear exactly once.',
+    })
+  }
+})
+
 export const OperatingBalanceFactSchema = z.object({
   monthlyRevenue: z.number().finite().nonnegative(),
   monthlyExpenses: z.number().finite().nonnegative(),
@@ -101,7 +138,7 @@ export type ReceivablesPayablesFact = z.infer<
   typeof ReceivablesPayablesFactSchema
 >
 
-export const RunwayFactsSchema = z.object({
+const LegacyRunwayFactsSchema = z.object({
   cash: z.number().finite().nonnegative(),
   monthlyBurnRate: z.number().finite().positive(),
   cashRunwayMonths: z.number().finite().nonnegative(),
@@ -115,6 +152,34 @@ export const RunwayFactsSchema = z.object({
     facts.accountsReceivable,
     facts.accountsPayable,
     facts.workingCapitalAdjustedRunwayMonths,
+    facts.workingCapitalAdjustedRunwayFormula,
+  ]
+  const presentCount = adjustedFields.filter((value) => value !== null).length
+  if (presentCount !== 0 && presentCount !== adjustedFields.length) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Working-capital-adjusted runway fields must be all present or all null.',
+    })
+  }
+})
+
+export const RunwayFactsSchema = z.object({
+  cash: z.number().finite().nonnegative(),
+  monthlyBurnRate: z.number().finite().positive(),
+  cashRunwayMonths: z.number().finite().nonnegative(),
+  cashRunwayDays: z.number().int().nonnegative(),
+  cashRunwayFormula: z.string().min(1),
+  accountsReceivable: z.number().finite().nonnegative().nullable(),
+  accountsPayable: z.number().finite().nonnegative().nullable(),
+  workingCapitalAdjustedRunwayMonths: z.number().finite().nullable(),
+  workingCapitalAdjustedRunwayDays: z.number().int().nullable(),
+  workingCapitalAdjustedRunwayFormula: z.string().min(1).nullable(),
+}).strict().superRefine((facts, context) => {
+  const adjustedFields = [
+    facts.accountsReceivable,
+    facts.accountsPayable,
+    facts.workingCapitalAdjustedRunwayMonths,
+    facts.workingCapitalAdjustedRunwayDays,
     facts.workingCapitalAdjustedRunwayFormula,
   ]
   const presentCount = adjustedFields.filter((value) => value !== null).length
@@ -172,7 +237,7 @@ export type FinancialForecastFact = z.infer<typeof FinancialForecastFactSchema>
 export const DeterministicFinancialFactsV1Schema = z.object({
   operatingBalance: OperatingBalanceFactSchema.nullable(),
   receivablesPayables: ReceivablesPayablesFactSchema.nullable(),
-  runway: RunwayFactsSchema.nullable(),
+  runway: LegacyRunwayFactsSchema.nullable(),
   history: z.array(FinancialTrendFactSchema),
   forecasts: z.array(FinancialForecastFactSchema),
 }).strict()
@@ -224,7 +289,59 @@ export type FinancialAnalysisPeriodComparison = z.infer<
   typeof FinancialAnalysisPeriodComparisonSchema
 >
 
-export const DeterministicFinancialFactsSchema = DeterministicFinancialFactsV1Schema.extend({
+const PeriodComparisonsSchema = z.array(FinancialAnalysisPeriodComparisonSchema)
+  .length(FINANCIAL_ANALYSIS_COMPARISON_METRIC_KEYS.length)
+  .superRefine((comparisons, context) => {
+    const metricKeys = comparisons.map((comparison) => comparison.metricKey)
+    if (
+      new Set(metricKeys).size !== metricKeys.length ||
+      FINANCIAL_ANALYSIS_COMPARISON_METRIC_KEYS.some(
+        (metricKey) => !metricKeys.includes(metricKey)
+      )
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Period comparisons must include each supported metric exactly once.',
+      })
+    }
+  })
+
+export const DeterministicFinancialFactsV2Schema = DeterministicFinancialFactsV1Schema.extend({
+  periodComparisons: PeriodComparisonsSchema,
+}).strict()
+
+export const FinancialRatioKeySchema = z.enum([
+  'gross_margin',
+  'operating_margin',
+  'current_ratio',
+  'debt_to_equity',
+])
+
+export const FinancialRatioFactsSchema = z.object({
+  calculated: z.array(z.object({
+    key: FinancialRatioKeySchema,
+    label: z.string().min(1),
+    value: z.number().finite(),
+    status: z.enum(['strong', 'healthy', 'caution', 'weak']),
+    interpretation: z.string().min(1),
+    formula: z.string().min(1),
+  }).strict()),
+  unavailable: z.array(z.object({
+    key: FinancialRatioKeySchema,
+    label: z.string().min(1),
+    missing: z.array(z.enum(FINANCIAL_METRIC_KEYS)),
+    reason: z.string().min(1),
+  }).strict()),
+  limitations: z.array(z.string().min(1)),
+}).strict()
+export type FinancialRatioFacts = z.infer<typeof FinancialRatioFactsSchema>
+
+export const DeterministicFinancialFactsSchema = z.object({
+  operatingBalance: OperatingBalanceFactSchema.nullable(),
+  receivablesPayables: ReceivablesPayablesFactSchema.nullable(),
+  runway: RunwayFactsSchema.nullable(),
+  history: z.array(FinancialTrendFactSchema),
+  forecasts: z.array(FinancialForecastFactSchema),
   periodComparisons: z.array(FinancialAnalysisPeriodComparisonSchema)
     .length(FINANCIAL_ANALYSIS_COMPARISON_METRIC_KEYS.length)
     .superRefine((comparisons, context) => {
@@ -241,6 +358,7 @@ export const DeterministicFinancialFactsSchema = DeterministicFinancialFactsV1Sc
         })
       }
     }),
+  ratios: FinancialRatioFactsSchema,
 }).strict()
 export type DeterministicFinancialFacts = z.infer<
   typeof DeterministicFinancialFactsSchema
@@ -480,11 +598,11 @@ export type FinancialAnalysisReadiness = z.infer<
   typeof FinancialAnalysisReadinessSchema
 >
 
-const FinancialAnalysisResultCommonShape = {
+const FinancialAnalysisResultLegacyCommonShape = {
   runStatus: FinancialAnalysisRunStatusSchema,
   generatedAt: z.string().datetime(),
   readiness: FinancialAnalysisReadinessSchema,
-  sections: FinancialAnalysisSectionsSchema,
+  sections: FinancialAnalysisLegacySectionsSchema,
   narrative: FinancialAnalysisNarrativeSchema,
   assumptions: z.array(z.string().min(1)),
   agentTrace: FinancialAnalysisAgentTraceSchema,
@@ -492,9 +610,14 @@ const FinancialAnalysisResultCommonShape = {
   recommendations: z.array(FinancialRecommendationSchema).max(3),
 }
 
+const FinancialAnalysisResultCommonShape = {
+  ...FinancialAnalysisResultLegacyCommonShape,
+  sections: FinancialAnalysisSectionsSchema,
+}
+
 export const FinancialAnalysisResultV1Schema = z.object({
   version: z.literal(FINANCIAL_ANALYSIS_RESULT_V1_VERSION),
-  ...FinancialAnalysisResultCommonShape,
+  ...FinancialAnalysisResultLegacyCommonShape,
   selectedBaseline: z.object({
     sourceKey: z.string().min(1),
     sourceLabel: z.string().min(1),
@@ -566,6 +689,17 @@ export type FinancialAnalysisSelectedBaseline = z.infer<
   typeof FinancialAnalysisSelectedBaselineSchema
 >
 
+export const FinancialAnalysisResultV2Schema = z.object({
+  version: z.literal(FINANCIAL_ANALYSIS_RESULT_V2_VERSION),
+  ...FinancialAnalysisResultLegacyCommonShape,
+  selectedBaseline: FinancialAnalysisSelectedBaselineSchema,
+  facts: DeterministicFinancialFactsV2Schema,
+  evidence: z.array(FinancialAnalysisEvidenceSchema),
+}).strict()
+export type FinancialAnalysisResultV2 = z.infer<
+  typeof FinancialAnalysisResultV2Schema
+>
+
 export const FinancialAnalysisResultSchema = z.object({
   version: z.literal(FINANCIAL_ANALYSIS_RESULT_VERSION),
   ...FinancialAnalysisResultCommonShape,
@@ -579,7 +713,11 @@ export type FinancialAnalysisResult = z.infer<
 
 export const PersistedFinancialAnalysisResultSchema = z.discriminatedUnion(
   'version',
-  [FinancialAnalysisResultV1Schema, FinancialAnalysisResultSchema]
+  [
+    FinancialAnalysisResultV1Schema,
+    FinancialAnalysisResultV2Schema,
+    FinancialAnalysisResultSchema,
+  ]
 )
 export type PersistedFinancialAnalysisResult = z.infer<
   typeof PersistedFinancialAnalysisResultSchema
@@ -611,6 +749,46 @@ export function normalizeFinancialAnalysisResult(
 ): FinancialAnalysisResult {
   if (result.version === FINANCIAL_ANALYSIS_RESULT_VERSION) return result
 
+  if (result.version === FINANCIAL_ANALYSIS_RESULT_V2_VERSION) {
+    const runway = result.facts.runway
+    const ratioSection: FinancialAnalysisSectionAvailability = {
+      sectionId: 'financial_ratios',
+      status: 'unavailable',
+      reason: 'Financial ratios were not stored in this legacy report.',
+    }
+    const workingCapitalIndex = result.sections.findIndex(
+      (section) => section.sectionId === 'working_capital'
+    )
+    const sections = [...result.sections] as FinancialAnalysisSectionAvailability[]
+    sections.splice(workingCapitalIndex + 1, 0, ratioSection)
+
+    return FinancialAnalysisResultSchema.parse({
+      ...result,
+      version: FINANCIAL_ANALYSIS_RESULT_VERSION,
+      sections,
+      facts: {
+        ...result.facts,
+        runway: runway
+          ? {
+              ...runway,
+              cashRunwayDays: runwayDaysFromMonths(runway.cashRunwayMonths),
+              workingCapitalAdjustedRunwayDays:
+                runway.workingCapitalAdjustedRunwayMonths === null
+                  ? null
+                  : runwayDaysFromMonths(
+                      runway.workingCapitalAdjustedRunwayMonths
+                    ),
+            }
+          : null,
+        ratios: {
+          calculated: [],
+          unavailable: [],
+          limitations: ['Financial ratios were not stored in this legacy report.'],
+        },
+      },
+    })
+  }
+
   const reportingDates = [...new Set(
     result.evidence.map((item) => item.reportingDate)
   )].sort()
@@ -619,9 +797,9 @@ export function normalizeFinancialAnalysisResult(
   const reportingPeriodEnd = reportingDates.at(-1) ?? fallbackDate
   const metadata = sourceMetadata(result.selectedBaseline.sourceKey)
 
-  return FinancialAnalysisResultSchema.parse({
+  const v2 = FinancialAnalysisResultV2Schema.parse({
     ...result,
-    version: FINANCIAL_ANALYSIS_RESULT_VERSION,
+    version: FINANCIAL_ANALYSIS_RESULT_V2_VERSION,
     selectedBaseline: {
       ...result.selectedBaseline,
       mode: 'single',
@@ -657,4 +835,6 @@ export function normalizeFinancialAnalysisResult(
       resolution: 'uncontested',
     })),
   })
+
+  return normalizeFinancialAnalysisResult(v2)
 }

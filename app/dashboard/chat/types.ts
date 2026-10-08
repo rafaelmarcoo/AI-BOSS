@@ -2,6 +2,7 @@ import type { ChatMessageStatus, ChatRole } from "./ChatMessage";
 import type { Conversation, ConversationVisibility } from "@/types/database";
 import type { DocumentSummary } from "@/lib/documents/types";
 import type { GenUiPlan } from "@/lib/gen-ui/types";
+import type { ModelName } from "@/lib/ai/models";
 
 export interface ChatRecord {
   id: string;
@@ -24,6 +25,7 @@ export interface ChatApiResponse {
     message: ChatApiMessage;
     conversation: ChatApiMessage[];
     visibility: ConversationVisibility;
+    selectedModel: ModelName | null;
     ui?: GenUiPlan | null;
   };
   error?: {
@@ -36,6 +38,7 @@ export type ChatConversationSummary = Pick<
   "id" | "title" | "created_at" | "updated_at"
 > & {
   visibility: ConversationVisibility;
+  selectedModel: ModelName | null;
   isOwner: boolean;
 };
 
@@ -55,6 +58,7 @@ export interface ConversationDetailApiResponse {
     conversationId: string;
     conversation: ChatApiMessage[];
     visibility: ConversationVisibility;
+    selectedModel: ModelName | null;
     isOwner: boolean;
   };
   error?: {

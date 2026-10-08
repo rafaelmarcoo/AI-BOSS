@@ -13,7 +13,14 @@ import {
   type FinancialSpecialist,
 } from '@/lib/agents/router'
 import { runMultiAgent } from '@/lib/agents/specialists'
-import { CHAT_MODEL } from '@/lib/ai/model-config'
+import { listCompanyNamesForRouting } from '@/lib/company-analysis/persistence'
+import {
+  assertModelAvailable,
+  DEFAULT_MODEL,
+  MODEL_CATALOG,
+  parseStoredModel,
+  type ModelName,
+} from '@/lib/ai/models'
 import { logChatDecision } from '@/lib/chat/log-chat-decision'
 import { buildChatContext } from '@/lib/chat/build-chat-context'
 import { planGenUi } from '@/lib/gen-ui/plan-gen-ui'
@@ -30,7 +37,8 @@ export async function generateChatResponse(
   userId: string,
   messages: ChatMessagePayload[],
   conversationId?: string,
-  visibility: ConversationVisibility = 'company'
+  visibility: ConversationVisibility = 'company',
+  model?: ModelName | null
 ) {
   const startedAt = Date.now()
   const latestUserMessage = [...messages]
@@ -45,12 +53,26 @@ export async function generateChatResponse(
     )
   }
 
+  if (model) {
+    assertModelAvailable(model)
+  }
+
   const conversation = await getOrCreateConversation(
     userId,
     conversationId,
     latestUserMessage.content,
-    visibility
+    visibility,
+    model
   )
+  const storedModel = parseStoredModel(conversation.selected_model)
+  // `null` explicitly returns the conversation to automatic/default routing.
+  // `undefined` means keep the model already stored on the conversation.
+  const selectedModel = model === null ? undefined : model ?? storedModel
+  const resolvedModel = selectedModel ?? DEFAULT_MODEL
+
+  if (selectedModel) {
+    assertModelAvailable(selectedModel)
+  }
 
   const persistedMessages = await listConversationMessages(conversation.id, userId)
   const persistedChatHistory = mapConversationMessagesToPayload(persistedMessages)
@@ -70,9 +92,19 @@ export async function generateChatResponse(
     const multiAgentEnabled = process.env.MULTI_AGENT_MODE === 'true'
     let agentResponse: AgentRunResult
     let specialist: FinancialSpecialist | undefined
+    // Logged with the decision, so the audit trail records the model that
+    // actually answered rather than assuming the default.
+    let modelUsed: string = MODEL_CATALOG[resolvedModel].model
+    let providerUsed: string = MODEL_CATALOG[resolvedModel].provider
+    const allowPrivateCompanies = conversation.visibility === 'private'
+    const companyNames = await listCompanyNamesForRouting(
+      userId,
+      allowPrivateCompanies
+    )
     const resolvedSpecialist = routeFinancialConversation(
       latestUserMessage.content,
-      persistedChatHistory
+      persistedChatHistory,
+      companyNames
     )
     const preflightClarification = getScenarioPreflightClarification(latestUserMessage.content)
 
@@ -84,22 +116,39 @@ export async function generateChatResponse(
         toolExecutions: [],
       }
       specialist = resolvedSpecialist
-    } else if (multiAgentEnabled || resolvedSpecialist === 'scenario') {
+    // Scenarios and company analysis always use their specialist: the general
+    // agent does not carry their tools.
+    } else if (
+      multiAgentEnabled ||
+      resolvedSpecialist === 'scenario' ||
+      resolvedSpecialist === 'company_analysis'
+    ) {
       const multiAgentResponse = await runMultiAgent(
         userId,
         latestUserMessage.content,
         chatHistory,
-        chatContext.messages
+        chatContext.messages,
+        selectedModel,
+        companyNames,
+        allowPrivateCompanies
       )
       agentResponse = multiAgentResponse
       specialist = multiAgentResponse.specialist
+      modelUsed = MODEL_CATALOG[multiAgentResponse.modelName].model
+      providerUsed = MODEL_CATALOG[multiAgentResponse.modelName].provider
     } else {
+      const singleAgentModel = resolvedModel
+      assertModelAvailable(singleAgentModel)
       agentResponse = await runAgent(
         latestUserMessage.content,
         chatHistory,
         getAgentTools(userId),
-        chatContext.messages
+        chatContext.messages,
+        undefined,
+        singleAgentModel
       )
+      modelUsed = MODEL_CATALOG[singleAgentModel].model
+      providerUsed = MODEL_CATALOG[singleAgentModel].provider
     }
     const uiPlan = await planGenUi({
       userId,
@@ -136,7 +185,8 @@ export async function generateChatResponse(
       assistantMessageId: savedAssistantMessage.id,
       messages: mapConversationMessagesToPayload(updatedConversationMessages),
       aiResponse: agentResponse.content,
-      modelUsed: CHAT_MODEL,
+      modelUsed,
+      providerUsed,
       tokensUsed: agentResponse.tokensUsed,
       toolsUsed: agentResponse.toolsUsed,
       calculations: agentResponse.toolExecutions ?? [],
@@ -152,6 +202,7 @@ export async function generateChatResponse(
     return {
       conversationId: conversation.id,
       visibility: conversation.visibility,
+      selectedModel: parseStoredModel(conversation.selected_model) ?? null,
       message: {
         role: 'assistant' as const,
         content: agentResponse.content,

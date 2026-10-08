@@ -45,9 +45,11 @@ describe('financial analysis calculations', () => {
 
     expect(result.cashRunwayMonths).toBe(5)
     expect(result.workingCapitalAdjustedRunwayMonths).toBe(5.12)
-    expect(result.cashRunwayFormula).toBe('85000 / 17000 = 5 months')
+    expect(result.cashRunwayFormula).toBe(
+      '85000 / 17000 = 5 months × 30 = 150 days = 5 months'
+    )
     expect(result.workingCapitalAdjustedRunwayFormula).toBe(
-      '(85000 + 16000 - 14000) / 17000 = 5.12 months'
+      '(85000 + 16000 - 14000) / 17000 = 5.12 months × 30 = 153 days = 5 months 3 days'
     )
   })
 

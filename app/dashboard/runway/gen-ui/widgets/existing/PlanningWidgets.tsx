@@ -3,6 +3,7 @@
 import { Box, Button, Chip, Stack, Typography } from "@mui/material";
 import ChatBubbleRoundedIcon from "@mui/icons-material/ChatBubbleRounded";
 import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
+import { formatRunway } from "@/lib/calculations/runway-display";
 import type {
   HighlightExplainerWidget as HighlightExplainerWidgetModel,
   MissingDataPanelWidget as MissingDataPanelWidgetModel,
@@ -11,7 +12,6 @@ import type {
 } from "@/lib/gen-ui/types";
 import { WidgetFrame } from "../../shared/WidgetFrame";
 import type { AskChatbotMode } from "../../types";
-import { formatNumber } from "../../shared/formatting";
 
 function statusColor(status: RiskThresholdTimelineWidgetModel["data"]["status"]) {
   if (status === "urgent") return "#fb7185";
@@ -96,7 +96,9 @@ export function RiskThresholdTimelineWidgetView({
             Cash runway
           </Typography>
           <Typography variant="body2" fontWeight={700} sx={{ color }}>
-            {formatNumber(widget.data.currentRunway)} months
+            {widget.data.currentRunway === null
+              ? "Unavailable"
+              : formatRunway(widget.data.currentRunway)}
           </Typography>
         </Stack>
         <Box
@@ -124,7 +126,7 @@ export function RiskThresholdTimelineWidgetView({
             {widget.data.workingCapitalAdjustedRunway === null ||
             widget.data.workingCapitalAdjustedRunway === undefined
               ? "Unavailable"
-              : `${formatNumber(widget.data.workingCapitalAdjustedRunway)} months`}
+              : formatRunway(widget.data.workingCapitalAdjustedRunway)}
           </Typography>
         </Stack>
         <Box
@@ -158,7 +160,7 @@ export function RiskThresholdTimelineWidgetView({
             <Typography variant="body2" fontWeight={700}>
               {widget.data.monthsUntilCaution === null
                 ? "Not trending there"
-                : `${widget.data.monthsUntilCaution} mo`}
+                : formatRunway(widget.data.monthsUntilCaution)}
             </Typography>
           </Box>
           <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "rgba(251,113,133,0.08)" }}>
@@ -168,7 +170,7 @@ export function RiskThresholdTimelineWidgetView({
             <Typography variant="body2" fontWeight={700}>
               {widget.data.monthsUntilUrgent === null
                 ? "Not trending there"
-                : `${widget.data.monthsUntilUrgent} mo`}
+                : formatRunway(widget.data.monthsUntilUrgent)}
             </Typography>
           </Box>
         </Box>

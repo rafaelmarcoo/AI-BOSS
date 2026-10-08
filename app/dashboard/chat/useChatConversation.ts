@@ -12,6 +12,7 @@ import type {
   ConversationsApiResponse,
 } from "./types";
 import { createConversationTitle } from "@/lib/chat/conversation-title";
+import type { ModelName } from "@/lib/ai/models";
 import type { GenUiPlan } from "@/lib/gen-ui/types";
 import type { ConversationVisibility } from "@/types/database";
 
@@ -38,22 +39,31 @@ function getLatestGenUiPlan(messages: ChatApiMessage[]) {
 
 interface UseChatConversationOptions {
   initialConversationId?: string | null;
+  initialModel?: ModelName | null;
+  forcedVisibility?: ConversationVisibility;
   startEmpty?: boolean;
   onGenUiPlan?: (plan: GenUiPlan | null) => void;
 }
 
 export function useChatConversation({
   initialConversationId = null,
+  initialModel = null,
+  forcedVisibility,
   startEmpty = false,
   onGenUiPlan,
 }: UseChatConversationOptions = {}) {
   const initialConversationIdRef = useRef(initialConversationId);
+  const initialModelRef = useRef(initialModel);
   const startEmptyRef = useRef(startEmpty);
+  const forcedVisibilityRef = useRef(forcedVisibility);
   const [conversationMessages, setConversationMessages] = useState<ChatRecord[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = useState(false);
   const [visibility, setVisibility] =
-    useState<ConversationVisibility>("company");
+    useState<ConversationVisibility>(forcedVisibility ?? "company");
+  const [model, setModel] = useState<ModelName | undefined>(
+    initialModel ?? undefined
+  );
   const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -85,9 +95,17 @@ export function useChatConversation({
         );
       }
 
+      if (
+        forcedVisibilityRef.current &&
+        payload.data.visibility !== forcedVisibilityRef.current
+      ) {
+        throw new Error("This chat is not available in the private Companies workspace.");
+      }
+
       setConversationId(payload.data.conversationId);
       setIsReadOnly(!payload.data.isOwner);
       setVisibility(payload.data.visibility);
+      setModel(payload.data.selectedModel ?? undefined);
       setConversationMessages(
         mapApiConversationToRecords(payload.data.conversation)
       );
@@ -119,7 +137,11 @@ export function useChatConversation({
           );
         }
 
-        const nextConversations = payload.data?.conversations ?? [];
+        const nextConversations = (payload.data?.conversations ?? []).filter(
+          (conversation) =>
+            !forcedVisibilityRef.current ||
+            conversation.visibility === forcedVisibilityRef.current
+        );
         setConversations(nextConversations);
 
         if (initialConversationIdRef.current) {
@@ -162,7 +184,8 @@ export function useChatConversation({
         },
         body: JSON.stringify({
           ...(conversationId ? { conversationId } : {}),
-          visibility,
+          model: model ?? null,
+          visibility: forcedVisibilityRef.current ?? visibility,
           messages: nextConversation.map(({ role, content }) => ({
             role,
             content,
@@ -180,6 +203,7 @@ export function useChatConversation({
 
       setConversationId(payload.data.conversationId);
       setVisibility(payload.data.visibility);
+      setModel(payload.data.selectedModel ?? undefined);
       const shouldGenerateAiTitle = !conversationId && !existingMessages.length;
 
       setConversations((prev) => {
@@ -195,6 +219,7 @@ export function useChatConversation({
             existingConversation?.created_at ?? new Date().toISOString(),
           updated_at: new Date().toISOString(),
           visibility: payload.data!.visibility,
+          selectedModel: payload.data!.selectedModel,
           isOwner: true,
         };
         const existingWithoutCurrent = prev.filter(
@@ -282,7 +307,8 @@ export function useChatConversation({
   const startNewConversation = () => {
     setConversationId(null);
     setIsReadOnly(false);
-    setVisibility("company");
+    setVisibility(forcedVisibilityRef.current ?? "company");
+    setModel(initialModelRef.current ?? undefined);
     setConversationMessages([]);
     setError(null);
     updateGenUiPlan(null);
@@ -291,6 +317,12 @@ export function useChatConversation({
   const changeVisibility = async (
     nextVisibility: ConversationVisibility
   ) => {
+    if (
+      forcedVisibilityRef.current &&
+      nextVisibility !== forcedVisibilityRef.current
+    ) {
+      return;
+    }
     if (!conversationId) {
       setVisibility(nextVisibility);
       return;
@@ -311,6 +343,36 @@ export function useChatConversation({
     }
 
     setVisibility(payload.data.conversation.visibility);
+    setConversations((prev) =>
+      prev.map((conversation) =>
+        conversation.id === conversationId
+          ? payload.data!.conversation!
+          : conversation
+      )
+    );
+  };
+
+  const changeModel = async (nextModel: ModelName | undefined) => {
+    if (!conversationId) {
+      setModel(nextModel);
+      return;
+    }
+
+    const response = await fetch(`/api/chat/conversations/${conversationId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ selectedModel: nextModel ?? null }),
+    });
+    const payload = (await response.json()) as ConversationMutationApiResponse;
+
+    if (!response.ok || !payload.success || !payload.data?.conversation) {
+      const message =
+        payload.error?.message ?? "Could not update the conversation model.";
+      setError({ message, failedMessageId: null });
+      throw new Error(message);
+    }
+
+    setModel(payload.data.conversation.selectedModel ?? undefined);
     setConversations((prev) =>
       prev.map((conversation) =>
         conversation.id === conversationId
@@ -375,6 +437,8 @@ export function useChatConversation({
     isReadOnly,
     visibility,
     changeVisibility,
+    model,
+    changeModel,
     conversationMessages,
     activeGenUiPlan,
     conversations,

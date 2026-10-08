@@ -22,6 +22,7 @@ const ownedConversation = {
   created_at: '2026-08-18T01:00:00.000Z',
   updated_at: '2026-08-18T02:00:00.000Z',
   visibility: 'company' as const,
+  selectedModel: null,
   isOwner: true,
 }
 
@@ -34,6 +35,8 @@ function setupConversation(overrides: Record<string, unknown> = {}) {
     isReadOnly: false,
     visibility: 'company',
     changeVisibility: jest.fn().mockResolvedValue(undefined),
+    model: undefined,
+    changeModel: jest.fn(),
     conversationMessages: [],
     activeGenUiPlan: null,
     conversations: [ownedConversation],

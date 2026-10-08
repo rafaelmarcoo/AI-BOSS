@@ -5,6 +5,7 @@ import { ApiError } from '@/lib/api/errors'
 import { CHAT_MODEL, mainModelOptions } from '@/lib/ai/model-config'
 import type { FinancialAnalysisCollection } from '@/lib/financial-analysis/collector'
 import { formatFinancialCurrency } from '@/lib/financial-data/currency'
+import { formatRunway } from '@/lib/calculations/runway-display'
 import {
   FinancialAnalysisNarrativeSchema,
   type FinancialAnalysisNarrative,
@@ -98,7 +99,7 @@ export async function runFinancialPositionAgent(
     systemPrompt: [
       'You are the bounded Financial Position Agent for AI-BOSS.',
       'Explain only the deterministic facts supplied by the application.',
-      'Cover current cash, cash runway, the separately labelled working-capital-adjusted runway, monthly operating balance, and receivables/payables position when available.',
+      'Cover current cash, cash runway in months and whole days, the separately labelled working-capital-adjusted runway, monthly operating balance, receivables/payables position, and deterministic ratios when available.',
       'Operating balance means monthly revenue minus monthly expenses. Never call it profit.',
       'Never convert currencies, invent missing facts, calculate new metrics, or provide more precision than supplied.',
       'State material limitations explicitly. Return concise structured output only.',
@@ -164,10 +165,10 @@ export function buildFinancialPositionFallback(
     `The selected ${collection.selection.currency} baseline is ${collection.readiness.status.replaceAll('_', ' ')}.`,
     ...(runway
       ? [
-          `Cash is ${formatFinancialCurrency(runway.cash, currency)} and monthly burn is ${formatFinancialCurrency(runway.monthlyBurnRate, currency)}, producing ${runway.cashRunwayMonths} months of cash runway.`,
+          `Cash is ${formatFinancialCurrency(runway.cash, currency)} and monthly burn is ${formatFinancialCurrency(runway.monthlyBurnRate, currency)}, producing ${formatRunway(runway.cashRunwayMonths)} of cash runway.`,
           ...(runway.workingCapitalAdjustedRunwayMonths === null
             ? ['The working-capital-adjusted runway is unavailable from compatible current inputs.']
-            : [`The separately labelled working-capital-adjusted runway is ${runway.workingCapitalAdjustedRunwayMonths} months.`]),
+            : [`The separately labelled working-capital-adjusted runway is ${formatRunway(runway.workingCapitalAdjustedRunwayMonths)}.`]),
         ]
       : ['Current runway is unavailable from compatible cash and burn inputs.']),
     ...(operatingBalance
@@ -176,6 +177,9 @@ export function buildFinancialPositionFallback(
     ...(receivablesPayables
       ? [`Receivables minus payables is ${formatFinancialCurrency(receivablesPayables.netPosition, currency)} (${receivablesPayables.position.replaceAll('_', ' ')}).`]
       : ['The receivables/payables position is unavailable from compatible inputs.']),
+    ...(collection.facts.ratios.calculated.length > 0
+      ? [`Deterministic ratios available: ${collection.facts.ratios.calculated.map((ratio) => `${ratio.label} ${ratio.value}${ratio.key.endsWith('margin') ? '%' : ''}`).join(', ')}.`]
+      : ['Financial ratios are unavailable from compatible current inputs.']),
   ]
 
   return SpecialistAnalysisOutputSchema.parse({

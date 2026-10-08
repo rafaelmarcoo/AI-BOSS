@@ -42,6 +42,35 @@ describe('LandingPage quick actions', () => {
         } as Response
       }
 
+      if (String(input) === '/api/ai/models') {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: {
+              models: [
+                {
+                  id: 'gpt-5.6-luna',
+                  label: 'GPT-5.6 Luna',
+                  provider: 'OpenAI',
+                  description: 'Default model',
+                  isDefault: true,
+                  available: true,
+                },
+                {
+                  id: 'gpt-4o',
+                  label: 'GPT-4o',
+                  provider: 'OpenAI',
+                  description: 'Fast, with more detail than mini.',
+                  isDefault: false,
+                  available: true,
+                },
+              ],
+            },
+          }),
+        } as Response
+      }
+
       return {
         ok: true,
         json: async () => ({ success: true, data: { conversations: [] } }),
@@ -204,5 +233,22 @@ describe('LandingPage quick actions', () => {
 
     expect(screen.getByDisplayValue('Please show my runway')).toBeInTheDocument()
     expect(mockPush).not.toHaveBeenCalled()
+  })
+
+  it('carries the selected configured model into a new dashboard chat', async () => {
+    const user = userEvent.setup()
+    renderLandingPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Model: GPT-5.6 Luna' }))
+    await user.click(screen.getByRole('menuitem', { name: /GPT-4o Fast/ }))
+    await user.type(
+      screen.getByLabelText('Ask AI-BOSS about your business finances'),
+      'Show my runway',
+    )
+    await user.click(screen.getByRole('button', { name: 'Send message' }))
+
+    expect(mockPush).toHaveBeenCalledWith(
+      '/dashboard?initialMessage=Show+my+runway&model=gpt-4o',
+    )
   })
 })

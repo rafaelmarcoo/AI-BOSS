@@ -12,6 +12,7 @@ interface LogChatDecisionParams {
   messages: ChatMessagePayload[]
   aiResponse: string
   modelUsed: string
+  providerUsed: string
   tokensUsed: number | null
   toolsUsed: AgentToolUsage[]
   calculations?: AgentToolExecution[]
@@ -26,6 +27,7 @@ export async function logChatDecision({
   messages,
   aiResponse,
   modelUsed,
+  providerUsed,
   tokensUsed,
   toolsUsed,
   calculations = [],
@@ -57,9 +59,13 @@ export async function logChatDecision({
     user_query: lastUserMessage.content,
     ai_response: aiResponse,
     conversation_history: messages,
-    tools_used: specialist
-      ? [...toolsUsed, { tool: 'specialist_router', args: { specialist } }]
-      : toolsUsed,
+    tools_used: [
+      ...toolsUsed,
+      ...(specialist
+        ? [{ tool: 'specialist_router', args: { specialist } }]
+        : []),
+      { tool: 'model_provider', args: { provider: providerUsed } },
+    ],
     data_accessed: null,
     calculations,
     model_used: modelUsed,

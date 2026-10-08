@@ -281,6 +281,10 @@ export function DashboardLayoutWorkspace({
   };
 
   const addWidget = (widgetType: GenUiWidgetType) => {
+    if (payload?.widgets.some((widget) => widget.widgetType === widgetType)) {
+      setError("This widget is already in the layout. Unhide or edit the existing widget instead.");
+      return;
+    }
     if (!payload || payload.widgets.length >= 20) {
       setError("A saved layout can contain up to 20 widgets.");
       return;
@@ -292,7 +296,7 @@ export function DashboardLayoutWorkspace({
   };
 
   return (
-    <Box>
+    <Box sx={{ minWidth: 0, width: "100%" }}>
       {customizationEnabled ? (
         <Stack
           spacing={1.25}

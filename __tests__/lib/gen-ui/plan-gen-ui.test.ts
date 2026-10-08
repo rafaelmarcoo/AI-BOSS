@@ -647,6 +647,37 @@ describe('planGenUi', () => {
     )
   })
 
+  it('renders one runway forecast with both cash and adjusted series', async () => {
+    mockPlannerInvoke.mockResolvedValue({ widgets: [] })
+    const collection = await mockReadFinancialMetricForecastSeries({
+      userId: 'user-123', metricKey: 'runway_months', range: 'all', horizon: 6,
+    })
+    const baseline = collection.series[0]
+    mockReadFinancialMetricForecastSeries.mockResolvedValue({
+      ...collection,
+      series: (['cash', 'working_capital_adjusted'] as const).map((variant) => ({
+        ...baseline,
+        metricKey: 'runway_months',
+        label: variant === 'cash' ? 'Cash runway' : 'Adjusted runway',
+        history: {
+          ...baseline.history,
+          metricKey: 'runway_months',
+          runwayVariant: variant,
+          seriesKey: 'document:runway',
+        },
+      })),
+    })
+    const plan = await planGenUi({
+      userId: 'user-123',
+      userMessage: 'Forecast my runway for the next 6 months.',
+      assistantMessage: 'Runway forecast.',
+      toolsUsed: [],
+    })
+    const forecasts = plan?.widgets.filter((widget) => widget.type === 'metric_forecast_chart')
+    expect(forecasts).toHaveLength(1)
+    expect(forecasts?.[0].data.runwaySeries).toHaveLength(2)
+  })
+
   it('uses the latest distinct revenue periods for deterministic revenue growth', async () => {
     const metrics = fillUnavailableMetrics({
       monthly_revenue: {

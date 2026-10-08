@@ -73,6 +73,24 @@ const hydration: HydratedDashboardLayout = {
 }
 
 describe('DashboardWidgetGrid customization', () => {
+  it('displays a saved widget type only once and respects hidden entries', () => {
+    const { rerender } = render(
+      <DashboardWidgetGrid payload={payload} hydration={hydration} onAskChatbot={jest.fn()} />,
+    )
+    expect(screen.getByText('Cash one')).toBeInTheDocument()
+    expect(screen.queryByText('Cash two')).not.toBeInTheDocument()
+    rerender(
+      <DashboardWidgetGrid
+        payload={{ ...payload, widgets: payload.widgets.map((item, index) =>
+          index === 0 ? { ...item, isHidden: true } : item) }}
+        hydration={hydration}
+        onAskChatbot={jest.fn()}
+      />,
+    )
+    expect(screen.queryByText('Cash one')).not.toBeInTheDocument()
+    expect(screen.getByText('Cash two')).toBeInTheDocument()
+  })
+
   it('hides widgets and reorders them through drag and drop', () => {
     const onPayloadChange = jest.fn()
     const { container } = render(

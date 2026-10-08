@@ -1,0 +1,11 @@
+import { uniqueWidgets } from '@/lib/gen-ui/unique-widgets'
+import { GEN_UI_WIDGET_TYPES } from '@/lib/gen-ui/types'
+
+it('keeps one instance of every type without mutating the plan or blocking later turns', () => {
+  const widgets = GEN_UI_WIDGET_TYPES.map((type) => ({ type, id: type }))
+  expect(uniqueWidgets([...widgets, ...widgets.map((widget) => ({
+    ...widget, id: widget.id + '-duplicate',
+  }))])).toEqual(widgets)
+  expect(uniqueWidgets(widgets)).toEqual(widgets)
+  expect(uniqueWidgets([])).toEqual([])
+})

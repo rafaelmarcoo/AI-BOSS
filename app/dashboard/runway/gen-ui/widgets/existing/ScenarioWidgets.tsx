@@ -59,7 +59,7 @@ export function ScenarioComparisonWidgetView({
       <Chip
         label={`Currency: ${widget.data.currency}`}
         size="small"
-        sx={{ alignSelf: "flex-start", color: "#2B6A9B", bgcolor: "rgba(43, 106, 155, 0.10)" }}
+        sx={{ alignSelf: "flex-start", color: dashboardTokens.info, bgcolor: "rgba(43, 106, 155, 0.10)" }}
       />
       <Stack spacing={1.25}>
         {rows.map((row) => {
@@ -94,7 +94,7 @@ export function ScenarioComparisonWidgetView({
                       sx={{
                         width: `${Math.max(2, runwayPercent)}%`,
                         height: "100%",
-                        bgcolor: row.label === "Current" ? "#38bdf8" : "#a78bfa",
+                        bgcolor: row.label === "Current" ? dashboardTokens.info : "#6745A0",
                         borderRadius: 999,
                       }}
                     />

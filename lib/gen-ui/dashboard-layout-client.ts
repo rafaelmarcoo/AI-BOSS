@@ -9,6 +9,7 @@ import {
 } from '@/lib/gen-ui/dashboard-layout-types'
 import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
 import type { GenUiPlan, GenUiWidget } from '@/lib/gen-ui/types'
+import { uniqueWidgets } from '@/lib/gen-ui/unique-widgets'
 
 const CONVERSATION_ONLY_WIDGETS = new Set([
   'scenario_comparison',
@@ -99,7 +100,7 @@ export function dashboardPayloadFromPlan(
 ): DashboardLayoutPayload {
   return {
     version: DASHBOARD_LAYOUT_VERSION,
-    widgets: (plan?.widgets ?? [])
+    widgets: uniqueWidgets(plan?.widgets ?? [])
       .filter((widget) => !CONVERSATION_ONLY_WIDGETS.has(widget.type))
       .map((widget) => createDashboardLayoutWidget(widget.type, widget)),
     riskThresholds: { ...riskThresholds },

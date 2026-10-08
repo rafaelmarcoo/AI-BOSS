@@ -1,4 +1,5 @@
 import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
+import type { DocumentCategory } from '@/lib/documents/categories'
 import type { StatementLineKey } from '@/lib/company-analysis/statement-lines'
 import type { FinancialMetricSourceType } from '@/lib/financial-data/types'
 import type { GenUiPlan } from '@/lib/gen-ui/types'
@@ -141,7 +142,7 @@ export interface Document {
   storage_path: string
   status: DocumentProcessingStatus
   financial_review_status: DocumentFinancialReviewStatus
-  document_type: string | null
+  document_type: DocumentCategory | null
   raw_text: string | null
   metadata: unknown
   error_message: string | null

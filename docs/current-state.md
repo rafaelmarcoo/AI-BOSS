@@ -56,8 +56,10 @@ RLS, and transactional publication of User-confirmed observations.
   employee-management, or role-change screen yet.
 - Company membership currently maps through the profile company name. A
   dedicated company-membership table is the scalable future design.
-- CSV, XLSX, and PDF originals are supported up to 15 MB. Text PDFs can be
-  extracted; scanned PDFs remain previewable but OCR is not available.
+- CSV, XLSX, PDF, DOCX, text and image originals are supported up to 15 MB.
+  Text PDFs use deterministic extraction first; scanned/image-only PDFs and
+  images use the configured OpenAI document model. Originals remain retained
+  when AI extraction is unavailable or fails.
 - New document-derived metrics remain candidates until the owner explicitly
   includes/excludes every candidate and approves valid metric, value, NZD/AUD
   currency, and reporting-date fields. Approved values are User-confirmed.

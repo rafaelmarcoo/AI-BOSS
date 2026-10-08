@@ -1,4 +1,7 @@
-import { extractDocumentCandidates } from '@/lib/documents/extraction-candidates'
+import {
+  extractDocumentCandidates,
+  extractImageItems,
+} from '@/lib/documents/extraction-candidates'
 import type { ParsedDocumentResult } from '@/lib/documents/types'
 
 const emptyResult = {
@@ -18,20 +21,26 @@ describe('document extraction candidates', () => {
       parsedDocument: {
         ...emptyResult,
         imageExtraction: {
+          documentCategory: 'invoice_receipt',
           documentType: 'invoice',
           supplier: 'Example Supplies',
           invoiceNumber: 'INV-1042',
-          invoiceDate: '2026-09-28',
+          documentDate: '2026-09-28',
           dueDate: '2026-10-20',
           currency: 'NZD',
+          currencyBasis: 'explicit',
+          currencyEvidence: 'NZD',
           totalAmount: 460,
-          lineItems: [
+          totalEvidence: 'Total NZD 460',
+          metrics: [],
+          items: [
             {
-              description: 'Paper boxes',
+              label: 'Paper boxes',
+              value: 400,
               quantity: 4,
               unit: 'box',
               unitPrice: 100,
-              lineTotal: 400,
+              evidenceExcerpt: '4 boxes @ NZD 100 = NZD 400',
             },
           ],
           transcription: 'Invoice INV-1042 Total NZD 460',
@@ -45,15 +54,91 @@ describe('document extraction candidates', () => {
       value: 460,
       currency: 'NZD',
       reportingDate: '2026-09-28',
-      extractorVersion: 'openai_image_invoice_v1',
+      extractorVersion: 'openai_image_financial_v2',
       originalPayload: {
         totalAmount: 460,
-        lineItems: [expect.objectContaining({ quantity: 4, lineTotal: 400 })],
+        items: [expect.objectContaining({ quantity: 4, value: 400 })],
       },
       warnings: [
         expect.objectContaining({ code: 'metric_selection_required' }),
       ],
     })
+  })
+
+  it('keeps inferred receipt currency visible as a review warning', () => {
+    const [candidate] = extractDocumentCandidates({
+      document: {
+        id: 'document-1',
+        file_name: 'receipt.jpg',
+        file_type: 'image',
+      },
+      parsedDocument: {
+        ...emptyResult,
+        imageExtraction: {
+          documentCategory: 'invoice_receipt',
+          documentType: 'receipt',
+          supplier: 'New World Botany',
+          invoiceNumber: null,
+          documentDate: '2026-08-26',
+          dueDate: null,
+          currency: 'NZD',
+          currencyBasis: 'inferred',
+          currencyEvidence: 'New Zealand store address and EFTPOS receipt',
+          totalAmount: 26.46,
+          totalEvidence: 'TOTAL $26.46',
+          metrics: [],
+          items: [],
+          transcription: 'TOTAL $26.46 26Aug26',
+        },
+      },
+      extractedAt: '2026-08-26T03:00:00.000Z',
+    })
+
+    expect(candidate).toMatchObject({
+      metricKey: null,
+      value: 26.46,
+      currency: 'NZD',
+      reportingDate: '2026-08-26',
+      warnings: expect.arrayContaining([
+        expect.objectContaining({ code: 'metric_selection_required' }),
+        expect.objectContaining({ code: 'currency_inferred' }),
+      ]),
+    })
+  })
+
+  it('preserves handwritten financial lines as editable supplementary Items', () => {
+    const items = extractImageItems({
+        ...emptyResult,
+        imageExtraction: {
+          documentCategory: 'other',
+          documentType: 'other',
+          supplier: null,
+          invoiceNumber: null,
+          documentDate: null,
+          dueDate: null,
+          currency: null,
+          currencyBasis: 'unknown',
+          currencyEvidence: null,
+          totalAmount: null,
+          totalEvidence: null,
+          metrics: [],
+          items: [
+            { label: 'Food Expenses', value: 23.14, quantity: null, unit: null, unitPrice: null, evidenceExcerpt: 'Food Expenses: 23.14' },
+            { label: 'Icecream Expense', value: 11.15, quantity: null, unit: null, unitPrice: null, evidenceExcerpt: 'Icecream Expense: 11.15' },
+            { label: 'Wood selling Revenue', value: 100, quantity: null, unit: null, unitPrice: null, evidenceExcerpt: 'Wood selling Revenue: 100' },
+            { label: 'Car selling Revenue', value: 1700, quantity: null, unit: null, unitPrice: null, evidenceExcerpt: 'Car selling Revenue: 1700' },
+          ],
+          transcription: 'Food Expenses: 23.14\nIcecream Expense: 11.15\nWood selling Revenue: 100\nCar selling Revenue: 1700',
+        },
+    })
+
+    expect(items).toHaveLength(4)
+    expect(items).toMatchObject([
+      { label: 'Food Expenses', value: 23.14 },
+      { label: 'Icecream Expense', value: 11.15 },
+      { label: 'Wood selling Revenue', value: 100 },
+      { label: 'Car selling Revenue', value: 1700 },
+    ])
   })
 
   it('creates XLSX candidates with worksheet and source-row evidence', () => {

@@ -1,5 +1,6 @@
 import type { Document } from '@/types/database'
 import type { FinancialMetricKey } from '@/lib/financial-data'
+import type { DocumentCategory } from '@/lib/documents/categories'
 import type {
   DocumentExtractionCandidate,
   DocumentExtractionRun,
@@ -45,6 +46,15 @@ export interface CreateDocumentResponse {
 export interface DeleteDocumentResponse {
   deleted: boolean
   documentId: string
+}
+
+export interface UpdateDocumentCategoryResponse {
+  document: DocumentSummary
+}
+
+export interface PromoteDocumentItemsResponse {
+  candidate: DocumentReviewCandidate
+  financialReviewStatus: 'pending'
 }
 
 export type DocumentReviewCandidate = Omit<
@@ -233,22 +243,37 @@ export interface ParsedDocumentResult {
   imageExtraction?: ParsedImageExtraction
 }
 
-export interface ParsedInvoiceLineItem {
-  description: string
+export interface ParsedImageItem {
+  label: string
+  value: number | null
   quantity: number | null
   unit: string | null
   unitPrice: number | null
-  lineTotal: number | null
+  evidenceExcerpt: string
+}
+
+export interface ParsedImageMetric {
+  metricKey: FinancialMetricKey
+  value: number
+  currency: 'NZD' | 'AUD' | null
+  reportingDate: string | null
+  confidence: number
+  evidenceExcerpt: string
 }
 
 export interface ParsedImageExtraction {
+  documentCategory: DocumentCategory
   documentType: 'invoice' | 'receipt' | 'statement' | 'other'
   supplier: string | null
   invoiceNumber: string | null
-  invoiceDate: string | null
+  documentDate: string | null
   dueDate: string | null
-  currency: string | null
+  currency: 'NZD' | 'AUD' | null
+  currencyBasis: 'explicit' | 'inferred' | 'unknown'
+  currencyEvidence: string | null
   totalAmount: number | null
-  lineItems: ParsedInvoiceLineItem[]
+  totalEvidence: string | null
+  metrics: ParsedImageMetric[]
+  items: ParsedImageItem[]
   transcription: string
 }

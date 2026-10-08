@@ -425,9 +425,9 @@ async function parsePdfDocument(
           extractionAvailable: false,
           warnings: [
             {
-              code: 'ocr_unavailable',
+              code: 'embedded_text_unavailable',
               message:
-                'No readable text was found. The PDF is retained for preview, but OCR extraction is not available.',
+                'No embedded text was found. AI-assisted extraction will be used when it is configured.',
             },
           ],
         },

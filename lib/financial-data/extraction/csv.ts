@@ -189,10 +189,6 @@ export function extractCsvFinancialMetrics(params: {
     AMOUNT_COLUMN_CANDIDATES
   )
 
-  if (!labelHeader || !amountHeader) {
-    return []
-  }
-
   const currencyHeader = findHeader(
     params.csvData.headers,
     CURRENCY_COLUMN_CANDIDATES
@@ -210,26 +206,27 @@ export function extractCsvFinancialMetrics(params: {
     ? normalizeCurrency(params.defaultCurrency)
     : null
 
-  return params.csvData.rows.flatMap((row) => {
-    const match = matchMetricLabel(readCell(row, labelHeader))
-    const value = parseNumber(readCell(row, amountHeader))
+  const rowCurrency = (row: ParsedCsvRow) =>
+    normalizeCurrency(readCell(row, currencyHeader)) ?? defaultCurrency
+  const rowDates = (row: ParsedCsvRow) => ({
+    periodStart: normalizeDate(readCell(row, periodStartHeader)),
+    periodEnd: normalizeDate(readCell(row, periodEndHeader)),
+    asOfDate: normalizeDate(readCell(row, asOfHeader)),
+  })
 
-    if (!match || value === null) {
-      return []
-    }
+  if (labelHeader && amountHeader) {
+    return params.csvData.rows.flatMap((row) => {
+      const match = matchMetricLabel(readCell(row, labelHeader))
+      const value = parseNumber(readCell(row, amountHeader))
 
-    const currency =
-      normalizeCurrency(readCell(row, currencyHeader)) ?? defaultCurrency
+      if (!match || value === null) return []
 
-    return [
-      {
+      return [{
         status: 'available',
         key: match.key,
         value,
-        currency,
-        periodStart: normalizeDate(readCell(row, periodStartHeader)),
-        periodEnd: normalizeDate(readCell(row, periodEndHeader)),
-        asOfDate: normalizeDate(readCell(row, asOfHeader)),
+        currency: rowCurrency(row),
+        ...rowDates(row),
         provenance: {
           sourceType: 'document',
           sourceLabel: params.sourceLabel,
@@ -243,7 +240,43 @@ export function extractCsvFinancialMetrics(params: {
         },
         confidence: match.confidence,
         updatedAt: params.extractedAt,
-      } satisfies AvailableFinancialMetricValue,
-    ]
+      } satisfies AvailableFinancialMetricValue]
+    })
+  }
+
+  // Wide exports put one canonical financial metric in each column, for
+  // example Date,Cash,Monthly Revenue,Monthly Expenses. Dates and currency
+  // still come from the row; only metric-labelled columns become candidates.
+  const metricColumns = params.csvData.headers.flatMap((header) => {
+    const match = matchMetricLabel(header)
+    return match ? [{ header, match }] : []
   })
+
+  return params.csvData.rows.flatMap((row) =>
+    metricColumns.flatMap(({ header, match }) => {
+      const value = parseNumber(readCell(row, header))
+      if (value === null) return []
+
+      return [{
+        status: 'available',
+        key: match.key,
+        value,
+        currency: rowCurrency(row),
+        ...rowDates(row),
+        provenance: {
+          sourceType: 'document',
+          sourceLabel: params.sourceLabel,
+          sourceId: params.documentId,
+          evidence: {
+            documentId: params.documentId,
+            sourceRowStart: row.rowNumber,
+            sourceRowEnd: row.rowNumber,
+            excerpt: `${header}: ${readCell(row, header)}`,
+          },
+        },
+        confidence: match.confidence,
+        updatedAt: params.extractedAt,
+      } satisfies AvailableFinancialMetricValue]
+    })
+  )
 }

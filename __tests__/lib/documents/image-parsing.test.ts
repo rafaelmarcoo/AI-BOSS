@@ -14,14 +14,19 @@ describe('image document parsing', () => {
 
   it('uses the original image MIME type and retains review evidence', async () => {
     mockExtractImageDocument.mockResolvedValue({
+      documentCategory: 'invoice_receipt',
       documentType: 'invoice',
       supplier: 'Example Supplies',
       invoiceNumber: 'INV-1042',
-      invoiceDate: '2026-09-28',
+      documentDate: '2026-09-28',
       dueDate: null,
       currency: 'NZD',
+      currencyBasis: 'explicit',
+      currencyEvidence: 'NZD',
       totalAmount: 460,
-      lineItems: [],
+      totalEvidence: 'Total NZD 460',
+      metrics: [],
+      items: [],
       transcription: 'Example Supplies\nInvoice INV-1042\nTotal NZD 460',
     })
     const fileBytes = new Uint8Array([137, 80, 78, 71])

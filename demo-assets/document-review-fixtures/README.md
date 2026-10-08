@@ -28,7 +28,7 @@ accounts payable, and burn rate - must still share one supported currency.
 | `09-empty.csv` | Empty upload | Rejected as empty |
 | `10-multi-sheet-financial-review.xlsx` | Sheets, formulas, dates, merged heading, hidden/empty sheets | Suggested financial sheets, cached formula accepted, uncached formula warned/excluded |
 | `11-text-financial-statement.pdf` | Two-page text PDF | PDF preview, page/excerpt evidence, review candidates |
-| `12-scanned-financial-statement.pdf` | Image-only PDF | Stored and previewable; OCR/extraction unavailable |
+| `12-scanned-financial-statement.pdf` | Image-only PDF | AI-assisted extraction when configured; otherwise stored and previewable with a configuration warning |
 | `13-locked-financial-statement.pdf` | Password-protected PDF | Password-specific recoverable failure |
 | `16-wide-55-columns.csv` | Preview column cap and pagination | At most 50 displayed columns and 100 rows per page |
 | `generated-local/14-too-large.pdf` | 15 MB upload limit | Rejected because it is exactly 15 MB + 1 byte |
@@ -223,9 +223,11 @@ npm run fixtures:document-review
 
 1. Upload `12-scanned-financial-statement.pdf`.
 2. Confirm the original remains stored and previewable.
-3. Confirm AI-BOSS states that the PDF appears scanned/image-only and OCR or
-   extraction is unavailable.
-4. Confirm it does not invent candidates from the visible image.
+3. With OpenAI configured, confirm AI-BOSS uses AI-assisted extraction and
+   shows recovered evidence as untrusted review content. Without configuration,
+   confirm the app explains that AI-assisted extraction is unavailable.
+4. Confirm no recovered candidate affects calculations before review and
+   administrator confirmation.
 5. Upload `05-no-metrics.csv`.
 6. Confirm the table preview works and the review side says
    **No financial metrics found**.

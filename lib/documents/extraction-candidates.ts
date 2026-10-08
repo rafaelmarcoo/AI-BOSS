@@ -4,12 +4,16 @@ import { extractCsvFinancialMetrics } from '@/lib/financial-data/extraction/csv'
 import { extractPdfFinancialMetrics } from '@/lib/financial-data/extraction/pdf'
 import type { AvailableFinancialMetricValue } from '@/lib/financial-data'
 import type { Document } from '@/types/database'
+import {
+  resolveItemValue,
+  type ExtractedItem,
+} from '@/lib/financial-data/attributes'
 
 const EXTRACTOR_VERSIONS = {
   csv: 'deterministic_csv_v2',
   xlsx: 'deterministic_xlsx_v1',
   pdf: 'deterministic_pdf_v1',
-  image: 'openai_image_invoice_v1',
+  image: 'openai_image_financial_v2',
   text: 'hybrid_text_v1',
   docx: 'hybrid_docx_v1',
 } as const
@@ -110,6 +114,66 @@ function deduplicateCandidates(candidates: DocumentExtractionCandidateDraft[]) {
   return [...unique.values()]
 }
 
+function imageCandidateWarnings(params: {
+  metricKey: DocumentExtractionCandidateDraft['metricKey']
+  currency: 'NZD' | 'AUD' | null
+  reportingDate: string | null
+  currencyBasis: 'explicit' | 'inferred' | 'unknown'
+  currencyEvidence: string | null
+}) {
+  const warnings: DocumentExtractionCandidateDraft['warnings'] = []
+
+  if (params.metricKey === null) {
+    warnings.push({
+      code: 'metric_selection_required',
+      message:
+        'Choose the financial meaning of this total before including it.',
+    })
+  }
+  if (params.metricKey !== 'runway_months' && !params.currency) {
+    warnings.push({
+      code: 'currency_missing',
+      message: 'Choose NZD or AUD before including this image value.',
+    })
+  }
+  if (params.currencyBasis === 'inferred' && params.currency) {
+    warnings.push({
+      code: 'currency_inferred',
+      message: `The currency was inferred from visible context${params.currencyEvidence ? `: ${params.currencyEvidence}` : ''}. Confirm it against the original.`,
+    })
+  }
+  if (!params.reportingDate) {
+    warnings.push({
+      code: 'reporting_date_missing',
+      message: 'Add a reporting date before including this image value.',
+    })
+  }
+  return warnings
+}
+
+export function extractImageItems(
+  parsedDocument: ParsedDocumentResult
+): ExtractedItem[] {
+  return (parsedDocument.imageExtraction?.items ?? []).flatMap((item) => {
+    const attributes = {
+      ...(item.quantity === null ? {} : { quantity: item.quantity }),
+      ...(item.unit === null ? {} : { unit: item.unit }),
+      ...(item.unitPrice === null ? {} : { 'unit price': item.unitPrice }),
+      ...(item.evidenceExcerpt.trim()
+        ? { 'source evidence': item.evidenceExcerpt.trim() }
+        : {}),
+    }
+    const resolved = resolveItemValue({ value: item.value, attributes })
+    if (!item.label.trim() || resolved.value === null) return []
+
+    return [{
+      label: item.label.trim(),
+      value: resolved.value,
+      attributes: resolved.attributes,
+    }]
+  })
+}
+
 export function extractDocumentCandidates(params: {
   document: Pick<Document, 'id' | 'file_name' | 'file_type'>
   parsedDocument: ParsedDocumentResult
@@ -117,60 +181,82 @@ export function extractDocumentCandidates(params: {
 }) {
   if (params.document.file_type === 'image') {
     const extraction = params.parsedDocument.imageExtraction
-    if (!extraction || extraction.totalAmount === null) return []
+    if (!extraction) return []
 
-    const currency =
-      extraction.currency === 'NZD' || extraction.currency === 'AUD'
-        ? extraction.currency
-        : null
-    const warnings: DocumentExtractionCandidateDraft['warnings'] = [
-      {
-        code: 'metric_selection_required',
-        message:
-          'Choose whether this total represents accounts payable or monthly expenses before including it.',
-      },
-    ]
-
-    if (!currency) {
-      warnings.push({
-        code: 'currency_missing',
-        message: 'Choose NZD or AUD before including this invoice total.',
+    const candidates: DocumentExtractionCandidateDraft[] = extraction.metrics.map(
+      (metric) => ({
+        originalPayload: { ...metric },
+        metricKey: metric.metricKey,
+        value: metric.value,
+        currency:
+          metric.metricKey === 'runway_months' ? null : metric.currency,
+        reportingDate: metric.reportingDate,
+        confidence: metric.confidence,
+        evidence: {
+          documentId: params.document.id,
+          sourceType: 'image',
+          excerpt: metric.evidenceExcerpt,
+          extractionMethod: 'ai_assisted',
+          currencyBasis: extraction.currencyBasis,
+          ...(extraction.currencyEvidence
+            ? { currencyEvidence: extraction.currencyEvidence }
+            : {}),
+        },
+        warnings: imageCandidateWarnings({
+          metricKey: metric.metricKey,
+          currency: metric.currency,
+          reportingDate: metric.reportingDate,
+          currencyBasis: extraction.currencyBasis,
+          currencyEvidence: extraction.currencyEvidence,
+        }),
+        extractorVersion: EXTRACTOR_VERSIONS.image,
       })
-    }
-    if (!extraction.invoiceDate) {
-      warnings.push({
-        code: 'reporting_date_missing',
-        message: 'Add the invoice reporting date before including this total.',
-      })
-    }
+    )
 
-    return [{
-      originalPayload: {
-        documentType: extraction.documentType,
-        supplier: extraction.supplier,
-        invoiceNumber: extraction.invoiceNumber,
-        invoiceDate: extraction.invoiceDate,
-        dueDate: extraction.dueDate,
+    if (extraction.totalAmount !== null) {
+      candidates.unshift({
+        originalPayload: {
+          documentType: extraction.documentType,
+          documentCategory: extraction.documentCategory,
+          supplier: extraction.supplier,
+          invoiceNumber: extraction.invoiceNumber,
+          documentDate: extraction.documentDate,
+          dueDate: extraction.dueDate,
+          currency: extraction.currency,
+          currencyBasis: extraction.currencyBasis,
+          totalAmount: extraction.totalAmount,
+          items: extraction.items,
+        },
+        metricKey: null,
+        value: extraction.totalAmount,
         currency: extraction.currency,
-        totalAmount: extraction.totalAmount,
-        lineItems: extraction.lineItems,
-      },
-      metricKey: null,
-      value: extraction.totalAmount,
-      currency,
-      reportingDate: extraction.invoiceDate,
-      confidence: 0.7,
-      evidence: {
-        documentId: params.document.id,
-        sourceType: 'image',
-        supplier: extraction.supplier,
-        invoiceNumber: extraction.invoiceNumber,
-        excerpt: extraction.transcription.slice(0, 500),
-        lineItems: extraction.lineItems,
-      },
-      warnings,
-      extractorVersion: EXTRACTOR_VERSIONS.image,
-    } satisfies DocumentExtractionCandidateDraft]
+        reportingDate: extraction.documentDate,
+        confidence: 0.8,
+        evidence: {
+          documentId: params.document.id,
+          sourceType: 'image',
+          supplier: extraction.supplier,
+          invoiceNumber: extraction.invoiceNumber,
+          excerpt:
+            extraction.totalEvidence ?? extraction.transcription.slice(0, 500),
+          extractionMethod: 'ai_assisted',
+          currencyBasis: extraction.currencyBasis,
+          ...(extraction.currencyEvidence
+            ? { currencyEvidence: extraction.currencyEvidence }
+            : {}),
+        },
+        warnings: imageCandidateWarnings({
+          metricKey: null,
+          currency: extraction.currency,
+          reportingDate: extraction.documentDate,
+          currencyBasis: extraction.currencyBasis,
+          currencyEvidence: extraction.currencyEvidence,
+        }),
+        extractorVersion: EXTRACTOR_VERSIONS.image,
+      })
+    }
+
+    return deduplicateCandidates(candidates)
   }
 
   if (

@@ -99,8 +99,9 @@ Which metrics are unavailable?
 
 - CSV and XLSX files create extraction candidates that require explicit user
   review before they can feed calculations.
-- Text PDFs feed RAG/evidence context and may create low-confidence extraction
-  candidates. Scanned PDFs remain previewable, but OCR is not available.
+- Text PDFs use deterministic extraction first and may create conservative
+  candidates. Scanned PDFs and images can use the configured OpenAI document
+  model; originals remain previewable when that assistance is unavailable.
 - New document-derived metrics become calculation truth only after the user
   selects **Use these values in AI-BOSS.**
 - Dashboard calculations never come directly from raw chunks.

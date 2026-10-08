@@ -287,4 +287,81 @@ describe('DocumentReviewWorkspace', () => {
     expect(screen.getByText('Account: Cash; Amount: 100000')).toBeInTheDocument()
     expect(screen.getByRole('table', { name: 'CSV original table preview' })).toBeInTheDocument()
   })
+
+  it('opens Items automatically and promotes only selected stored indexes', async () => {
+    const itemsDetails = {
+      ...details,
+      document: {
+        ...details.document,
+        metadata: {
+          extractionMethod: 'ai_assisted',
+          extractedItems: [
+            { label: 'Food Expenses', value: 23.14, attributes: {} },
+            { label: 'Icecream Expense', value: 11.15, attributes: {} },
+          ],
+        },
+      },
+      candidates: [],
+    }
+    let promoted = false
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.includes('/preview')) {
+        return {
+          ok: true,
+          json: async () => ({ success: true, data: preview }),
+        } as Response
+      }
+      if (url.endsWith('/candidates/from-items') && init?.method === 'POST') {
+        promoted = true
+        return {
+          ok: true,
+          json: async () => ({ success: true, data: { candidate: details.candidates[0] } }),
+        } as Response
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: promoted
+            ? { ...itemsDetails, candidates: details.candidates }
+            : itemsDetails,
+        }),
+      } as Response
+    })
+
+    const user = userEvent.setup()
+    render(<DocumentReviewWorkspace documentId="document-1" />)
+
+    expect(await screen.findByText('Food Expenses')).toBeInTheDocument()
+    await user.click(screen.getByRole('checkbox', { name: 'Select Food Expenses' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Select Icecream Expense' }))
+    expect(screen.getByText('2 selected · NZD 34.29')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Create calculation value' }))
+    await user.click(screen.getByLabelText('Financial metric'))
+    await user.click(screen.getByRole('option', { name: 'Monthly expenses' }))
+    fireEvent.change(screen.getByLabelText('Reporting date'), {
+      target: { value: '2026-08-31' },
+    })
+    await user.click(screen.getByRole('button', { name: 'Create pending value' }))
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/documents/document-1/candidates/from-items',
+        expect.objectContaining({ method: 'POST' })
+      )
+    })
+    const promotionCall = fetchMock.mock.calls.find(
+      ([url, init]) =>
+        String(url).endsWith('/candidates/from-items') && init?.method === 'POST'
+    )
+    expect(JSON.parse(promotionCall?.[1]?.body as string)).toEqual({
+      extractionRunId: 'run-1',
+      itemIndexes: [0, 1],
+      metricKey: 'monthly_expenses',
+      currency: 'NZD',
+      reportingDate: '2026-08-31',
+    })
+  })
 })

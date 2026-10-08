@@ -4,8 +4,13 @@ import type {
   ReviewedDocumentCandidateInput,
 } from '@/lib/documents/types'
 import type { ValidationResult } from '@/lib/api/validation'
+import {
+  isDocumentCategory,
+  type DocumentCategory,
+} from '@/lib/documents/categories'
 
 const MAX_WORKSHEET_SELECTIONS = 25
+const MAX_PROMOTED_ITEMS = 100
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -16,6 +21,88 @@ function isIsoDate(value: string) {
 
   const parsed = new Date(`${value}T00:00:00.000Z`)
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
+}
+
+export interface UpdateDocumentCategoryPayload {
+  documentType: DocumentCategory
+}
+
+export function validateUpdateDocumentCategoryPayload(
+  payload: unknown
+): ValidationResult<UpdateDocumentCategoryPayload> {
+  const input = isObject(payload) ? payload : {}
+  return isDocumentCategory(input.documentType)
+    ? { success: true, data: { documentType: input.documentType } }
+    : {
+        success: false,
+        details: { documentType: 'Choose a supported document category.' },
+      }
+}
+
+export interface PromoteDocumentItemsPayload {
+  extractionRunId: string
+  itemIndexes: number[]
+  metricKey: Exclude<ReviewedDocumentCandidateInput['metricKey'], 'runway_months' | null>
+  currency: 'NZD' | 'AUD'
+  reportingDate: string
+}
+
+export function validatePromoteDocumentItemsPayload(
+  payload: unknown
+): ValidationResult<PromoteDocumentItemsPayload> {
+  const input = isObject(payload) ? payload : {}
+  const details: Record<string, string> = {}
+  const extractionRunId = input.extractionRunId
+  const metricKey = input.metricKey
+  const currency = input.currency
+  const reportingDate = input.reportingDate
+  const rawIndexes = input.itemIndexes
+
+  if (typeof extractionRunId !== 'string' || !extractionRunId.trim()) {
+    details.extractionRunId = 'extractionRunId is required.'
+  }
+  if (
+    typeof metricKey !== 'string' ||
+    !isFinancialMetricKey(metricKey) ||
+    metricKey === 'runway_months'
+  ) {
+    details.metricKey = 'Choose a supported monetary financial metric.'
+  }
+  if (currency !== 'NZD' && currency !== 'AUD') {
+    details.currency = 'Currency must be NZD or AUD.'
+  }
+  if (typeof reportingDate !== 'string' || !isIsoDate(reportingDate)) {
+    details.reportingDate = 'Reporting date must be a valid YYYY-MM-DD date.'
+  }
+
+  const itemIndexes = Array.isArray(rawIndexes)
+    ? rawIndexes.filter(
+        (value): value is number =>
+          typeof value === 'number' && Number.isInteger(value) && value >= 0
+      )
+    : []
+  if (
+    !Array.isArray(rawIndexes) ||
+    itemIndexes.length !== rawIndexes.length ||
+    itemIndexes.length === 0 ||
+    itemIndexes.length > MAX_PROMOTED_ITEMS ||
+    new Set(itemIndexes).size !== itemIndexes.length
+  ) {
+    details.itemIndexes = `Choose between 1 and ${MAX_PROMOTED_ITEMS} unique items.`
+  }
+
+  if (Object.keys(details).length > 0) return { success: false, details }
+
+  return {
+    success: true,
+    data: {
+      extractionRunId: (extractionRunId as string).trim(),
+      itemIndexes,
+      metricKey: metricKey as PromoteDocumentItemsPayload['metricKey'],
+      currency: currency as 'NZD' | 'AUD',
+      reportingDate: reportingDate as string,
+    },
+  }
 }
 
 export interface ReprocessDocumentPayload {

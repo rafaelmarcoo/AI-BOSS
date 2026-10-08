@@ -168,4 +168,41 @@ describe('extractCsvFinancialMetrics', () => {
       currency: 'NZD',
     })
   })
+
+  it('extracts canonical metrics from a wide CSV layout', () => {
+    const csvData: ParsedCsvData = {
+      headers: ['Date', 'Currency', 'Cash', 'Monthly Revenue', 'Monthly Expenses'],
+      rows: [
+        {
+          rowNumber: 2,
+          values: ['2026-08-31', 'NZD', '80000', '42000', '17000'],
+          cells: {
+            Date: '2026-08-31',
+            Currency: 'NZD',
+            Cash: '80000',
+            'Monthly Revenue': '42000',
+            'Monthly Expenses': '17000',
+          },
+        },
+      ],
+    }
+
+    const metrics = extractCsvFinancialMetrics({
+      csvData,
+      documentId: 'document-123',
+      sourceLabel: 'wide-summary.csv',
+      extractedAt: '2026-09-01T00:00:00.000Z',
+    })
+
+    expect(metrics).toMatchObject([
+      { key: 'cash', value: 80000, currency: 'NZD', asOfDate: '2026-08-31' },
+      { key: 'monthly_revenue', value: 42000, currency: 'NZD', asOfDate: '2026-08-31' },
+      { key: 'monthly_expenses', value: 17000, currency: 'NZD', asOfDate: '2026-08-31' },
+    ])
+    expect(metrics[0].provenance.evidence).toMatchObject({
+      sourceRowStart: 2,
+      sourceRowEnd: 2,
+      excerpt: 'Cash: 80000',
+    })
+  })
 })

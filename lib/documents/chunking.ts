@@ -111,6 +111,23 @@ export function createTextChunks(params: {
   })) satisfies DocumentChunkInsert[]
 }
 
+export function createOcrChunks(params: {
+  documentId: string
+  userId: string
+  text: string
+  source: 'pdf' | 'image'
+}) {
+  return splitTextIntoWindows(params.text).map((content, chunkIndex) => ({
+    document_id: params.documentId,
+    user_id: params.userId,
+    chunk_index: chunkIndex,
+    content,
+    source_page: null,
+    metadata: { source: params.source, extractionMethod: 'ai_assisted_ocr' },
+    embedding: null,
+  })) satisfies DocumentChunkInsert[]
+}
+
 export function createCsvChunks(params: {
   documentId: string
   userId: string

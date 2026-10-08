@@ -9,6 +9,17 @@ import { createAdminSupabaseClient } from '@/lib/supabase'
 import { requireCompanyAdmin } from '@/lib/companies'
 import type { DocumentExtractionRun } from '@/types/database'
 import type { DocumentExtractionCandidate } from '@/types/database'
+import {
+  getEditableDocument,
+  updateDocumentRecord,
+} from '@/lib/documents/persistence'
+import type { FinancialMetricKey } from '@/lib/financial-data/metric-keys'
+import {
+  buildPromotedItemsCandidate,
+  hasPromotionSignature,
+  ITEM_PROMOTION_EXTRACTOR_VERSION,
+  selectStoredItemsForPromotion,
+} from '@/lib/documents/item-promotion'
 
 const EXTRACTION_RUN_SELECT = `
   id,
@@ -329,6 +340,139 @@ export async function saveDocumentExtractionCandidates(params: {
   }
 
   return data
+}
+
+export async function promoteDocumentItemsToCandidate(params: {
+  documentId: string
+  requesterId: string
+  extractionRunId: string
+  itemIndexes: number[]
+  metricKey: Exclude<FinancialMetricKey, 'runway_months'>
+  currency: 'NZD' | 'AUD'
+  reportingDate: string
+}) {
+  const document = await getEditableDocument(params.documentId, params.requesterId)
+  if (document.status !== 'ready') {
+    throw new ApiError(409, 'CONFLICT', 'Wait for document processing to finish.')
+  }
+  if (document.financial_review_status === 'confirmed') {
+    throw new ApiError(
+      409,
+      'CONFLICT',
+      'Reprocess this confirmed document before creating a new calculation value.'
+    )
+  }
+
+  const items = selectStoredItemsForPromotion(
+    document.metadata,
+    params.itemIndexes
+  )
+  if (!items) {
+    throw new ApiError(
+      400,
+      'VALIDATION_ERROR',
+      'One or more selected items no longer exist.'
+    )
+  }
+
+  const review = await getLatestDocumentExtractionReview({
+    documentId: document.id,
+    userId: document.user_id,
+  })
+  if (
+    !review.extractionRun ||
+    review.extractionRun.id !== params.extractionRunId ||
+    review.extractionRun.status !== 'extracted'
+  ) {
+    throw new ApiError(
+      409,
+      'CONFLICT',
+      'The extraction review changed. Reload the document and try again.'
+    )
+  }
+
+  const { candidate: draft, promotionSignature } = buildPromotedItemsCandidate({
+    documentId: document.id,
+    items,
+    metricKey: params.metricKey,
+    currency: params.currency,
+    reportingDate: params.reportingDate,
+  })
+
+  const supabase = createAdminSupabaseClient()
+  const { data: existing, error: duplicateError } = await supabase
+    .from('document_extraction_candidates')
+    .select('id, evidence')
+    .eq('extraction_run_id', params.extractionRunId)
+    .eq('document_id', document.id)
+    .eq('user_id', document.user_id)
+    .eq('extractor_version', ITEM_PROMOTION_EXTRACTOR_VERSION)
+
+  if (duplicateError) {
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to check the promoted calculation value.'
+    )
+  }
+  if (hasPromotionSignature(existing ?? [], promotionSignature)) {
+    throw new ApiError(
+      409,
+      'CONFLICT',
+      'These items have already been promoted with the same review details.'
+    )
+  }
+
+  const { data, error } = await supabase
+    .from('document_extraction_candidates')
+    .insert({
+      extraction_run_id: params.extractionRunId,
+      document_id: document.id,
+      user_id: document.user_id,
+      original_payload: draft.originalPayload,
+      reviewed_payload: null,
+      metric_key: draft.metricKey,
+      value: draft.value,
+      currency: draft.currency,
+      reporting_date: draft.reportingDate,
+      confidence: draft.confidence,
+      evidence: draft.evidence,
+      warnings: draft.warnings,
+      decision: 'pending',
+      extractor_version: draft.extractorVersion,
+      reviewer_id: null,
+      reviewed_at: null,
+    })
+    .select(EXTRACTION_CANDIDATE_SELECT)
+    .single()
+
+  if (error || !data) {
+    throw new ApiError(
+      500,
+      'INTERNAL_ERROR',
+      'Failed to create the calculation value.',
+      error?.message
+    )
+  }
+
+  try {
+    await updateDocumentRecord(
+      document.id,
+      document.user_id,
+      { financial_review_status: 'pending' },
+      params.requesterId
+    )
+  } catch (updateError) {
+    await supabase
+      .from('document_extraction_candidates')
+      .delete()
+      .eq('id', data.id)
+      .eq('document_id', document.id)
+      .eq('user_id', document.user_id)
+    throw updateError
+  }
+
+  return data as DocumentReviewCandidate
 }
 
 export async function completeDocumentExtractionRun(params: {

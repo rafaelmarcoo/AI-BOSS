@@ -1,11 +1,17 @@
 import { NextRequest } from 'next/server'
 import { requireAuthenticatedUser } from '@/lib/auth'
 import { handleRouteError, successResponse } from '@/lib/api/responses'
-import { deleteUserDocument } from '@/lib/documents/persistence'
+import {
+  deleteUserDocument,
+  updateDocumentCategory,
+} from '@/lib/documents/persistence'
 import { getDocumentDetails } from '@/lib/documents/review'
+import { assertValid, readJsonBody } from '@/lib/api/validation'
+import { validateUpdateDocumentCategoryPayload } from '@/lib/documents/review-validation'
 import type {
   DeleteDocumentResponse,
   DocumentDetailsResponse,
+  UpdateDocumentCategoryResponse,
 } from '@/lib/documents/types'
 
 interface RouteContext {
@@ -34,6 +40,25 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       ...result,
       documentId,
     })
+  } catch (error) {
+    return handleRouteError(error)
+  }
+}
+
+export async function PATCH(request: NextRequest, context: RouteContext) {
+  try {
+    const { user } = await requireAuthenticatedUser(request)
+    const { documentId } = await context.params
+    const payload = assertValid(
+      validateUpdateDocumentCategoryPayload(await readJsonBody(request))
+    )
+    const document = await updateDocumentCategory({
+      documentId,
+      requesterId: user.id,
+      documentType: payload.documentType,
+    })
+
+    return successResponse<UpdateDocumentCategoryResponse>({ document })
   } catch (error) {
     return handleRouteError(error)
   }

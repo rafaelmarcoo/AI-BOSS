@@ -121,7 +121,13 @@ describe('processDocument', () => {
     mockSaveDocumentExtractionCandidates.mockResolvedValue([{ id: 'candidate-1' }])
     mockCompleteDocumentExtractionRun.mockResolvedValue(undefined)
     mockFailDocumentExtractionRun.mockResolvedValue(undefined)
-    mockExtractAiAssistedDocument.mockResolvedValue({ candidates: [], items: [] })
+    mockExtractAiAssistedDocument.mockResolvedValue({
+      candidates: [],
+      items: [],
+      documentCategory: 'other',
+      transcription: '',
+      inputTruncated: false,
+    })
     mockGetPdfDocument.mockReturnValue({
       promise: Promise.resolve({
         numPages: 1,
@@ -207,6 +213,41 @@ describe('processDocument', () => {
           embedding: [1, 0, 0],
         }),
       ])
+    )
+  })
+
+  it('never overwrites a user-selected category during reprocessing', async () => {
+    mockGetDocumentById.mockResolvedValue({
+      id: 'document-123',
+      user_id: 'user-123',
+      company_id: 'company-1',
+      conversation_id: null,
+      file_name: 'summary.csv',
+      file_type: 'csv',
+      mime_type: 'text/csv',
+      storage_path: 'user-123/summary.csv',
+      status: 'processing',
+      financial_review_status: 'pending',
+      document_type: 'budget_forecast',
+      raw_text: null,
+      metadata: { documentCategorySource: 'user' },
+      error_message: null,
+      created_at: '2026-05-12T00:00:00.000Z',
+      updated_at: '2026-05-12T00:00:00.000Z',
+    })
+    mockDownloadDocumentFile.mockResolvedValue(
+      Buffer.from('Metric,Amount,Currency,Date\nCash,120000,NZD,2026-05-12')
+    )
+
+    await processDocument('document-123', 'user-123')
+
+    expect(mockUpdateDocumentRecord).toHaveBeenCalledWith(
+      'document-123',
+      'user-123',
+      expect.objectContaining({
+        document_type: 'budget_forecast',
+        metadata: expect.objectContaining({ documentCategorySource: 'user' }),
+      })
     )
   })
 
@@ -320,6 +361,9 @@ describe('processDocument', () => {
         extractorVersion: 'openai_assisted_v1',
       }],
       items: [],
+      documentCategory: 'financial_statement',
+      transcription: 'Cash at bank NZD 90,000',
+      inputTruncated: false,
     })
 
     await processDocument('document-123', 'user-123')
@@ -328,9 +372,116 @@ describe('processDocument', () => {
     expect(mockUpdateDocumentRecord).toHaveBeenCalledWith(
       'document-123',
       'user-123',
-      expect.objectContaining({ status: 'ready', financial_review_status: 'pending' })
+      expect.objectContaining({
+        status: 'ready',
+        financial_review_status: 'pending',
+        document_type: 'financial_statement',
+        raw_text: 'Cash at bank NZD 90,000',
+        metadata: expect.objectContaining({
+          extractionMethod: 'ai_assisted',
+        }),
+      })
+    )
+    expect(mockReplaceDocumentChunks).toHaveBeenCalledWith(
+      'document-123',
+      'user-123',
+      expect.arrayContaining([
+        expect.objectContaining({
+          content: 'Cash at bank NZD 90,000',
+          embedding: [1, 0, 0],
+        }),
+      ])
     )
     expect(mockFailDocumentExtractionRun).not.toHaveBeenCalled()
+  })
+
+  it('keeps AI-extracted Items reviewable when no canonical Value exists', async () => {
+    process.env.OPENAI_API_KEY = 'test-key'
+    mockGetDocumentById.mockResolvedValue({
+      id: 'document-123', user_id: 'user-123', company_id: 'company-1',
+      conversation_id: null, file_name: 'handwritten.csv', file_type: 'csv',
+      mime_type: 'text/csv', storage_path: 'user-123/handwritten.csv',
+      status: 'processing', financial_review_status: 'pending', document_type: null,
+      raw_text: null, metadata: null, error_message: null,
+      created_at: '2026-05-12T00:00:00.000Z', updated_at: '2026-05-12T00:00:00.000Z',
+    })
+    mockDownloadDocumentFile.mockResolvedValue(
+      Buffer.from('Description,Figure\nFood Expenses,23.14\nIcecream Expense,11.15')
+    )
+    mockExtractAiAssistedDocument.mockResolvedValue({
+      candidates: [],
+      items: [
+        { label: 'Food Expenses', value: 23.14, attributes: { row: 2 } },
+        { label: 'Icecream Expense', value: 11.15, attributes: { row: 3 } },
+      ],
+      documentCategory: 'data_export',
+      transcription: 'Food Expenses 23.14\nIcecream Expense 11.15',
+      inputTruncated: false,
+    })
+
+    await processDocument('document-123', 'user-123')
+
+    expect(mockExtractAiAssistedDocument).toHaveBeenCalled()
+    expect(mockSaveDocumentExtractionCandidates).toHaveBeenCalledWith(
+      expect.objectContaining({ candidates: [] })
+    )
+    expect(mockUpdateDocumentRecord).toHaveBeenCalledWith(
+      'document-123',
+      'user-123',
+      expect.objectContaining({
+        status: 'ready',
+        financial_review_status: 'pending',
+        document_type: 'data_export',
+        metadata: expect.objectContaining({
+          extractionMethod: 'hybrid',
+          metricCandidateCount: 0,
+          extractedItems: expect.arrayContaining([
+            expect.objectContaining({ label: 'Food Expenses', value: 23.14 }),
+          ]),
+        }),
+      })
+    )
+  })
+
+  it('records bounded AI input truncation on both the run and document', async () => {
+    process.env.OPENAI_API_KEY = 'test-key'
+    mockGetDocumentById.mockResolvedValue({
+      id: 'document-123', user_id: 'user-123', company_id: 'company-1',
+      conversation_id: null, file_name: 'large.csv', file_type: 'csv',
+      mime_type: 'text/csv', storage_path: 'user-123/large.csv',
+      status: 'processing', financial_review_status: 'pending', document_type: null,
+      raw_text: null, metadata: null, error_message: null,
+      created_at: '2026-05-12T00:00:00.000Z', updated_at: '2026-05-12T00:00:00.000Z',
+    })
+    mockDownloadDocumentFile.mockResolvedValue(Buffer.from('Month,Notes\nApril,None'))
+    mockExtractAiAssistedDocument.mockResolvedValue({
+      candidates: [],
+      items: [],
+      documentCategory: 'data_export',
+      transcription: '',
+      inputTruncated: true,
+    })
+
+    await processDocument('document-123', 'user-123')
+
+    expect(mockCompleteDocumentExtractionRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        warnings: expect.arrayContaining([
+          expect.objectContaining({ code: 'ai_input_truncated' }),
+        ]),
+      })
+    )
+    expect(mockUpdateDocumentRecord).toHaveBeenCalledWith(
+      'document-123',
+      'user-123',
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          extractionWarnings: expect.arrayContaining([
+            expect.objectContaining({ code: 'ai_input_truncated' }),
+          ]),
+        }),
+      })
+    )
   })
 
   it('retains deterministic output and the original when AI assistance fails', async () => {
@@ -367,6 +518,57 @@ describe('processDocument', () => {
             expect.objectContaining({ code: 'ai_assisted_failed' }),
           ]),
         }),
+      })
+    )
+  })
+
+  it('keeps the deterministic value when an explicit AI retry conflicts', async () => {
+    process.env.OPENAI_API_KEY = 'test-key'
+    mockGetDocumentById.mockResolvedValue({
+      id: 'document-123', user_id: 'user-123', company_id: 'company-1',
+      conversation_id: null, file_name: 'summary.csv', file_type: 'csv',
+      mime_type: 'text/csv', storage_path: 'user-123/summary.csv',
+      status: 'processing', financial_review_status: 'pending', document_type: null,
+      raw_text: null, metadata: null, error_message: null,
+      created_at: '2026-05-12T00:00:00.000Z', updated_at: '2026-05-12T00:00:00.000Z',
+    })
+    mockDownloadDocumentFile.mockResolvedValue(
+      Buffer.from('Metric,Amount,Currency,Date\nCash,120000,NZD,2026-05-31')
+    )
+    mockExtractAiAssistedDocument.mockResolvedValue({
+      candidates: [{
+        originalPayload: { metricKey: 'cash', value: 90000 },
+        metricKey: 'cash', value: 90000, currency: 'NZD',
+        reportingDate: '2026-05-31', confidence: 0.7,
+        evidence: { excerpt: 'Cash 90,000' }, warnings: [],
+        extractorVersion: 'openai_assisted_v1',
+      }],
+      items: [],
+      documentCategory: 'data_export',
+      transcription: 'Cash 90,000',
+      inputTruncated: false,
+    })
+
+    await processDocument('document-123', 'user-123', {
+      extractionMode: 'ai_assisted',
+    })
+
+    expect(mockSaveDocumentExtractionCandidates).toHaveBeenCalledWith(
+      expect.objectContaining({
+        candidates: [expect.objectContaining({
+          metricKey: 'cash',
+          value: 120000,
+          warnings: expect.arrayContaining([
+            expect.objectContaining({ code: 'ai_conflict_ignored' }),
+          ]),
+        })],
+      })
+    )
+    expect(mockUpdateDocumentRecord).toHaveBeenCalledWith(
+      'document-123',
+      'user-123',
+      expect.objectContaining({
+        metadata: expect.objectContaining({ extractionMethod: 'hybrid' }),
       })
     )
   })

@@ -19,6 +19,10 @@ import {
   resolveItemValue,
   type ItemAttributes,
 } from '@/lib/financial-data/attributes'
+import {
+  normalizeDocumentCategory,
+  type DocumentCategory,
+} from '@/lib/documents/categories'
 
 const DOCUMENT_SUMMARY_SELECT = `
   id,
@@ -106,6 +110,7 @@ export function toDocumentSummary(
 ): DocumentSummary {
   return {
     ...row,
+    document_type: normalizeDocumentCategory(row.document_type, row.file_type),
     uploadedBy: { id: row.user_id, label: uploaderLabel },
     access: documentAccess(row, requesterId, requesterType),
   }
@@ -414,6 +419,7 @@ export async function updateDocumentRecord(
       Document,
       | 'status'
       | 'financial_review_status'
+      | 'document_type'
       | 'raw_text'
       | 'metadata'
       | 'error_message'
@@ -449,7 +455,7 @@ export async function updateDocumentRecord(
   )
 }
 
-async function getEditableDocument(documentId: string, requesterId: string) {
+export async function getEditableDocument(documentId: string, requesterId: string) {
   const document = await getAccessibleDocumentById(documentId, requesterId)
   const company = await getUserCompany(requesterId)
   const access = documentAccess(document, requesterId, company.userType)
@@ -463,6 +469,30 @@ async function getEditableDocument(documentId: string, requesterId: string) {
   }
 
   return document
+}
+
+export async function updateDocumentCategory(params: {
+  documentId: string
+  requesterId: string
+  documentType: DocumentCategory
+}) {
+  const document = await getEditableDocument(params.documentId, params.requesterId)
+  const metadata =
+    document.metadata &&
+    typeof document.metadata === 'object' &&
+    !Array.isArray(document.metadata)
+      ? (document.metadata as Record<string, unknown>)
+      : {}
+
+  return updateDocumentRecord(
+    document.id,
+    document.user_id,
+    {
+      document_type: params.documentType,
+      metadata: { ...metadata, documentCategorySource: 'user' },
+    },
+    params.requesterId
+  )
 }
 
 export async function updateDocumentExtractedItem(params: {

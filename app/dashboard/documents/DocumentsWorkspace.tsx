@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import {
   Alert,
   Box,
@@ -16,6 +16,8 @@ import {
   MenuItem,
   Select,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Typography,
 } from "@mui/material";
@@ -26,8 +28,15 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import type { DocumentSummary } from "@/lib/documents/types";
 import { getDocumentStatusPresentation } from "@/lib/documents/presentation";
 import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
+import {
+  DOCUMENT_CATEGORIES,
+  DOCUMENT_CATEGORY_LABELS,
+  normalizeDocumentCategory,
+  type DocumentCategory,
+} from "@/lib/documents/categories";
 
 type FileFilter = "all" | "pdf" | "csv" | "xlsx" | "image" | "text" | "docx";
+type CategoryFilter = "all" | DocumentCategory;
 type StatusFilter = "all" | DocumentSummary["status"];
 type SortOption = "newest" | "oldest" | "name";
 
@@ -42,11 +51,13 @@ export function DocumentsWorkspace() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [fileFilter, setFileFilter] = useState<FileFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sort, setSort] = useState<SortOption>("newest");
   const [documentToDelete, setDocumentToDelete] = useState<DocumentSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [updatingCategoryId, setUpdatingCategoryId] = useState<string | null>(null);
 
   const loadDocuments = async () => {
     setLoading(true);
@@ -79,12 +90,14 @@ export function DocumentsWorkspace() {
   const visibleDocuments = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
     const filtered = documents.filter((document) => {
+      const category = normalizeDocumentCategory(document.document_type, document.file_type);
+      const matchesCategory = categoryFilter === "all" || category === categoryFilter;
       const matchesFile = fileFilter === "all" || document.file_type === fileFilter;
       const matchesStatus = statusFilter === "all" || document.status === statusFilter;
       const matchesSearch =
         !normalizedSearch || document.file_name.toLowerCase().includes(normalizedSearch);
 
-      return matchesFile && matchesStatus && matchesSearch;
+      return matchesCategory && matchesFile && matchesStatus && matchesSearch;
     });
 
     return filtered.sort((left, right) => {
@@ -92,7 +105,47 @@ export function DocumentsWorkspace() {
       const difference = new Date(left.created_at).getTime() - new Date(right.created_at).getTime();
       return sort === "newest" ? -difference : difference;
     });
-  }, [documents, fileFilter, search, sort, statusFilter]);
+  }, [categoryFilter, documents, fileFilter, search, sort, statusFilter]);
+
+  const categoryCounts = useMemo(() => {
+    const counts = Object.fromEntries(
+      DOCUMENT_CATEGORIES.map((category) => [category, 0]),
+    ) as Record<DocumentCategory, number>;
+    documents.forEach((document) => {
+      counts[normalizeDocumentCategory(document.document_type, document.file_type)] += 1;
+    });
+    return counts;
+  }, [documents]);
+
+  const updateCategory = async (
+    document: DocumentSummary,
+    documentType: DocumentCategory,
+  ) => {
+    setUpdatingCategoryId(document.id);
+    setError(null);
+    try {
+      const response = await fetch(`/api/documents/${encodeURIComponent(document.id)}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ documentType }),
+      });
+      const payload = (await response.json()) as {
+        success: boolean;
+        data?: { document: DocumentSummary };
+        error?: { message?: string };
+      };
+      if (!response.ok || !payload.success || !payload.data) {
+        throw new Error(payload.error?.message ?? "Could not update the category.");
+      }
+      setDocuments((current) => current.map((item) =>
+        item.id === document.id ? payload.data!.document : item,
+      ));
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Could not update the category.");
+    } finally {
+      setUpdatingCategoryId(null);
+    }
+  };
 
   const confirmDelete = async () => {
     if (!documentToDelete) return;
@@ -142,6 +195,23 @@ export function DocumentsWorkspace() {
       </Stack>
 
       <Box sx={{ p: { xs: 1.25, sm: 1.5 }, border: "1px solid", borderColor: dashboardTokens.border, borderRadius: 3, bgcolor: dashboardTokens.surface, boxShadow: "0 8px 24px rgba(32,58,80,0.06)" }}>
+      <Tabs
+        value={categoryFilter}
+        onChange={(_, value: CategoryFilter) => setCategoryFilter(value)}
+        variant="scrollable"
+        scrollButtons="auto"
+        aria-label="Document categories"
+        sx={{ mb: 1.5, minHeight: 40 }}
+      >
+        <Tab value="all" label={`All (${documents.length})`} />
+        {DOCUMENT_CATEGORIES.map((category) => (
+          <Tab
+            key={category}
+            value={category}
+            label={`${DOCUMENT_CATEGORY_LABELS[category]} (${categoryCounts[category]})`}
+          />
+        ))}
+      </Tabs>
       <Stack direction={{ xs: "column", lg: "row" }} spacing={1.25}>
         <TextField
           label="Search documents"
@@ -178,6 +248,7 @@ export function DocumentsWorkspace() {
           </Typography>
           {visibleDocuments.map((document) => {
             const status = getDocumentStatusPresentation(document);
+            const category = normalizeDocumentCategory(document.document_type, document.file_type);
 
             return (
               <Box key={document.id} sx={documentCardStyles}>
@@ -192,6 +263,28 @@ export function DocumentsWorkspace() {
                       </Typography>
                       <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
                         <Chip label={document.file_type.toUpperCase()} size="small" sx={fileTypeChipStyles} />
+                        {document.access.canSaveDraft ? (
+                          <FormControl size="small" sx={{ minWidth: 170 }}>
+                            <Select
+                              value={category}
+                              inputProps={{ "aria-label": `Category for ${document.file_name}` }}
+                              disabled={updatingCategoryId === document.id}
+                              onChange={(event) => void updateCategory(
+                                document,
+                                event.target.value as DocumentCategory,
+                              )}
+                              sx={{ height: 26, fontSize: 12, bgcolor: dashboardTokens.surfaceAlt }}
+                            >
+                              {DOCUMENT_CATEGORIES.map((option) => (
+                                <MenuItem key={option} value={option}>
+                                  {DOCUMENT_CATEGORY_LABELS[option]}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        ) : (
+                          <Chip label={DOCUMENT_CATEGORY_LABELS[category]} size="small" variant="outlined" />
+                        )}
                         <Chip label={status.label} size="small" sx={{ color: status.color, borderColor: status.color }} variant="outlined" />
                         <Typography variant="caption" sx={{ color: dashboardTokens.textMuted, alignSelf: "center" }}>
                           Uploaded {new Date(document.created_at).toLocaleString()}
@@ -285,10 +378,11 @@ function FilterSelect({ label, value, onChange, options }: {
   onChange: (value: string) => void;
   options: Array<[string, string]>;
 }) {
+  const labelId = useId();
   return (
     <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: 150 }, ...fieldStyles }}>
-      <InputLabel>{label}</InputLabel>
-      <Select label={label} value={value} onChange={(event) => onChange(event.target.value)}>
+      <InputLabel id={labelId}>{label}</InputLabel>
+      <Select labelId={labelId} label={label} value={value} onChange={(event) => onChange(event.target.value)}>
         {options.map(([optionValue, optionLabel]) => <MenuItem key={optionValue} value={optionValue}>{optionLabel}</MenuItem>)}
       </Select>
     </FormControl>

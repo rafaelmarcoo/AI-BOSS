@@ -20,7 +20,7 @@ jest.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
 }))
 
 describe('PDF parsing states', () => {
-  it('retains a scanned or image-only PDF as previewable without chunks', async () => {
+  it('marks an image-only PDF for optional AI-assisted extraction', async () => {
     const result = await parseDocumentContent(
       {
         id: 'document-1',
@@ -39,7 +39,7 @@ describe('PDF parsing states', () => {
       metadata: {
         scanned: true,
         extractionAvailable: false,
-        warnings: [expect.objectContaining({ code: 'ocr_unavailable' })],
+        warnings: [expect.objectContaining({ code: 'embedded_text_unavailable' })],
       },
     })
   })

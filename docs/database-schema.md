@@ -250,9 +250,9 @@ Stores uploaded user files and their ingestion state.
 | storage_path | TEXT | Path in Supabase Storage |
 | status | TEXT | `uploaded`, `processing`, `ready`, `failed` |
 | financial_review_status | TEXT | Separate calculation-trust state: `legacy`, `not_required`, `pending`, or `confirmed` |
-| document_type | TEXT | Optional business meaning like `policy`, `report`, `statement` |
+| document_type | TEXT | Application-controlled business category: `invoice_receipt`, `financial_statement`, `bank_statement`, `budget_forecast`, `data_export`, or `other` |
 | raw_text | TEXT | Extracted text used for chunking |
-| metadata | JSONB | Flexible metadata such as page counts, spreadsheet columns, AI-attempt warnings, and supplementary review items |
+| metadata | JSONB | Flexible metadata such as page counts, spreadsheet columns, extraction method/warnings, supplementary review items, and `documentCategorySource` (`automatic` or `user`) |
 | error_message | TEXT | Processing failure details if any |
 | created_at | TIMESTAMP | Upload time |
 | updated_at | TIMESTAMP | Last processing/update time |
@@ -272,6 +272,9 @@ Stores uploaded user files and their ingestion state.
 
 **Deletion behaviour:**
 - The server-only `delete_company_document_and_derived_metrics(document_id, requester_id)` function removes the document and all derived financial observations in one transaction. An uploader may delete their own unconfirmed document; a same-company administrator may also delete confirmed company documents. RAG chunks, extraction runs, and candidates are removed by foreign-key cascades. The private Storage object is removed immediately before the database transaction.
+
+**Category compatibility:**
+- No schema migration is required for the controlled categories because `document_type` is an existing nullable `TEXT` column. Application reads map legacy CSV/XLSX rows to `data_export` and other unknown legacy values to `other`. Reprocessing may replace an automatic category but never a category whose metadata source is `user`.
 
 **Extraction boundary:**
 - CSV and XLSX candidates are deterministic; XLSX worksheet selection and ingestion limits remain enforced.

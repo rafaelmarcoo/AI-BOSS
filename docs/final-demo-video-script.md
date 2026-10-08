@@ -48,8 +48,8 @@ Prepare these files:
    - Used to demonstrate a previewable text PDF with page and excerpt evidence.
 
 4. `12-scanned-financial-statement.pdf`
-   - Used to demonstrate a stored and previewable scanned PDF for which OCR is
-     unavailable.
+   - Used to demonstrate AI-assisted extraction of a scanned PDF when the
+     document model is configured, plus retained-original failure handling.
 
 Do not use `02-review-corrections.csv` in the main recording. The main CSV will
 already demonstrate one correction and one exclusion, which keeps the story
@@ -756,15 +756,17 @@ Adjusted runway: 7.33 -> 6.00 -> 5.12 months
    ```
 
 2. Open the document.
-3. Show the scanned or OCR-unavailable state.
+3. Show the AI-assisted extraction result, or the configuration-specific
+   unavailable state when the document model is not configured.
 
 ### Scanned PDF narration
 
-> Scanned PDFs are retained and previewable, but OCR is outside the current
-> scope.
+> Scanned PDFs are retained and previewable. When the OpenAI document model is
+> configured, AI-BOSS can recover transcription and review candidates.
 >
-> AI-BOSS clearly states that extraction is unavailable and does not invent
-> candidates from the image.
+> Recovered content remains untrusted until human review and administrator
+> confirmation. If AI assistance is unavailable or fails, the original is
+> retained and the limitation is shown explicitly.
 
 ## 14. Recent Activity and conclusion
 
@@ -801,7 +803,7 @@ Use these phrases:
 - Deterministic calculation
 - Scenario assumption
 - Text PDF extraction
-- OCR is deferred for scanned PDFs
+- AI-assisted extraction is bounded and review-gated
 - Cash runway is the conservative cash-only view
 - Working-capital-adjusted runway is a planning view with explicit assumptions
 

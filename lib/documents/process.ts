@@ -8,6 +8,7 @@ import { extractAiAssistedDocument } from '@/lib/documents/ai-assisted-extractio
 import { parseDocumentContent } from '@/lib/documents/parsing'
 import {
   extractDocumentCandidates,
+  extractImageItems,
   getDocumentExtractorVersion,
 } from '@/lib/documents/extraction-candidates'
 import {
@@ -28,6 +29,12 @@ import type {
   ProcessDocumentOptions,
 } from '@/lib/documents/types'
 import type { ExtractedItem } from '@/lib/financial-data/attributes'
+import { createOcrChunks } from '@/lib/documents/chunking'
+import {
+  classifyDocumentCategory,
+  normalizeDocumentCategory,
+  type DocumentCategory,
+} from '@/lib/documents/categories'
 
 function addExtractionMetadata(
   metadata: unknown,
@@ -57,17 +64,56 @@ function mergeCandidates(
 ) {
   const merged = new Map<string, DocumentExtractionCandidateDraft>()
 
-  for (const candidate of [...deterministic, ...aiAssisted]) {
-    const key = JSON.stringify([
-      candidate.metricKey,
-      candidate.value,
-      candidate.currency,
-      candidate.reportingDate,
-    ])
-    if (!merged.has(key)) merged.set(key, candidate)
+  const keyFor = (candidate: DocumentExtractionCandidateDraft) =>
+    JSON.stringify(
+      candidate.metricKey === null
+        ? [null, candidate.value, candidate.currency, candidate.reportingDate]
+        : [candidate.metricKey, candidate.currency, candidate.reportingDate]
+    )
+
+  for (const candidate of deterministic) {
+    if (!merged.has(keyFor(candidate))) merged.set(keyFor(candidate), candidate)
+  }
+
+  for (const candidate of aiAssisted) {
+    const key = keyFor(candidate)
+    const existing = merged.get(key)
+    if (!existing) {
+      merged.set(key, candidate)
+      continue
+    }
+
+    if (
+      existing.value !== candidate.value &&
+      !existing.warnings.some((warning) => warning.code === 'ai_conflict_ignored')
+    ) {
+      existing.warnings.push({
+        code: 'ai_conflict_ignored',
+        message:
+          'AI-assisted extraction found a different value for the same metric and reporting period. The deterministic value was retained for review.',
+      })
+    }
   }
 
   return [...merged.values()]
+}
+
+function deduplicateItems(items: ExtractedItem[]) {
+  const unique = new Map<string, ExtractedItem>()
+  for (const item of items) {
+    const key = JSON.stringify([item.label.toLowerCase(), item.value, item.attributes])
+    if (!unique.has(key)) unique.set(key, item)
+  }
+  return [...unique.values()]
+}
+
+function metadataCategorySource(metadata: unknown) {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    return null
+  }
+  return Reflect.get(metadata, 'documentCategorySource') === 'user'
+    ? 'user'
+    : null
 }
 
 function parsedPdfFallback(error: unknown): ParsedDocumentResult {
@@ -137,8 +183,14 @@ export async function processDocument(
       parsedDocument,
       extractedAt: new Date().toISOString(),
     })
+    const deterministicEvidenceAvailable =
+      parsedDocument.rawText.trim().length > 0 ||
+      parsedDocument.chunks.length > 0 ||
+      deterministicCandidates.length > 0
     const supportsAiAssistance =
       document.file_type === 'pdf' ||
+      document.file_type === 'csv' ||
+      document.file_type === 'xlsx' ||
       document.file_type === 'text' ||
       document.file_type === 'docx'
     const shouldAttemptAi =
@@ -149,7 +201,11 @@ export async function processDocument(
         deterministicCandidates.length === 0)
     const aiWarnings: Array<{ code: string; message: string }> = []
     let aiCandidates: DocumentExtractionCandidateDraft[] = []
-    let extractedItems: ExtractedItem[] = []
+    let extractedItems: ExtractedItem[] = extractImageItems(parsedDocument)
+    let aiCategory: DocumentCategory | null = null
+    let aiTranscription = ''
+    let aiInputTruncated = false
+    let aiAssistedSucceeded = false
 
     if (shouldAttemptAi) {
       if (!process.env.OPENAI_API_KEY) {
@@ -166,7 +222,11 @@ export async function processDocument(
             fileBytes,
           })
           aiCandidates = result.candidates
-          extractedItems = result.items
+          extractedItems = deduplicateItems([...extractedItems, ...result.items])
+          aiCategory = result.documentCategory
+          aiTranscription = result.transcription
+          aiInputTruncated = result.inputTruncated
+          aiAssistedSucceeded = true
         } catch (error) {
           console.error(
             `AI-assisted extraction failed for ${document.file_name}.`,
@@ -181,7 +241,28 @@ export async function processDocument(
       }
     }
 
+    if (!parsedDocument.rawText.trim() && aiTranscription) {
+      parsedDocument = {
+        ...parsedDocument,
+        rawText: aiTranscription,
+        chunks: createOcrChunks({
+          documentId: document.id,
+          userId: document.user_id,
+          text: aiTranscription,
+          source: document.file_type === 'pdf' ? 'pdf' : 'image',
+        }),
+      }
+    }
+
     const candidates = mergeCandidates(deterministicCandidates, aiCandidates)
+
+    if (aiInputTruncated) {
+      aiWarnings.push({
+        code: 'ai_input_truncated',
+        message:
+          'AI-assisted extraction inspected the first 120,000 characters. Deterministic parsing still inspected the complete file.',
+      })
+    }
 
     if (
       parsedDocument.chunks.length === 0 &&
@@ -225,11 +306,25 @@ export async function processDocument(
     })
 
     const financialReviewStatus =
-      candidates.length > 0
+      candidates.length > 0 || extractedItems.length > 0
         ? 'pending'
         : document.financial_review_status === 'pending'
           ? 'not_required'
           : document.financial_review_status
+
+    const previousCategorySource = metadataCategorySource(document.metadata)
+    const automaticCategory =
+      parsedDocument.imageExtraction?.documentCategory ??
+      aiCategory ??
+      classifyDocumentCategory({
+        fileType: document.file_type,
+        fileName: document.file_name,
+        text: parsedDocument.rawText,
+      })
+    const documentCategory =
+      previousCategorySource === 'user'
+        ? normalizeDocumentCategory(document.document_type, document.file_type)
+        : automaticCategory
     const metadata = addExtractionMetadata(
       parsedDocument.metadata,
       {
@@ -237,22 +332,30 @@ export async function processDocument(
         extractionRunId,
         embeddingModel: DOCUMENT_EMBEDDING_MODEL,
         extractionMethod:
-          aiCandidates.length > 0
-            ? deterministicCandidates.length > 0
+          document.file_type === 'image'
+            ? 'ai_assisted'
+            : aiAssistedSucceeded
+            ? deterministicEvidenceAvailable
               ? 'hybrid'
               : 'ai_assisted'
             : 'deterministic',
-        aiAssistedAttempted: shouldAttemptAi,
+        aiAssistedAttempted: shouldAttemptAi || document.file_type === 'image',
         ...(extractedItems.length > 0 ? { extractedItems } : {}),
         ...(aiWarnings.length > 0 ? { extractionWarnings: aiWarnings } : {}),
       }
     )
+    const categorizedMetadata = {
+      ...(metadata as Record<string, unknown>),
+      documentCategorySource:
+        previousCategorySource === 'user' ? 'user' : 'automatic',
+    }
 
     await updateDocumentRecord(document.id, document.user_id, {
       status: 'ready',
       financial_review_status: financialReviewStatus,
+      document_type: documentCategory,
       raw_text: parsedDocument.rawText,
-      metadata,
+      metadata: categorizedMetadata,
       error_message: null,
     })
     await logDocumentIngestion({
@@ -262,7 +365,7 @@ export async function processDocument(
       fileName: document.file_name,
       status: 'ready',
       chunkCount: parsedDocument.chunks.length,
-      metadata,
+      metadata: categorizedMetadata,
       errorMessage: null,
       responseTimeMs: Date.now() - startedAt,
     })

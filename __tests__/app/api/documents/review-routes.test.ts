@@ -1,11 +1,15 @@
 /** @jest-environment node */
 
 import { NextRequest } from 'next/server'
-import { GET as getDocument } from '@/app/api/documents/[documentId]/route'
+import {
+  GET as getDocument,
+  PATCH as updateDocumentCategoryRoute,
+} from '@/app/api/documents/[documentId]/route'
 import { GET as getPreview } from '@/app/api/documents/[documentId]/preview/route'
 import { POST as reprocessDocument } from '@/app/api/documents/[documentId]/reprocess/route'
 import { POST as confirmDocument } from '@/app/api/documents/[documentId]/confirm/route'
 import { PATCH as saveDocumentReview } from '@/app/api/documents/[documentId]/review/route'
+import { POST as promoteItems } from '@/app/api/documents/[documentId]/candidates/from-items/route'
 import { requireAuthenticatedUser } from '@/lib/auth'
 import { requireCompanyAdmin } from '@/lib/companies'
 import {
@@ -14,10 +18,12 @@ import {
 } from '@/lib/documents/review'
 import {
   getAccessibleDocumentById,
+  updateDocumentCategory,
   updateDocumentRecord,
 } from '@/lib/documents/persistence'
 import {
   confirmDocumentExtraction,
+  promoteDocumentItemsToCandidate,
   saveDocumentExtractionReviewDraft,
 } from '@/lib/documents/extraction-review-persistence'
 
@@ -39,6 +45,7 @@ jest.mock('@/lib/documents/review', () => ({
 jest.mock('@/lib/documents/persistence', () => ({
   deleteUserDocument: jest.fn(),
   getAccessibleDocumentById: jest.fn(),
+  updateDocumentCategory: jest.fn(),
   updateDocumentRecord: jest.fn(),
 }))
 
@@ -48,6 +55,7 @@ jest.mock('@/lib/documents/process', () => ({
 
 jest.mock('@/lib/documents/extraction-review-persistence', () => ({
   confirmDocumentExtraction: jest.fn(),
+  promoteDocumentItemsToCandidate: jest.fn(),
   saveDocumentExtractionReviewDraft: jest.fn(),
 }))
 
@@ -56,8 +64,12 @@ const mockRequireCompanyAdmin = jest.mocked(requireCompanyAdmin)
 const mockGetDocumentDetails = jest.mocked(getDocumentDetails)
 const mockGetDocumentPreview = jest.mocked(getDocumentPreview)
 const mockGetAccessibleDocumentById = jest.mocked(getAccessibleDocumentById)
+const mockUpdateDocumentCategory = jest.mocked(updateDocumentCategory)
 const mockUpdateDocumentRecord = jest.mocked(updateDocumentRecord)
 const mockConfirmDocumentExtraction = jest.mocked(confirmDocumentExtraction)
+const mockPromoteDocumentItemsToCandidate = jest.mocked(
+  promoteDocumentItemsToCandidate
+)
 const mockSaveDocumentExtractionReviewDraft = jest.mocked(
   saveDocumentExtractionReviewDraft
 )
@@ -110,6 +122,10 @@ describe('document review routes', () => {
     })
     mockGetAccessibleDocumentById.mockResolvedValue(fullDocument)
     mockUpdateDocumentRecord.mockResolvedValue(summary)
+    mockUpdateDocumentCategory.mockResolvedValue({
+      ...summary,
+      document_type: 'financial_statement',
+    })
     mockSaveDocumentExtractionReviewDraft.mockResolvedValue(true)
   })
 
@@ -262,6 +278,76 @@ describe('document review routes', () => {
           reportingDate: null,
         },
       ],
+    })
+  })
+
+  it('updates a document category through the authenticated edit boundary', async () => {
+    const response = await updateDocumentCategoryRoute(
+      new NextRequest('http://localhost/api/documents/document-1', {
+        method: 'PATCH',
+        body: JSON.stringify({ documentType: 'financial_statement' }),
+        headers: { 'content-type': 'application/json' },
+      }),
+      context
+    )
+
+    expect(response.status).toBe(200)
+    expect(mockUpdateDocumentCategory).toHaveBeenCalledWith({
+      documentId: 'document-1',
+      requesterId: 'user-1',
+      documentType: 'financial_statement',
+    })
+  })
+
+  it('promotes selected Items without accepting a client-calculated total', async () => {
+    mockPromoteDocumentItemsToCandidate.mockResolvedValue({
+      id: 'candidate-promoted',
+      extraction_run_id: 'run-1',
+      original_payload: {},
+      reviewed_payload: null,
+      metric_key: 'monthly_expenses',
+      value: 34.29,
+      currency: 'NZD',
+      reporting_date: '2026-08-31',
+      confidence: 1,
+      evidence: {},
+      warnings: [],
+      decision: 'pending',
+      extractor_version: 'user_item_promotion_v1',
+      reviewer_id: null,
+      reviewed_at: null,
+      created_at: '2026-08-31T00:00:00.000Z',
+      updated_at: '2026-08-31T00:00:00.000Z',
+    })
+
+    const response = await promoteItems(
+      new NextRequest(
+        'http://localhost/api/documents/document-1/candidates/from-items',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            extractionRunId: 'run-1',
+            itemIndexes: [0, 1],
+            metricKey: 'monthly_expenses',
+            currency: 'NZD',
+            reportingDate: '2026-08-31',
+            total: 999999,
+          }),
+          headers: { 'content-type': 'application/json' },
+        }
+      ),
+      context
+    )
+
+    expect(response.status).toBe(201)
+    expect(mockPromoteDocumentItemsToCandidate).toHaveBeenCalledWith({
+      documentId: 'document-1',
+      requesterId: 'user-1',
+      extractionRunId: 'run-1',
+      itemIndexes: [0, 1],
+      metricKey: 'monthly_expenses',
+      currency: 'NZD',
+      reportingDate: '2026-08-31',
     })
   })
 })

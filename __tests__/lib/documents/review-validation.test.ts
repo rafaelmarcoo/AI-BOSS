@@ -1,6 +1,8 @@
 import {
   validateConfirmDocumentPayload,
+  validatePromoteDocumentItemsPayload,
   validateReprocessDocumentPayload,
+  validateUpdateDocumentCategoryPayload,
 } from '@/lib/documents/review-validation'
 
 describe('document review validation', () => {
@@ -172,5 +174,62 @@ describe('document review validation', () => {
     expect(
       validateReprocessDocumentPayload({ extractionMode: 'autonomous' }).success
     ).toBe(false)
+  })
+
+  it('validates controlled document categories', () => {
+    expect(
+      validateUpdateDocumentCategoryPayload({
+        documentType: 'invoice_receipt',
+      })
+    ).toEqual({
+      success: true,
+      data: { documentType: 'invoice_receipt' },
+    })
+    expect(
+      validateUpdateDocumentCategoryPayload({ documentType: 'random' }).success
+    ).toBe(false)
+  })
+
+  it('validates Item promotion without accepting a client total', () => {
+    expect(
+      validatePromoteDocumentItemsPayload({
+        extractionRunId: 'run-1',
+        itemIndexes: [0, 2],
+        metricKey: 'monthly_expenses',
+        currency: 'NZD',
+        reportingDate: '2026-08-31',
+        total: 999999,
+      })
+    ).toEqual({
+      success: true,
+      data: {
+        extractionRunId: 'run-1',
+        itemIndexes: [0, 2],
+        metricKey: 'monthly_expenses',
+        currency: 'NZD',
+        reportingDate: '2026-08-31',
+      },
+    })
+  })
+
+  it('rejects invalid, duplicate, empty and non-monetary Item promotions', () => {
+    const base = {
+      extractionRunId: 'run-1',
+      itemIndexes: [0, 0],
+      metricKey: 'runway_months',
+      currency: 'USD',
+      reportingDate: '2026-02-31',
+    }
+    const result = validatePromoteDocumentItemsPayload(base)
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.details).toMatchObject({
+        itemIndexes: expect.any(String),
+        metricKey: expect.any(String),
+        currency: expect.any(String),
+        reportingDate: expect.any(String),
+      })
+    }
   })
 })

@@ -10,6 +10,10 @@ import {
   Chip,
   CircularProgress,
   Divider,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
   FormControlLabel,
   InputLabel,
@@ -56,6 +60,10 @@ import {
   buildItemMatrix,
   readExtractedItemsWithIndex,
 } from "@/lib/financial-data/item-matrix";
+import {
+  DOCUMENT_CATEGORY_LABELS,
+  normalizeDocumentCategory,
+} from "@/lib/documents/categories";
 
 type CandidateDecision = "pending" | "included" | "excluded";
 
@@ -149,6 +157,37 @@ function warningMessages(candidate: DocumentReviewCandidate) {
   });
 }
 
+function metadataValue(metadata: unknown, key: string) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return undefined;
+  return Reflect.get(metadata, key);
+}
+
+function extractionMethodLabel(metadata: unknown) {
+  const value = metadataValue(metadata, "extractionMethod");
+  if (value === "ai_assisted") return "AI-assisted extraction";
+  if (value === "hybrid") return "Deterministic + AI extraction";
+  return "Deterministic extraction";
+}
+
+function emptyExtractionMessage(metadata: unknown, itemCount: number) {
+  if (itemCount > 0) {
+    return `${itemCount} supporting ${itemCount === 1 ? "item was" : "items were"} extracted. Review Items and create a calculation value when the source supports one.`;
+  }
+  const warnings = metadataValue(metadata, "extractionWarnings");
+  const codes = Array.isArray(warnings)
+    ? warnings.map((warning) =>
+        warning && typeof warning === "object" ? Reflect.get(warning, "code") : null,
+      )
+    : [];
+  if (codes.includes("ai_assisted_unavailable")) {
+    return "AI-assisted extraction is not configured. The original remains stored and previewable.";
+  }
+  if (codes.includes("ai_assisted_failed")) {
+    return "AI-assisted extraction could not read calculation-ready values. The original remains stored and can be reprocessed.";
+  }
+  return "No calculation-ready values were found. The original and any recovered transcription remain available as evidence.";
+}
+
 export function DocumentReviewWorkspace({ documentId }: { documentId: string }) {
   const router = useRouter();
   const [details, setDetails] = useState<DocumentDetailsResponse | null>(null);
@@ -240,6 +279,12 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
   );
   const confirmed = details?.document.financial_review_status === "confirmed";
   const reviewable = details?.extractionRun?.status === "extracted" && !confirmed;
+
+  useEffect(() => {
+    if (details && candidates.length === 0 && itemCount > 0) {
+      setReviewSection("items");
+    }
+  }, [candidates.length, details, itemCount]);
   const summary = useMemo(() => {
     let included = 0;
     let excluded = 0;
@@ -472,6 +517,14 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
           </Typography>
           <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
             <Chip size="small" label={details.document.file_type.toUpperCase()} />
+            <Chip
+              size="small"
+              label={DOCUMENT_CATEGORY_LABELS[
+                normalizeDocumentCategory(details.document.document_type, details.document.file_type)
+              ]}
+              variant="outlined"
+            />
+            <Chip size="small" label={extractionMethodLabel(details.document.metadata)} variant="outlined" />
             <ReviewStatusChip details={details} />
             {details.document.status === "processing" ? <CircularProgress size={20} aria-label="Processing document" /> : null}
           </Stack>
@@ -485,7 +538,7 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
           >
             {reprocessing ? "Starting…" : "Reprocess document"}
           </Button>
-          {["pdf", "text", "docx"].includes(details.document.file_type) ? (
+          {["pdf", "csv", "xlsx", "text", "docx"].includes(details.document.file_type) ? (
             <Button
               variant="text"
               disabled={reprocessing || details.document.status === "processing"}
@@ -604,9 +657,7 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
             <Paper variant="outlined" sx={{ ...panelStyles, textAlign: "center", py: 6 }}>
               <Typography fontWeight={700}>No financial metrics found</Typography>
               <Typography variant="body2" sx={{ mt: 0.75, color: dashboardTokens.textMuted }}>
-                {details.document.file_type === "pdf"
-                  ? "The original remains available as evidence. If this is a scanned PDF, OCR extraction is not available."
-                  : "Try different worksheets or reprocess after checking the file layout."}
+                {emptyExtractionMessage(details.document.metadata, itemCount)}
               </Typography>
             </Paper>
           ) : (
@@ -685,9 +736,12 @@ export function DocumentReviewWorkspace({ documentId }: { documentId: string }) 
           ) : (
             <SupplementaryItemsPanel
               documentId={documentId}
+              extractionRunId={details.extractionRun?.id ?? null}
               metadata={details.document.metadata}
               editable={details.document.access.canSaveDraft}
+              canPromote={reviewable && details.document.access.canSaveDraft}
               onSaved={() => loadDetails(false)}
+              onPromoted={() => setReviewSection("values")}
               onError={setError}
               onNotice={setNotice}
             />
@@ -710,16 +764,22 @@ function metadataCurrency(metadata: unknown): "NZD" | "AUD" {
 
 function SupplementaryItemsPanel({
   documentId,
+  extractionRunId,
   metadata,
   editable,
+  canPromote,
   onSaved,
+  onPromoted,
   onError,
   onNotice,
 }: {
   documentId: string;
+  extractionRunId: string | null;
   metadata: unknown;
   editable: boolean;
+  canPromote: boolean;
   onSaved: () => Promise<void>;
+  onPromoted: () => void;
   onError: (message: string | null) => void;
   onNotice: (message: string | null) => void;
 }) {
@@ -738,6 +798,14 @@ function SupplementaryItemsPanel({
     metadataCurrency(metadata),
   );
   const [savingRow, setSavingRow] = useState<number | "new" | "currency" | null>(null);
+  const [selectedIndexes, setSelectedIndexes] = useState<Set<number>>(new Set());
+  const [promotionOpen, setPromotionOpen] = useState(false);
+  const [promotionMetric, setPromotionMetric] = useState("");
+  const [promotionCurrency, setPromotionCurrency] = useState<"NZD" | "AUD">(
+    metadataCurrency(metadata),
+  );
+  const [promotionDate, setPromotionDate] = useState("");
+  const [promoting, setPromoting] = useState(false);
 
   useEffect(() => {
     setDrafts(Object.fromEntries(matrix.rows.map((row) => [
@@ -750,6 +818,10 @@ function SupplementaryItemsPanel({
       },
     ])));
     setCurrency(metadataCurrency(metadata));
+    setPromotionCurrency(metadataCurrency(metadata));
+    setSelectedIndexes((current) => new Set(
+      [...current].filter((index) => matrix.rows.some((row) => row.index === index)),
+    ));
   }, [matrix.rows, metadata]);
 
   const columns = [...matrix.columns];
@@ -848,11 +920,51 @@ function SupplementaryItemsPanel({
     }
   };
 
+  const selectedRows = matrix.rows.filter((row) => selectedIndexes.has(row.index));
+  const selectedTotal = Math.round(
+    (selectedRows.reduce((total, row) => total + row.value, 0) + Number.EPSILON) * 100,
+  ) / 100;
+
+  const promoteItems = async () => {
+    if (!extractionRunId || selectedRows.length === 0 || !promotionMetric || !promotionDate) {
+      onError("Choose Items, a metric, currency, and reporting date.");
+      return;
+    }
+    setPromoting(true);
+    onError(null);
+    try {
+      await request(
+        `/api/documents/${encodeURIComponent(documentId)}/candidates/from-items`,
+        {
+          extractionRunId,
+          itemIndexes: selectedRows.map((row) => row.index),
+          metricKey: promotionMetric,
+          currency: promotionCurrency,
+          reportingDate: promotionDate,
+        },
+        "POST",
+      );
+      setPromotionOpen(false);
+      setPromotionMetric("");
+      setPromotionDate("");
+      setSelectedIndexes(new Set());
+      await onSaved();
+      onPromoted();
+      onNotice(
+        `Created a pending calculation value of ${promotionCurrency} ${selectedTotal.toLocaleString()}. Review and approve it before calculations can use it.`,
+      );
+    } catch (requestError) {
+      onError(requestError instanceof Error ? requestError.message : "Could not create the calculation value.");
+    } finally {
+      setPromoting(false);
+    }
+  };
+
   return (
     <Paper variant="outlined" sx={panelStyles}>
       <Stack spacing={2}>
         <Alert severity="info">
-          Items are supporting document metadata only. Editing them does not change confirmed observations, dashboards, analysis, forecasts, or scenarios.
+          Items are supporting document metadata only. Select one or more and create a calculation value when the original supports grouping them. Nothing affects calculations until administrator approval.
         </Alert>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="space-between">
           <FormControl size="small" sx={{ minWidth: 150 }} disabled={!editable || savingRow !== null}>
@@ -895,10 +1007,46 @@ function SupplementaryItemsPanel({
             No supplementary items were extracted. You can add rows manually without affecting trusted financial values.
           </Typography>
         ) : (
+          <Stack spacing={1.25}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="space-between" alignItems={{ sm: "center" }}>
+            <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
+              {selectedRows.length === 0
+                ? "Select Items to combine into one reviewed financial value."
+                : `${selectedRows.length} selected · ${currency} ${selectedTotal.toLocaleString()}`}
+            </Typography>
+            <Button
+              variant="contained"
+              disabled={!canPromote || selectedRows.length === 0 || savingRow !== null}
+              onClick={() => {
+                setPromotionCurrency(currency);
+                setPromotionOpen(true);
+              }}
+            >
+              Create calculation value
+            </Button>
+          </Stack>
+          {!canPromote ? (
+            <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
+              Reprocess a confirmed document before creating another calculation value.
+            </Typography>
+          ) : null}
           <TableContainer sx={{ overflowX: "auto" }}>
             <Table size="small" aria-label="Supplementary document items">
               <TableHead>
                 <TableRow>
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      inputProps={{ "aria-label": "Select all supplementary items" }}
+                      disabled={!canPromote}
+                      checked={matrix.rows.length > 0 && selectedIndexes.size === matrix.rows.length}
+                      indeterminate={selectedIndexes.size > 0 && selectedIndexes.size < matrix.rows.length}
+                      onChange={(event) => setSelectedIndexes(
+                        event.target.checked
+                          ? new Set(matrix.rows.map((row) => row.index))
+                          : new Set(),
+                      )}
+                    />
+                  </TableCell>
                   <TableCell sx={{ minWidth: 170 }}>Item</TableCell>
                   <TableCell sx={{ minWidth: 120 }}>Value ({currency})</TableCell>
                   {columns.map((column) => <TableCell key={column} sx={{ minWidth: 140 }}>{column}</TableCell>)}
@@ -910,6 +1058,19 @@ function SupplementaryItemsPanel({
                   const draft = drafts[row.index] ?? { value: String(row.value), attributes: {} };
                   return (
                     <TableRow key={row.index} hover>
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          inputProps={{ "aria-label": `Select ${row.label}` }}
+                          disabled={!canPromote}
+                          checked={selectedIndexes.has(row.index)}
+                          onChange={(event) => setSelectedIndexes((current) => {
+                            const next = new Set(current);
+                            if (event.target.checked) next.add(row.index);
+                            else next.delete(row.index);
+                            return next;
+                          })}
+                        />
+                      </TableCell>
                       <TableCell component="th" scope="row">{row.label}</TableCell>
                       <TableCell>
                         <TextField
@@ -957,6 +1118,7 @@ function SupplementaryItemsPanel({
               </TableBody>
             </Table>
           </TableContainer>
+          </Stack>
         )}
 
         {editable ? (
@@ -984,6 +1146,63 @@ function SupplementaryItemsPanel({
           </>
         ) : null}
       </Stack>
+      <Dialog open={promotionOpen} onClose={() => !promoting && setPromotionOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Create calculation value</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <Alert severity="info">
+              AI-BOSS will add the {selectedRows.length} stored Item values and create one pending review candidate. The total cannot be edited in this dialog.
+            </Alert>
+            <TextField
+              label="Calculated total"
+              value={`${promotionCurrency} ${selectedTotal.toLocaleString()}`}
+              disabled
+            />
+            <FormControl fullWidth>
+              <InputLabel id="promotion-metric-label">Financial metric</InputLabel>
+              <Select
+                labelId="promotion-metric-label"
+                label="Financial metric"
+                value={promotionMetric}
+                onChange={(event) => setPromotionMetric(event.target.value)}
+              >
+                {FINANCIAL_METRIC_KEYS.filter((key) => key !== "runway_months").map((key) => (
+                  <MenuItem key={key} value={key}>{FINANCIAL_METRIC_LABELS[key]}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel id="promotion-currency-label">Currency</InputLabel>
+              <Select
+                labelId="promotion-currency-label"
+                label="Currency"
+                value={promotionCurrency}
+                onChange={(event) => setPromotionCurrency(event.target.value as "NZD" | "AUD")}
+              >
+                <MenuItem value="NZD">NZD</MenuItem>
+                <MenuItem value="AUD">AUD</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField
+              label="Reporting date"
+              type="date"
+              value={promotionDate}
+              onChange={(event) => setPromotionDate(event.target.value)}
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={promoting} onClick={() => setPromotionOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            disabled={promoting || !promotionMetric || !promotionDate}
+            onClick={() => void promoteItems()}
+          >
+            {promoting ? "Creating…" : "Create pending value"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Paper>
   );
 }

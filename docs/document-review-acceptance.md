@@ -48,7 +48,7 @@ Prepare files that contain no real customer data:
 1. Upload one valid file from the landing page. Confirm the page stays in place, displays processing, and offers **Review extracted data**.
 2. Upload another valid file from chat. Confirm chat stays open, the document list polls, and the review link appears after extraction.
 3. Verify CSV, XLSX, and PDF are accepted; empty, oversized, corrupt, password-protected, legacy `.xls`, and unsupported files show understandable errors.
-4. Verify failed and scanned originals remain listed and previewable/deletable. A scanned PDF must state that OCR/extraction is unavailable.
+4. Verify failed and scanned originals remain listed and previewable/deletable. With OpenAI configured, a scanned PDF should show recovered transcription, Items or candidates. Without configuration, it must state that AI-assisted extraction is unavailable while retaining the original.
 
 ### Preview and worksheet selection
 

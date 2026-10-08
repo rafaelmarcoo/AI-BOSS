@@ -5,8 +5,8 @@ import {
 
 describe('runway formatting', () => {
   it.each([
-    [4.7, '4 months, 21 days'],
-    [1, '1 month'],
+    [4.7, '4 months 21 days (141 days)'],
+    [1, '1 month (30 days)'],
     [0.5, '15 days'],
     [0, '0 days'],
   ])('formats %s months as %s', (value, expected) => {
@@ -14,7 +14,7 @@ describe('runway formatting', () => {
   })
 
   it('formats signed changes without rounding to whole months', () => {
-    expect(formatRunwayChange(1.2)).toBe('+1 month, 6 days')
+    expect(formatRunwayChange(1.2)).toBe('+1 month 6 days (36 days)')
     expect(formatRunwayChange(-0.5)).toBe('-15 days')
   })
 

@@ -32,7 +32,29 @@ The compatibility field `runway_months` contains the primary cash-runway value.
 | `runway_months` | Primary cash runway in months (2 decimal places) |
 | `cash_runway_months` | Explicit primary cash-runway value |
 | `working_capital_adjusted_runway_months` | Secondary runway after adding receivables and subtracting payables |
-| `calculation_breakdown` | Inputs plus both deterministic formula strings |
+| `cash_runway_days` | Primary cash runway in whole days, for display |
+| `working_capital_adjusted_runway_days` | Adjusted runway in whole days, for display |
+| `calculation_breakdown` | Inputs plus both deterministic formula strings, including the day conversion |
+
+### Displaying runway in days
+
+Runway is calculated and stored in months, because burn is a monthly rate. A
+figure such as "9.09 months" is hard to read, so wherever a person reads a
+runway it is shown as whole days with the month figure alongside:
+`272 days (≈9.1 months)`. The single formatter is `formatRunway` in
+`lib/calculations/runway-display.ts`.
+
+- **30 days per month**, the 30/360 day-count convention used in finance. At
+  that rate the policy thresholds convert exactly: under 3 months is under
+  90 days, under 6 months is under 180 days.
+- **Rounded down.** Cash that runs out part-way through a day has not covered
+  it, so the day count never overstates runway.
+- **Derived from the stored two-decimal month value**, so the chat, history,
+  forecast and charts all show the same day count for the same data.
+- **Only runway durations convert.** Monthly rates (burn, revenue) and calendar
+  periods (a 6-month forecast, a scenario horizon) stay in months.
+
+The stored metric key remains `runway_months`, and no database value changes.
 
 ---
 
@@ -82,6 +104,26 @@ It never places both currencies into one calculation or converts between them.
 Users can filter chart data by supported currency and source/statement, and can
 show the latest 12, 25, 50, or all retrieved records. Each filtered series keeps
 its own reporting period, source labels, trend, and latest recorded value.
+
+## Financial Ratios
+
+AI-BOSS calculates four ratios with deterministic code rather than asking the
+language model to perform arithmetic:
+
+| Ratio | Formula | Required confirmed observations |
+|-------|---------|----------------------------------|
+| Gross margin | `(revenue - cost of sales) / revenue x 100` | `monthly_revenue`, `cost_of_sales` |
+| Operating margin | `operating profit / revenue x 100` | `operating_profit`, `monthly_revenue` |
+| Current ratio | `current assets / current liabilities` | `current_assets`, `current_liabilities` |
+| Debt-to-equity | `total debt / total equity` | `total_debt`, `total_equity` |
+
+Inputs must be user-confirmed observations from the same authorised source,
+currency, and reporting date. Ratios are unavailable when an input is missing,
+when revenue is zero or negative, or when liabilities or equity are zero or
+negative. Negative asset, cost-of-sales, and debt inputs are also rejected.
+The result includes the formula, source evidence, missing or invalid inputs,
+and a limitation that benchmark interpretation depends on the business sector.
+The model may explain these facts but cannot replace or modify the calculation.
 
 ## Financial Forecasting
 

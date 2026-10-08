@@ -2,13 +2,13 @@
 
 **Database:** Supabase (PostgreSQL)  
 **Created:** March 22, 2025  
-**Last Updated:** September 29, 2026
+**Last Updated:** October 8, 2026
 
 ---
 
 ## Overview
 
-The database now consists of 17 main tables:
+The database's main application tables include:
 - **companies** - Company identities used as shared-data access boundaries
 - **company_join_codes** - Server-only daily credentials for employee signup
 - **users** - User profiles (extends Supabase Auth)
@@ -26,6 +26,8 @@ The database now consists of 17 main tables:
 - **financial_metric_observations** - Source-aware normalized financial metric values
 - **scenarios** - Saved private or company-visible scenario assumptions and latest deterministic results
 - **user_gen_ui_preferences** - Per-user Gen UI role, focus, detail, horizon, and history-consent settings
+- **analysed_companies** - User-private uploads and shared reference companies for annual-statement analysis
+- **company_statement_lines** - Annual statement lines kept separate from the user's trusted business metrics
 
 ---
 
@@ -109,6 +111,7 @@ Stores chat threads so each user can keep a real message history.
 | company_id | UUID (FK) | References companies(id); company access boundary |
 | title | TEXT | Optional conversation title |
 | visibility | TEXT | `private`, `company` (default), or `admins` |
+| selected_model | TEXT | Nullable server-validated model catalogue key restored when the conversation reopens |
 | created_at | TIMESTAMP | Conversation creation time |
 | updated_at | TIMESTAMP | Last message/update time |
 
@@ -487,7 +490,7 @@ are published only from included candidates through `confirm_document_extraction
 | company_id | UUID (FK) | Company authorization and calculation boundary; nullable only for legacy rows that could not be mapped |
 | connection_id | UUID (FK) | Optional source connection from data_connections |
 | document_id | UUID (FK) | Optional uploaded document source |
-| metric_key | TEXT | Canonical key: `cash`, `accounts_receivable`, `accounts_payable`, `monthly_revenue`, `monthly_expenses`, `burn_rate`, or `runway_months` |
+| metric_key | TEXT | Canonical key: `cash`, `accounts_receivable`, `accounts_payable`, `monthly_revenue`, `monthly_expenses`, `burn_rate`, `runway_months`, `cost_of_sales`, `operating_profit`, `current_assets`, `current_liabilities`, `total_debt`, or `total_equity` |
 | value | NUMERIC(18,4) | Normalized metric value |
 | currency | TEXT | `NZD` or `AUD` for monetary metrics; `NULL` for unit-based `runway_months` |
 | period_start | DATE | Optional period start for period-based metrics |
@@ -871,6 +874,62 @@ the final one-default-per-user guard.
 
 ---
 
+### 23. analysed_companies
+
+Stores companies whose annual statements are analysed independently from the
+signed-in user's operating metrics. Uploaded rows have an owner in `user_id`;
+bundled case studies use `user_id = NULL` and are loaded only by the explicit
+service-role demo loader.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID (PK) | Analysed-company identifier |
+| user_id | UUID (FK) | Upload owner, or `NULL` for a shared reference case study |
+| name | TEXT | Owner-scoped or shared unique display name |
+| industry | TEXT | Optional industry context |
+| peer_group | TEXT | Optional deterministic peer grouping |
+| currency | TEXT | Statement currency or fictional case-study currency |
+| amounts_in | TEXT | `units`, `thousands`, or `millions` |
+| description | TEXT | Optional context |
+| source | TEXT | Visible statement or upload provenance |
+| created_at | TIMESTAMP | Creation time |
+| updated_at | TIMESTAMP | Last update time |
+
+**RLS and separation:**
+- Authenticated users can read shared case studies and only their own uploads.
+- Users can create, update, and delete only their own rows; shared rows are
+  writable only through the service-role loader.
+- These records are never copied to `financial_metric_observations`, so they
+  cannot affect runway, dashboards, user analysis, or scenarios.
+- Company-analysis tools can see user-private uploads only in private chats.
+
+---
+
+### 24. company_statement_lines
+
+Stores deterministic annual-statement lines for `analysed_companies`, including
+the fiscal year, canonical line key, optional revenue segment, value, and source
+page. Values support company analysis and comparisons only.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID (PK) | Statement-line identifier |
+| company_id | UUID (FK) | Parent analysed company; cascades on deletion |
+| fiscal_year_end | DATE | Annual reporting date |
+| line_key | TEXT | Validated income-statement, balance-sheet, or segment key |
+| segment | TEXT | Required only for segment revenue/direct-cost lines |
+| value | NUMERIC(18,4) | Stored statement amount |
+| source_page | INTEGER | Optional source page |
+| created_at | TIMESTAMP | Creation time |
+| updated_at | TIMESTAMP | Last update time |
+
+**RLS and integrity:**
+- A user can read lines only when the parent company is shared or user-owned.
+- A user can change lines only for a parent company they own.
+- `(company_id, fiscal_year_end, line_key, segment)` is unique.
+
+---
+
 ## Relationships
 ```
 users (1) ──< (many) conversations
@@ -918,6 +977,8 @@ users (1) ──< (many) financial_analysis_runs
 financial_analysis_runs (1) ──< (many) financial_decision_tests
 users (1) ──< (many) financial_decision_tests
 users (1) ──< (many) user_dashboard_layouts
+users (1) ──< (many) analysed_companies
+analysed_companies (1) ──< (many) company_statement_lines
 ```
 
 ---
@@ -954,6 +1015,9 @@ All schema changes are tracked in `db/migrations/`:
 - `027_stage6_customer_and_revenue_dimensions.sql` - Adds canonical customers, signed revenue entries, typed dimensions, RLS, and provider-safe deduplication for Stage 6 analytics
 - `028_stage7_dashboard_layouts.sql` - Adds versioned user-owned manual dashboard layouts, one-default enforcement, and RLS
 - `029_extended_documents_and_providers.sql` - Adds TXT/DOCX document types, retains MYOB, adds Zoho Books and FreeAgent, and synchronises provider/source constraints across trusted and detailed financial tables
+- `030_financial_ratio_metrics.sql` - Adds six confirmed ratio inputs while preserving company-scoped administrator confirmation and NZD/AUD validation
+- `031_analysed_companies.sql` - Adds user-private/shared analysed companies and annual statement lines with RLS, separate from trusted business metrics
+- `032_conversation_model_selection.sql` - Adds nullable per-conversation model selection with safe application fallback for unknown legacy values
 
 ---
 
@@ -1008,4 +1072,4 @@ Planned for Sprint 2+:
 
 ---
 
-**Last Updated:** September 22, 2026 by Rafael Manubay
+**Last Updated:** October 8, 2026 by Rafael Manubay

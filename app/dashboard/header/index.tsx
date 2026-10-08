@@ -13,6 +13,7 @@ const navigation = [
   { label: "Scenarios", href: "/dashboard/scenarios" },
   { label: "Connections", href: "/dashboard/data-connectors" },
   { label: "Documents", href: "/dashboard/documents" },
+  { label: "Companies", href: "/dashboard/companies" },
   { label: "Settings", href: "/dashboard/settings" },
 ];
 

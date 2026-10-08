@@ -17,6 +17,7 @@ import {
   YAxis,
 } from "recharts";
 import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
+import { formatRunway } from "@/lib/calculations/runway-display";
 import {
   formatFinancialCurrency,
   isSupportedFinancialCurrency,
@@ -180,7 +181,7 @@ export function MetricTrendChartWidgetView({
     : widget.data.points;
   const formatValue = (value: number) =>
     isRunway
-      ? `${value.toFixed(1)} mo`
+      ? formatRunway(value)
       : isSupportedFinancialCurrency(widget.data.currency)
         ? formatFinancialCurrency(value, widget.data.currency)
         : "Currency not provided";
@@ -188,7 +189,7 @@ export function MetricTrendChartWidgetView({
   return (
     <WidgetFrame title={widget.title} reason={widget.reason}>
       <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-        <Chip label={isRunway ? "Unit: months" : `Currency: ${widget.data.currency}`} size="small" sx={chartContextChipSx} />
+        <Chip label={isRunway ? "Source unit: months · labels include days" : `Currency: ${widget.data.currency}`} size="small" sx={chartContextChipSx} />
         <Chip label={`Reporting period: ${formatPeriod(widget.data.points)}`} size="small" sx={chartContextChipSx} />
         <Chip label={`Observations: ${widget.data.points.length}`} size="small" sx={chartContextChipSx} />
       </Stack>
@@ -262,7 +263,7 @@ export function MetricForecastChartWidgetView({
   const runwaySeries = isRunway ? (widget.data.runwaySeries ?? []) : [];
   const formatValue = (value: number) =>
     isRunway
-      ? `${value.toFixed(1)} mo`
+      ? formatRunway(value)
       : isSupportedFinancialCurrency(widget.data.currency)
         ? formatFinancialCurrency(value, widget.data.currency)
         : "Currency not provided";
@@ -299,7 +300,7 @@ export function MetricForecastChartWidgetView({
   return (
     <WidgetFrame title={widget.title} reason={widget.reason}>
       <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-        <Chip label={isRunway ? "Unit: months" : `Currency: ${widget.data.currency}`} size="small" sx={chartContextChipSx} />
+        <Chip label={isRunway ? "Source unit: months · labels include days" : `Currency: ${widget.data.currency}`} size="small" sx={chartContextChipSx} />
         <Chip label={`Historical period: ${formatPeriod(widget.data.actualPoints)}`} size="small" sx={chartContextChipSx} />
         <Chip label={`Forecast period: Next ${widget.data.horizon} months`} size="small" sx={chartContextChipSx} />
       </Stack>

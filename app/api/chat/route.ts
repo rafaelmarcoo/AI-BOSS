@@ -16,7 +16,8 @@ export async function POST(request: NextRequest) {
       user.id,
       payload.messages,
       payload.conversationId,
-      payload.visibility
+      payload.visibility,
+      payload.model
     )
 
     return successResponse({

@@ -4,9 +4,11 @@ import { convertMessagesToResponsesInput } from '@langchain/openai'
 import {
   buildAgentMessages,
   createAssistantHistoryMessage,
+  mergeSystemMessages,
   preserveFinancialCurrencyCoverage,
   readModelMessageText,
   requiresUnavailableAdjustedRunwayCorrection,
+  toChatCompletionsHistory,
   toolInputRepairResult,
 } from '@/lib/ai/agent'
 
@@ -51,6 +53,26 @@ describe('createAssistantHistoryMessage', () => {
   })
 })
 
+describe('toChatCompletionsHistory', () => {
+  it('flattens Responses-shaped replies to plain text for other providers', () => {
+    const [flattened] = toChatCompletionsHistory([
+      createAssistantHistoryMessage('Earlier answer'),
+    ])
+
+    expect(flattened.content).toBe('Earlier answer')
+  })
+
+  it('leaves user messages and plain-text replies untouched', () => {
+    const user = new HumanMessage('Question')
+    const plainReply = new AIMessage('Plain answer')
+
+    expect(toChatCompletionsHistory([user, plainReply])).toEqual([
+      user,
+      plainReply,
+    ])
+  })
+})
+
 describe('buildAgentMessages', () => {
   it('places supplied context after the system prompt and before chat history', () => {
     const messages = buildAgentMessages({
@@ -71,6 +93,38 @@ describe('buildAgentMessages', () => {
     ])
     expect(messages[1].content).toBe('structured metrics context')
     expect(messages[4].content).toBe('What is my runway?')
+  })
+})
+
+describe('mergeSystemMessages', () => {
+  it('folds every system message into one leading message, keeping order', () => {
+    const merged = mergeSystemMessages(
+      buildAgentMessages({
+        input: 'What is my runway?',
+        systemPrompt: 'base prompt',
+        contextMessages: [
+          new SystemMessage('metrics context'),
+          new SystemMessage('document context'),
+        ],
+        chatHistory: [new HumanMessage('Earlier'), new AIMessage('Answer')],
+      })
+    )
+
+    expect(merged.map((message) => message._getType())).toEqual([
+      'system',
+      'human',
+      'ai',
+      'human',
+    ])
+    expect(merged[0].content).toBe(
+      'base prompt\n\nmetrics context\n\ndocument context'
+    )
+  })
+
+  it('leaves a conversation without system messages untouched', () => {
+    const conversation = [new HumanMessage('Hello')]
+
+    expect(mergeSystemMessages(conversation)).toEqual(conversation)
   })
 })
 
@@ -128,6 +182,34 @@ describe('requiresUnavailableAdjustedRunwayCorrection', () => {
       requiresUnavailableAdjustedRunwayCorrection({
         response: 'Working-capital-adjusted runway: 6.12 months.',
         evidence: ['Working-capital-adjusted runway status: AVAILABLE.'],
+      })
+    ).toBe(false)
+  })
+  it.each([
+    'Working-capital-adjusted runway: 183 days (≈6.1 months).',
+    'Working-capital-adjusted runway is **183 days**.',
+    'Working-capital-adjusted runway:\n`(NZD 100,000 + NZD 18,000 - NZD 14,000) / NZD 17,000 × 30 = 183 days`',
+  ])('rejects a leaked adjusted runway stated in days: %p', (response) => {
+    expect(
+      requiresUnavailableAdjustedRunwayCorrection({ response, evidence })
+    ).toBe(true)
+  })
+
+  it('rejects a leaked negative adjusted runway', () => {
+    expect(
+      requiresUnavailableAdjustedRunwayCorrection({
+        response: 'Working-capital-adjusted runway: -45 days.',
+        evidence,
+      })
+    ).toBe(true)
+  })
+
+  it('still allows the cash runway in days alongside a symbolic adjusted formula', () => {
+    expect(
+      requiresUnavailableAdjustedRunwayCorrection({
+        response:
+          'Cash runway: 176 days (≈5.9 months).\n\nWorking-capital-adjusted runway is unavailable. Formula: `(cash + accounts receivable - accounts payable) / monthly burn`.',
+        evidence,
       })
     ).toBe(false)
   })

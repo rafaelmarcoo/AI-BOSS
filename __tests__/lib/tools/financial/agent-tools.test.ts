@@ -195,6 +195,19 @@ describe('financial agent tools', () => {
     expect(result).toMatchObject({ status: 'needs_input', field: 'source_currency' })
   })
 
+  it('model_scenario accepts the file name the user chose from the listed sources', async () => {
+    mockListScenarioBaselineOptions.mockResolvedValue([
+      { sourceKey: 'document:nzd', sourceLabel: 'nzd.csv', sourceType: 'document', currency: 'NZD', availableMetrics: ['cash'], latestReportingDate: '2026-05-31', cashObservationCount: 3, metrics: {} },
+      { sourceKey: 'document:aud', sourceLabel: 'aud.csv', sourceType: 'document', currency: 'AUD', availableMetrics: ['cash'], latestReportingDate: '2026-05-31', cashObservationCount: 3, metrics: {} },
+    ])
+    mockAnalyseScenario.mockResolvedValue({ sourceLabel: 'nzd.csv' } as never)
+
+    const result = await createModelScenarioTool('user-123').handler({ ...scenarioInput, sourceKey: 'NZD.csv' })
+
+    expect(result.status).toBe('ready')
+    expect(mockAnalyseScenario).toHaveBeenCalledWith('user-123', expect.objectContaining({ sourceKey: 'document:nzd' }))
+  })
+
   it('models a removed recurring employee cost as a saving for a firing scenario', async () => {
     mockListScenarioBaselineOptions.mockResolvedValue([{
       sourceKey: 'document:doc-1', sourceLabel: 'demo.csv', sourceType: 'document',

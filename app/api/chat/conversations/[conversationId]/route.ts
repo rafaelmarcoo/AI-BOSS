@@ -7,9 +7,16 @@ import {
   listConversationMessages,
   mapConversationMessagesToPayload,
   renameConversation,
+  updateConversationModel,
   updateConversationVisibility,
 } from '@/lib/chat/persistence'
 import { ApiError } from '@/lib/api/errors'
+import {
+  assertModelAvailable,
+  DEFAULT_MODEL,
+  isModelName,
+  parseStoredModel,
+} from '@/lib/ai/models'
 
 interface RouteContext {
   params: Promise<{
@@ -28,6 +35,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       conversationId,
       conversation: mapConversationMessagesToPayload(messages),
       visibility: conversation.visibility,
+      selectedModel: parseStoredModel(conversation.selected_model) ?? null,
       isOwner: conversation.user_id === user.id,
     })
   } catch (error) {
@@ -42,6 +50,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const body = (await request.json()) as {
       title?: unknown
       visibility?: unknown
+      selectedModel?: unknown
     }
 
     if (
@@ -69,11 +78,23 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       )
     }
 
-    if (body.title === undefined && body.visibility === undefined) {
+    if (
+      body.selectedModel !== undefined &&
+      body.selectedModel !== null &&
+      (typeof body.selectedModel !== 'string' || !isModelName(body.selectedModel))
+    ) {
+      throw new ApiError(400, 'BAD_REQUEST', 'selectedModel must be a known model name or null.')
+    }
+
+    if (
+      body.title === undefined &&
+      body.visibility === undefined &&
+      body.selectedModel === undefined
+    ) {
       throw new ApiError(
         400,
         'BAD_REQUEST',
-        'Provide a title or visibility to update.'
+        'Provide a title, visibility, or selected model to update.'
       )
     }
 
@@ -114,6 +135,18 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       )
     }
 
+    if (
+      body.selectedModel === null ||
+      (typeof body.selectedModel === 'string' && isModelName(body.selectedModel))
+    ) {
+      assertModelAvailable(body.selectedModel ?? DEFAULT_MODEL)
+      conversation = await updateConversationModel(
+        conversationId,
+        user.id,
+        body.selectedModel
+      )
+    }
+
     if (!conversation) {
       throw new ApiError(400, 'BAD_REQUEST', 'No conversation update was provided.')
     }
@@ -125,6 +158,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         created_at: conversation.created_at,
         updated_at: conversation.updated_at,
         visibility: conversation.visibility,
+        selectedModel: parseStoredModel(conversation.selected_model) ?? null,
         isOwner: true,
       },
     })

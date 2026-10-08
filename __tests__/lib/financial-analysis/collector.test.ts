@@ -41,6 +41,12 @@ const currentRows = [
   observation({ id: 'revenue-current', metricKey: 'monthly_revenue', value: 60000, date: '2026-06-30' }),
   observation({ id: 'expenses-current', metricKey: 'monthly_expenses', value: 70000, date: '2026-06-30' }),
   observation({ id: 'burn-current', metricKey: 'burn_rate', value: 17000, date: '2026-06-30' }),
+  observation({ id: 'cos-current', metricKey: 'cost_of_sales', value: 24000, date: '2026-06-30' }),
+  observation({ id: 'profit-current', metricKey: 'operating_profit', value: 12000, date: '2026-06-30' }),
+  observation({ id: 'current-assets', metricKey: 'current_assets', value: 90000, date: '2026-06-30' }),
+  observation({ id: 'current-liabilities', metricKey: 'current_liabilities', value: 60000, date: '2026-06-30' }),
+  observation({ id: 'total-debt', metricKey: 'total_debt', value: 50000, date: '2026-06-30' }),
+  observation({ id: 'total-equity', metricKey: 'total_equity', value: 100000, date: '2026-06-30' }),
 ]
 
 describe('financial analysis collector', () => {
@@ -104,7 +110,9 @@ describe('financial analysis collector', () => {
     expect(collection.readiness.status).toBe('ready')
     expect(collection.facts.runway).toMatchObject({
       cashRunwayMonths: 5,
+      cashRunwayDays: 150,
       workingCapitalAdjustedRunwayMonths: 5.12,
+      workingCapitalAdjustedRunwayDays: 153,
     })
     expect(collection.facts.operatingBalance).toMatchObject({
       operatingBalance: -10000,
@@ -115,6 +123,12 @@ describe('financial analysis collector', () => {
     expect(collection.facts.forecasts.find((fact) => fact.metricKey === 'cash')?.values)
       .toHaveLength(6)
     expect(collection.facts.periodComparisons).toHaveLength(8)
+    expect(collection.facts.ratios.calculated).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'gross_margin', value: 60 }),
+      expect.objectContaining({ key: 'operating_margin', value: 20 }),
+      expect.objectContaining({ key: 'current_ratio', value: 1.5 }),
+      expect.objectContaining({ key: 'debt_to_equity', value: 0.5 }),
+    ]))
     expect(collection.evidence.some((item) => item.value === 999999)).toBe(false)
     expect(collection.evidence.some((item) => item.value === 777777)).toBe(false)
     expect(collection.evidence.some((item) => item.metricKey === 'runway_months')).toBe(false)
@@ -155,6 +169,25 @@ describe('financial analysis collector', () => {
     expect(collection.readiness.reasons.join(' ')).toContain(
       'Cash and monthly burn must share one reporting date'
     )
+  })
+
+  it('does not calculate a ratio across reporting dates', () => {
+    const observations = currentRows.map((row) =>
+      row.metric_key === 'current_liabilities'
+        ? { ...row, as_of_date: '2026-05-31' }
+        : row
+    )
+    const collection = collectFinancialAnalysisFromObservations({
+      request: { sourceKey: 'document:document-1', currency: 'NZD' },
+      observations,
+    })
+
+    expect(collection.facts.ratios.calculated.some(
+      (ratio) => ratio.key === 'current_ratio'
+    )).toBe(false)
+    expect(collection.sections.find(
+      (section) => section.sectionId === 'financial_ratios'
+    )?.status).toBe('limited')
   })
 
   it('keeps cash runway but marks the section limited when adjusted inputs are incomplete', () => {

@@ -12,7 +12,7 @@ import type { GenUiPlan } from '@/lib/gen-ui/types'
 import { getUserCompany } from '@/lib/companies'
 
 const CONVERSATION_COLUMNS =
-  'id, user_id, company_id, visibility, title, created_at, updated_at'
+  'id, user_id, company_id, visibility, title, selected_model, created_at, updated_at'
 
 export interface ConversationPayloadMessage extends ChatMessagePayload {
   ui: GenUiPlan | null
@@ -22,7 +22,8 @@ export async function getOrCreateConversation(
   userId: string,
   conversationId: string | undefined,
   firstUserMessage: string,
-  visibility: ConversationVisibility = 'company'
+  visibility: ConversationVisibility = 'company',
+  selectedModel?: string | null
 ) {
   const supabase = createAdminSupabaseClient()
   const company = await getUserCompany(userId)
@@ -48,7 +49,26 @@ export async function getOrCreateConversation(
       throw new ApiError(404, 'NOT_FOUND', 'Conversation not found.')
     }
 
-    return data as Conversation
+    const conversation = data as Conversation
+
+    if (selectedModel === undefined || conversation.selected_model === selectedModel) {
+      return conversation
+    }
+
+    const { data: updated, error: updateError } = await supabase
+      .from('conversations')
+      .update({ selected_model: selectedModel })
+      .eq('id', conversationId)
+      .eq('user_id', userId)
+      .eq('company_id', company.id)
+      .select(CONVERSATION_COLUMNS)
+      .single()
+
+    if (updateError || !updated) {
+      throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to save the selected model.')
+    }
+
+    return updated as Conversation
   }
 
   const { data, error } = await supabase
@@ -58,6 +78,7 @@ export async function getOrCreateConversation(
       company_id: company.id,
       visibility,
       title: createConversationTitle(firstUserMessage),
+      selected_model: selectedModel ?? null,
     })
     .select(CONVERSATION_COLUMNS)
     .single()
@@ -283,6 +304,32 @@ export async function updateConversationVisibility(
     .from('conversations')
     .update({
       visibility,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', conversationId)
+    .eq('user_id', userId)
+    .eq('company_id', company.id)
+    .select(CONVERSATION_COLUMNS)
+    .single()
+
+  if (error || !data) {
+    throw new ApiError(404, 'NOT_FOUND', 'Conversation not found.')
+  }
+
+  return data as Conversation
+}
+
+export async function updateConversationModel(
+  conversationId: string,
+  userId: string,
+  selectedModel: string | null
+) {
+  const supabase = createAdminSupabaseClient()
+  const company = await getUserCompany(userId)
+  const { data, error } = await supabase
+    .from('conversations')
+    .update({
+      selected_model: selectedModel,
       updated_at: new Date().toISOString(),
     })
     .eq('id', conversationId)

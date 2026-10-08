@@ -7,6 +7,7 @@ import {
   summarizeMetricAvailability,
   type FinancialMetricSet,
 } from '@/lib/financial-data'
+import { FINANCIAL_METRIC_KEYS } from '@/lib/financial-data/metric-keys'
 
 function createMetric(
   key: 'cash' | 'accounts_receivable' | 'accounts_payable' | 'burn_rate',
@@ -55,15 +56,7 @@ describe('financial data read service helpers', () => {
       sourceLabel: null,
       updatedAt: null,
     })
-    expect(Object.keys(metrics)).toEqual([
-      'cash',
-      'accounts_receivable',
-      'accounts_payable',
-      'monthly_revenue',
-      'monthly_expenses',
-      'burn_rate',
-      'runway_months',
-    ])
+    expect(Object.keys(metrics)).toEqual([...FINANCIAL_METRIC_KEYS])
   })
 
   it('summarizes available and unavailable metric counts', () => {
@@ -74,7 +67,7 @@ describe('financial data read service helpers', () => {
 
     expect(summarizeMetricAvailability(metrics)).toEqual({
       availableMetricCount: 2,
-      unavailableMetricCount: 5,
+      unavailableMetricCount: FINANCIAL_METRIC_KEYS.length - 2,
     })
   })
 
@@ -204,7 +197,7 @@ describe('financial data read service helpers', () => {
       provenance: {
         sourceLabel: 'summary.csv (cash runway calculated)',
         evidence: {
-          excerpt: '80000 / 17000 = 4.71 months',
+          excerpt: '80000 / 17000 = 4.71 months × 30 = 141 days = 4 months 21 days',
         },
       },
     })
@@ -224,7 +217,7 @@ describe('financial data read service helpers', () => {
         sourceLabel:
           'summary.csv (working-capital-adjusted runway calculated)',
         evidence: {
-          excerpt: '(80000 + 16000 - 14000) / 17000 = 4.82 months',
+          excerpt: '(80000 + 16000 - 14000) / 17000 = 4.82 months × 30 = 144 days = 4 months 24 days',
         },
       },
     })

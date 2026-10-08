@@ -1,6 +1,6 @@
 import {
   FINANCIAL_ANALYSIS_COMPARISON_METRIC_KEYS,
-  FINANCIAL_ANALYSIS_SECTION_IDS,
+  FINANCIAL_ANALYSIS_LEGACY_SECTION_IDS,
   FinancialAnalysisResultSchema,
   FinancialDecisionTestResultSchema,
   PersistedFinancialAnalysisResultSchema,
@@ -39,7 +39,7 @@ describe('financial analysis domain schemas', () => {
         historicalObservationCount: 2,
         reasons: [],
       },
-      sections: FINANCIAL_ANALYSIS_SECTION_IDS.map((sectionId) => ({
+      sections: FINANCIAL_ANALYSIS_LEGACY_SECTION_IDS.map((sectionId) => ({
         sectionId,
         status: 'available',
         reason: null,
@@ -66,9 +66,28 @@ describe('financial analysis domain schemas', () => {
     })
 
     const result = normalizeFinancialAnalysisResult(legacyResult)
-    expect(result.version).toBe('financial-analysis-v2')
+    expect(result.version).toBe('financial-analysis-v3')
     expect(result.selectedBaseline.mode).toBe('single')
     expect(result.facts.periodComparisons).toHaveLength(8)
+    expect(result.facts.ratios.limitations[0]).toContain('legacy report')
+
+    const v2Result = PersistedFinancialAnalysisResultSchema.parse({
+      ...result,
+      version: 'financial-analysis-v2',
+      sections: result.sections.filter(
+        (section) => section.sectionId !== 'financial_ratios'
+      ),
+      facts: {
+        operatingBalance: result.facts.operatingBalance,
+        receivablesPayables: result.facts.receivablesPayables,
+        runway: null,
+        history: result.facts.history,
+        forecasts: result.facts.forecasts,
+        periodComparisons: result.facts.periodComparisons,
+      },
+    })
+    expect(normalizeFinancialAnalysisResult(v2Result).version)
+      .toBe('financial-analysis-v3')
   })
 
   it('accepts the current report shape and requires every comparison metric', () => {
@@ -89,7 +108,7 @@ describe('financial analysis domain schemas', () => {
           historicalObservationCount: 1,
           reasons: [],
         },
-        sections: FINANCIAL_ANALYSIS_SECTION_IDS.map((sectionId) => ({
+        sections: FINANCIAL_ANALYSIS_LEGACY_SECTION_IDS.map((sectionId) => ({
           sectionId,
           status: 'available',
           reason: null,
@@ -131,6 +150,11 @@ describe('financial analysis domain schemas', () => {
             unavailableReason: 'Unavailable.',
           })
         ),
+        ratios: {
+          calculated: [],
+          unavailable: [],
+          limitations: ['Legacy report.'],
+        },
       },
     })
 

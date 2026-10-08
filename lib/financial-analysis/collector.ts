@@ -29,6 +29,7 @@ import {
   type FinancialAnalysisRequest,
 } from '@/lib/financial-analysis/timeline'
 import type { FinancialMetricObservation } from '@/types/database'
+import { calculateRatios } from '@/lib/calculations/ratios'
 
 export { FinancialAnalysisRequestSchema }
 export type { FinancialAnalysisRequest }
@@ -368,6 +369,12 @@ export function collectFinancialAnalysisFromObservations(params: {
   const burn = latest.get('burn_rate')
   const revenue = latest.get('monthly_revenue')
   const expenses = latest.get('monthly_expenses')
+  const costOfSales = latest.get('cost_of_sales')
+  const operatingProfit = latest.get('operating_profit')
+  const currentAssets = latest.get('current_assets')
+  const currentLiabilities = latest.get('current_liabilities')
+  const totalDebt = latest.get('total_debt')
+  const totalEquity = latest.get('total_equity')
   const cashRunwayCompatible = sameReportingDate([cash, burn])
   const adjustedRunwayCompatible = sameReportingDate([
     cash,
@@ -397,6 +404,41 @@ export function collectFinancialAnalysisFromObservations(params: {
         accountsPayable: payables.value,
       })
     : null
+  const compatibleRatioValue = (
+    first: FinancialMetricObservation | undefined,
+    second: FinancialMetricObservation | undefined
+  ) =>
+    sameReportingDate([first, second]) &&
+    getFinancialObservationSourceKey(first as FinancialMetricObservation) ===
+      getFinancialObservationSourceKey(second as FinancialMetricObservation) &&
+    effectiveDate(first as FinancialMetricObservation) === reportDate
+      ? [first?.value, second?.value] as const
+      : [undefined, undefined] as const
+  const [grossMarginRevenue, grossMarginCostOfSales] = compatibleRatioValue(
+    revenue,
+    costOfSales
+  )
+  const [operatingMarginRevenue, compatibleOperatingProfit] = compatibleRatioValue(
+    revenue,
+    operatingProfit
+  )
+  const [compatibleCurrentAssets, compatibleCurrentLiabilities] = compatibleRatioValue(
+    currentAssets,
+    currentLiabilities
+  )
+  const [compatibleTotalDebt, compatibleTotalEquity] = compatibleRatioValue(
+    totalDebt,
+    totalEquity
+  )
+  const ratios = calculateRatios({
+    monthlyRevenue: grossMarginRevenue ?? operatingMarginRevenue,
+    costOfSales: grossMarginCostOfSales,
+    operatingProfit: compatibleOperatingProfit,
+    currentAssets: compatibleCurrentAssets,
+    currentLiabilities: compatibleCurrentLiabilities,
+    totalDebt: compatibleTotalDebt,
+    totalEquity: compatibleTotalEquity,
+  })
   const history = buildHistoryFacts(calculationRows, reportDate)
   const forecasts = buildForecastFacts(calculationRows, reportDate)
   const availableMetricKeys = [
@@ -428,6 +470,24 @@ export function collectFinancialAnalysisFromObservations(params: {
     currencySelected: true,
     incompatibleSections,
   })
+  const ratioSectionStatus = ratios.calculated.length === 4
+    ? 'available' as const
+    : ratios.calculated.length > 0
+      ? 'limited' as const
+      : 'unavailable' as const
+  const sections = readiness.sections.map((item) =>
+    item.sectionId === 'financial_ratios'
+      ? {
+          ...item,
+          status: ratioSectionStatus,
+          reason: ratioSectionStatus === 'available'
+            ? null
+            : ratioSectionStatus === 'limited'
+              ? 'Some ratios are unavailable because compatible same-date inputs are missing or invalid.'
+              : 'No ratio has a complete, valid pair of inputs on the latest reporting date.',
+        }
+      : item
+  )
   const evidenceRows = timeline?.selectedRows ?? calculationRows
   const evidence = evidenceRows.map((row) => {
     const resolution = timeline?.evidenceResolutionById.get(row.id)
@@ -461,7 +521,7 @@ export function collectFinancialAnalysisFromObservations(params: {
       reportDate,
     },
     readiness: readiness.readiness,
-    sections: readiness.sections,
+    sections,
     facts: {
       operatingBalance,
       receivablesPayables,
@@ -469,6 +529,13 @@ export function collectFinancialAnalysisFromObservations(params: {
       history,
       forecasts,
       periodComparisons: buildPeriodComparisons(calculationRows, reportDate),
+      ratios: {
+        ...ratios,
+        limitations: [
+          'Ratio thresholds are directional indicators only; sector norms and accounting policies vary.',
+          'Ratios use compatible confirmed observations from the latest selected reporting date and are not forecasts.',
+        ],
+      },
     },
     evidence,
     assumptions: [
@@ -484,6 +551,7 @@ export function collectFinancialAnalysisFromObservations(params: {
       'Forecasts continue the observed date-aware linear trend for six months and are not guarantees.',
       'Operating balance is monthly revenue minus monthly expenses and is not presented as profit.',
       'Working-capital-adjusted runway assumes receivables are collected and payables are paid.',
+      'Ratio status labels are directional indicators, not sector benchmarks or financial advice.',
     ],
     baselineFingerprint: evidenceRows.map((row) => ({
       id: row.id,

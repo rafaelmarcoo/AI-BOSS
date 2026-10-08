@@ -22,8 +22,10 @@ import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import SpeedRoundedIcon from "@mui/icons-material/SpeedRounded";
+import { ModelSelector } from "@/app/dashboard/chat/ModelSelector";
 import { dashboardTokens } from "@/app/theme";
 import { VoiceInputButton } from "@/components/voice-input-button";
+import type { ModelName } from "@/lib/ai/models";
 import type { Conversation } from "@/types/database";
 import {
   LANDING_BACKGROUND,
@@ -132,6 +134,7 @@ export function LandingPage({ fullName, email, companyName }: LandingPageProps) 
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [message, setMessage] = useState("");
+  const [model, setModel] = useState<ModelName | undefined>();
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadedDocument, setUploadedDocument] = useState<{
@@ -187,7 +190,10 @@ export function LandingPage({ fullName, email, companyName }: LandingPageProps) 
     const trimmed = message.trim();
 
     if (trimmed) {
-      router.push(`/dashboard?initialMessage=${encodeURIComponent(trimmed)}`);
+      const params = new URLSearchParams({ initialMessage: trimmed });
+      if (model) params.set("model", model);
+
+      router.push(`/dashboard?${params.toString()}`);
     }
   };
 
@@ -405,6 +411,25 @@ export function LandingPage({ fullName, email, companyName }: LandingPageProps) 
               </IconButton>
             </Stack>
           </Box>
+
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            alignItems={{ xs: "flex-start", sm: "center" }}
+            justifyContent="space-between"
+            spacing={1}
+            sx={{ mt: 1 }}
+          >
+            <ModelSelector model={model} onModelChange={setModel} tone="light" />
+            <Typography
+              sx={{
+                color: "#B8C7D9",
+                fontSize: 11,
+                textAlign: { sm: "right" },
+              }}
+            >
+              AI-BOSS provides financial insights. Review important decisions before acting.
+            </Typography>
+          </Stack>
 
           {uploading ? (
             <Alert severity="info" icon={<CircularProgress size={18} />} sx={{ mt: 2 }}>

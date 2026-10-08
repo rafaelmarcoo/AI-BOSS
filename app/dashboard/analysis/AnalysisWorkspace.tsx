@@ -80,12 +80,20 @@ const RECOMMENDATION_LABELS: Record<string, string> = {
 const REPORT_NAVIGATION = [
   { id: 'analysis-summary', label: 'Summary' },
   { id: 'analysis-position', label: 'Position' },
+  { id: 'analysis-ratios', label: 'Ratios' },
   { id: 'analysis-period-comparison', label: 'Period comparison' },
   { id: 'analysis-history-forecast', label: 'History and forecast' },
   { id: 'analysis-risks', label: 'Risks' },
   { id: 'analysis-actions', label: 'Actions' },
   { id: 'analysis-evidence', label: 'Evidence' },
 ] as const
+
+const RATIO_EVIDENCE_KEYS: Record<string, FinancialMetricKey[]> = {
+  gross_margin: ['monthly_revenue', 'cost_of_sales'],
+  operating_margin: ['monthly_revenue', 'operating_profit'],
+  current_ratio: ['current_assets', 'current_liabilities'],
+  debt_to_equity: ['total_debt', 'total_equity'],
+}
 
 const POLICY_RESULT_PRESENTATION: Record<CurrentRunwayResult, {
   label: string
@@ -219,6 +227,7 @@ export function ReportView({ report }: { report: FinancialAnalysisRunView }) {
   const runway = result.facts.runway
   const operatingBalance = result.facts.operatingBalance
   const workingCapital = result.facts.receivablesPayables
+  const ratios = result.facts.ratios
   const hasCurrentCash = result.evidence.some((item) =>
     item.metricKey === 'cash' &&
     item.reportingDate === result.selectedBaseline.reportDate &&
@@ -387,6 +396,75 @@ export function ReportView({ report }: { report: FinancialAnalysisRunView }) {
             metricKeys: ['accounts_receivable', 'accounts_payable'],
           })}
         />
+      </Box>
+
+      <Box id="analysis-ratios" className="analysis-report-section analysis-report-anchor">
+        <Panel title="Financial ratios">
+          <Typography variant="body2" sx={{ mb: 2, color: dashboardTokens.textSoft }}>
+            Ratios use confirmed values from the same source, currency, and reporting date.
+            Status labels are directional only because appropriate benchmarks depend on the sector and accounting context.
+          </Typography>
+          {ratios.calculated.length > 0 ? (
+            <TableContainer>
+              <Table size="small" aria-label="Deterministic financial ratios">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Ratio</TableCell>
+                    <TableCell>Result</TableCell>
+                    <TableCell>Working and interpretation</TableCell>
+                    <TableCell className="analysis-screen-only">Evidence</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {ratios.calculated.map((ratio) => (
+                    <TableRow key={ratio.key}>
+                      <TableCell>{ratio.label}</TableCell>
+                      <TableCell>
+                        {ratio.value}{ratio.key.endsWith('margin') ? '%' : ''}
+                        <Typography variant="caption" sx={{ display: 'block', color: dashboardTokens.textMuted }}>
+                          {ratio.status}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">{ratio.formula}</Typography>
+                        <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>
+                          {ratio.interpretation}
+                        </Typography>
+                      </TableCell>
+                      <TableCell className="analysis-screen-only">
+                        <Button
+                          size="small"
+                          onClick={() => showEvidence({
+                            label: ratio.label,
+                            metricKeys: RATIO_EVIDENCE_KEYS[ratio.key] ?? [],
+                          })}
+                        >
+                          View
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          ) : (
+            <Alert severity="info">No ratio has a complete, valid pair of inputs for this report.</Alert>
+          )}
+          {ratios.unavailable.length > 0 ? (
+            <Stack spacing={0.5} sx={{ mt: 2 }}>
+              {ratios.unavailable.map((ratio) => (
+                <Typography key={ratio.key} variant="caption" sx={{ color: dashboardTokens.textMuted }}>
+                  {ratio.label}: {ratio.reason}.
+                </Typography>
+              ))}
+            </Stack>
+          ) : null}
+          {ratios.limitations.map((limitation) => (
+            <Typography key={limitation} variant="caption" sx={{ display: 'block', mt: 1, color: dashboardTokens.textSubtle }}>
+              {limitation}
+            </Typography>
+          ))}
+        </Panel>
       </Box>
 
       <Box id="analysis-period-comparison" className="analysis-report-section analysis-report-anchor">

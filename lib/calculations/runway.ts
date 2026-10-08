@@ -3,6 +3,16 @@ import {
   assessRunwayPolicy,
   type RunwayPolicy,
 } from '@/lib/calculations/runway-policy'
+import {
+  DAYS_PER_MONTH,
+  monthsAndDays,
+  runwayDaysFromMonths,
+} from '@/lib/calculations/runway-display'
+
+function inMonthsAndDays(days: number) {
+  const text = monthsAndDays(days)
+  return text ? ` = ${text}` : ''
+}
 
 export const RunwayInputSchema = z.object({
   cash: z.number().nonnegative('Cash must be non-negative.'),
@@ -28,6 +38,8 @@ export interface RunwayResult {
   runway_months: number
   cash_runway_months: number
   working_capital_adjusted_runway_months: number
+  cash_runway_days: number
+  working_capital_adjusted_runway_days: number
   calculation_breakdown: RunwayBreakdown
   policy: RunwayPolicy
   working_capital_adjusted_policy: RunwayPolicy
@@ -40,20 +52,26 @@ export function calculateRunway(input: RunwayInput): RunwayResult {
   const workingCapitalAdjustedRunwayMonths = parseFloat(
     (netAvailableCash / burn).toFixed(2)
   )
+  const cashRunwayDays = runwayDaysFromMonths(cashRunwayMonths)
+  const workingCapitalAdjustedRunwayDays = runwayDaysFromMonths(
+    workingCapitalAdjustedRunwayMonths
+  )
 
   return {
     runway_months: cashRunwayMonths,
     cash_runway_months: cashRunwayMonths,
     working_capital_adjusted_runway_months:
       workingCapitalAdjustedRunwayMonths,
+    cash_runway_days: cashRunwayDays,
+    working_capital_adjusted_runway_days: workingCapitalAdjustedRunwayDays,
     calculation_breakdown: {
       cash,
       accountsReceivable: ar,
       accountsPayable: ap,
       monthlyBurnRate: burn,
       netAvailableCash,
-      formula: `${cash} / ${burn} = ${cashRunwayMonths} months`,
-      workingCapitalAdjustedFormula: `(${cash} + ${ar} - ${ap}) / ${burn} = ${workingCapitalAdjustedRunwayMonths} months`,
+      formula: `${cash} / ${burn} = ${cashRunwayMonths} months × ${DAYS_PER_MONTH} = ${cashRunwayDays} days${inMonthsAndDays(cashRunwayDays)}`,
+      workingCapitalAdjustedFormula: `(${cash} + ${ar} - ${ap}) / ${burn} = ${workingCapitalAdjustedRunwayMonths} months × ${DAYS_PER_MONTH} = ${workingCapitalAdjustedRunwayDays} days${inMonthsAndDays(workingCapitalAdjustedRunwayDays)}`,
     },
     policy: assessRunwayPolicy(cashRunwayMonths),
     working_capital_adjusted_policy: assessRunwayPolicy(

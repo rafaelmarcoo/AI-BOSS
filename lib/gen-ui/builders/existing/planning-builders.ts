@@ -3,12 +3,12 @@ import { getMetricNumber, isAvailableMetric } from "@/lib/financial-data/metrics
 import type { GenUiWidget } from "@/lib/gen-ui/types";
 import {
   formatCurrency,
-  formatNumber,
   listMissingMetrics,
   widgetId,
 } from "../shared";
 import type { GenUiDataContext, PlannerWidget } from "../types";
 import { DEFAULT_DASHBOARD_RISK_THRESHOLDS } from "@/lib/gen-ui/dashboard-layout-types";
+import { formatRunway } from "@/lib/calculations/runway-display";
 
 export function buildPlanningChecklistWidget(
   spec: PlannerWidget,
@@ -32,7 +32,7 @@ export function buildPlanningChecklistWidget(
           : 'Review runway buffer',
       detail:
         currentRunway !== null
-          ? `Current runway is ${formatNumber(currentRunway)} months.`
+          ? `Current runway is ${formatRunway(currentRunway)}.`
           : 'Cash runway is unavailable, so collect compatible cash and burn first.',
       tone:
         currentRunway !== null && currentRunway < urgentThreshold
@@ -125,7 +125,7 @@ export function buildRiskThresholdTimelineWidget(
         : status === 'caution'
           ? 'Runway is below the recommended buffer and should be watched closely.'
           : monthsUntilUrgent !== null
-            ? `At the observed decline rate, urgent runway is roughly ${monthsUntilUrgent} months away.`
+            ? `At the observed decline rate, urgent runway is roughly ${formatRunway(monthsUntilUrgent)} away.`
             : 'Current runway is above the caution threshold.'
 
   return {

@@ -32,3 +32,158 @@ describe('routeFinancialQuestion', () => {
     )).toBe('scenario')
   })
 })
+
+describe('company analysis routing', () => {
+  it.each([
+    'Analyse Trimayr',
+    'Compare Ressett with its competitor',
+    "How is Fixxupp's revenue growing?",
+    'Tell me about Pallo and Troo',
+    'Which case study company is more profitable?',
+    'How do we compare with our competitors?',
+  ])('routes %p to the company analyst', (query) => {
+    expect(routeFinancialQuestion(query)).toBe('company_analysis')
+  })
+
+  it.each([
+    ['What do my ratios say?', 'financial_position'],
+    ['What do my ratios say by CIMA standards?', 'financial_position'],
+    ['What is my runway?', 'financial_position'],
+    ['Compare hiring for NZD 8,000 per month with buying equipment.', 'scenario'],
+  ] as const)('keeps own-business question %p with %s', (query, expected) => {
+    expect(routeFinancialQuestion(query)).toBe(expected)
+  })
+
+  const afterComparison = [
+    { role: 'user' as const, content: 'Compare Ressett with Fixxupp' },
+    { role: 'assistant' as const, content: 'Ressett is more profitable than Fixxupp, but Fixxupp is growing faster.' },
+  ]
+
+  it.each(['Which one is growing faster?', 'What about gearing?', 'Why?'])(
+    'keeps follow-up %p with the company analyst',
+    (query) => {
+      // "growing" alone would otherwise send this to the scenario specialist.
+      expect(routeFinancialConversation(query, afterComparison)).toBe('company_analysis')
+    }
+  )
+
+  it.each([
+    ['What is my runway?', 'financial_position'],
+    ['What if I cut burn by 10%?', 'scenario'],
+  ] as const)('lets %p return to the user’s own business', (query, expected) => {
+    expect(routeFinancialConversation(query, afterComparison)).toBe(expected)
+  })
+})
+
+describe('uploaded company names', () => {
+  const names = ['Kiwi Salons', 'Pallo & Troo', 'Ressett']
+
+  it.each([
+    'Analyse Kiwi Salons',
+    'how is kiwi salons doing?',
+    "What is Kiwi Salons's gross margin?",
+    'Compare Kiwi Salons with Trimayr',
+  ])('routes %p to the company analyst', (query) => {
+    expect(routeFinancialQuestion(query, names)).toBe('company_analysis')
+  })
+
+  it('does not know the name unless it is passed in', () => {
+    expect(routeFinancialQuestion('Analyse Kiwi Salons')).toBe('financial_position')
+  })
+
+  it.each([
+    ['How are my salons doing?', 'financial_position'],
+    ['What is my runway?', 'financial_position'],
+    ['Forecast revenue for kiwi season', 'historical_forecast'],
+  ] as const)('does not capture own-business question %p with part of a name', (query, expected) => {
+    expect(routeFinancialQuestion(query, names)).toBe(expected)
+  })
+
+  it('keeps a follow-up about an uploaded company with the company analyst', () => {
+    const afterKiwi = [
+      { role: 'user' as const, content: 'Analyse Kiwi Salons' },
+      { role: 'assistant' as const, content: 'Kiwi Salons grew revenue by 9.7% and its operating margin rose.' },
+    ]
+    expect(routeFinancialConversation('What about gearing?', afterKiwi, names)).toBe('company_analysis')
+    expect(routeFinancialConversation('What is my runway?', afterKiwi, names)).toBe('financial_position')
+  })
+})
+
+describe('a company named by the start of its name (6d)', () => {
+  it('sends "the company momo" to the company analyst when "momo new" exists', () => {
+    expect(routeFinancialQuestion('can you tell me about the company momo', ['momo new'])).toBe('company_analysis')
+    expect(routeFinancialQuestion('Tell me about the business called kiwi', ['Kiwi Salons'])).toBe('company_analysis')
+  })
+
+  it.each([
+    'How is my company doing?',
+    'How is the company doing this month?',
+    'What is my business runway?',
+  ])('keeps own-business question %p with the own-business agent', (query) => {
+    expect(routeFinancialQuestion(query, ['momo new', 'Kiwi Salons'])).toBe('financial_position')
+  })
+
+  it('does not match a word that only appears later in a name', () => {
+    expect(routeFinancialQuestion('Tell me about the company salons', ['Kiwi Salons'])).toBe('financial_position')
+  })
+})
+
+describe('a long briefing is not a scenario question (6d)', () => {
+  const briefing = [
+    'momo — management briefing. momo had a strong year operationally. Revenue grew modestly, but profitability improved substantially: operating profit rose faster than sales and margins widened.',
+    'Liquidity also improved. The main tension is that momo paid out almost all of its profit as dividends, leaving less profit retained in the business.',
+    'Marketing as a percentage of revenue was not calculable because marketing expense data was unavailable.',
+    'Questions management should investigate next: 1. What drove the improvement in margins? 2. Can revenue growth accelerate without increasing inventory or receivable days? 3. Is the 96.2% dividend payout compatible with investment needs?',
+  ].join(' ').repeat(3) // real briefings run to 2,800+ characters
+
+  it('does not treat the next message as a scenario answer', () => {
+    expect(briefing.length).toBeGreaterThan(1500)
+    expect(
+      routeFinancialConversation('so in detail tell me how good the company momo is', [
+        { role: 'user', content: 'can you tell me about the company momo' },
+        { role: 'assistant', content: briefing },
+      ], ['momo new'])
+    ).toBe('company_analysis')
+    expect(
+      routeFinancialConversation('Tell me more about that.', [{ role: 'assistant', content: briefing }])
+    ).toBe('financial_position')
+  })
+})
+
+describe('scenario clarification replies', () => {
+  it('keeps a timing answer with the scenario specialist', () => {
+    expect(
+      routeFinancialConversation('Start October 2026, no end date.', [
+        { role: 'user', content: 'What if I cut monthly burn by NZD 3,000 from next month?' },
+        {
+          role: 'assistant',
+          content: 'What start and end timing should I use for the recurring NZD 3,000 monthly burn reduction?',
+        },
+      ])
+    ).toBe('scenario')
+  })
+})
+
+describe('forecast words inside a scenario answer', () => {
+  const askedForTiming = [
+    { role: 'user' as const, content: 'What if I cut monthly burn by NZD 3,000 from next month?' },
+    {
+      role: 'assistant' as const,
+      content: 'What start and end timing should I use for the recurring NZD 3,000 monthly burn reduction?',
+    },
+  ]
+
+  it.each([
+    'Start October 2026, no end date. Apply it for the whole projection.',
+    'Use a 6 month horizon.',
+    'From next month, for the future.',
+  ])('keeps %p with the scenario specialist', (reply) => {
+    expect(routeFinancialConversation(reply, askedForTiming)).toBe('scenario')
+  })
+
+  it('still lets a plainly new forecast request through', () => {
+    expect(
+      routeFinancialConversation('Actually, can you forecast my cash for the next 3 months instead?', askedForTiming)
+    ).toBe('historical_forecast')
+  })
+})

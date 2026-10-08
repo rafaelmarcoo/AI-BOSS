@@ -139,11 +139,15 @@ export function calculateAnalysisRunway(input: {
     cash: parsed.cash,
     monthlyBurnRate: parsed.monthlyBurnRate,
     cashRunwayMonths: result.cash_runway_months,
+    cashRunwayDays: result.cash_runway_days,
     cashRunwayFormula: result.calculation_breakdown.formula,
     accountsReceivable: parsed.accountsReceivable ?? null,
     accountsPayable: parsed.accountsPayable ?? null,
     workingCapitalAdjustedRunwayMonths: hasWorkingCapitalInputs
       ? result.working_capital_adjusted_runway_months
+      : null,
+    workingCapitalAdjustedRunwayDays: hasWorkingCapitalInputs
+      ? result.working_capital_adjusted_runway_days
       : null,
     workingCapitalAdjustedRunwayFormula: hasWorkingCapitalInputs
       ? result.calculation_breakdown.workingCapitalAdjustedFormula
@@ -227,6 +231,16 @@ export function classifyFinancialAnalysisReadiness(
   const hasWorkingCapital =
     available.has('accounts_receivable') && available.has('accounts_payable')
   const hasAdjustedRunwayInputs = hasRunway && hasWorkingCapital
+  const ratioInputKeys = [
+    'monthly_revenue',
+    'cost_of_sales',
+    'operating_profit',
+    'current_assets',
+    'current_liabilities',
+    'total_debt',
+    'total_equity',
+  ] as const satisfies readonly FinancialMetricKey[]
+  const availableRatioInputCount = ratioInputKeys.filter((key) => available.has(key)).length
   const selectionBlocked = sourceSelectionMissing || currencySelectionMissing
   const summaryStatus = selectionBlocked
     ? 'unavailable'
@@ -267,6 +281,19 @@ export function classifyFinancialAnalysisReadiness(
         'working_capital',
         selectionBlocked || !hasWorkingCapital || incompatibleSections.has('working_capital') ? 'unavailable' : 'available',
         !hasWorkingCapital ? 'Accounts receivable and payable are required.' : incompatibleSections.has('working_capital') ? 'Accounts receivable and payable must share one reporting date.' : selectionBlocked ? 'A source and currency selection is required.' : null
+      ),
+      section(
+        'financial_ratios',
+        selectionBlocked || availableRatioInputCount === 0
+          ? 'unavailable'
+          : availableRatioInputCount === ratioInputKeys.length
+            ? 'available'
+            : 'limited',
+        selectionBlocked
+          ? 'A source and currency selection is required.'
+          : availableRatioInputCount === ratioInputKeys.length
+            ? null
+            : 'Ratio availability depends on compatible same-date statement inputs.'
       ),
       section(
         'history',

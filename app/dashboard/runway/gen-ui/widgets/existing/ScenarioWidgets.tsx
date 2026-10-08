@@ -31,6 +31,7 @@ import {
   YAxis,
 } from "recharts";
 import { dashboardCanvasTokens as dashboardTokens } from "@/app/theme";
+import { formatRunway } from "@/lib/calculations/runway-display";
 import type {
   ScenarioComparisonWidget as ScenarioComparisonWidgetModel,
   ScenarioAnalysisWidget as ScenarioAnalysisWidgetModel,
@@ -40,7 +41,6 @@ import {
   chartContextChipSx,
   formatAxisNumber,
   formatCurrency,
-  formatNumber,
 } from "../../shared/formatting";
 
 export function ScenarioComparisonWidgetView({
@@ -104,7 +104,7 @@ export function ScenarioComparisonWidgetView({
                   variant="body2"
                   sx={{ width: 74, textAlign: "right", color: dashboardTokens.text }}
                 >
-                  {formatNumber(row.runwayMonths)} mo
+                  {row.runwayMonths === null ? "Unavailable" : formatRunway(row.runwayMonths)}
                 </Typography>
               </Stack>
             </Box>

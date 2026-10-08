@@ -81,6 +81,24 @@ describe('validateChatPayload visibility', () => {
       details: { visibility: 'visibility must be private, company, or admins.' },
     })
   })
+
+  it('accepts a supported model and an explicit reset to the default model', () => {
+    expect(validateChatPayload({ messages, model: 'gpt-4o' })).toMatchObject({
+      success: true,
+      data: { model: 'gpt-4o' },
+    })
+    expect(validateChatPayload({ messages, model: null })).toMatchObject({
+      success: true,
+      data: { model: null },
+    })
+  })
+
+  it('rejects a model outside the server catalogue', () => {
+    expect(validateChatPayload({ messages, model: 'made-up-model' })).toEqual({
+      success: false,
+      details: { model: 'model must be a known model name.' },
+    })
+  })
 })
 
 describe('validateSignInPayload', () => {

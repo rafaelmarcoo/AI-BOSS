@@ -7,6 +7,7 @@ import { dashboardCanvasTokens, dashboardTokens } from "@/app/theme";
 import { ChatSidebar } from "./chat/sidebar";
 import { RunwaySection } from "./runway";
 import type { GenUiPlan } from "@/lib/gen-ui/types";
+import type { ModelName } from "@/lib/ai/models";
 import type { UserType } from "@/types/database";
 
 interface ResizablePanelsProps {
@@ -15,6 +16,7 @@ interface ResizablePanelsProps {
   userType: UserType | null;
   initialConversationId?: string | null;
   initialMessage?: string | null;
+  initialModel?: ModelName | null;
 }
 
 interface SelectionChatPrompt {
@@ -34,6 +36,7 @@ export function ResizablePanels({
   userType,
   initialConversationId = null,
   initialMessage = null,
+  initialModel = null,
 }: ResizablePanelsProps) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -129,6 +132,7 @@ export function ResizablePanels({
           userType={userType}
           initialConversationId={initialConversationId}
           initialMessage={initialMessage}
+          initialModel={initialModel}
           onDocumentsProcessed={() => router.refresh()}
           onInitialMessageHandled={() => {
             window.history.replaceState(null, "", "/dashboard");

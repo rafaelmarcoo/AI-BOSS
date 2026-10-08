@@ -20,6 +20,7 @@ import {
   createDashboardLayoutWidget,
   dashboardPayloadFromPlan,
 } from "@/lib/gen-ui/dashboard-layout-client";
+import { dashboardWidgetIdentity } from "@/lib/gen-ui/unique-widgets";
 import type {
   DashboardLayoutPayload,
   HydratedDashboardLayout,
@@ -281,18 +282,25 @@ export function DashboardLayoutWorkspace({
   };
 
   const addWidget = (widgetType: GenUiWidgetType) => {
+    const candidate = createDashboardLayoutWidget(widgetType);
+    if (payload?.widgets.some(
+      (widget) => dashboardWidgetIdentity(widget) === dashboardWidgetIdentity(candidate),
+    )) {
+      setError("This widget is already in the layout. Unhide or edit the existing widget instead.");
+      return;
+    }
     if (!payload || payload.widgets.length >= 20) {
       setError("A saved layout can contain up to 20 widgets.");
       return;
     }
     setPayload({
       ...payload,
-      widgets: [...payload.widgets, createDashboardLayoutWidget(widgetType)],
+      widgets: [...payload.widgets, candidate],
     });
   };
 
   return (
-    <Box>
+    <Box sx={{ minWidth: 0, width: "100%" }}>
       {customizationEnabled ? (
         <Stack
           spacing={1.25}

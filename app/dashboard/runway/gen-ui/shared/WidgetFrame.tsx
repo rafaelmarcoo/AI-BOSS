@@ -19,7 +19,9 @@ export function WidgetFrame({
         p: { xs: 2, sm: 2.25 },
         color: dashboardTokens.text,
         minWidth: 0,
-        height: "100%",
+        maxWidth: "100%",
+        boxSizing: "border-box",
+        overflowWrap: "anywhere",
         bgcolor: "transparent",
       }}
     >
@@ -37,7 +39,7 @@ export function WidgetFrame({
           <Typography
             variant="caption"
             fontWeight={600}
-            sx={{ color: "#2B6A9B", letterSpacing: 0 }}
+            sx={{ color: dashboardTokens.info, letterSpacing: 0 }}
           >
             Why AI-BOSS chose this widget
           </Typography>

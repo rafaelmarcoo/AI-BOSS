@@ -40,13 +40,13 @@ import {
 } from "../../shared/formatting";
 
 const METRIC_COLORS: Record<string, string> = {
-  cash: "#16825D",
-  accounts_receivable: "#2B6A9B",
-  accounts_payable: "#C7652E",
-  runway_months: "#3276B1",
-  burn_rate: "#B43C50",
-  monthly_revenue: "#16825D",
-  monthly_expenses: "#B43C50",
+  cash: dashboardTokens.positive,
+  accounts_receivable: dashboardTokens.info,
+  accounts_payable: "#9B451C",
+  runway_months: dashboardTokens.info,
+  burn_rate: dashboardTokens.negative,
+  monthly_revenue: dashboardTokens.positive,
+  monthly_expenses: dashboardTokens.negative,
 };
 
 export function MetricSnapshotWidgetView({
@@ -59,10 +59,7 @@ export function MetricSnapshotWidgetView({
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: {
-            xs: "1fr",
-            sm: "repeat(2, minmax(0, 1fr))",
-          },
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
           gap: 1.5,
         }}
       >
@@ -72,7 +69,7 @@ export function MetricSnapshotWidgetView({
             label={metric.label}
             value={metric.value}
             unit={metric.unit ?? undefined}
-            color={metric.runwayVariant === 'working_capital_adjusted' ? '#22d3ee' : METRIC_COLORS[metric.key] ?? "#94a3b8"}
+            color={metric.runwayVariant === 'working_capital_adjusted' ? dashboardTokens.adjusted : METRIC_COLORS[metric.key] ?? dashboardTokens.textMuted}
             sourceLabel={metric.sourceLabel}
             sourceTone={metric.sourceTone}
             contextLabel={metricContextLabel(metric)}
@@ -90,13 +87,13 @@ export function MetricSourceEvidenceWidgetView({
   widget: MetricSourceEvidenceWidgetModel;
 }) {
   const tonePresentation = {
-    available: { label: "available", color: "#16825D", background: "rgba(22, 130, 93, 0.10)" },
-    derived: { label: "calculated", color: "#2B6A9B", background: "rgba(43, 106, 155, 0.10)" },
-    unavailable: { label: "unavailable", color: "#B43C50", background: "rgba(180, 60, 80, 0.10)" },
+    available: { label: "available", color: dashboardTokens.positive, background: "rgba(22, 130, 93, 0.10)" },
+    derived: { label: "calculated", color: dashboardTokens.info, background: "rgba(43, 106, 155, 0.10)" },
+    unavailable: { label: "unavailable", color: dashboardTokens.negative, background: "rgba(180, 60, 80, 0.10)" },
   } as const;
   const contextOnlyPresentation = {
     label: "context only",
-    color: "#9A6512",
+    color: dashboardTokens.warning,
     background: "rgba(245, 158, 11, 0.12)",
   } as const;
 
@@ -131,7 +128,7 @@ export function MetricSourceEvidenceWidgetView({
                 {metric.sourceLabel}
               </Typography>
               {metricContextLabel(metric) ? (
-                <Typography variant="caption" sx={{ color: "#2B6A9B", display: "block", mt: 0.25 }}>
+                <Typography variant="caption" sx={{ color: dashboardTokens.info, display: "block", mt: 0.25 }}>
                   {metricContextLabel(metric)}
                 </Typography>
               ) : null}
@@ -194,9 +191,9 @@ export function MetricTrendChartWidgetView({
         <Chip label={`Observations: ${widget.data.points.length}`} size="small" sx={chartContextChipSx} />
       </Stack>
       <Typography variant="body2" fontWeight={700} sx={{ color: dashboardTokens.text }}>
-        Value axis: <Box component="span" sx={{ color: "#2B6A9B" }}>{isRunway ? "Runway (months)" : `${widget.data.label} (${widget.data.currency})`}</Box>
+        Value axis: <Box component="span" sx={{ color: dashboardTokens.info }}>{isRunway ? "Runway (months)" : `${widget.data.label} (${widget.data.currency})`}</Box>
       </Typography>
-      <Box sx={{ height: 250 }}>
+      <Box sx={{ height: "clamp(220px, 30cqi, 320px)", width: "100%", minWidth: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData} margin={{ top: 10, right: 16, left: 8, bottom: 30 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={dashboardTokens.border} />
@@ -231,8 +228,8 @@ export function MetricTrendChartWidgetView({
             />
             {runwaySeries.length > 0 ? (
               <>
-                {runwaySeries.some((series) => series.variant === 'cash') ? <Line type="monotone" dataKey="cash" stroke="#4da6ff" strokeWidth={2} dot={{ fill: "#4da6ff", r: 4 }} connectNulls={false} /> : null}
-                {runwaySeries.some((series) => series.variant === 'working_capital_adjusted') ? <Line type="monotone" dataKey="adjusted" stroke="#22d3ee" strokeWidth={2} dot={{ fill: "#22d3ee", r: 4 }} connectNulls={false} /> : null}
+                {runwaySeries.some((series) => series.variant === 'cash') ? <Line type="monotone" dataKey="cash" stroke={dashboardTokens.info} strokeWidth={2} dot={{ fill: dashboardTokens.info, r: 4 }} connectNulls={false} /> : null}
+                {runwaySeries.some((series) => series.variant === 'working_capital_adjusted') ? <Line type="monotone" dataKey="adjusted" stroke={dashboardTokens.adjusted} strokeWidth={2} dot={{ fill: dashboardTokens.adjusted, r: 4 }} connectNulls={false} /> : null}
               </>
             ) : <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={{ fill: color, r: 4 }} />}
           </LineChart>
@@ -245,7 +242,7 @@ export function MetricTrendChartWidgetView({
         {widget.data.note}
       </Typography>
       {widget.data.hasRecordedDateFallback ? (
-        <Typography variant="caption" sx={{ color: "#9A6512" }}>
+        <Typography variant="caption" sx={{ color: dashboardTokens.warning }}>
           Some points use upload dates because reporting dates were unavailable.
         </Typography>
       ) : null}
@@ -305,9 +302,9 @@ export function MetricForecastChartWidgetView({
         <Chip label={`Forecast period: Next ${widget.data.horizon} months`} size="small" sx={chartContextChipSx} />
       </Stack>
       <Typography variant="body2" fontWeight={700} sx={{ color: dashboardTokens.text }}>
-        Value axis: <Box component="span" sx={{ color: "#2B6A9B" }}>{isRunway ? "Runway (months)" : `${widget.data.label} (${widget.data.currency})`}</Box>
+        Value axis: <Box component="span" sx={{ color: dashboardTokens.info }}>{isRunway ? "Runway (months)" : `${widget.data.label} (${widget.data.currency})`}</Box>
       </Typography>
-      <Box sx={{ height: 250 }}>
+      <Box sx={{ height: "clamp(220px, 30cqi, 320px)", width: "100%", minWidth: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 10, right: 16, left: 8, bottom: 30 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={dashboardTokens.border} />
@@ -330,19 +327,19 @@ export function MetricForecastChartWidgetView({
               formatter={(value, name) => [formatValue(Number(value)), runwaySeries.length > 0 ? ({ cashActual: 'Cash runway', adjustedActual: 'Adjusted runway', cashForecast: 'Cash forecast', adjustedForecast: 'Adjusted forecast' }[String(name)] ?? name) : name === "actual" ? "Actual" : "Forecast"]}
             />
             {runwaySeries.length > 0 ? <>
-              {runwaySeries.some((series) => series.variant === 'cash') ? <><Line type="monotone" dataKey="cashActual" stroke="#4da6ff" strokeWidth={2} dot={{ fill: "#4da6ff", r: 4 }} connectNulls={false} /><Line type="monotone" dataKey="cashForecast" stroke="#4da6ff" strokeWidth={2} strokeDasharray="6 4" connectNulls={false} /></> : null}
-              {runwaySeries.some((series) => series.variant === 'working_capital_adjusted') ? <><Line type="monotone" dataKey="adjustedActual" stroke="#22d3ee" strokeWidth={2} dot={{ fill: "#22d3ee", r: 4 }} connectNulls={false} /><Line type="monotone" dataKey="adjustedForecast" stroke="#22d3ee" strokeWidth={2} strokeDasharray="6 4" connectNulls={false} /></> : null}
-            </> : <><Line type="monotone" dataKey="actual" stroke={color} strokeWidth={2} dot={{ fill: color, r: 4 }} connectNulls={false} /><Line type="monotone" dataKey="forecast" stroke="#fbbf24" strokeWidth={2} strokeDasharray="6 4" dot={{ fill: "#fbbf24", r: 4 }} connectNulls={false} /></>}
+              {runwaySeries.some((series) => series.variant === 'cash') ? <><Line type="monotone" dataKey="cashActual" stroke={dashboardTokens.info} strokeWidth={2} dot={{ fill: dashboardTokens.info, r: 4 }} connectNulls={false} /><Line type="monotone" dataKey="cashForecast" stroke={dashboardTokens.info} strokeWidth={2} strokeDasharray="6 4" connectNulls={false} /></> : null}
+              {runwaySeries.some((series) => series.variant === 'working_capital_adjusted') ? <><Line type="monotone" dataKey="adjustedActual" stroke={dashboardTokens.adjusted} strokeWidth={2} dot={{ fill: dashboardTokens.adjusted, r: 4 }} connectNulls={false} /><Line type="monotone" dataKey="adjustedForecast" stroke={dashboardTokens.adjusted} strokeWidth={2} strokeDasharray="6 4" connectNulls={false} /></> : null}
+            </> : <><Line type="monotone" dataKey="actual" stroke={color} strokeWidth={2} dot={{ fill: color, r: 4 }} connectNulls={false} /><Line type="monotone" dataKey="forecast" stroke={dashboardTokens.warning} strokeWidth={2} strokeDasharray="6 4" dot={{ fill: dashboardTokens.warning, r: 4 }} connectNulls={false} /></>}
           </LineChart>
         </ResponsiveContainer>
       </Box>
       <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-        <Chip label={`Latest ${formatValue(latestActual?.value ?? 0)}`} size="small" sx={{ color: "#2B6A9B", bgcolor: "rgba(43, 106, 155, 0.10)" }} />
-        <Chip label={`${widget.data.monthlySlope >= 0 ? "+" : ""}${formatValue(widget.data.monthlySlope)} / month`} size="small" sx={{ color: "#9A6512", bgcolor: "rgba(154, 101, 18, 0.10)" }} />
-        <Chip label={`${widget.data.horizon}-month estimate`} size="small" sx={{ color: "#16825D", bgcolor: "rgba(22, 130, 93, 0.10)" }} />
+        <Chip label={`Latest ${formatValue(latestActual?.value ?? 0)}`} size="small" sx={{ color: dashboardTokens.info, bgcolor: "rgba(43, 106, 155, 0.10)" }} />
+        <Chip label={`${widget.data.monthlySlope >= 0 ? "+" : ""}${formatValue(widget.data.monthlySlope)} / month`} size="small" sx={{ color: dashboardTokens.warning, bgcolor: "rgba(154, 101, 18, 0.10)" }} />
+        <Chip label={`${widget.data.horizon}-month estimate`} size="small" sx={{ color: dashboardTokens.positive, bgcolor: "rgba(22, 130, 93, 0.10)" }} />
       </Stack>
       <Typography variant="caption" sx={{ color: dashboardTokens.textMuted }}>{widget.data.note}</Typography>
-      {widget.data.hasRecordedDateFallback ? <Typography variant="caption" sx={{ color: "#9A6512" }}>Some points use upload dates because reporting dates were unavailable.</Typography> : null}
+      {widget.data.hasRecordedDateFallback ? <Typography variant="caption" sx={{ color: dashboardTokens.warning }}>Some points use upload dates because reporting dates were unavailable.</Typography> : null}
     </WidgetFrame>
   );
 }

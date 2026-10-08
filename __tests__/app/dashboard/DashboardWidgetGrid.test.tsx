@@ -9,6 +9,7 @@ import {
 
 const firstId = '11111111-1111-4111-8111-111111111111'
 const secondId = '22222222-2222-4222-8222-222222222222'
+const thirdId = '33333333-3333-4333-8333-333333333333'
 
 const payload: DashboardLayoutPayload = {
   version: DASHBOARD_LAYOUT_VERSION,
@@ -37,6 +38,19 @@ const payload: DashboardLayoutPayload = {
       period: 'current',
       forecastHorizon: null,
       currency: 'NZD',
+      metricKeys: [],
+    },
+    {
+      id: thirdId,
+      widgetType: 'cash_balance',
+      title: 'Cash AUD',
+      reason: 'Different currency.',
+      size: '1x1',
+      isPinned: false,
+      isHidden: false,
+      period: 'current',
+      forecastHorizon: null,
+      currency: 'AUD',
       metricKeys: [],
     },
   ],
@@ -68,11 +82,31 @@ const hydration: HydratedDashboardLayout = {
   items: [
     { itemId: firstId, widget: cashWidget(firstId, 'Cash one'), error: null },
     { itemId: secondId, widget: cashWidget(secondId, 'Cash two'), error: null },
+    { itemId: thirdId, widget: cashWidget(thirdId, 'Cash AUD'), error: null },
   ],
   availableCurrencies: ['AUD', 'NZD'],
 }
 
 describe('DashboardWidgetGrid customization', () => {
+  it('displays a saved widget type only once and respects hidden entries', () => {
+    const { rerender } = render(
+      <DashboardWidgetGrid payload={payload} hydration={hydration} onAskChatbot={jest.fn()} />,
+    )
+    expect(screen.getByText('Cash one')).toBeInTheDocument()
+    expect(screen.queryByText('Cash two')).not.toBeInTheDocument()
+    expect(screen.getByText('Cash AUD')).toBeInTheDocument()
+    rerender(
+      <DashboardWidgetGrid
+        payload={{ ...payload, widgets: payload.widgets.map((item, index) =>
+          index === 0 ? { ...item, isHidden: true } : item) }}
+        hydration={hydration}
+        onAskChatbot={jest.fn()}
+      />,
+    )
+    expect(screen.queryByText('Cash one')).not.toBeInTheDocument()
+    expect(screen.getByText('Cash two')).toBeInTheDocument()
+  })
+
   it('hides widgets and reorders them through drag and drop', () => {
     const onPayloadChange = jest.fn()
     const { container } = render(
@@ -106,8 +140,8 @@ describe('DashboardWidgetGrid customization', () => {
       widgets: [
         expect.objectContaining({ id: secondId }),
         expect.objectContaining({ id: firstId }),
+        expect.objectContaining({ id: thirdId }),
       ],
     }))
   })
 })
-

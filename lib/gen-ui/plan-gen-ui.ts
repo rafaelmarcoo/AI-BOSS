@@ -1,4 +1,5 @@
 import { ChatOpenAI } from '@langchain/openai'
+import { uniqueWidgets } from '@/lib/gen-ui/unique-widgets'
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { z } from 'zod'
 import { CHAT_MODEL, mainModelOptions } from '@/lib/ai/model-config'
@@ -869,6 +870,6 @@ export async function planGenUi({
       source === 'selection'
         ? 'Generated from the selected dashboard highlight.'
         : 'Generated from the latest AI-BOSS chat turn.',
-    widgets: widgets.slice(0, MAX_WIDGETS),
+    widgets: uniqueWidgets(widgets).slice(0, MAX_WIDGETS),
   }
 }

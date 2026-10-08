@@ -176,7 +176,7 @@ export function GenUiCanvas({
               sx={{
                 height: 24,
                 color: historicalDocumentSnapshot
-                  ? "#2B6A9B"
+                  ? dashboardTokens.info
                   : documentReviewMode
                     ? dashboardTokens.warning
                     : dashboardTokens.positive,

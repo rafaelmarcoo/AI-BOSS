@@ -75,7 +75,7 @@ function ForecastView({ title, reason, data }: { title: string; reason: string; 
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
           <Chip size="small" label={`Currency: ${data.currency ?? "Unavailable"}`} />
           <Chip size="small" label="Actual" sx={{ color: dashboardTokens.positive }} />
-          {data.forecastPoints.length > 0 ? <Chip size="small" label="Forecast" sx={{ color: "#38bdf8" }} /> : null}
+          {data.forecastPoints.length > 0 ? <Chip size="small" label="Forecast" sx={{ color: dashboardTokens.info }} /> : null}
         </Stack>
         <Box sx={{ width: "100%", height: 260, minWidth: 0, overflow: "hidden" }}>
           <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={180} initialDimension={{ width: 500, height: 260 }}>
@@ -85,7 +85,7 @@ function ForecastView({ title, reason, data }: { title: string; reason: string; 
               <YAxis tickFormatter={(value) => formatAxisNumber(Number(value), false)} stroke={dashboardTokens.textMuted} />
               <Tooltip formatter={(value) => formatCurrency(Number(value), data.currency)} labelFormatter={(label) => formatAxisDate(String(label))} />
               <Line type="monotone" dataKey="actual" name="Actual" stroke={dashboardTokens.positive} strokeWidth={2.5} connectNulls />
-              <Line type="monotone" dataKey="forecast" name="Forecast" stroke="#38bdf8" strokeWidth={2.5} strokeDasharray="6 5" connectNulls />
+              <Line type="monotone" dataKey="forecast" name="Forecast" stroke={dashboardTokens.info} strokeWidth={2.5} strokeDasharray="6 5" connectNulls />
             </LineChart>
           </ResponsiveContainer>
         </Box>

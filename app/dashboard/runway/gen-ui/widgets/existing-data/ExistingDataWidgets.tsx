@@ -20,31 +20,31 @@ import { WidgetFrame } from "../../shared/WidgetFrame";
 import { formatCurrency, formatDate } from "../../shared/formatting";
 
 export function CashBalanceWidgetView({ widget }: { widget: CashBalanceWidgetModel }) {
-  return <KpiWidget title={widget.title} reason={widget.reason} data={widget.data} accent="#16825D" />;
+  return <KpiWidget title={widget.title} reason={widget.reason} data={widget.data} accent={dashboardTokens.positive} />;
 }
 
 export function RevenueSnapshotWidgetView({ widget }: { widget: RevenueSnapshotWidgetModel }) {
-  return <KpiWidget title={widget.title} reason={widget.reason} data={widget.data} accent="#16825D" />;
+  return <KpiWidget title={widget.title} reason={widget.reason} data={widget.data} accent={dashboardTokens.positive} />;
 }
 
 export function ExpenseSummaryWidgetView({ widget }: { widget: ExpenseSummaryWidgetModel }) {
-  return <KpiWidget title={widget.title} reason={widget.reason} data={widget.data} accent="#B43C50" />;
+  return <KpiWidget title={widget.title} reason={widget.reason} data={widget.data} accent={dashboardTokens.negative} />;
 }
 
 export function AccountsReceivableWidgetView({ widget }: { widget: AccountsReceivableWidgetModel }) {
-  return <KpiWidget title={widget.title} reason={widget.reason} data={widget.data} accent="#2B6A9B" />;
+  return <KpiWidget title={widget.title} reason={widget.reason} data={widget.data} accent={dashboardTokens.info} />;
 }
 
 export function AccountsPayableWidgetView({ widget }: { widget: AccountsPayableWidgetModel }) {
-  return <KpiWidget title={widget.title} reason={widget.reason} data={widget.data} accent="#C7652E" />;
+  return <KpiWidget title={widget.title} reason={widget.reason} data={widget.data} accent="#9B451C" />;
 }
 
 export function RevenueTrendWidgetView({ widget }: { widget: RevenueTrendWidgetModel }) {
-  return <TrendChartWidget title={widget.title} reason={widget.reason} data={widget.data} accent="#16825D" />;
+  return <TrendChartWidget title={widget.title} reason={widget.reason} data={widget.data} accent={dashboardTokens.positive} />;
 }
 
 export function ExpenseTrendWidgetView({ widget }: { widget: ExpenseTrendWidgetModel }) {
-  return <TrendChartWidget title={widget.title} reason={widget.reason} data={widget.data} accent="#B43C50" />;
+  return <TrendChartWidget title={widget.title} reason={widget.reason} data={widget.data} accent={dashboardTokens.negative} />;
 }
 
 export function RevenueGrowthWidgetView({ widget }: { widget: RevenueGrowthWidgetModel }) {

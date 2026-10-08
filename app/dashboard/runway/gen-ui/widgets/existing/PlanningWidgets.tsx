@@ -14,9 +14,9 @@ import { WidgetFrame } from "../../shared/WidgetFrame";
 import type { AskChatbotMode } from "../../types";
 
 function statusColor(status: RiskThresholdTimelineWidgetModel["data"]["status"]) {
-  if (status === "urgent") return "#fb7185";
-  if (status === "caution") return "#fbbf24";
-  if (status === "healthy") return "#34d399";
+  if (status === "urgent") return dashboardTokens.negative;
+  if (status === "caution") return dashboardTokens.warning;
+  if (status === "healthy") return dashboardTokens.positive;
   return dashboardTokens.textMuted;
 }
 
@@ -26,9 +26,9 @@ export function PlanningChecklistWidgetView({
   widget: PlanningChecklistWidgetModel;
 }) {
   const toneColors = {
-    urgent: "#fb7185",
-    watch: "#fbbf24",
-    steady: "#34d399",
+    urgent: dashboardTokens.negative,
+    watch: dashboardTokens.warning,
+    steady: dashboardTokens.positive,
   };
 
   return (
@@ -122,7 +122,7 @@ export function RiskThresholdTimelineWidgetView({
           <Typography variant="body2" sx={{ color: dashboardTokens.textMuted }}>
             Working-capital-adjusted runway
           </Typography>
-          <Typography variant="body2" fontWeight={700} sx={{ color: "#22d3ee" }}>
+          <Typography variant="body2" fontWeight={700} sx={{ color: dashboardTokens.adjusted }}>
             {widget.data.workingCapitalAdjustedRunway === null ||
             widget.data.workingCapitalAdjustedRunway === undefined
               ? "Unavailable"
@@ -141,7 +141,7 @@ export function RiskThresholdTimelineWidgetView({
             sx={{
               width: `${Math.max(0, adjustedPercent)}%`,
               height: "100%",
-              bgcolor: "#22d3ee",
+              bgcolor: dashboardTokens.adjusted,
               borderRadius: 999,
             }}
           />
@@ -154,7 +154,7 @@ export function RiskThresholdTimelineWidgetView({
           }}
         >
           <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "rgba(251,191,36,0.08)" }}>
-            <Typography variant="caption" sx={{ color: "#9A6512" }}>
+            <Typography variant="caption" sx={{ color: dashboardTokens.warning }}>
               Caution
             </Typography>
             <Typography variant="body2" fontWeight={700}>
@@ -164,7 +164,7 @@ export function RiskThresholdTimelineWidgetView({
             </Typography>
           </Box>
           <Box sx={{ p: 1.25, borderRadius: 1, bgcolor: "rgba(251,113,133,0.08)" }}>
-            <Typography variant="caption" sx={{ color: "#B43C50" }}>
+            <Typography variant="caption" sx={{ color: dashboardTokens.negative }}>
               Urgent
             </Typography>
             <Typography variant="body2" fontWeight={700}>
@@ -200,7 +200,7 @@ export function MissingDataPanelWidgetView({
               label={metric}
               size="small"
               sx={{
-                color: "#B43C50",
+                color: dashboardTokens.negative,
                 bgcolor: "rgba(244, 63, 94, 0.12)",
               }}
             />

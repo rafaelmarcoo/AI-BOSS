@@ -88,15 +88,15 @@ export function metricContextLabel(metric: {
 }
 
 export const chartContextChipSx = {
-  color: "#2B6A9B",
+  color: dashboardTokens.info,
   bgcolor: "rgba(59, 130, 246, 0.14)",
   border: "1px solid rgba(96, 165, 250, 0.3)",
   fontWeight: 600,
 };
 
 export function trendDirectionColor(direction: string) {
-  if (direction === "improving") return "#34d399";
-  if (direction === "worsening") return "#fb7185";
-  if (direction === "stable") return "#fbbf24";
+  if (direction === "improving") return dashboardTokens.positive;
+  if (direction === "worsening") return dashboardTokens.negative;
+  if (direction === "stable") return dashboardTokens.warning;
   return dashboardTokens.textSoft;
 }

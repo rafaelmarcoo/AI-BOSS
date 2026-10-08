@@ -1,5 +1,7 @@
+"use client";
+
 import { Box, Chip, Stack, Typography, Skeleton } from "@mui/material";
-import { dashboardTokens } from "@/app/theme";
+import { useTheme } from "@mui/material/styles";
 
 interface MetricCardProps {
   label: string;
@@ -24,12 +26,11 @@ export function MetricCard({
   contextLabel,
   detail,
 }: MetricCardProps) {
+  const theme = useTheme();
   const sourceColor =
-    sourceTone === "available"
-      ? dashboardTokens.textSoft
-      : sourceTone === "derived"
-        ? "#93c5fd"
-        : dashboardTokens.textMuted;
+    sourceTone === "derived"
+      ? theme.palette.info.main
+      : theme.palette.text.secondary;
 
   return (
     <Box
@@ -37,7 +38,7 @@ export function MetricCard({
         py: 1.5,
         px: { xs: 0, sm: 1 },
         bgcolor: "transparent",
-        color: dashboardTokens.text,
+        color: "text.primary",
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
@@ -68,7 +69,7 @@ export function MetricCard({
                 fontSize: "0.75rem",
                 fontWeight: 600,
                 letterSpacing: "0.02em",
-                color: dashboardTokens.textMuted,
+                color: "text.secondary",
                 overflowWrap: "anywhere",
               }}
             >
@@ -83,12 +84,9 @@ export function MetricCard({
               sx={{
                 maxWidth: 140,
                 height: 24,
-                borderRadius: `${dashboardTokens.radiusSm}px`,
+                borderRadius: "10px",
                 color: sourceColor,
-                borderColor:
-                  sourceTone === "unavailable"
-                    ? dashboardTokens.border
-                    : dashboardTokens.borderMuted,
+                borderColor: "divider",
                 "& .MuiChip-label": {
                   px: 0.75,
                   display: "block",
@@ -107,13 +105,14 @@ export function MetricCard({
               variant="text"
               width="60%"
               height={40}
-              sx={{ bgcolor: "rgba(255, 255, 255, 0.1)" }}
+              sx={{ bgcolor: "action.hover" }}
             />
           ) : (
             <Typography
               variant="h4"
               sx={{
                 fontWeight: 700,
+                color: "text.primary",
                 fontSize: { xs: "1.5rem", sm: "1.65rem" },
                 lineHeight: 1,
                 overflowWrap: "anywhere",
@@ -127,7 +126,7 @@ export function MetricCard({
                     fontSize: "0.5em",
                     fontWeight: 500,
                     ml: 1,
-                    color: dashboardTokens.textMuted,
+                    color: "text.secondary",
                   }}
                 >
                   {unit}
@@ -138,7 +137,7 @@ export function MetricCard({
           <Typography
             variant="caption"
             sx={{
-              color: dashboardTokens.textMuted,
+              color: "text.secondary",
               fontSize: "0.72rem",
               minHeight: 18,
               overflow: "hidden",
@@ -159,7 +158,7 @@ export function MetricCard({
           {detail ? (
             <Typography
               variant="caption"
-              sx={{ color: dashboardTokens.textMuted, fontSize: "0.7rem", lineHeight: 1.45 }}
+              sx={{ color: "text.secondary", fontSize: "0.7rem", lineHeight: 1.45 }}
             >
               {detail}
             </Typography>

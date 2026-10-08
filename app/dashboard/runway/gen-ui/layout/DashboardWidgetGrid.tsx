@@ -30,7 +30,11 @@ import type {
   DashboardLayoutWidget,
   HydratedDashboardLayout,
 } from "@/lib/gen-ui/dashboard-layout-types";
-import type { GenUiPlan } from "@/lib/gen-ui/types";
+import type { GenUiPlan, GenUiWidget } from "@/lib/gen-ui/types";
+import {
+  dashboardWidgetIdentity,
+  uniqueWidgets,
+} from "@/lib/gen-ui/unique-widgets";
 import { GenUiWidgetRenderer } from "../GenUiWidgetRenderer";
 import { WidgetFrame } from "../shared/WidgetFrame";
 import type { AskChatbotMode } from "../types";
@@ -103,7 +107,7 @@ export function DashboardWidgetGrid({
   onPayloadChange,
   onAskChatbot,
 }: DashboardWidgetGridProps) {
-  const generatedWidgets = plan?.widgets ?? [];
+  const generatedWidgets = uniqueWidgets(plan?.widgets ?? []);
   const manualWidgets = payload ? sortedWidgets(payload.widgets) : [];
   const visibleManualWidgets = editing
     ? manualWidgets
@@ -144,7 +148,12 @@ export function DashboardWidgetGrid({
     onPayloadChange({ ...payload, widgets });
   };
 
-  const items = payload
+  const rawItems: Array<{
+    key: string;
+    item: DashboardLayoutWidget | null;
+    widget: GenUiWidget | null;
+    error: string | null;
+  }> = payload
     ? visibleManualWidgets.map((item) => ({
         key: item.id,
         item,
@@ -157,6 +166,22 @@ export function DashboardWidgetGrid({
         widget,
         error: null,
       }));
+
+  const seenConfigurations = new Set<string>();
+  const items = rawItems.flatMap((entry) => {
+    const identity = entry.item
+      ? dashboardWidgetIdentity(entry.item)
+      : entry.widget!.type;
+    if (seenConfigurations.has(identity)) {
+      // Keep controls available to remove old saved duplicates, but never render
+      // a second copy of their financial information.
+      return editing
+        ? [{ ...entry, widget: null, error: "This widget is already shown. Remove this duplicate from the layout." }]
+        : [];
+    }
+    seenConfigurations.add(identity);
+    return [entry];
+  });
 
   if (items.length === 0) {
     return (
@@ -171,18 +196,21 @@ export function DashboardWidgetGrid({
   }
 
   return (
+    <Box sx={{ containerType: "inline-size", containerName: "dashboard-grid", minWidth: 0, width: "100%" }}>
     <Box
       sx={{
         pt: 2,
         pb: 3,
         display: "grid",
-        gridTemplateColumns: {
-          xs: "minmax(0, 1fr)",
-          md: "repeat(2, minmax(0, 1fr))",
-          xl: "repeat(12, minmax(0, 1fr))",
+        gridTemplateColumns: "minmax(0, 1fr)",
+        "@container dashboard-grid (min-width: 720px)": {
+          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
         },
-        gridAutoRows: { xs: "auto", xl: "minmax(210px, auto)" },
-        gridAutoFlow: { xl: "dense" },
+        "@container dashboard-grid (min-width: 1200px)": {
+          gridTemplateColumns: "repeat(12, minmax(0, 1fr))",
+        },
+        alignItems: "start",
+        gridAutoRows: "auto",
         gap: { xs: 1.5, sm: 2 },
       }}
     >
@@ -209,13 +237,16 @@ export function DashboardWidgetGrid({
             data-widget-size={size}
             sx={{
               minWidth: 0,
-              height: "100%",
-              gridColumn: {
-                xs: "1 / -1",
-                md: `span ${dimensions.columnSpan}`,
-                xl: `span ${wideColumnSpan}`,
+              width: "100%",
+              boxSizing: "border-box",
+              containerType: "inline-size",
+              gridColumn: "1 / -1",
+              "@container dashboard-grid (min-width: 720px)": {
+                gridColumn: `span ${dimensions.columnSpan}`,
               },
-              gridRow: { xs: "auto", xl: `span ${dimensions.rowSpan}` },
+              "@container dashboard-grid (min-width: 1200px)": {
+                gridColumn: `span ${wideColumnSpan}`,
+              },
               border: "1px solid",
               borderColor: dashboardTokens.border,
               borderRadius: "14px",
@@ -411,6 +442,7 @@ export function DashboardWidgetGrid({
           </Box>
         );
       })}
+    </Box>
     </Box>
   );
 }

@@ -8,7 +8,7 @@ import { WidgetFrame } from "../shared/WidgetFrame";
 const toneColor = {
   positive: dashboardTokens.positive,
   warning: dashboardTokens.warning,
-  neutral: "#2B6A9B",
+  neutral: dashboardTokens.info,
 } as const;
 
 export function NarrativeWidget({ widget }: { widget: AiFinancialBriefWidget }) {

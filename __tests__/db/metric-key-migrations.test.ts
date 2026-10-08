@@ -111,6 +111,25 @@ describe('metric key migrations', () => {
     expect(companies).not.toContain('INSERT INTO public.analysed_companies')
   })
 
+  it('can safely retry analysed-company policies and triggers', () => {
+    const companies = readMigration('031_analysed_companies.sql')
+    const createdPolicies = [...companies.matchAll(/CREATE POLICY "([^"]+)"/g)]
+      .map(([, name]) => name)
+      .sort()
+    const droppedPolicies = [...companies.matchAll(/DROP POLICY IF EXISTS "([^"]+)"/g)]
+      .map(([, name]) => name)
+      .sort()
+    const createdTriggers = [...companies.matchAll(/CREATE TRIGGER ([a-z_]+)/g)]
+      .map(([, name]) => name)
+      .sort()
+    const droppedTriggers = [...companies.matchAll(/DROP TRIGGER IF EXISTS ([a-z_]+)/g)]
+      .map(([, name]) => name)
+      .sort()
+
+    expect(droppedPolicies).toEqual(createdPolicies)
+    expect(droppedTriggers).toEqual(createdTriggers)
+  })
+
   it('stores model selection without coupling legacy rows to the current catalogue', () => {
     const conversations = readMigration('032_conversation_model_selection.sql')
 

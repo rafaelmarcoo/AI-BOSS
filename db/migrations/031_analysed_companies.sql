@@ -112,22 +112,35 @@ CREATE INDEX IF NOT EXISTS idx_company_statement_lines_company_year
 ALTER TABLE public.analysed_companies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.company_statement_lines ENABLE ROW LEVEL SECURITY;
 
+-- PostgreSQL does not support CREATE POLICY IF NOT EXISTS. Drop and recreate
+-- these definitions so a safe retry can finish after an interrupted or
+-- previously applied migration without deleting company records.
+DROP POLICY IF EXISTS "Users can view shared and own analysed companies"
+  ON public.analysed_companies;
 CREATE POLICY "Users can view shared and own analysed companies"
   ON public.analysed_companies FOR SELECT
   USING (user_id IS NULL OR auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own analysed companies"
+  ON public.analysed_companies;
 CREATE POLICY "Users can insert own analysed companies"
   ON public.analysed_companies FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own analysed companies"
+  ON public.analysed_companies;
 CREATE POLICY "Users can update own analysed companies"
   ON public.analysed_companies FOR UPDATE
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own analysed companies"
+  ON public.analysed_companies;
 CREATE POLICY "Users can delete own analysed companies"
   ON public.analysed_companies FOR DELETE
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can view statement lines of visible companies"
+  ON public.company_statement_lines;
 CREATE POLICY "Users can view statement lines of visible companies"
   ON public.company_statement_lines FOR SELECT
   USING (
@@ -139,6 +152,8 @@ CREATE POLICY "Users can view statement lines of visible companies"
     )
   );
 
+DROP POLICY IF EXISTS "Users can change statement lines of own companies"
+  ON public.company_statement_lines;
 CREATE POLICY "Users can change statement lines of own companies"
   ON public.company_statement_lines FOR ALL
   USING (
@@ -158,11 +173,15 @@ CREATE POLICY "Users can change statement lines of own companies"
     )
   );
 
+DROP TRIGGER IF EXISTS update_analysed_companies_updated_at
+  ON public.analysed_companies;
 CREATE TRIGGER update_analysed_companies_updated_at
   BEFORE UPDATE ON public.analysed_companies
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_company_statement_lines_updated_at
+  ON public.company_statement_lines;
 CREATE TRIGGER update_company_statement_lines_updated_at
   BEFORE UPDATE ON public.company_statement_lines
   FOR EACH ROW
